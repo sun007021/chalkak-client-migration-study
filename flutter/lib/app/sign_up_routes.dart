@@ -142,7 +142,9 @@ void _onPreviewEvent(
 /// 미리보기는 PNG 없이 열 수 없어 그리기로 보낸다.
 String? signUpRedirect(AppDependencies dependencies, GoRouterState state) {
   final location = state.matchedLocation;
-  if (!location.startsWith(AppRoutes.terms)) return null;
+  final inSignUp =
+      location == AppRoutes.terms || location.startsWith('${AppRoutes.terms}/');
+  if (!inSignUp) return null;
   if (dependencies.signUpContext.current == null) return AppRoutes.login;
   if (location == AppRoutes.signUpPreview && state.extra is! Uint8List) {
     return AppRoutes.signUpSignature;

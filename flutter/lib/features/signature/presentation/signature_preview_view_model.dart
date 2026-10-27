@@ -66,7 +66,8 @@ final class PreviewReturnToLogin extends SignaturePreviewEvent {
 ///   `.change`). invalid는 [PreviewReturnToDrawing], expired는 [PreviewReturnToLogin],
 ///   가입의 forbidden은 error + [PreviewReturnToLogin]. 그 밖의 실패는 미리보기에 머물고
 ///   png는 그대로라 다시 누르면 처음부터 다시 시작한다.
-///   취소 결과는 상태·이벤트 없이 버린다.
+///   취소 결과(사인 변경 중 계정 전환 등)는 이벤트 없이 버리고 isSubmitting만 풀어
+///   화면이 잠기지 않게 한다. [dispose] 뒤의 취소는 상태도 바꾸지 않는다.
 /// - [dispose]: 진행 중 요청의 CancelToken을 취소하고 이후 상태·이벤트를 내지 않는다.
 /// - [onShown]: `screen_view`(모드별 preview 화면 이름)를 인스턴스당 한 번만 보낸다.
 class SignaturePreviewViewModel extends ChangeNotifier {
