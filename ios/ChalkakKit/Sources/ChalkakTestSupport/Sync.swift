@@ -56,10 +56,11 @@ public actor StubbornGate {
 }
 
 /// "불렸다"를 세고 기다리는 쪽을 깨운다. Fake가 호출 진입 때 `fire()`하고, 테스트는 `wait(atLeast:)`로 실시간·양보 횟수에 기대지 않고 기다린다.
-/// 일어나지 않을 이벤트를 기다리면 멈추므로 호출하는 스위트에 `.timeLimit`을 둔다.
+/// 기다리는 중 취소(테스트 시간 초과 등)되면 깨어나므로, 일어나지 않을 이벤트를 기다려도 멈춰 있지 않고 이어지는 단언이 실패로 끝난다.
 public actor CallSignal {
     public private(set) var count = 0
-    private var waiters: [(target: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var waiters: [(id: Int, target: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var nextID = 0
 
     public init() {}
 
@@ -72,6 +73,19 @@ public actor CallSignal {
 
     public func wait(atLeast target: Int = 1) async {
         if count >= target { return }
-        await withCheckedContinuation { waiters.append((target, $0)) }
+        nextID += 1
+        let id = nextID
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                if Task.isCancelled { continuation.resume() } else { waiters.append((id, target, continuation)) }
+            }
+        } onCancel: {
+            Task { await self.cancelWaiter(id) }
+        }
+    }
+
+    private func cancelWaiter(_ id: Int) {
+        guard let index = waiters.firstIndex(where: { $0.id == id }) else { return }
+        waiters.remove(at: index).continuation.resume()
     }
 }

@@ -152,6 +152,14 @@ class SignatureCardStateHolder(
         job = scope.launch { load() }
     }
 
+    /** A change succeeded: the GET that is in flight (if any) predates it, so it is cancelled and its answer dropped; GET again. */
+    fun reload() {
+        if (isGuest) return
+        job?.cancel()
+        _state.update { it.copy(loading = true) }
+        job = scope.launch { load() }
+    }
+
     /** Logout / account switch: drops the shown image and ignores any in-flight response. */
     fun onAccountChanged() {
         job?.cancel()
