@@ -12,7 +12,8 @@ import { KakaoCallbackScreen, LoginScreen } from '../features/auth/LoginScreen';
 import { resolveAuthGate } from '../features/boot/authGate';
 import type { AuthGateDecision } from '../features/boot/authGate';
 import { BootScreen, SplashView } from '../features/boot/BootScreen';
-import { MainShell, RecordTabRoute, useShellContext } from '../features/shell/MainShell';
+import { BottomBarSlotContext, HomePlaceholder, MainShell, TabGate, TabPlaceholder } from '../features/shell/MainShell';
+import type { TabRouteHandle } from '../features/shell/MainShell';
 import { ContainerProvider } from './AppContext';
 import type { AppContainer } from './container';
 import { DEV_SESSION_PATH } from './devSession';
@@ -20,16 +21,13 @@ import { ROUTES } from './paths';
 
 export { ROUTES };
 
+/** 전역 경로 추적이 보내는 화면. 탭 4개는 게이트를 통과해 그려진 탭 화면이 useScreenView로 보낸다(차단된 URL 진입은 0건). */
 const PATH_SCREEN_NAMES: Readonly<Record<string, ScreenName>> = {
   [ROUTES.login]: 'login',
   [ROUTES.terms]: 'terms',
-  [ROUTES.home]: 'home',
-  [ROUTES.display]: 'display',
-  [ROUTES.record]: 'record',
-  [ROUTES.settings]: 'settings',
 };
 
-/** pathname → 분석 screen_name. '/login' → 'login', '/signup/terms' → 'terms', '/home' → 'home', 탭 3종('/display', '/record', '/settings') → 같은 이름, 그 밖(부팅 '/', 콜백, 개발 화면)은 null. */
+/** pathname → 분석 screen_name(비탭 화면만). '/login' → 'login', '/signup/terms' → 'terms', 그 밖(부팅 '/', 콜백, 탭 경로, 개발 화면)은 null. */
 export function screenNameForPath(pathname: string): ScreenName | null {
   const name = PATH_SCREEN_NAMES[pathname];
   return name && (ANALYTICS_SCREEN_NAMES as readonly string[]).includes(name) ? name : null;
@@ -49,10 +47,17 @@ function devSessionRoutes(container: AppContainer): RouteObject[] {
   return [];
 }
 
+const homeHandle: TabRouteHandle = { tab: 'home' };
+const displayHandle: TabRouteHandle = { tab: 'display' };
+const recordHandle: TabRouteHandle = { tab: 'record' };
+const settingsHandle: TabRouteHandle = { tab: 'settings' };
+
 function RootLayout({ container }: { container: AppContainer }): ReactNode {
   const navigate = useNavigate();
+  const [bottomBarSlot, setBottomBarSlot] = useState<HTMLElement | null>(null);
   useEffect(
-    () => container.sessionEvents.subscribe(() => void navigate(ROUTES.login, { replace: true })),
+    // 다른 탭이 계정을 바꾸면 부팅 경로에서 인증 게이트를 다시 판정하고, 그 밖에는 로그인으로 보낸다.
+    () => container.sessionEvents.subscribe((reason) => void navigate(reason === 'changed' ? ROUTES.boot : ROUTES.login, { replace: true })),
     [container, navigate],
   );
   // 다른 탭의 로그아웃·계정 전환(REQ-NAV-022)과 문서 가시성에 따른 토스트(D-20). 정리 함수로 구독이 하나만 남는다(StrictMode 포함).
@@ -62,10 +67,13 @@ function RootLayout({ container }: { container: AppContainer }): ReactNode {
     <ContainerProvider container={container}>
       <AnalyticsProvider reporter={container.analytics}>
         <RouteScreenViewTracker resolve={screenNameForPath} />
-        <main>
-          <Outlet />
-        </main>
-        <ToastHost controller={container.toast} />
+        <BottomBarSlotContext.Provider value={bottomBarSlot}>
+          <main>
+            <Outlet />
+          </main>
+          <div ref={setBottomBarSlot} />
+          <ToastHost controller={container.toast} />
+        </BottomBarSlotContext.Provider>
       </AnalyticsProvider>
     </ContainerProvider>
   );
@@ -90,17 +98,18 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
         {
           element: <RequireSession container={container}>{(mode) => <MainShell mode={mode} />}</RequireSession>,
           children: [
-            { path: ROUTES.home, element: <HomePlaceholder /> },
-            { path: ROUTES.display, element: <TabPlaceholder testId="display.root" /> },
+            { path: ROUTES.home, handle: homeHandle, element: <HomePlaceholder /> },
+            { path: ROUTES.display, handle: displayHandle, element: <TabPlaceholder tab="display" testId="display.root" /> },
             {
               path: ROUTES.record,
+              handle: recordHandle,
               element: (
-                <RecordTabRoute>
-                  <TabPlaceholder testId="record.root" />
-                </RecordTabRoute>
+                <TabGate tab="record">
+                  <TabPlaceholder tab="record" testId="record.root" />
+                </TabGate>
               ),
             },
-            { path: ROUTES.settings, element: <TabPlaceholder testId="settings.root" /> },
+            { path: ROUTES.settings, handle: settingsHandle, element: <TabPlaceholder tab="settings" testId="settings.root" /> },
           ],
         },
         ...devSessionRoutes(container),
@@ -131,15 +140,4 @@ export function RequireSession({ container, children }: { container: AppContaine
   if (!decision) return <SplashView />;
   if (decision.destination === 'login') return <Navigate to={ROUTES.login} replace />;
   return children(decision.mode);
-}
-
-/** 메인(홈 탭) 자리표시. data-testid="home.root", 회원/게스트는 data-mode="member|guest". 홈 PR이 채운다. */
-export function HomePlaceholder(): ReactNode {
-  const { mode } = useShellContext();
-  return <div data-testid="home.root" data-mode={mode} />;
-}
-
-/** 전시·기록·설정 탭 자리표시. 각 기능 PR이 채운다. */
-function TabPlaceholder({ testId }: { testId: string }): ReactNode {
-  return <div data-testid={testId} />;
 }

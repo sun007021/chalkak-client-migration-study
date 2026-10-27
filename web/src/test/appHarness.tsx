@@ -60,7 +60,7 @@ export function makeHarness(options: { session?: StoredSession; env?: Partial<Ap
 }
 
 /** 라우터를 만들어 그린다. router.state로 현재 경로·이동 방식(PUSH/REPLACE)을 확인한다. */
-export function renderApp(container: AppContainer, initialPath = '/', options: { strict?: boolean } = {}) {
+export function renderApp(container: AppContainer, initialPath: string | { pathname: string; state?: unknown } = '/', options: { strict?: boolean } = {}) {
   const router = createMemoryRouter(createAppRoutes(container), { initialEntries: [initialPath] });
   const tree = <RouterProvider router={router} />;
   const view = render(options.strict ? <StrictMode>{tree}</StrictMode> : tree);

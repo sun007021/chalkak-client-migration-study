@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { makeHarness, renderApp } from '../../test/appHarness';
 import type { Harness } from '../../test/appHarness';
 import { watchAdded } from '../../test/domWatch';
@@ -33,11 +33,18 @@ async function goTo(tab: TabDestination, path: () => string) {
 }
 
 describe('하단 바 구성', () => {
-  it('TC-NAV-001 REQ-NAV-001 홈, 전시, 업로드 버튼, 기록, 설정 순서로 5개이고 탭 라벨은 홈/전시/기록/설정이다', async () => {
+  it('TC-NAV-001 REQ-NAV-001 탭 4개(홈, 전시, 기록, 설정)는 tablist 안에, 업로드 버튼은 tablist 밖 형제로 있고 시각 순서는 가운데 배치(CSS 격자)이다. 탭 라벨은 홈/전시/기록/설정이다', async () => {
     await openMain('member');
     const bar = screen.getByTestId('bottom-bar.root');
-    const ids = Array.from(bar.querySelectorAll('[data-testid]')).map((el) => el.getAttribute('data-testid'));
-    expect(ids).toEqual(['bottom-bar.tab-home', 'bottom-bar.tab-display', 'bottom-bar.upload-button', 'bottom-bar.tab-record', 'bottom-bar.tab-settings']);
+    const tablist = within(bar).getByRole('tablist');
+    const tabIds = Array.from(tablist.querySelectorAll('[data-testid]')).map((el) => el.getAttribute('data-testid'));
+    expect(tabIds).toEqual(['bottom-bar.tab-home', 'bottom-bar.tab-display', 'bottom-bar.tab-record', 'bottom-bar.tab-settings']);
+    const upload = screen.getByTestId('bottom-bar.upload-button');
+    expect(tablist).not.toContainElement(upload);
+    expect(bar).toContainElement(upload);
+    expect(bar.querySelectorAll('[data-testid]')).toHaveLength(5);
+    const column = (id: string) => (screen.getByTestId(id) as HTMLElement).style.gridColumn;
+    expect([column(TAB_IDS.home), column(TAB_IDS.display), column(TAB_IDS.record), column(TAB_IDS.settings)]).toEqual(['1', '2', '4', '5']); // 3열은 업로드 버튼 자리
     expect(tabButton('home')).toHaveTextContent(t('nav.tab.home'));
     expect(tabButton('display')).toHaveTextContent('전시');
     expect(tabButton('record')).toHaveTextContent('기록');
@@ -403,5 +410,100 @@ describe('분석 (D-22)', () => {
     await goTo('display', path);
     fireEvent.click(screen.getByTestId('bottom-bar.upload-button'));
     expect(screenViews(h).filter((name) => name === 'display')).toHaveLength(1);
+  });
+});
+
+describe('접근성·구조', () => {
+  it('하단 바와 토스트는 <main> 밖에 있다', async () => {
+    await openMain('guest');
+    fireEvent.click(tabButton('record'));
+    const main = screen.getByRole('main');
+    expect(main).not.toContainElement(screen.getByTestId('bottom-bar.root'));
+    expect(main).not.toContainElement(screen.getByTestId('toast.container'));
+    expect(main).toContainElement(screen.getByTestId('home.root'));
+  });
+
+  it('roving tabindex: 선택된 탭만 tabindex 0이고 따라서 바뀐다', async () => {
+    const { path } = await openMain('member');
+    expect(TABS.map((tab) => tabButton(tab).getAttribute('tabindex'))).toEqual(['0', '-1', '-1', '-1']);
+    await goTo('display', path);
+    expect(TABS.map((tab) => tabButton(tab).getAttribute('tabindex'))).toEqual(['-1', '0', '-1', '-1']);
+  });
+
+  it('좌우 방향키는 포커스만 이웃 탭으로 옮기고(양 끝 순환) 선택·이동은 하지 않는다', async () => {
+    const { path } = await openMain('member');
+    tabButton('home').focus();
+    fireEvent.keyDown(tabButton('home'), { key: 'ArrowRight' });
+    expect(tabButton('display')).toHaveFocus();
+    fireEvent.keyDown(tabButton('display'), { key: 'ArrowLeft' });
+    fireEvent.keyDown(tabButton('home'), { key: 'ArrowLeft' });
+    expect(tabButton('settings')).toHaveFocus();
+    fireEvent.keyDown(tabButton('settings'), { key: 'ArrowRight' });
+    expect(tabButton('home')).toHaveFocus();
+    expect(selectedTab()).toEqual(['home']);
+    expect(path()).toBe('/home');
+  });
+});
+
+describe('URL 판정과 히스토리 state', () => {
+  it('TC-NAV-044 끝 슬래시가 붙은 /display/ 도 전시 탭으로 열리고 선택된다', async () => {
+    await openMain('member', '/display/');
+    expect(await screen.findByTestId('display.root')).toBeInTheDocument();
+    expect(selectedTab()).toEqual(['display']);
+  });
+
+  it('TC-NAV-044 직접 /display에 들어온 첫 항목에 homeBelow:true state가 위조되어 있어도 홈 탭은 뒤로 가지 않고 replace로 간다', async () => {
+    const h = makeHarness({ session: memberSession() });
+    const { router, path } = renderApp(h.container, { pathname: '/display', state: { homeBelow: true } });
+    await screen.findByTestId('bottom-bar.root');
+    fireEvent.click(tabButton('home'));
+    await screen.findByTestId('home.root');
+    expect(router.state.historyAction).toBe('REPLACE');
+    expect(path()).toBe('/home');
+  });
+
+  it("TC-NAV-044 homeBelow가 문자열 'true'인 state는 무시한다(replace)", async () => {
+    const { router, path } = await openMain('member');
+    await goTo('display', path);
+    await act(async () => router.navigate('/settings', { replace: true, state: { homeBelow: 'true' } }));
+    await screen.findByTestId('settings.root');
+    fireEvent.click(tabButton('home'));
+    await screen.findByTestId('home.root');
+    expect(router.state.historyAction).toBe('REPLACE');
+  });
+});
+
+describe('screen_view는 게이트를 통과해 그려진 탭 화면이 보낸다', () => {
+  it('TC-NAV-016 TC-ANL-005 게스트가 /record로 직접 들어오면 record screen_view는 0건이다(홈만 1건)', async () => {
+    const h = makeHarness({ session: guestSession });
+    renderApp(h.container, '/record');
+    await screen.findByTestId('home.root');
+    expect(screenViews(h)).toEqual(['home']);
+  });
+
+  it('TC-NAV-044 TC-ANL-005 세션 없이 /display로 들어오면 display screen_view는 0건이고 로그인만 보낸다', async () => {
+    const h = makeHarness();
+    renderApp(h.container, '/display');
+    await screen.findByTestId('login.root');
+    expect(screenViews(h)).toEqual(['login']);
+  });
+
+  it('TC-ANL-017 탭이 아닌 화면(로그인)은 전역 경로 추적이 계속 보낸다', async () => {
+    const h = makeHarness();
+    renderApp(h.container, '/');
+    await screen.findByTestId('login.root');
+    expect(screenViews(h)).toEqual(['login']);
+  });
+});
+
+describe('StrictMode', () => {
+  it('TC-NAV-016 게스트 /record 직접 진입 토스트는 StrictMode에서도 1회만 요청된다', async () => {
+    const h = makeHarness({ session: guestSession });
+    const show = vi.spyOn(h.container.toast, 'show');
+    renderApp(h.container, '/record', { strict: true });
+    await screen.findByTestId('home.root');
+    expect(show).toHaveBeenCalledTimes(1);
+    expect(toastText()).toBe(t('nav.guest.record'));
+    expect(screenViews(h)).toEqual(['home']);
   });
 });

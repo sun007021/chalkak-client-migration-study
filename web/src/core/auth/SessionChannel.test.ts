@@ -40,6 +40,7 @@ beforeEach(() => {
 
 const host = { BroadcastChannel: FakeBroadcastChannel };
 const switched: SessionSignal = { previousUserId: ME, userId: OTHER_USER };
+const remote = { origin: 'other-tab', ...switched };
 
 describe('createSessionChannel (BroadcastChannel)', () => {
   it('채널 이름은 chalkak-session이다', () => {
@@ -60,9 +61,25 @@ describe('createSessionChannel (BroadcastChannel)', () => {
     expect(seenB).toEqual([switched]);
   });
 
-  it('신호는 userId(와 이전 userId)만 담고 일반 객체로 보낸다. 토큰 필드가 없다', () => {
+  it('신호는 발신 탭 표식(origin)과 userId(와 이전 userId)만 담고 일반 객체로 보낸다. 토큰 필드가 없다', () => {
     createSessionChannel(host).post({ previousUserId: ME, userId: null });
-    expect(FakeBroadcastChannel.instances[0]!.sent).toEqual([{ previousUserId: ME, userId: null }]);
+    expect(FakeBroadcastChannel.instances[0]!.sent).toEqual([{ origin: expect.any(String) as string, previousUserId: ME, userId: null }]);
+  });
+
+  it('탭마다 origin이 다르고(기본은 무작위 UUID) 같은 origin의 신호는 받지 않는다', () => {
+    const a = createSessionChannel(host);
+    const b = createSessionChannel(host);
+    a.post(switched);
+    b.post(switched);
+    const [rawA, rawB] = FakeBroadcastChannel.instances as [FakeBroadcastChannel, FakeBroadcastChannel];
+    const originOf = (raw: FakeBroadcastChannel) => (raw.sent[0] as { origin: string }).origin;
+    expect(originOf(rawA)).not.toBe(originOf(rawB));
+    const seen: SessionSignal[] = [];
+    a.subscribe((s) => seen.push(s));
+    rawA.emit({ origin: originOf(rawA), previousUserId: ME, userId: null }); // 같은 탭의 다른 객체가 보낸 것처럼
+    expect(seen).toEqual([]);
+    rawA.emit({ origin: 'someone-else', previousUserId: ME, userId: null });
+    expect(seen).toEqual([{ previousUserId: ME, userId: null }]);
   });
 
   it('모양이 틀린 메시지(문자열, null, 필드 누락, 잘못된 타입)는 무시한다', () => {
@@ -70,9 +87,9 @@ describe('createSessionChannel (BroadcastChannel)', () => {
     const seen: SessionSignal[] = [];
     channel.subscribe((s) => seen.push(s));
     const raw = FakeBroadcastChannel.instances[0]!;
-    for (const bad of ['logout', null, undefined, 42, [], {}, { userId: ME }, { previousUserId: ME }, { previousUserId: 1, userId: null }, { previousUserId: ME, userId: {} }]) raw.emit(bad);
+    for (const bad of ['logout', null, undefined, 42, [], {}, { userId: ME }, { previousUserId: ME }, { previousUserId: 1, userId: null }, { previousUserId: ME, userId: {} }, { previousUserId: ME, userId: null }, { origin: '', previousUserId: ME, userId: null }, { origin: 1, previousUserId: ME, userId: null }]) raw.emit(bad);
     expect(seen).toEqual([]);
-    raw.emit({ previousUserId: null, userId: ME });
+    raw.emit({ origin: 'tab-x', previousUserId: null, userId: ME });
     expect(seen).toEqual([{ previousUserId: null, userId: ME }]);
   });
 
@@ -81,9 +98,9 @@ describe('createSessionChannel (BroadcastChannel)', () => {
     const seen: SessionSignal[] = [];
     const off = channel.subscribe((s) => seen.push(s));
     const raw = FakeBroadcastChannel.instances[0]!;
-    raw.emit(switched);
+    raw.emit(remote);
     off();
-    raw.emit(switched);
+    raw.emit(remote);
     expect(seen).toHaveLength(1);
     expect(raw.listenerCount).toBe(0);
   });
@@ -95,7 +112,7 @@ describe('createSessionChannel (BroadcastChannel)', () => {
       throw new Error('boom');
     });
     channel.subscribe((s) => seen.push(s));
-    expect(() => FakeBroadcastChannel.instances[0]!.emit(switched)).not.toThrow();
+    expect(() => FakeBroadcastChannel.instances[0]!.emit(remote)).not.toThrow();
     expect(seen).toEqual([switched]);
   });
 

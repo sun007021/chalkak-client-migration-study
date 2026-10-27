@@ -3,14 +3,12 @@ import { ViewModel } from '../../core/state/ViewModel';
 import type { TabDestination } from '../../constants';
 import type { SessionMode } from '../boot/authGate';
 import type { GuestGate } from './GuestGate';
-import { planTabNavigation } from './tabs';
+import { canEnterTab, planTabNavigation } from './tabs';
 import type { TabHistoryState, TabNavigation } from './tabs';
 import type { UploadEntry } from './UploadEntry';
 
 export interface MainShellState {
   mode: SessionMode;
-  /** 선택 표시가 있는 탭 하나. 업로드 버튼은 선택되지 않는다. */
-  selected: TabDestination;
 }
 
 export interface MainShellDeps {
@@ -21,37 +19,28 @@ export interface MainShellDeps {
 }
 
 /**
- * 메인 셸(하단 바) 상태. URL이 탭의 근거이므로 화면은 경로가 바뀔 때마다 syncSelected로 맞춘다.
- * selectTab은 허용되면 selected를 바꾸고 이동 계획을 돌려준다(이동은 화면이 한다).
+ * 메인 셸(하단 바) 로직. 선택된 탭은 URL에서만 파생되므로(화면이 현재 탭을 넘긴다) 상태로 들고 있지 않다.
+ * selectTab은 허용되면 분석을 보내고 이동 계획을 돌려준다(이동은 화면이 한다).
  */
 export class MainShellViewModel extends ViewModel<MainShellState> {
   private readonly reselectListeners = new Set<(tab: TabDestination) => void>();
 
-  constructor(
-    private readonly deps: MainShellDeps,
-    initialTab: TabDestination = 'home',
-  ) {
-    super({ mode: deps.mode, selected: initialTab });
-  }
-
-  /** 새로고침 복원·브라우저 뒤로/앞으로로 경로가 바뀐 결과를 반영한다. 분석·게스트 판정은 하지 않는다. */
-  syncSelected(tab: TabDestination): void {
-    this.setState({ selected: tab });
+  constructor(private readonly deps: MainShellDeps) {
+    super({ mode: deps.mode });
   }
 
   /**
-   * 하단 바 탭 선택. 게스트의 기록 탭은 { kind: 'none' } + 토스트(분석 없음, selected 불변).
+   * 하단 바 탭 선택. 게스트의 기록 탭은 { kind: 'none' } + 토스트(분석 없음).
    * 허용되면 bottom_navigation_selected를 보낸다(같은 탭 재선택 포함, TC-ANL-014 임시안). 같은 탭이면 reselect 리스너를 부르고 { kind: 'none' }.
    */
-  selectTab(tab: TabDestination, history: TabHistoryState | null): TabNavigation {
-    if (tab === 'record' && !this.deps.guestGate.requireMember(this.state.mode, 'record')) return { kind: 'none' };
-    this.deps.analytics.tabSelected(tab);
-    const plan = planTabNavigation(this.state.selected, tab, history);
-    if (plan.kind === 'none') {
-      for (const listener of [...this.reselectListeners]) listener(tab);
-      return plan;
+  selectTab(current: TabDestination, tab: TabDestination, history: TabHistoryState | null): TabNavigation {
+    if (!canEnterTab(this.state.mode, tab)) {
+      this.deps.guestGate.requireMember(this.state.mode, 'record');
+      return { kind: 'none' };
     }
-    this.setState({ selected: tab });
+    this.deps.analytics.tabSelected(tab);
+    const plan = planTabNavigation(current, tab, history);
+    if (plan.kind === 'none') for (const listener of [...this.reselectListeners]) listener(tab);
     return plan;
   }
 
@@ -63,7 +52,7 @@ export class MainShellViewModel extends ViewModel<MainShellState> {
     };
   }
 
-  /** 업로드 버튼. 게스트면 토스트 nav.guest.upload, 회원이면 uploadEntry.start(). selected·분석은 건드리지 않는다. */
+  /** 업로드 버튼. 게스트면 토스트 nav.guest.upload, 회원이면 uploadEntry.start(). 분석은 보내지 않는다. */
   pressUpload(): void {
     if (this.deps.guestGate.requireMember(this.state.mode, 'upload')) this.deps.uploadEntry.start();
   }

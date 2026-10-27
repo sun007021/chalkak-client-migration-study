@@ -1,6 +1,6 @@
 import { ROUTES, screenNameForPath } from '../../app/routes';
 import { ANALYTICS_TAB_DESTINATIONS } from '../../constants';
-import { MAIN_TABS, planTabNavigation, tabForPath, tabPath } from './tabs';
+import { MAIN_TABS, adjacentTab, canEnterTab, planTabNavigation, readTabHistoryState, tabForPath, tabPath } from './tabs';
 
 describe('탭 경로', () => {
   it('REQ-NAV-001 탭은 홈, 전시, 기록, 설정 순서로 4개이고 분석 destination과 같다', () => {
@@ -22,8 +22,15 @@ describe('탭 경로', () => {
     }
   });
 
-  it('TC-ANL-005 탭 경로의 screen_view 이름은 home, display, record, settings이다', () => {
-    expect(MAIN_TABS.map((tab) => screenNameForPath(tabPath(tab)))).toEqual(['home', 'display', 'record', 'settings']);
+  it('TC-ANL-005 탭 경로는 전역 경로 추적이 보내지 않는다(게이트를 통과해 그려진 탭 화면이 보낸다)', () => {
+    expect(MAIN_TABS.map((tab) => screenNameForPath(tabPath(tab)))).toEqual([null, null, null, null]);
+  });
+
+  it('끝 슬래시는 같은 탭 경로로 본다: /display/ → display, 루트 /는 탭이 아니다', () => {
+    expect(tabForPath('/display/')).toBe('display');
+    expect(tabForPath('/home/')).toBe('home');
+    expect(tabForPath('/')).toBeNull();
+    expect(tabForPath('//')).toBeNull();
   });
 });
 
@@ -48,5 +55,35 @@ describe('탭 전환 히스토리 정책 (push vs replace)', () => {
     expect(planTabNavigation('settings', 'home', { homeBelow: true })).toEqual({ kind: 'back' });
     expect(planTabNavigation('settings', 'home', { homeBelow: false })).toEqual({ kind: 'replace', to: '/home', state: { homeBelow: false } });
     expect(planTabNavigation('record', 'home', null)).toEqual({ kind: 'replace', to: '/home', state: { homeBelow: false } });
+  });
+});
+
+describe('접근 판정과 히스토리 state', () => {
+  it('D-05 canEnterTab: 게스트는 기록만 막히고 회원은 모두 열린다', () => {
+    for (const tab of MAIN_TABS) {
+      expect(canEnterTab('member', tab)).toBe(true);
+      expect(canEnterTab('guest', tab)).toBe(tab !== 'record');
+    }
+  });
+
+  it('readTabHistoryState: 앱이 만든 항목(key가 default가 아님)의 boolean homeBelow만 읽는다', () => {
+    expect(readTabHistoryState({ homeBelow: true }, 'k1')).toEqual({ homeBelow: true });
+    expect(readTabHistoryState({ homeBelow: false }, 'k1')).toEqual({ homeBelow: false });
+    expect(readTabHistoryState({ homeBelow: true }, 'default')).toBeNull(); // 직접 진입한 첫 항목의 state는 믿지 않는다
+    expect(readTabHistoryState({ homeBelow: 'true' }, 'k1')).toBeNull();
+    expect(readTabHistoryState({ homeBelow: 1 }, 'k1')).toBeNull();
+    expect(readTabHistoryState({}, 'k1')).toBeNull();
+    expect(readTabHistoryState(null, 'k1')).toBeNull();
+    expect(readTabHistoryState('homeBelow', 'k1')).toBeNull();
+  });
+
+  it('adjacentTab: 좌우 방향키로 이웃 탭(양 끝 순환), Home/End는 양 끝, 그 밖의 키는 null', () => {
+    expect(adjacentTab('home', 'ArrowRight')).toBe('display');
+    expect(adjacentTab('settings', 'ArrowRight')).toBe('home');
+    expect(adjacentTab('home', 'ArrowLeft')).toBe('settings');
+    expect(adjacentTab('record', 'ArrowLeft')).toBe('display');
+    expect(adjacentTab('display', 'Home')).toBe('home');
+    expect(adjacentTab('display', 'End')).toBe('settings');
+    expect(adjacentTab('display', 'Enter')).toBeNull();
   });
 });

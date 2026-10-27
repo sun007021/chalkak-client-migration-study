@@ -34,7 +34,6 @@ import { MainShellViewModel } from '../features/shell/MainShellViewModel';
 import { NoopUploadEntry } from '../features/shell/UploadEntry';
 import type { UploadEntry } from '../features/shell/UploadEntry';
 import type { SessionMode } from '../features/boot/authGate';
-import type { TabDestination } from '../constants';
 import { BootViewModel } from '../features/boot/BootViewModel';
 import { NoopHomePreloader } from '../features/boot/HomePreloader';
 import type { HomePreloader } from '../features/boot/HomePreloader';
@@ -100,7 +99,7 @@ export interface AppContainer {
   createLoginViewModel(): LoginViewModel;
   createBootViewModel(): BootViewModel;
   /** 메인 셸이 마운트될 때마다 새 ViewModel을 만든다. */
-  createMainShellViewModel(mode: SessionMode, initialTab?: TabDestination): MainShellViewModel;
+  createMainShellViewModel(mode: SessionMode): MainShellViewModel;
 }
 
 /**
@@ -117,7 +116,17 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
   const clock = options.clock ?? new SystemClock();
   const logger = options.logger ?? new ConsoleLogger();
   const ids = options.ids ?? new RandomIdGenerator();
-  const sessionChannel: SessionChannel = options.sessionChannel ?? createSessionChannel(); // store와 crossTabSync가 같은 객체를 쓴다
+  const holder: { sync?: CrossTabSessionSync } = {};
+  const rawChannel = options.sessionChannel ?? createSessionChannel();
+  // store와 crossTabSync가 같은 객체를 쓴다. 이 탭이 보내는 신호는 crossTabSync가 "이 탭이 아는 userId"를 갱신하는 데도 쓴다.
+  const sessionChannel: SessionChannel = {
+    post: (signal) => {
+      holder.sync?.noteLocalUser(signal.userId);
+      rawChannel.post(signal);
+    },
+    subscribe: (listener) => rawChannel.subscribe(listener),
+    close: () => rawChannel.close(),
+  };
   const store = options.store ?? new IndexedDbSessionStore({ indexedDB: options.indexedDB, channel: sessionChannel });
   const lock = options.lock ?? new WebLocksRefreshLock();
 
@@ -159,6 +168,15 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
   const devSessionEnabled = options.devSessionEnabled ?? DEV_SESSION_ENABLED;
   const signupDraft = new SignupDraft();
   sessionEvents.subscribe(() => signupDraft.clear()); // 로그아웃·만료 뒤에는 가입 중이던 자격 증명을 남기지 않는다
+  const crossTabSync = new CrossTabSessionSync({
+    channel: sessionChannel,
+    store,
+    userCaches,
+    sessionEvents,
+    document: globalThis.document,
+    window: globalThis.window,
+  });
+  holder.sync = crossTabSync;
   const container: AppContainer = {
     clock,
     logger,
@@ -179,7 +197,7 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     devSessionEnabled,
     guestGate: new GuestGate({ toast }),
     uploadEntry: options.uploadEntry ?? new NoopUploadEntry(),
-    crossTabSync: new CrossTabSessionSync({ channel: sessionChannel, userCaches, sessionEvents }),
+    crossTabSync,
     devSessionDeps: devSessionEnabled ? { refresher, store, userCaches } : null,
     createLoginViewModel() {
       return new LoginViewModel({
@@ -193,8 +211,8 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
         logger: this.logger,
       });
     },
-    createMainShellViewModel(mode, initialTab) {
-      return new MainShellViewModel({ mode, guestGate: this.guestGate, analytics: this.analytics, uploadEntry: this.uploadEntry }, initialTab);
+    createMainShellViewModel(mode) {
+      return new MainShellViewModel({ mode, guestGate: this.guestGate, analytics: this.analytics, uploadEntry: this.uploadEntry });
     },
     createBootViewModel() {
       return new BootViewModel({ store: this.store, clock: this.clock, preloader: this.preloader, logger: this.logger });
