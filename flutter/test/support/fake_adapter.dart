@@ -13,7 +13,7 @@ class RecordedRequest {
     required this.method,
     required this.uri,
     required this.headers,
-    required this.body,
+    required this.bodyBytes,
     required this.connectTimeout,
     required this.receiveTimeout,
     required this.followRedirects,
@@ -25,13 +25,21 @@ class RecordedRequest {
 
   /// 소문자 키.
   final Map<String, String> headers;
-  final String? body;
+
+  /// 요청 본문 원본 바이트(PNG 같은 이진 본문 포함). 본문이 없으면 null.
+  final Uint8List? bodyBytes;
   final Duration? connectTimeout;
   final Duration? receiveTimeout;
   final bool followRedirects;
 
   /// 요청이 어댑터에 도착한 (가상) 시각.
   final DateTime at;
+
+  /// 본문을 UTF-8 문자열로 본 값. 이진 본문은 깨진 문자로 바뀌므로 [bodyBytes]를 쓴다.
+  String? get body {
+    final b = bodyBytes;
+    return b == null ? null : utf8.decode(b, allowMalformed: true);
+  }
 
   String get path => uri.path;
   String? header(String name) => headers[name.toLowerCase()];
@@ -162,13 +170,13 @@ class FakeAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
-    String? body;
+    Uint8List? body;
     if (requestStream != null) {
-      final bytes = <int>[];
+      final bytes = BytesBuilder(copy: false);
       await for (final chunk in requestStream) {
-        bytes.addAll(chunk);
+        bytes.add(chunk);
       }
-      body = utf8.decode(bytes);
+      body = bytes.takeBytes();
     }
     final rec = RecordedRequest(
       method: options.method.toUpperCase(),
@@ -177,7 +185,7 @@ class FakeAdapter implements HttpClientAdapter {
         for (final e in options.headers.entries)
           e.key.toLowerCase(): '${e.value}',
       },
-      body: body,
+      bodyBytes: body,
       connectTimeout: options.connectTimeout,
       receiveTimeout: options.receiveTimeout,
       followRedirects: options.followRedirects,

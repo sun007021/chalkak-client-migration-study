@@ -1,5 +1,3 @@
-import 'dart:ui' show Tristate;
-
 import 'package:chalkak/app/app_dependencies.dart';
 import 'package:chalkak/app/chalkak_app.dart';
 import 'package:chalkak/core/auth/session.dart';
@@ -10,12 +8,20 @@ import 'package:chalkak/features/auth/domain/user_data_cleaner.dart';
 import 'package:chalkak/features/boot/domain/auth_gate.dart';
 import 'package:chalkak/features/boot/domain/pending_navigation.dart';
 import 'package:chalkak/features/boot/domain/update_gate.dart';
+import 'package:chalkak/features/onboarding/data/api_sign_up_repository.dart';
+import 'package:chalkak/features/onboarding/domain/sign_up_context.dart';
+import 'package:chalkak/features/onboarding/domain/sign_up_use_case.dart';
+import 'package:chalkak/features/signature/data/api_signature_repository.dart';
+import 'package:chalkak/features/signature/data/api_signature_uploader.dart';
+import 'package:chalkak/features/signature/domain/change_signature_use_case.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'auth_fakes.dart';
 import 'fake_analytics_tracker.dart';
-import 'fake_async_helpers.dart' show atFixtureNow;
+import 'onboarding_fakes.dart';
+
+export 'ui_helpers.dart';
 
 /// Fake로 채운 [AppDependencies]와 그 Fake들에 접근하는 창구. 위젯 테스트용.
 class AppHarness {
@@ -32,6 +38,8 @@ class AppHarness {
     );
     final repository = ApiAuthRepository(client: http.client);
     final cleaner = CompositeUserDataCleaner([userData, pendingNavigation]);
+    final signatureRepository = ApiSignatureRepository(client: http.client);
+    final signatureUploader = ApiSignatureUploader(client: http.client);
     dependencies = AppDependencies(
       sessions: http.sessions,
       analytics: analytics,
@@ -61,6 +69,23 @@ class AppHarness {
         repository: repository,
         cleaner: cleaner,
       ),
+      signUpContext: signUpContext,
+      signUpUseCase: SignUpUseCase(
+        repository: ApiSignUpRepository(client: http.client),
+        uploader: signatureUploader,
+        authRepository: repository,
+        sessions: http.sessions,
+        pushRegistrar: push,
+      ),
+      changeSignatureUseCase: ChangeSignatureUseCase(
+        repository: signatureRepository,
+        uploader: signatureUploader,
+        sessions: http.sessions,
+      ),
+      signatureRepository: signatureRepository,
+      signatureRenderer: renderer,
+      externalLinkLauncher: externalLinks,
+      legalWebViewBuilder: fakeLegalWebView,
     );
   }
 
@@ -72,6 +97,9 @@ class AppHarness {
   final FakeUserDataCleaner userData = FakeUserDataCleaner();
   final FakeSocialLoginClient kakao = FakeSocialLoginClient();
   final FakeAnalyticsTracker analytics = FakeAnalyticsTracker();
+  final SignUpContext signUpContext = SignUpContext();
+  final FakeSignatureRenderer renderer = FakeSignatureRenderer();
+  final FakeExternalLinkLauncher externalLinks = FakeExternalLinkLauncher();
   final List<String> pushNavigations = [];
   late final UpdateGate updateGate;
   late final PendingNavigation pendingNavigation;
@@ -79,8 +107,6 @@ class AppHarness {
 
   Widget get app => ChalkakApp(dependencies: dependencies);
 }
-
-Finder byId(String id) => find.byKey(Key(id));
 
 /// 앱을 띄우고 [frames]프레임(16ms)을 흘린다. 진행 표시가 계속 도는 화면이 있어
 /// pumpAndSettle은 쓰지 않는다.
@@ -91,24 +117,4 @@ Future<void> pumpApp(
 }) async {
   await tester.pumpWidget(h.app);
   await settleUi(tester, frames: frames);
-}
-
-Future<void> settleUi(WidgetTester tester, {int frames = 10}) async {
-  for (var i = 0; i < frames; i++) {
-    await tester.pump(const Duration(milliseconds: 16));
-  }
-}
-
-/// `Semantics.enabled` 상태. testids.md §2: 버튼은 enabled를 접근성 속성으로 노출한다.
-bool isEnabled(WidgetTester tester, String id) =>
-    tester
-        .getSemantics(byId(id))
-        .getSemanticsData()
-        .flagsCollection
-        .isEnabled ==
-    Tristate.isTrue;
-
-/// 위젯 테스트도 `clock.now()`를 FIXTURE_NOW로 고정해야 세션 만료 판정이 fixture와 맞는다.
-void widgetTest(String name, Future<void> Function(WidgetTester tester) body) {
-  testWidgets(name, (tester) => atFixtureNow(() => body(tester)));
 }
