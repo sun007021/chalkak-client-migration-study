@@ -16,19 +16,19 @@
 | HOME | [home.md](catalog/home.md) | 60 | 2 | 2 | 0/60 | 0/60 | 0/60 | 0/60 | 0/60 |
 | BANR | [home.md](catalog/home.md) | 31 | 1 | 1 | 0/31 | 0/31 | 0/31 | 0/31 | 0/31 |
 | DISP | [display-feed.md](catalog/display-feed.md) | 62 | 1 | 1 | 0/62 | 0/62 | 0/62 | 0/62 | 0/62 |
-| FEED | [display-feed.md](catalog/display-feed.md) | 58 | 2 | 2 | 0/58 | 0/58 | 0/58 | 0/58 | 0/58 |
+| FEED | [display-feed.md](catalog/display-feed.md) | 58 | 2 | 2 | 0/58 | 0/58 | 7/58 | 0/58 | 0/58 |
 | LIKE | [display-feed.md](catalog/display-feed.md) | 35 | 1 | 1 | 0/35 | 0/35 | 0/35 | 0/35 | 0/35 |
-| UPL | [upload-edit.md](catalog/upload-edit.md) | 92 | 3 | 3 | 0/92 | 0/92 | 0/92 | 0/92 | 0/92 |
+| UPL | [upload-edit.md](catalog/upload-edit.md) | 92 | 3 | 3 | 0/92 | 0/92 | 3/92 | 0/92 | 0/92 |
 | EDIT | [upload-edit.md](catalog/upload-edit.md) | 51 | 4 | 4 | 0/51 | 0/51 | 0/51 | 0/51 | 0/51 |
 | AIR | [ai-review.md](catalog/ai-review.md) | 61 | 2 | 2 | 0/61 | 0/61 | 0/61 | 0/61 | 0/61 |
 | REC | [record.md](catalog/record.md) | 45 | 2 | 2 | 0/45 | 0/45 | 0/45 | 0/45 | 0/45 |
 | NOTI | [notification-push.md](catalog/notification-push.md) | 57 | 2 | 2 | 0/57 | 0/57 | 0/57 | 0/57 | 0/57 |
 | PUSH | [notification-push.md](catalog/notification-push.md) | 77 | 4 | 6 | 0/77 | 0/77 | 0/77 | 0/77 | 0/77 |
 | SET | [settings-feedback.md](catalog/settings-feedback.md) | 56 | 3 | 3 | 0/56 | 0/56 | 0/56 | 0/56 | 0/56 |
-| FDBK | [settings-feedback.md](catalog/settings-feedback.md) | 37 | 2 | 2 | 0/37 | 0/37 | 0/37 | 0/37 | 0/37 |
+| FDBK | [settings-feedback.md](catalog/settings-feedback.md) | 37 | 2 | 2 | 0/37 | 0/37 | 1/37 | 0/37 | 0/37 |
 | NET | [common-infra.md](catalog/common-infra.md) | 62 | 2 | 2 | 0/62 | 0/62 | 0/62 | 0/62 | 0/62 |
-| TIME | [common-infra.md](catalog/common-infra.md) | 30 | 0 | 0 | 0/30 | 0/30 | 0/30 | 0/30 | 0/30 |
-| ANL | [common-infra.md](catalog/common-infra.md) | 25 | 0 | 0 | 0/25 | 0/25 | 0/25 | 0/25 | 0/25 |
+| TIME | [common-infra.md](catalog/common-infra.md) | 30 | 0 | 0 | 0/30 | 0/30 | 20/30 | 0/30 | 0/30 |
+| ANL | [common-infra.md](catalog/common-infra.md) | 25 | 0 | 0 | 0/25 | 0/25 | 8/25 | 0/25 | 0/25 |
 
 ## 허용된 차이
 
