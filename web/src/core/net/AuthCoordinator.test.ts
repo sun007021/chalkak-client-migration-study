@@ -47,12 +47,12 @@ describe('prepare (Authorization 헤더 결정)', () => {
     expect(await auth.prepare()).toEqual({ authorization: 'Bearer fixture-access-token-1', userId: ME, accessTokenAtRequest: 'fixture-access-token-1', refreshTokenAtRequest: 'fixture-refresh-token-1', canRefresh: true });
   });
 
-  it('TC-NET-014 만료된 access token은 헤더에서 빼지만 갱신 자격(canRefresh)은 유지한다', async () => {
+  it('TC-NET-014 TC-AUTH-054 만료된 access token은 헤더에서 빼지만 갱신 자격(canRefresh)은 유지한다', async () => {
     const { auth } = setup(memberSession({ accessTokenExpiresAt: NOW - 1 }));
     expect(await auth.prepare()).toEqual({ authorization: null, userId: ME, accessTokenAtRequest: 'fixture-access-token-1', refreshTokenAtRequest: 'fixture-refresh-token-1', canRefresh: true });
   });
 
-  it('TC-NET-014 만료 시각 정각(now == expiresAt)도 만료로 본다', async () => {
+  it('TC-NET-014 TC-AUTH-054 만료 시각 정각(now == expiresAt)도 만료로 본다', async () => {
     const { auth } = setup(memberSession({ accessTokenExpiresAt: NOW }));
     expect((await auth.prepare()).authorization).toBeNull();
   });
@@ -253,7 +253,7 @@ describe('handleReauthenticationRequired (일반 API가 받은 401 REAUTHENTICAT
 });
 
 describe('세션이 바뀐 요청 (계정 전환, 다른 요청·탭의 갱신)', () => {
-  it('TC-NET-057 요청 뒤 다른 계정으로 전환됐으면 refresh도 retry도 하지 않고 SessionChangedError로 실패한다', async () => {
+  it('TC-NET-057 TC-AUTH-042 요청 뒤 다른 계정으로 전환됐으면 refresh도 retry도 하지 않고 SessionChangedError로 실패한다', async () => {
     const { auth, refresher, store } = setup();
     const ctx = await auth.prepare();
     await store.write({ ...memberSession({ accessToken: 'b-access', refreshToken: 'b-refresh' }), userId: OTHER_USER });

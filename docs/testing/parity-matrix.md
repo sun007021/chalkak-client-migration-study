@@ -8,16 +8,16 @@
 
 | 영역 | 카탈로그 | TC | A 포함 | AG | iOS | Android | Flutter | RN | Web |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| BOOT | [boot-auth.md](catalog/boot-auth.md) | 39 | 2 | 2 | 30/39 | 27/39 | 34/39 | 33/39 | 0/39 |
-| AUTH | [boot-auth.md](catalog/boot-auth.md) | 65 | 5 | 5 | 48/65 | 52/65 | 56/65 | 53/65 | 0/65 |
+| BOOT | [boot-auth.md](catalog/boot-auth.md) | 39 | 2 | 2 | 30/39 | 27/39 | 34/39 | 33/39 | 17/39 |
+| AUTH | [boot-auth.md](catalog/boot-auth.md) | 65 | 5 | 5 | 48/65 | 52/65 | 56/65 | 53/65 | 54/65 |
 | ONB | [onboarding-signature.md](catalog/onboarding-signature.md) | 52 | 3 | 2 | 0/52 | 0/52 | 46/52 | 0/52 | 0/52 |
 | SIGN | [onboarding-signature.md](catalog/onboarding-signature.md) | 45 | 2 | 2 | 0/45 | 0/45 | 42/45 | 0/45 | 0/45 |
 | NAV | [navigation.md](catalog/navigation.md) | 50 | 0 | 0 | 0/50 | 0/50 | 0/50 | 0/50 | 0/50 |
 | HOME | [home.md](catalog/home.md) | 60 | 2 | 2 | 0/60 | 0/60 | 0/60 | 0/60 | 0/60 |
 | BANR | [home.md](catalog/home.md) | 31 | 1 | 1 | 0/31 | 0/31 | 0/31 | 0/31 | 0/31 |
-| DISP | [display-feed.md](catalog/display-feed.md) | 62 | 1 | 1 | 0/62 | 0/62 | 0/62 | 0/62 | 0/62 |
-| FEED | [display-feed.md](catalog/display-feed.md) | 58 | 2 | 2 | 0/58 | 3/58 | 7/58 | 0/58 | 0/58 |
-| LIKE | [display-feed.md](catalog/display-feed.md) | 35 | 1 | 1 | 0/35 | 0/35 | 0/35 | 0/35 | 0/35 |
+| DISP | [display-feed.md](catalog/display-feed.md) | 62 | 1 | 1 | 23/62 | 0/62 | 0/62 | 0/62 | 0/62 |
+| FEED | [display-feed.md](catalog/display-feed.md) | 58 | 2 | 2 | 31/58 | 3/58 | 7/58 | 0/58 | 0/58 |
+| LIKE | [display-feed.md](catalog/display-feed.md) | 35 | 1 | 1 | 31/35 | 0/35 | 0/35 | 0/35 | 0/35 |
 | UPL | [upload-edit.md](catalog/upload-edit.md) | 92 | 3 | 3 | 0/92 | 3/92 | 3/92 | 0/92 | 0/92 |
 | EDIT | [upload-edit.md](catalog/upload-edit.md) | 51 | 4 | 4 | 0/51 | 0/51 | 0/51 | 0/51 | 0/51 |
 | AIR | [ai-review.md](catalog/ai-review.md) | 61 | 2 | 2 | 0/61 | 0/61 | 0/61 | 0/61 | 0/61 |
