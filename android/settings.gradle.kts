@@ -17,6 +17,7 @@ dependencyResolutionManagement {
 rootProject.name = "chalkak-android"
 
 include(":core:common")
+include(":core:network")
 
 // The Android :app module is NOT part of the scaffold PR. It is included only when an
 // Android SDK is available (local.properties `sdk.dir` or env ANDROID_HOME), so that

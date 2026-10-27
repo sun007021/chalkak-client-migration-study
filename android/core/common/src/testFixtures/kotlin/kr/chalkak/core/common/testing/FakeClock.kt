@@ -7,7 +7,7 @@ import java.time.Instant
 
 /** Settable [Clock] for tests. Starts at FIXTURE_NOW by default. Never sleeps. */
 class FakeClock(start: Instant = Fixtures.fixtureNow) : Clock {
-    private var current: Instant = start
+    @Volatile private var current: Instant = start
     override fun now(): Instant = current
 
     fun set(instant: Instant) { current = instant }
