@@ -29,6 +29,7 @@ import '../features/signature/data/api_signature_repository.dart';
 import '../features/signature/data/api_signature_uploader.dart';
 import '../features/signature/data/ui_signature_renderer.dart';
 import '../features/signature/domain/change_signature_use_case.dart';
+import '../features/navigation/main_dependencies_factory.dart';
 import 'app_dependencies.dart';
 
 /// 실제 구현으로 [AppDependencies]를 조립한다. 아직 구현이 없는 기능(홈, 푸시)은
@@ -103,6 +104,7 @@ AppDependencies buildAppDependencies(AppConfig config) {
     signatureRenderer: const UiSignatureRenderer(),
     externalLinkLauncher: const UrlLauncherExternalLinkLauncher(),
     legalWebViewBuilder: LegalWebView.build,
+    main: buildMainDependencies(client),
   );
 }
 
