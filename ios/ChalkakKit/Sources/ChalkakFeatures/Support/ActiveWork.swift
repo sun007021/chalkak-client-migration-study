@@ -10,7 +10,8 @@ final class ActiveWork {
         let work = Task { @MainActor in await body() }
         task = work
         await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
-        task = nil
+        // 그 사이 새 작업이 시작됐다면 지우지 않는다.
+        if task == work { task = nil }
     }
 
     func cancel() { task?.cancel() }
