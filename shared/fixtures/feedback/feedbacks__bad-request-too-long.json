@@ -1,0 +1,4 @@
+{
+  "errorCode": "BUSINESS_ERROR",
+  "message": "피드백 내용은 1000자 이하여야 합니다."
+}

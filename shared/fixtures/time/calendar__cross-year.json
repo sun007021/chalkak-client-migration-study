@@ -1,0 +1,50 @@
+{
+  "_kind": "case",
+  "cases": [
+    {
+      "clock": "2026-10-27T03:00:00Z",
+      "weekStart": "2026-10-25",
+      "weekEnd": "2026-10-31",
+      "requests": [
+        {
+          "year": 2026,
+          "month": 10
+        }
+      ]
+    },
+    {
+      "clock": "2026-12-30T03:00:00Z",
+      "weekStart": "2026-12-27",
+      "weekEnd": "2027-01-02",
+      "requests": [
+        {
+          "year": 2026,
+          "month": 12
+        },
+        {
+          "year": 2027,
+          "month": 1
+        }
+      ],
+      "responses": {
+        "2026-12": {
+          "year": 2026,
+          "month": 12,
+          "posts": [
+            {
+              "topicDate": "2026-12-31",
+              "postId": "22222222-2222-4222-8222-222222222234",
+              "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222234/thumbnail.webp",
+              "status": "APPROVED"
+            }
+          ]
+        },
+        "2027-01": {
+          "year": 2027,
+          "month": 1,
+          "posts": []
+        }
+      }
+    }
+  ]
+}

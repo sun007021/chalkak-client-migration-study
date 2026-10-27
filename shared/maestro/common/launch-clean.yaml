@@ -1,0 +1,16 @@
+# Subflow: reset mock server, select scenario, launch the app with cleared state.
+# Usage:
+#   - runFlow:
+#       file: ../common/launch-clean.yaml
+#       env:
+#         SCENARIO: default      # shared/mock-server/scenarios/<name>.json
+appId: ${APP_ID}
+---
+- runScript:
+    file: set-scenario.js
+    env:
+      SCENARIO: ${SCENARIO}
+- launchApp:
+    clearState: true
+    clearKeychain: true   # iOS only; ignored on Android
+    stopApp: true

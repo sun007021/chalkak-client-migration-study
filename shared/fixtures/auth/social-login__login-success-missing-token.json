@@ -1,0 +1,7 @@
+{
+  "status": "LOGIN_SUCCESS",
+  "userId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  "accessToken": "fixture-access-token-1",
+  "expiresIn": 900,
+  "refreshTokenExpiresIn": 2592000
+}

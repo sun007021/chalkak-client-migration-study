@@ -1,0 +1,14 @@
+{
+  "_kind": "case",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhYWFhYWFhYS1hYWFhLTRhYWEtOGFhYS1hYWFhYWFhYWFhYWEiLCJzY29wZSI6IlVTRVIiLCJpYXQiOjE3OTMwNzAwMDAsImV4cCI6MTc5MzA3MTgwMCwic2Vzc2lvbl9pZCI6Ijg4ODg4ODg4LTg4ODgtNDg4OC04ODg4LTg4ODg4ODg4ODgwMSJ9.fixture-unsigned-signature",
+  "payload": {
+    "sub": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "scope": "USER",
+    "iat": 1793070000,
+    "exp": 1793071800,
+    "session_id": "88888888-8888-4888-8888-888888888801"
+  },
+  "expect": {
+    "hasSessionId": true
+  }
+}

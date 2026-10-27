@@ -1,0 +1,7 @@
+{
+  "uploadId": "55555555-5555-4555-8555-555555555501",
+  "uploadUrl": "http://localhost:4010/__upload/55555555-5555-4555-8555-555555555501?X-Amz-Expires=300",
+  "expiresInSeconds": 300,
+  "contentType": "image/webp",
+  "maxBytes": 5242880
+}

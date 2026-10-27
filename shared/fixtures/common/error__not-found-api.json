@@ -1,0 +1,4 @@
+{
+  "errorCode": "BUSINESS_ERROR",
+  "message": "요청한 API를 찾을 수 없습니다."
+}

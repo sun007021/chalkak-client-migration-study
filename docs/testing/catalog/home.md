@@ -129,7 +129,7 @@
 | home/posts-today__403-banned.json | GET /posts/today | 403 | FORBIDDEN "차단된 회원입니다." |
 | home/posts-today__401-unauthorized.json | GET /posts/today | 401 | UNAUTHORIZED "유효하지 않은 인증 정보입니다." |
 | home/posts-today__500-server-error.json | GET /posts/today | 500 | INTERNAL_ERROR "서버에서 요청을 처리하지 못했습니다." |
-| home/topics__open-2026-10-27.json | GET /topics?date=2026-10-27 | 200 | phase=OPEN, startsAt 2026-10-26T15:00:00Z, endsAt 2026-10-27T15:00:00Z, title="우산" |
+| home/topics__open-2026-10-27.json | GET /topics?date=2026-10-27 | 200 | phase=OPEN, startsAt 2026-10-26T15:00:00Z, endsAt 2026-10-27T15:00:00Z, title="가을 하늘" |
 | home/topics__open-2026-10-26.json | GET /topics?date=2026-10-26 | 200 | 어제 주제, phase=CLOSED |
 | home/topics__open-2026-10-28.json | GET /topics?date=2026-10-28 | 200 | 자정 이후 새 주제(자정 재로드 TC용) |
 | home/topics__404-not-found.json | GET /topics?date=… | 404 | BUSINESS_ERROR "주제를 찾을 수 없습니다." |

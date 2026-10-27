@@ -1,0 +1,4 @@
+{
+  "_raw": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Error><Code>SignatureDoesNotMatch</Code><Message>The request signature we calculated does not match the signature you provided. Check your key and signing method.</Message><RequestId>FIXTURE0000000001</RequestId></Error>",
+  "_contentType": "application/xml"
+}

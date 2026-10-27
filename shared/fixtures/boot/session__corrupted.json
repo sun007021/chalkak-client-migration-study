@@ -1,0 +1,16 @@
+{
+  "_kind": "storage",
+  "stored": {
+    "userId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "accessToken": "!!undecryptable-ciphertext!!",
+    "refreshToken": "!!undecryptable-ciphertext!!",
+    "accessTokenExpiresAt": "2026-10-27T03:15:00Z",
+    "refreshTokenExpiresAt": "2026-11-26T03:00:00Z"
+  },
+  "corrupted": true,
+  "expect": {
+    "destination": "login",
+    "storageCleared": true,
+    "crash": false
+  }
+}

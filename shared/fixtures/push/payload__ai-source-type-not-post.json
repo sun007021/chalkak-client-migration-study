@@ -1,0 +1,14 @@
+{
+  "_kind": "push",
+  "notification": {
+    "title": "AI 피드백이 도착했어요",
+    "body": "찰칵AI가 사진을 분석했어요."
+  },
+  "data": {
+    "eventId": "66666666-6666-4666-8666-666666666610",
+    "notificationId": "33333333-3333-4333-8333-333333333310",
+    "type": "AI_REVIEW_COMPLETED",
+    "sourceType": "NOTICE",
+    "sourceId": "22222222-2222-4222-8222-222222222201"
+  }
+}

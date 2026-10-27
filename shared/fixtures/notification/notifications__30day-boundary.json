@@ -1,0 +1,29 @@
+{
+  "currentPage": 1,
+  "pageSize": 20,
+  "hasNext": false,
+  "notifications": [
+    {
+      "id": "33333333-3333-4333-8333-333333333301",
+      "type": "POST_APPROVED",
+      "sourceType": "POST",
+      "sourceId": "22222222-2222-4222-8222-222222222201",
+      "title": "사진이 승인되었어요",
+      "body": "오늘의 사진이 전시에 올라갔어요.",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222201/thumbnail.webp",
+      "readAt": null,
+      "createdAt": "2026-09-27T03:00:00Z"
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333302",
+      "type": "POST_REJECTED",
+      "sourceType": "POST",
+      "sourceId": "22222222-2222-4222-8222-222222222201",
+      "title": "사진이 반려되었어요",
+      "body": "자세한 사유를 확인해 주세요.",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222201/thumbnail.webp",
+      "readAt": null,
+      "createdAt": "2026-08-01T03:00:00Z"
+    }
+  ]
+}

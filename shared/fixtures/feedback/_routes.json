@@ -1,0 +1,57 @@
+[
+  {
+    "fixture": "feedback/feedbacks__bad-request-blank.json",
+    "method": "POST",
+    "path": "/api/v1/feedbacks",
+    "status": 400,
+    "tc": [
+      "TC-FDBK-021"
+    ]
+  },
+  {
+    "fixture": "feedback/feedbacks__bad-request-too-long.json",
+    "method": "POST",
+    "path": "/api/v1/feedbacks",
+    "status": 400,
+    "tc": [
+      "TC-FDBK-021"
+    ]
+  },
+  {
+    "fixture": "feedback/feedbacks__created.json",
+    "method": "POST",
+    "path": "/api/v1/feedbacks",
+    "status": 201,
+    "tc": [
+      "TC-FDBK-006",
+      "TC-FDBK-008",
+      "TC-FDBK-012",
+      "TC-FDBK-015",
+      "TC-FDBK-016",
+      "TC-FDBK-017",
+      "TC-FDBK-019",
+      "TC-FDBK-020",
+      "TC-FDBK-026",
+      "TC-FDBK-028",
+      "TC-FDBK-030"
+    ]
+  },
+  {
+    "fixture": "feedback/feedbacks__internal-error.json",
+    "method": "POST",
+    "path": "/api/v1/feedbacks",
+    "status": 500,
+    "tc": [
+      "TC-FDBK-024"
+    ]
+  },
+  {
+    "fixture": "feedback/feedbacks__unauthorized.json",
+    "method": "POST",
+    "path": "/api/v1/feedbacks",
+    "status": 401,
+    "tc": [
+      "TC-FDBK-022"
+    ]
+  }
+]

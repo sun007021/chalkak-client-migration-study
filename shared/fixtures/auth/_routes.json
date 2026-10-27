@@ -1,0 +1,212 @@
+[
+  {
+    "fixture": "auth/logout__internal-error.json",
+    "method": "POST",
+    "path": "/api/v1/auth/logout",
+    "status": 500,
+    "tc": [
+      "TC-AUTH-036"
+    ]
+  },
+  {
+    "fixture": "auth/logout__no-content.json",
+    "method": "POST",
+    "path": "/api/v1/auth/logout",
+    "status": 204,
+    "tc": [
+      "TC-AUTH-035",
+      "TC-AUTH-037",
+      "TC-NET-007",
+      "TC-NAV-041",
+      "TC-SET-043"
+    ]
+  },
+  {
+    "fixture": "auth/refresh__internal-error.json",
+    "method": "POST",
+    "path": "/api/v1/auth/refresh",
+    "status": 500,
+    "tc": [
+      "TC-NET-024"
+    ]
+  },
+  {
+    "fixture": "auth/refresh__missing-token-field.json",
+    "method": "POST",
+    "path": "/api/v1/auth/refresh",
+    "status": 200,
+    "tc": [
+      "TC-NET-025"
+    ]
+  },
+  {
+    "fixture": "auth/refresh__reauthentication-required.json",
+    "method": "POST",
+    "path": "/api/v1/auth/refresh",
+    "status": 401,
+    "tc": [
+      "TC-AUTH-051",
+      "TC-AUTH-056",
+      "TC-NET-018",
+      "TC-NET-019",
+      "TC-NET-020",
+      "TC-NET-021",
+      "TC-NAV-042",
+      "TC-PUSH-025",
+      "TC-FDBK-023"
+    ]
+  },
+  {
+    "fixture": "auth/refresh__success.json",
+    "method": "POST",
+    "path": "/api/v1/auth/refresh",
+    "status": 200,
+    "tc": [
+      "TC-BOOT-009",
+      "TC-AUTH-045",
+      "TC-NET-012",
+      "TC-NET-014",
+      "TC-NET-015",
+      "TC-NET-016",
+      "TC-NET-022",
+      "TC-NET-027",
+      "TC-NET-028",
+      "TC-NET-029",
+      "TC-NET-059",
+      "TC-TIME-028",
+      "TC-NOTI-035",
+      "TC-PUSH-023",
+      "TC-SIGN-033",
+      "TC-SET-012",
+      "TC-FDBK-022"
+    ]
+  },
+  {
+    "fixture": "auth/social-login__bad-request-authcode.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-login",
+    "status": 400,
+    "tc": [
+      "TC-AUTH-023"
+    ]
+  },
+  {
+    "fixture": "auth/social-login__forbidden-banned.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-login",
+    "status": 403,
+    "tc": [
+      "TC-AUTH-021"
+    ]
+  },
+  {
+    "fixture": "auth/social-login__forbidden-withdrawn-banned.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-login",
+    "status": 403,
+    "tc": [
+      "TC-AUTH-022"
+    ]
+  },
+  {
+    "fixture": "auth/social-login__internal-error.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-login",
+    "status": 500,
+    "tc": [
+      "TC-AUTH-024"
+    ]
+  },
+  {
+    "fixture": "auth/social-login__login-success.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-login",
+    "status": 200,
+    "tc": [
+      "TC-BOOT-037",
+      "TC-AUTH-005",
+      "TC-AUTH-006",
+      "TC-AUTH-007",
+      "TC-AUTH-008",
+      "TC-AUTH-030",
+      "TC-AUTH-031",
+      "TC-AUTH-034",
+      "TC-AUTH-057",
+      "TC-AUTH-058",
+      "TC-NAV-039",
+      "TC-NAV-049",
+      "TC-NAV-050",
+      "TC-ONB-031"
+    ]
+  },
+  {
+    "fixture": "auth/social-login__login-success-missing-token.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-login",
+    "status": 200,
+    "tc": [
+      "TC-AUTH-012"
+    ]
+  },
+  {
+    "fixture": "auth/social-login__sign-up-required.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-login",
+    "status": 200,
+    "tc": [
+      "TC-AUTH-009",
+      "TC-AUTH-010",
+      "TC-AUTH-050",
+      "TC-ONB-018"
+    ]
+  },
+  {
+    "fixture": "auth/social-login__unauthorized.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-login",
+    "status": 401,
+    "tc": [
+      "TC-AUTH-020"
+    ]
+  },
+  {
+    "fixture": "auth/social-login__unknown-status.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-login",
+    "status": 200,
+    "tc": [
+      "TC-AUTH-011"
+    ]
+  },
+  {
+    "fixture": "auth/users-me__delete-internal-error.json",
+    "method": "DELETE",
+    "path": "/api/v1/users/me",
+    "status": 500,
+    "tc": [
+      "TC-AUTH-044",
+      "TC-SET-046"
+    ]
+  },
+  {
+    "fixture": "auth/users-me__delete-no-content.json",
+    "method": "DELETE",
+    "path": "/api/v1/users/me",
+    "status": 204,
+    "tc": [
+      "TC-AUTH-043",
+      "TC-AUTH-046",
+      "TC-AUTH-049",
+      "TC-SET-046"
+    ]
+  },
+  {
+    "fixture": "auth/users-me__delete-unauthorized.json",
+    "method": "DELETE",
+    "path": "/api/v1/users/me",
+    "status": 401,
+    "tc": [
+      "TC-AUTH-045"
+    ]
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "_kind": "storage",
+  "stored": {
+    "guest": true
+  },
+  "expect": {
+    "destination": "home",
+    "mode": "guest"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "uploadId": "55555555-5555-4555-8555-555555555507",
+  "uploadUrl": "http://upload.example.test/55555555-5555-4555-8555-555555555507?X-Amz-Expires=300",
+  "expiresInSeconds": 300,
+  "contentType": "image/webp",
+  "maxBytes": 5242880
+}

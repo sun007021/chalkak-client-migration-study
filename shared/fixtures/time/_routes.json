@@ -1,0 +1,136 @@
+[
+  {
+    "fixture": "time/calendar__cross-month.json",
+    "method": "NONE",
+    "path": "-",
+    "tc": [
+      "TC-TIME-013"
+    ]
+  },
+  {
+    "fixture": "time/calendar__cross-year.json",
+    "method": "NONE",
+    "path": "-",
+    "tc": [
+      "TC-TIME-012"
+    ]
+  },
+  {
+    "fixture": "time/calendar__months-without-current.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar/months",
+    "status": 200,
+    "tc": [
+      "TC-TIME-016"
+    ]
+  },
+  {
+    "fixture": "time/instants__invalid.json",
+    "method": "NONE",
+    "path": "-",
+    "tc": [
+      "TC-TIME-026"
+    ]
+  },
+  {
+    "fixture": "time/instants__variants.json",
+    "method": "NONE",
+    "path": "-",
+    "tc": [
+      "TC-TIME-025"
+    ]
+  },
+  {
+    "fixture": "time/posts-today__adjacent-topic.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 200,
+    "tc": [
+      "TC-TIME-020"
+    ]
+  },
+  {
+    "fixture": "time/posts-today__cross-midnight.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 200,
+    "tc": [
+      "TC-TIME-017",
+      "TC-TIME-018"
+    ]
+  },
+  {
+    "fixture": "time/posts-today__no-topic.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 404,
+    "tc": [
+      "TC-TIME-021"
+    ]
+  },
+  {
+    "fixture": "time/topics__before-open.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "query": {
+      "date": "2026-10-27"
+    },
+    "status": 200,
+    "tc": [
+      "TC-TIME-019"
+    ]
+  },
+  {
+    "fixture": "time/topics__closed.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "query": {
+      "date": "2026-10-26"
+    },
+    "status": 200,
+    "tc": [
+      "TC-TIME-019"
+    ]
+  },
+  {
+    "fixture": "time/topics__future-400.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "query": {
+      "date": "2026-10-28"
+    },
+    "status": 400,
+    "tc": [
+      "TC-TIME-007",
+      "TC-TIME-008"
+    ]
+  },
+  {
+    "fixture": "time/topics__not-found.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "query": {
+      "date": "2026-09-16"
+    },
+    "status": 404,
+    "tc": [
+      "TC-TIME-009",
+      "TC-TIME-010"
+    ]
+  },
+  {
+    "fixture": "time/topics__open.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "query": {
+      "date": "2026-10-27"
+    },
+    "status": 200,
+    "tc": [
+      "TC-TIME-006",
+      "TC-TIME-014",
+      "TC-TIME-015",
+      "TC-TIME-019"
+    ]
+  }
+]

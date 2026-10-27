@@ -1,0 +1,99 @@
+{
+  "currentPage": 2,
+  "pageSize": 20,
+  "hasNext": false,
+  "randomSeed": null,
+  "posts": [
+    {
+      "id": "22222222-2222-4222-8222-222222222221",
+      "authorId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "originalImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222221/original.webp",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222221/thumbnail.webp",
+      "signatureOriginalImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/original.png",
+      "signatureThumbnailImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/thumbnail.png",
+      "title": "노을",
+      "submittedAt": "2026-10-27T02:39:00Z",
+      "likeCount": 19,
+      "isLiked": false,
+      "isMine": false
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "authorId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "originalImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222222/original.webp",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222222/thumbnail.webp",
+      "signatureOriginalImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/original.png",
+      "signatureThumbnailImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/thumbnail.png",
+      "title": "은행잎",
+      "submittedAt": "2026-10-27T02:38:00Z",
+      "likeCount": 18,
+      "isLiked": false,
+      "isMine": false
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222223",
+      "authorId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "originalImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222223/original.webp",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222223/thumbnail.webp",
+      "signatureOriginalImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/original.png",
+      "signatureThumbnailImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/thumbnail.png",
+      "title": "골목",
+      "submittedAt": "2026-10-27T02:37:00Z",
+      "likeCount": 17,
+      "isLiked": true,
+      "isMine": false
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222224",
+      "authorId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "originalImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222224/original.webp",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222224/thumbnail.webp",
+      "signatureOriginalImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/original.png",
+      "signatureThumbnailImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/thumbnail.png",
+      "title": null,
+      "submittedAt": "2026-10-27T02:36:00Z",
+      "likeCount": 16,
+      "isLiked": false,
+      "isMine": false
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222225",
+      "authorId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "originalImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222225/original.webp",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222225/thumbnail.webp",
+      "signatureOriginalImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/original.png",
+      "signatureThumbnailImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/thumbnail.png",
+      "title": "가을 바람",
+      "submittedAt": "2026-10-27T02:35:00Z",
+      "likeCount": 15,
+      "isLiked": false,
+      "isMine": false
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222226",
+      "authorId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "originalImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222226/original.webp",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222226/thumbnail.webp",
+      "signatureOriginalImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/original.png",
+      "signatureThumbnailImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/thumbnail.png",
+      "title": "높은 하늘",
+      "submittedAt": "2026-10-27T02:34:00Z",
+      "likeCount": 14,
+      "isLiked": false,
+      "isMine": false
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222227",
+      "authorId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "originalImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222227/original.webp",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222227/thumbnail.webp",
+      "signatureOriginalImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/original.png",
+      "signatureThumbnailImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/thumbnail.png",
+      "title": "퇴근길",
+      "submittedAt": "2026-10-27T02:33:00Z",
+      "likeCount": 13,
+      "isLiked": false,
+      "isMine": false
+    }
+  ]
+}

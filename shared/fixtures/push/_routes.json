@@ -1,0 +1,212 @@
+[
+  {
+    "fixture": "push/push-devices-current__no-content.json",
+    "method": "PUT",
+    "path": "/api/v1/push-devices/current",
+    "status": 204,
+    "tc": [
+      "TC-PUSH-012",
+      "TC-PUSH-015",
+      "TC-PUSH-032",
+      "TC-PUSH-033"
+    ]
+  },
+  {
+    "fixture": "push/push-devices-current__bad-request-empty-token.json",
+    "method": "PUT",
+    "path": "/api/v1/push-devices/current",
+    "status": 400,
+    "tc": [
+      "TC-PUSH-031"
+    ]
+  },
+  {
+    "fixture": "push/push-devices-current__reauthentication-required.json",
+    "method": "PUT",
+    "path": "/api/v1/push-devices/current",
+    "status": 401,
+    "tc": [
+      "TC-PUSH-028",
+      "TC-PUSH-029"
+    ]
+  },
+  {
+    "fixture": "push/push-devices-current__unauthorized.json",
+    "method": "PUT",
+    "path": "/api/v1/push-devices/current",
+    "status": 401,
+    "headers": {
+      "WWW-Authenticate": "Bearer"
+    },
+    "tc": [
+      "TC-PUSH-027",
+      "TC-PUSH-034"
+    ]
+  },
+  {
+    "fixture": "push/push-devices-current__internal-error.json",
+    "method": "PUT",
+    "path": "/api/v1/push-devices/current",
+    "status": 500,
+    "tc": [
+      "TC-PUSH-030"
+    ]
+  },
+  {
+    "fixture": "push/jwt__with-session-id.json",
+    "method": "NONE",
+    "path": "-",
+    "_kind": "case",
+    "tc": [
+      "TC-PUSH-014",
+      "TC-PUSH-022"
+    ]
+  },
+  {
+    "fixture": "push/jwt__without-session-id.json",
+    "method": "NONE",
+    "path": "-",
+    "_kind": "case",
+    "tc": [
+      "TC-PUSH-023",
+      "TC-PUSH-024"
+    ]
+  },
+  {
+    "fixture": "push/jwt__malformed.json",
+    "method": "NONE",
+    "path": "-",
+    "_kind": "case",
+    "tc": [
+      "TC-PUSH-026"
+    ]
+  },
+  {
+    "fixture": "push/payload__topic.json",
+    "method": "PUSH",
+    "path": "push",
+    "tc": [
+      "TC-PUSH-037",
+      "TC-PUSH-062",
+      "TC-PUSH-065"
+    ]
+  },
+  {
+    "fixture": "push/payload__reminder.json",
+    "method": "PUSH",
+    "path": "push",
+    "tc": [
+      "TC-PUSH-038"
+    ]
+  },
+  {
+    "fixture": "push/payload__post-approved.json",
+    "method": "PUSH",
+    "path": "push",
+    "tc": [
+      "TC-PUSH-039",
+      "TC-PUSH-050",
+      "TC-PUSH-051",
+      "TC-PUSH-052",
+      "TC-PUSH-058",
+      "TC-PUSH-059",
+      "TC-PUSH-060",
+      "TC-PUSH-061",
+      "TC-PUSH-063",
+      "TC-PUSH-066",
+      "TC-PUSH-068",
+      "TC-PUSH-069",
+      "TC-PUSH-073"
+    ]
+  },
+  {
+    "fixture": "push/payload__post-rejected.json",
+    "method": "PUSH",
+    "path": "push",
+    "tc": [
+      "TC-PUSH-041"
+    ]
+  },
+  {
+    "fixture": "push/payload__ai-review-completed.json",
+    "method": "PUSH",
+    "path": "push",
+    "tc": [
+      "TC-PUSH-040",
+      "TC-PUSH-064",
+      "TC-PUSH-070"
+    ]
+  },
+  {
+    "fixture": "push/payload__ai-review-failed.json",
+    "method": "PUSH",
+    "path": "push",
+    "tc": [
+      "TC-PUSH-040"
+    ]
+  },
+  {
+    "fixture": "push/payload__notice.json",
+    "method": "PUSH",
+    "path": "push",
+    "tc": [
+      "TC-PUSH-042"
+    ]
+  },
+  {
+    "fixture": "push/payload__unknown-type.json",
+    "method": "PUSH",
+    "path": "push",
+    "tc": [
+      "TC-PUSH-044"
+    ]
+  },
+  {
+    "fixture": "push/payload__missing-type.json",
+    "method": "PUSH",
+    "path": "push",
+    "tc": [
+      "TC-PUSH-045"
+    ]
+  },
+  {
+    "fixture": "push/payload__missing-notification-id.json",
+    "method": "PUSH",
+    "path": "push",
+    "tc": [
+      "TC-PUSH-043"
+    ]
+  },
+  {
+    "fixture": "push/payload__invalid-uuid.json",
+    "method": "PUSH",
+    "path": "push",
+    "tc": [
+      "TC-PUSH-046"
+    ]
+  },
+  {
+    "fixture": "push/payload__ai-source-type-not-post.json",
+    "method": "PUSH",
+    "path": "push",
+    "tc": [
+      "TC-PUSH-047"
+    ]
+  },
+  {
+    "fixture": "push/payload__uppercase-uuid.json",
+    "method": "PUSH",
+    "path": "push",
+    "tc": [
+      "TC-PUSH-048"
+    ]
+  },
+  {
+    "fixture": "push/payload__non-string-values.json",
+    "method": "PUSH",
+    "path": "push",
+    "tc": [
+      "TC-PUSH-049"
+    ]
+  }
+]

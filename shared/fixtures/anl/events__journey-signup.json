@@ -1,0 +1,34 @@
+{
+  "_kind": "case",
+  "cases": [
+    {
+      "name": "signup-entry",
+      "events": [
+        {
+          "name": "screen_view",
+          "params": {
+            "screen_name": "login"
+          }
+        },
+        {
+          "name": "screen_view",
+          "params": {
+            "screen_name": "terms"
+          }
+        },
+        {
+          "name": "screen_view",
+          "params": {
+            "screen_name": "onboarding_signature"
+          }
+        },
+        {
+          "name": "screen_view",
+          "params": {
+            "screen_name": "onboarding_signature_preview"
+          }
+        }
+      ]
+    }
+  ]
+}

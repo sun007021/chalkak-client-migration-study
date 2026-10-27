@@ -1,0 +1,28 @@
+# TC-AUTH-032: tapping "browse without login" enters the home in guest mode,
+# and a guest-restricted action shows the login-required toast (D-05) without a login screen.
+# Run: maestro test shared/maestro/auth/TC-AUTH-032-guest-browse.yaml --env APP_ID=<bundle id>
+appId: ${APP_ID}
+tags:
+  - auth
+  - guest
+---
+- runFlow:
+    file: ../common/launch-clean.yaml
+    env:
+      SCENARIO: default
+- assertVisible:
+    id: login.root
+- tapOn:
+    id: login.guest-button
+- assertVisible:
+    id: home.root
+- assertNotVisible:
+    id: login.root
+# Guest restriction: record tab -> toast, stay on home (copy: shared/copy/ko.json nav.guest.record)
+- tapOn:
+    id: bottom-bar.tab-record
+- assertVisible:
+    id: toast.message
+    text: "기록을 보려면 로그인이 필요해요"
+- assertVisible:
+    id: home.root

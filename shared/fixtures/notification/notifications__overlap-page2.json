@@ -1,0 +1,62 @@
+{
+  "currentPage": 2,
+  "pageSize": 20,
+  "hasNext": false,
+  "notifications": [
+    {
+      "id": "33333333-3333-4333-8333-333333333319",
+      "type": "AI_REVIEW_FAILED",
+      "sourceType": "POST",
+      "sourceId": "22222222-2222-4222-8222-222222222211",
+      "title": "AI 피드백을 생성하지 못했어요",
+      "body": "다시 요청해 보세요.",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222211/thumbnail.webp",
+      "readAt": "2026-10-26T16:40:00Z",
+      "createdAt": "2026-10-26T16:30:00Z"
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333320",
+      "type": "NOTICE",
+      "sourceType": "NOTICE",
+      "sourceId": "77777777-7777-4777-8777-777777777701",
+      "title": "서비스 점검 안내",
+      "body": "10월 30일 새벽 2시부터 4시까지 점검이 진행돼요.",
+      "thumbnailImageUrl": null,
+      "readAt": "2026-10-26T16:10:00Z",
+      "createdAt": "2026-10-26T16:00:00Z"
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333326",
+      "type": "POST_APPROVED",
+      "sourceType": "POST",
+      "sourceId": "22222222-2222-4222-8222-222222222208",
+      "title": "사진이 승인되었어요",
+      "body": "오늘의 사진이 전시에 올라갔어요.",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222208/thumbnail.webp",
+      "readAt": "2026-10-26T13:10:00Z",
+      "createdAt": "2026-10-26T13:00:00Z"
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333327",
+      "type": "POST_REJECTED",
+      "sourceType": "POST",
+      "sourceId": "22222222-2222-4222-8222-222222222209",
+      "title": "사진이 반려되었어요",
+      "body": "자세한 사유를 확인해 주세요.",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222209/thumbnail.webp",
+      "readAt": "2026-10-26T12:40:00Z",
+      "createdAt": "2026-10-26T12:30:00Z"
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333328",
+      "type": "AI_REVIEW_COMPLETED",
+      "sourceType": "POST",
+      "sourceId": "22222222-2222-4222-8222-222222222210",
+      "title": "AI 피드백이 도착했어요",
+      "body": "찰칵AI가 사진을 분석했어요.",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222210/thumbnail.webp",
+      "readAt": "2026-10-26T12:10:00Z",
+      "createdAt": "2026-10-26T12:00:00Z"
+    }
+  ]
+}

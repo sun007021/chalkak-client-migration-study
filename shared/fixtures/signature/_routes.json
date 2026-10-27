@@ -1,0 +1,172 @@
+[
+  {
+    "fixture": "signature/presigned-put__forbidden.json",
+    "method": "PUT",
+    "path": "/__upload/55555555-5555-4555-8555-555555555521",
+    "query": {
+      "X-Amz-Expires": "300"
+    },
+    "status": 403,
+    "tc": [
+      "TC-SIGN-023"
+    ]
+  },
+  {
+    "fixture": "signature/presigned-put__ok.json",
+    "method": "PUT",
+    "path": "/__upload/55555555-5555-4555-8555-555555555521",
+    "query": {
+      "X-Amz-Expires": "300"
+    },
+    "status": 200,
+    "headers": {
+      "ETag": "\"fixture-etag-3\""
+    },
+    "tc": [
+      "TC-SIGN-021"
+    ]
+  },
+  {
+    "fixture": "signature/users-me-signature-uploads__forbidden-banned.json",
+    "method": "POST",
+    "path": "/api/v1/users/me/signature/uploads",
+    "status": 403,
+    "tc": [
+      "TC-SIGN-030"
+    ]
+  },
+  {
+    "fixture": "signature/users-me-signature-uploads__success.json",
+    "method": "POST",
+    "path": "/api/v1/users/me/signature/uploads",
+    "status": 200,
+    "tc": [
+      "TC-SIGN-019",
+      "TC-SIGN-020",
+      "TC-SIGN-024"
+    ]
+  },
+  {
+    "fixture": "signature/users-me-signature__get-internal-error.json",
+    "method": "GET",
+    "path": "/api/v1/users/me/signature",
+    "status": 500,
+    "tc": [
+      "TC-SET-005",
+      "TC-SET-006"
+    ]
+  },
+  {
+    "fixture": "signature/users-me-signature__get-registration-required.json",
+    "method": "GET",
+    "path": "/api/v1/users/me/signature",
+    "status": 400,
+    "tc": [
+      "TC-SIGN-040"
+    ]
+  },
+  {
+    "fixture": "signature/users-me-signature__get-success.json",
+    "method": "GET",
+    "path": "/api/v1/users/me/signature",
+    "status": 200,
+    "tc": [
+      "TC-SIGN-026",
+      "TC-SIGN-039",
+      "TC-SET-002",
+      "TC-SET-003",
+      "TC-SET-004",
+      "TC-SET-009",
+      "TC-SET-010",
+      "TC-SET-011",
+      "TC-SET-013"
+    ]
+  },
+  {
+    "fixture": "signature/users-me-signature__get-thumbnail-null.json",
+    "method": "GET",
+    "path": "/api/v1/users/me/signature",
+    "status": 200,
+    "tc": [
+      "TC-SIGN-026",
+      "TC-SET-003"
+    ]
+  },
+  {
+    "fixture": "signature/users-me-signature__get-unauthorized.json",
+    "method": "GET",
+    "path": "/api/v1/users/me/signature",
+    "status": 401,
+    "tc": [
+      "TC-SET-012"
+    ]
+  },
+  {
+    "fixture": "signature/users-me-signature__put-forbidden-banned.json",
+    "method": "PUT",
+    "path": "/api/v1/users/me/signature",
+    "status": 403,
+    "tc": [
+      "TC-SIGN-031"
+    ]
+  },
+  {
+    "fixture": "signature/users-me-signature__put-internal-error.json",
+    "method": "PUT",
+    "path": "/api/v1/users/me/signature",
+    "status": 500,
+    "tc": [
+      "TC-SIGN-035"
+    ]
+  },
+  {
+    "fixture": "signature/users-me-signature__put-invalid-signature.json",
+    "method": "PUT",
+    "path": "/api/v1/users/me/signature",
+    "status": 400,
+    "tc": [
+      "TC-SIGN-029"
+    ]
+  },
+  {
+    "fixture": "signature/users-me-signature__put-reupload-required.json",
+    "method": "PUT",
+    "path": "/api/v1/users/me/signature",
+    "status": 400,
+    "tc": [
+      "TC-SIGN-028"
+    ]
+  },
+  {
+    "fixture": "signature/users-me-signature__put-success.json",
+    "method": "PUT",
+    "path": "/api/v1/users/me/signature",
+    "status": 200,
+    "tc": [
+      "TC-NAV-038",
+      "TC-SIGN-019",
+      "TC-SIGN-022",
+      "TC-SIGN-025",
+      "TC-SIGN-027",
+      "TC-SIGN-038"
+    ]
+  },
+  {
+    "fixture": "signature/users-me-signature__put-unauthorized.json",
+    "method": "PUT",
+    "path": "/api/v1/users/me/signature",
+    "status": 401,
+    "tc": [
+      "TC-SIGN-033"
+    ]
+  },
+  {
+    "fixture": "signature/users-me-signature__put-upload-not-found.json",
+    "method": "PUT",
+    "path": "/api/v1/users/me/signature",
+    "status": 404,
+    "tc": [
+      "TC-SIGN-032"
+    ]
+  }
+]

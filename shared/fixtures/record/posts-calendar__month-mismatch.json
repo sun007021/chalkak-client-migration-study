@@ -1,0 +1,12 @@
+{
+  "year": 2026,
+  "month": 9,
+  "posts": [
+    {
+      "topicDate": "2026-09-17",
+      "postId": "22222222-2222-4222-8222-222222222297",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222297/thumbnail.webp",
+      "status": "APPROVED"
+    }
+  ]
+}

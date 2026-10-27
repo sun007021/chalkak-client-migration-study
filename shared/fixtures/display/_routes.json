@@ -1,0 +1,379 @@
+[
+  {
+    "fixture": "display/posts-list__400-bad-query.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "status": 400,
+    "tc": [
+      "TC-DISP-008"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__400-future-date.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "status": 400,
+    "tc": [
+      "TC-DISP-008"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__401-unauthorized.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "status": 401,
+    "headers": {
+      "WWW-Authenticate": "Bearer"
+    },
+    "tc": [
+      "TC-DISP-051"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__404-topic-not-found.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "status": 404,
+    "tc": [
+      "TC-DISP-007"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__500-server-error.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "status": 500,
+    "tc": [
+      "TC-DISP-005",
+      "TC-DISP-010",
+      "TC-DISP-026"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__503-retry-after.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "status": 503,
+    "headers": {
+      "Retry-After": "1"
+    },
+    "tc": [
+      "TC-DISP-052"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__guest-page1.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27",
+      "sort": "recent",
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-DISP-004",
+      "TC-DISP-053",
+      "TC-DISP-054"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__mixed-ratio.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27",
+      "sort": "recent",
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-DISP-057"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__page99-empty.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27",
+      "sort": "recent",
+      "page": "99",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-DISP-023"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__popular-3.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-26",
+      "sort": "popular",
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-DISP-043"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__popular-page1.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27",
+      "sort": "popular",
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-DISP-011",
+      "TC-DISP-012",
+      "TC-DISP-013",
+      "TC-DISP-042",
+      "TC-DISP-047",
+      "TC-HOME-023"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__random-no-seed.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27",
+      "sort": "random",
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-DISP-019"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__random-page1-seed.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27",
+      "sort": "random",
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-DISP-014",
+      "TC-DISP-015",
+      "TC-DISP-017",
+      "TC-DISP-020",
+      "TC-DISP-021",
+      "TC-DISP-045"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__random-page2.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27",
+      "sort": "random",
+      "page": "2",
+      "pageSize": "20",
+      "randomSeed": "seed_abc123"
+    },
+    "status": 200,
+    "tc": [
+      "TC-DISP-016",
+      "TC-DISP-045"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__random-page2-overlap.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27",
+      "sort": "random",
+      "page": "2",
+      "pageSize": "20",
+      "randomSeed": "seed_abc123"
+    },
+    "status": 200,
+    "tc": [
+      "TC-DISP-020"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__recent-page1.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27",
+      "sort": "recent",
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-DISP-002",
+      "TC-DISP-004",
+      "TC-DISP-005",
+      "TC-DISP-009",
+      "TC-DISP-011",
+      "TC-DISP-012",
+      "TC-DISP-018",
+      "TC-DISP-022",
+      "TC-DISP-025",
+      "TC-DISP-038",
+      "TC-DISP-044",
+      "TC-DISP-046",
+      "TC-DISP-050",
+      "TC-DISP-051",
+      "TC-DISP-055",
+      "TC-DISP-056",
+      "TC-DISP-061",
+      "TC-LIKE-021",
+      "TC-UPL-086"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__recent-page2.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27",
+      "sort": "recent",
+      "page": "2",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-DISP-022",
+      "TC-DISP-025",
+      "TC-DISP-026"
+    ]
+  },
+  {
+    "fixture": "display/posts-list__recent-page2-overlap.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27",
+      "sort": "recent",
+      "page": "2",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-DISP-027"
+    ]
+  },
+  {
+    "fixture": "display/posts__guest-recent.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27",
+      "sort": "recent",
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-NAV-015"
+    ]
+  },
+  {
+    "fixture": "display/posts__recent-page1.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27",
+      "sort": "recent",
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-NAV-012"
+    ]
+  },
+  {
+    "fixture": "display/topics__404-not-found.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "status": 404,
+    "tc": [
+      "TC-DISP-006",
+      "TC-DISP-031",
+      "TC-DISP-032"
+    ]
+  },
+  {
+    "fixture": "display/topics__500-server-error.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "status": 500,
+    "tc": [
+      "TC-DISP-033"
+    ]
+  },
+  {
+    "fixture": "display/topics__before-open.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "query": {
+      "date": "2026-10-28"
+    },
+    "status": 200,
+    "tc": [
+      "TC-DISP-009"
+    ]
+  },
+  {
+    "fixture": "display/topics__first-date-2026-09-17.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "query": {
+      "date": "2026-09-17"
+    },
+    "status": 200,
+    "tc": [
+      "TC-DISP-028"
+    ]
+  },
+  {
+    "fixture": "display/topics__open-2026-10-26.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "query": {
+      "date": "2026-10-26"
+    },
+    "status": 200,
+    "tc": [
+      "TC-DISP-013"
+    ]
+  },
+  {
+    "fixture": "display/topics__open-2026-10-27.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "query": {
+      "date": "2026-10-27"
+    },
+    "status": 200,
+    "tc": [
+      "TC-DISP-001",
+      "TC-DISP-002",
+      "TC-DISP-041"
+    ]
+  }
+]

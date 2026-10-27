@@ -1,0 +1,13 @@
+{
+  "_kind": "case",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhYWFhYWFhYS1hYWFhLTRhYWEtOGFhYS1hYWFhYWFhYWFhYWEiLCJzY29wZSI6IlVTRVIiLCJpYXQiOjE3OTMwNzAwMDAsImV4cCI6MTc5MzA3MTgwMH0.fixture-unsigned-signature",
+  "payload": {
+    "sub": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "scope": "USER",
+    "iat": 1793070000,
+    "exp": 1793071800
+  },
+  "expect": {
+    "hasSessionId": false
+  }
+}

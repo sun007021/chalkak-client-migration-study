@@ -1,0 +1,13 @@
+{
+  "name": "chalkak-shared",
+  "private": true,
+  "type": "module",
+  "description": "Shared test infrastructure (fixtures tooling, mock server, coverage scripts). No dependencies.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test",
+    "manifest": "node scripts/build-manifest.mjs",
+    "validate": "node scripts/validate-fixtures.mjs",
+    "mock": "node mock-server/server.mjs"
+  }
+}

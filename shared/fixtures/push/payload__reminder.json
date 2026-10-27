@@ -1,0 +1,13 @@
+{
+  "_kind": "push",
+  "notification": {
+    "title": "사진 올릴 시간이에요",
+    "body": "오늘의 주제로 사진을 올려 보세요."
+  },
+  "data": {
+    "eventId": "66666666-6666-4666-8666-666666666642",
+    "type": "REMINDER",
+    "sourceType": "REMINDER",
+    "sourceId": "99999999-9999-4999-8999-999999999901"
+  }
+}

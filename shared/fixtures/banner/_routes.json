@@ -1,0 +1,157 @@
+[
+  {
+    "fixture": "banner/banners__400-bad-query.json",
+    "method": "GET",
+    "path": "/api/v1/banners",
+    "status": 400,
+    "tc": [
+      "TC-BANR-005"
+    ]
+  },
+  {
+    "fixture": "banner/banners__401-unauthorized.json",
+    "method": "GET",
+    "path": "/api/v1/banners",
+    "status": 401,
+    "headers": {
+      "WWW-Authenticate": "Bearer"
+    },
+    "tc": [
+      "TC-BANR-002"
+    ]
+  },
+  {
+    "fixture": "banner/banners__500-server-error.json",
+    "method": "GET",
+    "path": "/api/v1/banners",
+    "status": 500,
+    "tc": [
+      "TC-BANR-005",
+      "TC-BANR-010",
+      "TC-BANR-011",
+      "TC-BANR-013"
+    ]
+  },
+  {
+    "fixture": "banner/banners__bad-thumbnail.json",
+    "method": "GET",
+    "path": "/api/v1/banners",
+    "query": {
+      "page": "1",
+      "pageSize": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-BANR-007"
+    ]
+  },
+  {
+    "fixture": "banner/banners__empty.json",
+    "method": "GET",
+    "path": "/api/v1/banners",
+    "query": {
+      "page": "1",
+      "pageSize": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-BANR-003",
+      "TC-BANR-010",
+      "TC-BANR-011",
+      "TC-BANR-014"
+    ]
+  },
+  {
+    "fixture": "banner/banners__insecure-url.json",
+    "method": "GET",
+    "path": "/api/v1/banners",
+    "query": {
+      "page": "1",
+      "pageSize": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-BANR-006"
+    ]
+  },
+  {
+    "fixture": "banner/banners__malformed.json",
+    "method": "GET",
+    "path": "/api/v1/banners",
+    "query": {
+      "page": "1",
+      "pageSize": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-BANR-006"
+    ]
+  },
+  {
+    "fixture": "banner/banners__no-has-next.json",
+    "method": "GET",
+    "path": "/api/v1/banners",
+    "query": {
+      "page": "1",
+      "pageSize": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-BANR-004"
+    ]
+  },
+  {
+    "fixture": "banner/banners__page1.json",
+    "method": "GET",
+    "path": "/api/v1/banners",
+    "query": {
+      "page": "1",
+      "pageSize": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-NAV-036"
+    ]
+  },
+  {
+    "fixture": "banner/banners__page1-10.json",
+    "method": "GET",
+    "path": "/api/v1/banners",
+    "query": {
+      "page": "1",
+      "pageSize": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-BANR-001",
+      "TC-BANR-009",
+      "TC-BANR-012",
+      "TC-BANR-015",
+      "TC-BANR-024",
+      "TC-BANR-025",
+      "TC-BANR-026",
+      "TC-BANR-027",
+      "TC-BANR-028",
+      "TC-BANR-029",
+      "TC-BANR-031",
+      "TC-HOME-012"
+    ]
+  },
+  {
+    "fixture": "banner/banners__page2-last.json",
+    "method": "GET",
+    "path": "/api/v1/banners",
+    "query": {
+      "page": "2",
+      "pageSize": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-BANR-003",
+      "TC-BANR-012",
+      "TC-BANR-013",
+      "TC-BANR-014",
+      "TC-BANR-016"
+    ]
+  }
+]

@@ -1,0 +1,247 @@
+[
+  {
+    "fixture": "record/posts-calendar-months__empty.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar/months",
+    "status": 200,
+    "tc": [
+      "TC-REC-002"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar-months__multi-year.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar/months",
+    "status": 200,
+    "tc": [
+      "TC-REC-018"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar-months__recent-first.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar/months",
+    "status": 200,
+    "tc": [
+      "TC-REC-001",
+      "TC-REC-002",
+      "TC-REC-017"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar-months__without-current.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar/months",
+    "status": 200,
+    "tc": [
+      "TC-REC-003"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar__2026-08-empty.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "8"
+    },
+    "status": 200,
+    "tc": [
+      "TC-REC-004",
+      "TC-REC-041"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar__2026-09.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "9"
+    },
+    "status": 200,
+    "tc": [
+      "TC-REC-016",
+      "TC-REC-019",
+      "TC-REC-020",
+      "TC-REC-025",
+      "TC-REC-041"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar__2026-10.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-REC-001",
+      "TC-REC-008",
+      "TC-REC-009",
+      "TC-REC-011",
+      "TC-REC-019",
+      "TC-REC-022",
+      "TC-REC-023",
+      "TC-REC-027",
+      "TC-REC-029",
+      "TC-REC-034",
+      "TC-REC-035",
+      "TC-REC-036",
+      "TC-REC-037",
+      "TC-REC-038",
+      "TC-REC-041",
+      "TC-REC-043"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar__2026-10-after-delete.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-REC-024",
+      "TC-REC-026",
+      "TC-REC-041"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar__2026-10-shuffled.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-REC-015",
+      "TC-REC-041"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar__2026-11-empty.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "11"
+    },
+    "status": 200,
+    "tc": [
+      "TC-REC-007",
+      "TC-REC-041"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar__400-invalid-month.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "status": 400,
+    "tc": [
+      "TC-REC-031",
+      "TC-REC-041"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar__401-unauthorized.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "status": 401,
+    "headers": {
+      "WWW-Authenticate": "Bearer"
+    },
+    "tc": [
+      "TC-REC-030",
+      "TC-REC-041"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar__500-server-error.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "status": 500,
+    "tc": [
+      "TC-REC-021",
+      "TC-REC-022",
+      "TC-REC-032",
+      "TC-REC-041"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar__date-out-of-month.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-REC-013",
+      "TC-REC-041"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar__duplicate-date.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-REC-013",
+      "TC-REC-041"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar__empty-thumbnail.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-REC-013",
+      "TC-REC-041"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar__month-mismatch.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-REC-012",
+      "TC-REC-041"
+    ]
+  },
+  {
+    "fixture": "record/posts-calendar__unknown-status.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-REC-014",
+      "TC-REC-041"
+    ]
+  }
+]
