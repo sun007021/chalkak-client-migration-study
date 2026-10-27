@@ -39,7 +39,10 @@ function withHostileLocale(run: () => void): void {
     jest.spyOn(Date.prototype, 'toLocaleString').mockImplementation(() => '٢٠٢٦/١٠/٢٧'),
     jest.spyOn(Date.prototype, 'toLocaleDateString').mockImplementation(() => '٢٥٦٩/๑๐/๒๗'),
     jest.spyOn(Date.prototype, 'toLocaleTimeString').mockImplementation(() => '۱۴:۰۰'),
-    jest.spyOn(Intl.DateTimeFormat.prototype, 'format').mockImplementation(() => '٢٠٢٦-١٠-٢٧'),
+    // format은 접근자 프로퍼티라 getter를 가로챈다.
+    jest
+      .spyOn(Intl.DateTimeFormat.prototype as { format: unknown }, 'format', 'get')
+      .mockImplementation(() => () => '٢٠٢٦-١٠-٢٧'),
   ];
   try {
     run();
