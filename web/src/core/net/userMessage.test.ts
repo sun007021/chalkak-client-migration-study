@@ -33,12 +33,12 @@ describe('userMessageKey', () => {
 
 describe('decideErrorPresentation', () => {
   it('TC-NET-046 콘텐츠가 이미 보이면 토스트만 띄운다(콘텐츠 유지)', () => {
-    expect(decideErrorPresentation({ error: new NetworkError('connection'), hasContent: true })).toEqual({ kind: 'toast', copyKey: 'common.error.network' });
+    expect(decideErrorPresentation({ error: new NetworkError('connection'), hasContent: true })).toEqual({ kind: 'toast', copy: 'common.error.network' });
   });
 
   it('TC-NET-047 콘텐츠가 없으면 오류 화면(다시 시도)이다', () => {
-    expect(decideErrorPresentation({ error: new NetworkError('connection'), hasContent: false })).toEqual({ kind: 'error_screen', copyKey: 'common.error.network' });
-    expect(decideErrorPresentation({ error: new ApiError(500, 'INTERNAL_ERROR', 'x'), hasContent: false })).toEqual({ kind: 'error_screen', copyKey: 'common.error.generic' });
+    expect(decideErrorPresentation({ error: new NetworkError('connection'), hasContent: false })).toEqual({ kind: 'error_screen', copy: 'common.error.network' });
+    expect(decideErrorPresentation({ error: new ApiError(500, 'INTERNAL_ERROR', 'x'), hasContent: false })).toEqual({ kind: 'error_screen', copy: 'common.error.generic' });
   });
 
   it('TC-NET-048 취소는 오류 화면도 토스트도 아니다', () => {

@@ -1,3 +1,5 @@
+import { isCancellation } from '../net/errors';
+import type { Logger } from '../net/Logger';
 import type { Clock } from './Clock';
 import { kstToday, nextKstMidnight } from './kst';
 import type { DateString } from './kst';
@@ -10,7 +12,7 @@ export class MidnightWatcher {
   private lastDate: DateString | null = null;
   private abort: AbortController | null = null;
 
-  constructor(private readonly deps: { clock: Clock; onDateChanged: (today: DateString) => void }) {}
+  constructor(private readonly deps: { clock: Clock; onDateChanged: (today: DateString) => void; logger?: Logger }) {}
 
   start(): void {
     this.stop();
@@ -37,7 +39,12 @@ export class MidnightWatcher {
     const today = kstToday(this.deps.clock);
     if (today === this.lastDate) return;
     this.lastDate = today;
-    this.deps.onDateChanged(today);
+    try {
+      this.deps.onDateChanged(today);
+    } catch (error) {
+      // 콜백 예외로 감시 자체가 멈추면 이후 자정을 모두 놓친다. 기록만 하고 계속한다.
+      this.deps.logger?.log('error', 'MidnightWatcher onDateChanged threw', { error: error instanceof Error ? error.message : String(error) });
+    }
   }
 
   private arm(): void {
@@ -48,13 +55,15 @@ export class MidnightWatcher {
 
   private async loop(signal: AbortSignal): Promise<void> {
     const { clock } = this.deps;
-    try {
-      while (!signal.aborted) {
+    while (!signal.aborted) {
+      try {
         await clock.sleep(nextKstMidnight(clock.nowMs()) - clock.nowMs(), signal);
-        this.notifyIfChanged();
+      } catch (error) {
+        // stop()에 의한 취소(AbortError)만 정상 종료다. 그 밖의 예외는 기록하고 멈춘다(바쁜 루프 방지).
+        if (!isCancellation(error)) this.deps.logger?.log('error', 'MidnightWatcher sleep failed', { error: error instanceof Error ? error.message : String(error) });
+        return;
       }
-    } catch {
-      // stop()에 의한 취소. 정리할 것 없음.
+      this.notifyIfChanged();
     }
   }
 }

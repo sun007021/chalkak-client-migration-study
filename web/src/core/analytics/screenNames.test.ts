@@ -1,8 +1,8 @@
-import { SCREEN_NAMES, TAB_DESTINATIONS } from '../../constants';
+import { ANALYTICS_SCREEN_NAMES, ANALYTICS_TAB_DESTINATIONS } from '../../constants';
 
 describe('분석 허용 목록', () => {
   it('TC-ANL-002 TC-ANL-010 screen_name은 19종이고 철자까지 D-22와 같다', () => {
-    expect([...SCREEN_NAMES]).toEqual([
+    expect([...ANALYTICS_SCREEN_NAMES]).toEqual([
       'login',
       'terms',
       'terms_of_service',
@@ -23,10 +23,10 @@ describe('분석 허용 목록', () => {
       'photo_upload',
       'photo_upload_success',
     ]);
-    expect(new Set(SCREEN_NAMES).size).toBe(19);
+    expect(new Set(ANALYTICS_SCREEN_NAMES).size).toBe(19);
   });
 
   it('TC-ANL-013 TC-ANL-015 탭 destination은 home, display, record, settings 4종뿐이다', () => {
-    expect([...TAB_DESTINATIONS]).toEqual(['home', 'display', 'record', 'settings']);
+    expect([...ANALYTICS_TAB_DESTINATIONS]).toEqual(['home', 'display', 'record', 'settings']);
   });
 });

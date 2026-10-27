@@ -1,11 +1,12 @@
 import { ApiClient } from '../core/net/ApiClient';
 import { AuthCoordinator } from '../core/net/AuthCoordinator';
 import { HttpTokenRefresher } from '../core/net/TokenRefresher';
-import { RecordingLogger } from '../core/net/Logger';
+import { RecordingLogger } from './RecordingLogger';
 import { parseApiBaseUrl } from '../core/config/apiBaseUrl';
-import { FakeSessionStore } from '../core/auth/FakeSessionStore';
+import { InProcessRefreshLock } from '../core/auth/RefreshLock';
+import { FakeSessionStore } from './FakeSessionStore';
 import type { StoredSession } from '../core/auth/SessionStore';
-import { FakeClock } from '../core/time/FakeClock';
+import { FakeClock } from './FakeClock';
 import { FakeFetch } from './fakeFetch';
 import { NOW, guestSession } from './fixtures';
 
@@ -19,7 +20,7 @@ export function makeApiEnv(session: StoredSession = guestSession, baseUrl: strin
   const logger = new RecordingLogger();
   const expired = { count: 0 };
   const refresher = new HttpTokenRefresher({ fetch: ff.fetch, clock, baseUrl: parseApiBaseUrl(baseUrl), logger });
-  const auth = new AuthCoordinator({ store, refresher, clock, onSessionExpired: () => (expired.count += 1) });
-  const client = () => new ApiClient({ baseUrl, fetch: ff.fetch, clock, auth, logger });
+  const auth = new AuthCoordinator({ store, refresher, clock, lock: new InProcessRefreshLock(), onSessionExpired: () => (expired.count += 1) });
+  const client = () => new ApiClient({ baseUrl: parseApiBaseUrl(baseUrl), fetch: ff.fetch, clock, auth, logger });
   return { clock, ff, store, logger, expired, client };
 }

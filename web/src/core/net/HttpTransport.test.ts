@@ -1,10 +1,10 @@
 import { HttpTransport, isIdempotentRequest, parseRetryAfter, type TransportRequest } from './HttpTransport';
 import { NetworkError, isCancellation } from './errors';
-import { RecordingLogger } from './Logger';
-import { FakeClock } from '../time/FakeClock';
+import { RecordingLogger } from '../../test/RecordingLogger';
+import { FakeClock } from '../../test/FakeClock';
 import { FakeFetch, emptyResponse, jsonResponse, networkFailure, textResponse, withUrl } from '../../test/fakeFetch';
 import { track } from '../../test/track';
-import { HTTP_RESPONSE_TIMEOUT_MS, PRESIGNED_PUT_TIMEOUT_MS, RETRY_BACKOFF_MS } from '../../constants';
+import { HTTP_RESPONSE_TIMEOUT_MS, UPLOAD_PUT_TIMEOUT_MS, RETRY_BACKOFF_MS } from '../../constants';
 import { NOW } from '../../test/fixtures';
 
 function setup() {
@@ -246,7 +246,7 @@ describe('타임아웃', () => {
       await ok.clock.sleep(59_000);
       return emptyResponse(200);
     });
-    const a = track(ok.transport.send(ok.req({ method: 'PUT', url: 'https://s3.test/bucket/key?sig=1', timeoutMs: PRESIGNED_PUT_TIMEOUT_MS, retry: false })));
+    const a = track(ok.transport.send(ok.req({ method: 'PUT', url: 'https://s3.test/bucket/key?sig=1', timeoutMs: UPLOAD_PUT_TIMEOUT_MS, retry: false })));
     await ok.clock.advance(59_000);
     expect(a.state).toBe('fulfilled');
 
@@ -255,9 +255,38 @@ describe('타임아웃', () => {
       await slow.clock.sleep(61_000);
       return emptyResponse(200);
     });
-    const b = track(slow.transport.send(slow.req({ method: 'PUT', url: 'https://s3.test/bucket/key?sig=1', timeoutMs: PRESIGNED_PUT_TIMEOUT_MS, retry: false })));
+    const b = track(slow.transport.send(slow.req({ method: 'PUT', url: 'https://s3.test/bucket/key?sig=1', timeoutMs: UPLOAD_PUT_TIMEOUT_MS, retry: false })));
     await slow.clock.advance(60_000);
     expect(b.error).toMatchObject({ kind: 'timeout' });
+  });
+
+  it('TC-NET-043 헤더는 왔지만 본문이 멈추면 15초에 NetworkError(timeout)이다', async () => {
+    const { clock, ff, transport, req } = setup();
+    ff.route('GET /topics', () => new Response(new ReadableStream({ start() {} }), { status: 200 }));
+    const result = track(transport.send(req({ retry: false })));
+    await clock.advance(HTTP_RESPONSE_TIMEOUT_MS - 1);
+    expect(result.state).toBe('pending');
+    await clock.advance(1);
+    expect(result.error).toMatchObject({ name: 'NetworkError', kind: 'timeout' });
+    expect(ff.calls[0]!.signal?.aborted).toBe(true);
+    expect(clock.pendingTimers).toBe(0);
+  });
+
+  it('TC-NET-043 본문이 14.9초에 끝나면 성공이다', async () => {
+    const { clock, ff, transport, req } = setup();
+    ff.route('GET /topics', async () => {
+      const slowBody = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          await clock.sleep(14_900);
+          controller.enqueue(new TextEncoder().encode('{"ok":true}'));
+          controller.close();
+        },
+      });
+      return new Response(slowBody, { status: 200 });
+    });
+    const result = track(transport.send(req({ retry: false })));
+    await clock.advance(14_900);
+    expect(result.value?.text).toBe('{"ok":true}');
   });
 
   it('TC-NET-043 끝난 요청은 타임아웃 타이머를 남기지 않는다', async () => {
@@ -331,6 +360,27 @@ describe('오류 매핑·취소·리다이렉트', () => {
     const result = track(transport.send(req({ retry: false })));
     await clock.advance(0);
     expect(result.error).toMatchObject({ name: 'NetworkError', kind: 'insecure_redirect' });
+  });
+
+  it('TC-NET-050 http로 리다이렉트된 응답의 본문은 취소(cancel)한다', async () => {
+    const { clock, ff, transport, req } = setup();
+    const cancelled = vi.fn();
+    ff.route('GET /topics', () => {
+      const body = new ReadableStream({ start() {}, cancel: cancelled });
+      return withUrl(new Response(body, { status: 200 }), 'http://mock.local/api/v1/topics');
+    });
+    const result = track(transport.send(req({ retry: false })));
+    await clock.advance(0);
+    expect(result.error).toMatchObject({ kind: 'insecure_redirect' });
+    expect(cancelled).toHaveBeenCalled();
+  });
+
+  it('REQ-NET-017 쿠키·자격 증명을 보내지 않는다(credentials: omit)', async () => {
+    const { clock, ff, transport, req } = setup();
+    ff.route('GET /topics', () => jsonResponse(200, {}));
+    track(transport.send(req({ retry: false })));
+    await clock.advance(0);
+    expect(ff.calls[0]!.credentials).toBe('omit');
   });
 
   it('TC-NET-050 같은 https 주소로 끝난 응답은 정상이다', async () => {

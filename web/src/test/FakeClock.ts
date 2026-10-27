@@ -1,4 +1,4 @@
-import type { Clock } from './Clock';
+import type { Clock } from '../core/time/Clock';
 
 interface Timer {
   at: number;

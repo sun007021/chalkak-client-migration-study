@@ -1,4 +1,4 @@
-import { EMPTY_SESSION, type SessionStore, type StoredSession } from './SessionStore';
+import { EMPTY_SESSION, type SessionStore, type StoredSession } from '../core/auth/SessionStore';
 
 /** 테스트용 in-memory SessionStore. 쓰기/삭제 기록을 남긴다. */
 export class FakeSessionStore implements SessionStore {
@@ -22,5 +22,17 @@ export class FakeSessionStore implements SessionStore {
   async clear(): Promise<void> {
     this.current = structuredClone(EMPTY_SESSION);
     this.clearCount += 1;
+  }
+
+  async updateIf(expectedRefreshToken: string, next: StoredSession): Promise<boolean> {
+    if (this.current.tokens?.refreshToken !== expectedRefreshToken) return false;
+    await this.write(next);
+    return true;
+  }
+
+  async clearIf(expectedRefreshToken: string): Promise<boolean> {
+    if (this.current.tokens?.refreshToken !== expectedRefreshToken) return false;
+    await this.clear();
+    return true;
   }
 }

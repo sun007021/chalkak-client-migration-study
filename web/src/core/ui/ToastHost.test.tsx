@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 import { ToastController } from './ToastController';
 import { ToastHost } from './ToastHost';
-import { FakeClock } from '../time/FakeClock';
+import { FakeClock } from '../../test/FakeClock';
 import { SequentialIdGenerator } from '../../test/sequentialIds';
 
 function setup() {

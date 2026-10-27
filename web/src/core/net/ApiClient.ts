@@ -1,10 +1,9 @@
 import { HTTP_RESPONSE_TIMEOUT_MS } from '../../constants';
-import { parseApiBaseUrl } from '../config/apiBaseUrl';
 import type { ApiBaseUrl } from '../config/apiBaseUrl';
 import type { Clock } from '../time/Clock';
 import type { AuthContext, AuthCoordinator } from './AuthCoordinator';
 import type { Decoder } from './decode';
-import { ApiError, InvalidResponseError, parseErrorResponse } from './errors';
+import { ApiError, InvalidResponseError, SessionChangedError, parseErrorResponse } from './errors';
 import { HttpTransport, isIdempotentRequest } from './HttpTransport';
 import type { TransportResponse } from './HttpTransport';
 import type { Logger } from './Logger';
@@ -22,15 +21,15 @@ export interface ApiRequest {
 }
 
 export interface ApiClientDeps {
-  /** 검증 전 문자열. 잘못되면 생성자가 ConfigError를 던진다(요청은 한 건도 나가지 않는다). */
-  baseUrl: string | undefined;
+  /** parseApiBaseUrl/readApiBaseUrl로 검증을 마친 주소. 검증은 조립 한 곳(container)에서만 한다. */
+  baseUrl: ApiBaseUrl;
   fetch: typeof fetch;
   clock: Clock;
   auth: AuthCoordinator;
   logger?: Logger;
 }
 
-const NO_AUTH: AuthContext = { authorization: null, accessTokenAtRequest: null, canRefresh: false };
+const NO_AUTH: AuthContext = { authorization: null, userId: null, accessTokenAtRequest: null, refreshTokenAtRequest: null, canRefresh: false };
 const JSON_CONTENT_TYPE = /^application\/([\w.+-]+\+)?json\s*(;|$)/i;
 
 /** 토큰을 붙이지 않고 401 갱신도 하지 않는 API: /auth/*, /banners (REQ-NET-017, 025). */
@@ -47,7 +46,7 @@ export class ApiClient {
   private readonly transport: HttpTransport;
 
   constructor(private readonly deps: ApiClientDeps) {
-    this.baseUrl = parseApiBaseUrl(deps.baseUrl);
+    this.baseUrl = deps.baseUrl;
     this.transport = new HttpTransport({ fetch: deps.fetch, clock: deps.clock, logger: deps.logger });
   }
 
@@ -97,7 +96,9 @@ export class ApiClient {
       } else {
         throw error;
       }
-      ctx = await auth.prepare();
+      const next = await auth.prepare();
+      if (next.userId !== ctx.userId) throw new SessionChangedError('account switched before retry');
+      ctx = next;
     }
   }
 

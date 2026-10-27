@@ -1,4 +1,4 @@
-import { RETRY_AFTER_MAX_SECONDS, RETRY_BACKOFF_MS } from '../../constants';
+import { RETRY_AFTER_MAX_MS, RETRY_BACKOFF_MS } from '../../constants';
 import type { Clock } from '../time/Clock';
 import { NetworkError, isCancellation } from './errors';
 import { sanitizeLogFields, stripUrlQuery } from './Logger';
@@ -79,9 +79,9 @@ export class HttpTransport {
     const controller = new AbortController();
     const onUserAbort = () => controller.abort();
     request.signal?.addEventListener('abort', onUserAbort, { once: true });
+    // 응답 본문을 다 읽을 때까지 하나의 타임아웃을 적용한다(헤더 후 본문이 멈춰도 NetworkError(timeout), D-21).
     const timerStop = new AbortController();
     let timedOut = false;
-    // 타임아웃은 응답 헤더가 도착할 때까지만 적용한다(fetch는 연결/응답 타임아웃을 나눌 수 없다).
     void clock.sleep(request.timeoutMs, timerStop.signal).then(
       () => {
         timedOut = true;
@@ -89,20 +89,34 @@ export class HttpTransport {
       },
       () => {},
     );
+    const aborted = new Promise<never>((_, reject) => {
+      controller.signal.addEventListener('abort', () => reject(abortError()), { once: true });
+    });
+    aborted.catch(() => {});
+    // fetch·본문 읽기가 abort를 무시하는 환경에서도 끝나도록 abort와 경주시킨다. 진 쪽의 늦은 거절은 삼킨다.
+    const raceWithAbort = <T>(promise: Promise<T>): Promise<T> => {
+      promise.catch(() => {});
+      return Promise.race([promise, aborted]);
+    };
+    let response: Response | undefined;
     try {
-      const response = await this.deps.fetch(request.url, {
-        method: request.method,
-        headers: request.headers,
-        body: request.body,
-        signal: controller.signal,
-      });
+      response = await raceWithAbort(
+        this.deps.fetch(request.url, {
+          method: request.method,
+          headers: request.headers,
+          body: request.body,
+          signal: controller.signal,
+          credentials: 'omit',
+        }),
+      );
       if (request.url.startsWith('https:') && response.url.startsWith('http:')) {
+        await response.body?.cancel().catch(() => {});
         throw new NetworkError('insecure_redirect');
       }
-      timerStop.abort();
-      const text = await response.text();
+      const text = await raceWithAbort(response.text());
       return { status: response.status, headers: response.headers, text };
     } catch (error) {
+      void response?.body?.cancel().catch(() => {});
       if (request.signal?.aborted) throw isCancellation(error) ? error : abortError();
       if (timedOut) throw new NetworkError('timeout', error);
       if (error instanceof NetworkError) throw error;
@@ -129,11 +143,11 @@ export function isIdempotentRequest(method: string, path: string): boolean {
   return upper === 'POST' && IDEMPOTENT_POST_PATHS.has(path);
 }
 
-/** Retry-After 값을 대기 ms로. 숫자 초 또는 HTTP 날짜. 음수·비숫자·과거 날짜는 null(무시). 상한(RETRY_AFTER_MAX_SECONDS) 초과는 'too_long'. */
+/** Retry-After 값을 대기 ms로. 숫자 초 또는 HTTP 날짜. 음수·비숫자·과거 날짜는 null(무시). 상한(RETRY_AFTER_MAX_MS) 초과는 'too_long'. */
 export function parseRetryAfter(value: string | null, nowMs: number): number | 'too_long' | null {
   const text = value?.trim() ?? '';
   if (text === '') return null;
-  const maxMs = RETRY_AFTER_MAX_SECONDS * 1000;
+  const maxMs = RETRY_AFTER_MAX_MS;
   if (/^\d+$/.test(text)) {
     const ms = Number(text) * 1000;
     return ms > maxMs ? 'too_long' : ms;

@@ -1,10 +1,10 @@
-import { SCREEN_NAMES, TAB_DESTINATIONS } from '../../constants';
+import { ANALYTICS_SCREEN_NAMES, ANALYTICS_TAB_DESTINATIONS } from '../../constants';
 import type { ScreenName, TabDestination } from '../../constants';
 import type { Logger } from '../net/Logger';
 import type { AnalyticsEvent, AnalyticsTracker } from './AnalyticsTracker';
 
-const isScreenName = (value: string): value is ScreenName => (SCREEN_NAMES as readonly string[]).includes(value);
-const isTabDestination = (value: string): value is TabDestination => (TAB_DESTINATIONS as readonly string[]).includes(value);
+const isScreenName = (value: string): value is ScreenName => (ANALYTICS_SCREEN_NAMES as readonly string[]).includes(value);
+const isTabDestination = (value: string): value is TabDestination => (ANALYTICS_TAB_DESTINATIONS as readonly string[]).includes(value);
 
 /**
  * 화면 코드가 쓰는 얇은 API. 허용 목록 밖 screen_name/destination은 보내지 않고,

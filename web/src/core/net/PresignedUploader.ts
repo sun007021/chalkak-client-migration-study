@@ -1,4 +1,4 @@
-import { PRESIGNED_PUT_TIMEOUT_MS } from '../../constants';
+import { UPLOAD_PUT_TIMEOUT_MS } from '../../constants';
 import { assertAllowedAbsoluteUrl } from '../config/apiBaseUrl';
 import type { Clock } from '../time/Clock';
 import { ApiError } from './errors';
@@ -36,7 +36,7 @@ export class PresignedUploader {
       url: request.url,
       headers: { 'content-type': request.contentType },
       body: request.body,
-      timeoutMs: PRESIGNED_PUT_TIMEOUT_MS,
+      timeoutMs: UPLOAD_PUT_TIMEOUT_MS,
       retry: false,
       signal: request.signal,
     });

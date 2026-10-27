@@ -4,19 +4,18 @@ export interface Logger {
   log(level: LogLevel, message: string, fields?: Record<string, unknown>): void;
 }
 
-/** 테스트용 로그 sink. */
-export class RecordingLogger implements Logger {
-  readonly entries: { level: LogLevel; message: string; fields?: Record<string, unknown> }[] = [];
+/** 브라우저 콘솔로 내보내는 기본 Logger. 호출자가 비밀값을 넣지 않아도 되도록 필드를 한 번 더 걸러 낸다. */
+export class ConsoleLogger implements Logger {
+  constructor(private readonly sink: Pick<Console, 'debug' | 'info' | 'warn' | 'error'> = console) {}
   log(level: LogLevel, message: string, fields?: Record<string, unknown>): void {
-    this.entries.push({ level, message, fields });
-  }
-  /** 모든 기록을 한 문자열로(비밀값 포함 여부 검사용). */
-  dump(): string {
-    return JSON.stringify(this.entries);
+    const safe = fields === undefined ? undefined : sanitizeLogFields(fields);
+    if (safe === undefined) this.sink[level](message);
+    else this.sink[level](message, safe);
   }
 }
 
-const SECRET_KEYS = new Set(['accesstoken', 'refreshtoken', 'idtoken', 'rawnonce', 'fcmtoken', 'signuptoken', 'authorization']);
+/** 키 이름에 token·nonce·authorization이 들어가면(idToken, signupToken, fcmToken, rawNonce 등) 값을 지운다. */
+const isSecretKey = (key: string): boolean => /token|nonce|authorization/i.test(key);
 const REDACTED = '[REDACTED]';
 const MAX_DEPTH = 8;
 const URL_WITH_QUERY = /(https?:\/\/[^\s?#"'<>]+)[?#][^\s"'<>]*/g;
@@ -30,7 +29,7 @@ function sanitizeValue(value: unknown, depth: number): unknown {
   if (Array.isArray(value)) return value.map((item) => sanitizeValue(item, depth + 1));
   const out: Record<string, unknown> = {};
   for (const [key, inner] of Object.entries(value)) {
-    out[key] = SECRET_KEYS.has(key.toLowerCase()) ? REDACTED : sanitizeValue(inner, depth + 1);
+    out[key] = isSecretKey(key) ? REDACTED : sanitizeValue(inner, depth + 1);
   }
   return out;
 }

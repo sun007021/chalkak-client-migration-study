@@ -8,11 +8,3 @@ export type AnalyticsEvent =
 export interface AnalyticsTracker {
   track(event: AnalyticsEvent): void;
 }
-
-/** 테스트용. */
-export class FakeAnalyticsTracker implements AnalyticsTracker {
-  readonly events: AnalyticsEvent[] = [];
-  track(event: AnalyticsEvent): void {
-    this.events.push(event);
-  }
-}

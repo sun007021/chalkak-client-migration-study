@@ -1,11 +1,15 @@
 import type { ReactNode } from 'react';
 import { t } from '../../copy/ko';
 
-/** screenId는 testids.md의 화면 접두(예: 'home'). 요소 id는 `<screenId>.loading`. */
+/** screenId는 testids.md의 화면 접두(예: 'home'). 요소 id는 `<screenId>.loading`. 문구 없이 회전 스피너만 그린다. */
 export function LoadingIndicator({ screenId }: { screenId: string }): ReactNode {
   return (
-    <div data-testid={`${screenId}.loading`} role="progressbar" aria-busy="true" aria-label="loading">
-      ...
+    <div data-testid={`${screenId}.loading`} role="status" aria-busy="true" style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
+      <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="56 20" opacity="0.6">
+          <animateTransform attributeName="transform" type="rotate" from="0 16 16" to="360 16 16" dur="0.9s" repeatCount="indefinite" />
+        </circle>
+      </svg>
     </div>
   );
 }

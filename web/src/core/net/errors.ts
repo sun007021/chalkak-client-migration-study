@@ -55,6 +55,14 @@ export class ConfigError extends Error {
   readonly name = 'ConfigError';
 }
 
+/** 요청을 보낸 뒤 로그아웃·계정 전환·세션 만료로 세션이 바뀌어 요청을 이어 갈 수 없다. 다른 세션의 토큰으로 재전송하지 않는다(D-17). */
+export class SessionChangedError extends Error {
+  readonly name = 'SessionChangedError';
+  constructor(reason = 'session changed') {
+    super(reason);
+  }
+}
+
 /** 요청 취소(AbortController)는 오류가 아니다. 취소는 AbortError DOMException 그대로 전파한다(D-20). */
 export function isCancellation(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { name?: unknown }).name === 'AbortError';

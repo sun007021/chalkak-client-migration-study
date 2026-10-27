@@ -1,5 +1,5 @@
 /**
- * 계약 테스트용 fake fetch. MSW 대신 이것으로 통일한다: 가짜 시계(FakeClock)와 같이 쓸 때 타이머 간섭이 없고,
+ * 계약 테스트용 fake fetch. MSW 같은 네트워크 가로채기 대신 이것으로 통일한다: 가짜 시계(FakeClock)와 같이 쓸 때 타이머 간섭이 없고,
  * 경로·메서드·헤더·바디 기록과 요청 취소(signal) 처리를 직접 통제할 수 있다.
  */
 export interface RecordedRequest {
@@ -14,6 +14,7 @@ export interface RecordedRequest {
   /** 문자열 본문, 없으면 null. Blob/ArrayBuffer는 그 객체 */
   body: string | Blob | ArrayBuffer | null;
   signal: AbortSignal | null;
+  credentials: RequestCredentials | null;
 }
 
 export type Responder = (req: RecordedRequest) => Response | Promise<Response>;
@@ -77,6 +78,7 @@ export class FakeFetch {
       headers,
       body: (init?.body as RecordedRequest['body']) ?? null,
       signal: init?.signal ?? null,
+      credentials: init?.credentials ?? null,
     };
     this.calls.push(req);
     if (req.signal?.aborted) throw abortError();

@@ -1,6 +1,6 @@
 import { sanitizeLogFields, stripUrlQuery } from './Logger';
 
-const SECRET_KEYS = ['accessToken', 'refreshToken', 'idToken', 'rawNonce', 'fcmToken', 'signupToken', 'authorization', 'Authorization'];
+const SECRET_KEYS = ['googleIdToken', 'pushToken', 'new_refresh_token', 'accessToken', 'refreshToken', 'idToken', 'rawNonce', 'fcmToken', 'signupToken', 'authorization', 'Authorization'];
 
 describe('sanitizeLogFields', () => {
   it.each(SECRET_KEYS)('TC-NET-055 %s 값은 로그에 남기지 않는다', (key) => {

@@ -1,7 +1,8 @@
 import { AnalyticsReporter } from './AnalyticsReporter';
-import { FakeAnalyticsTracker, type AnalyticsEvent, type AnalyticsTracker } from './AnalyticsTracker';
-import { RecordingLogger } from '../net/Logger';
-import { SCREEN_NAMES, TAB_DESTINATIONS } from '../../constants';
+import { type AnalyticsEvent, type AnalyticsTracker } from './AnalyticsTracker';
+import { FakeAnalyticsTracker } from '../../test/FakeAnalyticsTracker';
+import { RecordingLogger } from '../../test/RecordingLogger';
+import { ANALYTICS_SCREEN_NAMES, ANALYTICS_TAB_DESTINATIONS } from '../../constants';
 
 function setup() {
   const tracker = new FakeAnalyticsTracker();
@@ -22,8 +23,8 @@ describe('AnalyticsReporter', () => {
 
   it('TC-ANL-002 허용된 19종 이름은 모두 그대로 전송된다', () => {
     const { tracker, reporter } = setup();
-    SCREEN_NAMES.forEach((n) => reporter.screenView(n));
-    expect(tracker.events.map((e) => (e.name === 'screen_view' ? e.params.screen_name : null))).toEqual([...SCREEN_NAMES]);
+    ANALYTICS_SCREEN_NAMES.forEach((n) => reporter.screenView(n));
+    expect(tracker.events.map((e) => (e.name === 'screen_view' ? e.params.screen_name : null))).toEqual([...ANALYTICS_SCREEN_NAMES]);
   });
 
   it('TC-ANL-002 허용 목록 밖 screen_name은 전송하지 않는다', () => {
@@ -34,7 +35,7 @@ describe('AnalyticsReporter', () => {
     expect(tracker.events).toEqual([]);
   });
 
-  it.each(TAB_DESTINATIONS)('TC-ANL-013 탭 %s 선택은 bottom_navigation_selected {destination}으로 전송된다', (dest) => {
+  it.each(ANALYTICS_TAB_DESTINATIONS)('TC-ANL-013 탭 %s 선택은 bottom_navigation_selected {destination}으로 전송된다', (dest) => {
     const { tracker, reporter } = setup();
     reporter.tabSelected(dest);
     expect(tracker.events).toEqual([{ name: 'bottom_navigation_selected', params: { destination: dest } }]);

@@ -1,6 +1,6 @@
 import { clampDayToMonth, formatDateString, isSelectableTopicDate, isTodayKst, kstDateOf, kstStartOfDay, kstToday, nextKstMidnight, parseDateString, weekOf } from './kst';
-import { FakeClock } from './FakeClock';
-import { DEVICE_TIME_ZONES, withHostileLocale, withTimeZone } from './withTimeZone';
+import { FakeClock } from '../../test/FakeClock';
+import { DEVICE_TIME_ZONES, withHostileLocale, withTimeZone } from '../../test/withTimeZone';
 
 const utc = (iso: string) => Date.parse(iso);
 

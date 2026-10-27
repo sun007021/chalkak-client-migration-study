@@ -1,10 +1,10 @@
-import { ApiError, NetworkError, isCancellation } from './errors';
+import { ApiError, InvalidResponseError, NetworkError, SessionChangedError, isCancellation } from './errors';
 import { d } from './decode';
 import { emptyResponse, jsonResponse, networkFailure, type Responder } from '../../test/fakeFetch';
 import { makeApiEnv } from '../../test/apiEnv';
 import { track } from '../../test/track';
-import { errorBodies, guestSession, memberSession, refreshSuccessBody, NOW, tokens } from '../../test/fixtures';
-import { flushAsync } from '../time/FakeClock';
+import { ME, errorBodies, guestSession, memberSession, refreshSuccessBody, NOW, tokens } from '../../test/fixtures';
+import { flushAsync } from '../../test/FakeClock';
 
 const ok = d.object({ id: d.string() });
 const body = { id: 'ok' };
@@ -23,24 +23,24 @@ function byToken(map: Record<string, Response | (() => Response)>, fallback: () 
 describe('401 갱신', () => {
   it('TC-NET-012 TC-NET-059 401 UNAUTHORIZED면 refresh 1회 후 새 토큰으로 원 요청을 정확히 1회 재전송하고 성공을 돌려준다', async () => {
     const { ff, client, clock, store } = makeApiEnv(memberSession());
-    ff.route('GET /notifications', byToken({ 'access-2': jsonResponse(200, body) }));
+    ff.route('GET /notifications', byToken({ 'fixture-access-token-2': jsonResponse(200, body) }));
     ff.route('POST /auth/refresh', () => jsonResponse(200, refreshSuccessBody));
     const result = track(client().request({ method: 'GET', path: '/notifications' }, ok));
     await clock.advance(0);
     expect(result.value).toEqual(body);
     const sent = ff.callsTo('GET /notifications');
-    expect(sent.map((c) => c.headers['authorization'])).toEqual(['Bearer access-1', 'Bearer access-2']);
+    expect(sent.map((c) => c.headers['authorization'])).toEqual(['Bearer fixture-access-token-1', 'Bearer fixture-access-token-2']);
     expect(ff.callsTo('POST /auth/refresh')).toHaveLength(1);
-    expect(JSON.parse(ff.callsTo('POST /auth/refresh')[0]!.body as string)).toEqual({ refreshToken: 'refresh-1' });
+    expect(JSON.parse(ff.callsTo('POST /auth/refresh')[0]!.body as string)).toEqual({ refreshToken: 'fixture-refresh-token-1' });
     const saved = (await store.read()).tokens!;
-    expect([saved.accessToken, saved.refreshToken]).toEqual(['access-2', 'refresh-2']);
+    expect([saved.accessToken, saved.refreshToken]).toEqual(['fixture-access-token-2', 'fixture-refresh-token-2']);
   });
 
   it('TC-NET-022 새 토큰은 저장이 끝난 뒤에야 원 요청이 재전송된다', async () => {
     const { ff, client, clock, store } = makeApiEnv(memberSession());
     let storedWhenRetried: string | undefined;
     ff.route('GET /notifications', (req) => {
-      if (req.headers['authorization'] === 'Bearer access-2') {
+      if (req.headers['authorization'] === 'Bearer fixture-access-token-2') {
         return store.read().then((s) => {
           storedWhenRetried = s.tokens?.accessToken;
           return jsonResponse(200, body);
@@ -51,7 +51,7 @@ describe('401 갱신', () => {
     ff.route('POST /auth/refresh', () => jsonResponse(200, refreshSuccessBody));
     track(client().request({ method: 'GET', path: '/notifications' }, ok));
     await clock.advance(0);
-    expect(storedWhenRetried).toBe('access-2');
+    expect(storedWhenRetried).toBe('fixture-access-token-2');
   });
 
   it('TC-NET-013 토큰 없이 보낸 게스트 요청의 401은 refresh하지 않고 세션도 지우지 않는다', async () => {
@@ -68,20 +68,20 @@ describe('401 갱신', () => {
 
   it('TC-NET-014 만료된 access token은 Authorization 없이 보내고 서버 401을 받아 갱신 경로로 간다', async () => {
     const { ff, client, clock } = makeApiEnv(memberSession({ accessTokenExpiresAt: NOW - 1_000 }));
-    ff.route('GET /notifications', byToken({ 'access-2': jsonResponse(200, body) }));
+    ff.route('GET /notifications', byToken({ 'fixture-access-token-2': jsonResponse(200, body) }));
     ff.route('POST /auth/refresh', () => jsonResponse(200, refreshSuccessBody));
     const result = track(client().request({ method: 'GET', path: '/notifications' }, ok));
     await clock.advance(0);
     const sent = ff.callsTo('GET /notifications');
     expect(sent[0]!.headers['authorization']).toBeUndefined();
-    expect(sent[1]!.headers['authorization']).toBe('Bearer access-2');
+    expect(sent[1]!.headers['authorization']).toBe('Bearer fixture-access-token-2');
     expect(result.value).toEqual(body);
   });
 
   it('TC-TIME-028 기기 시계가 하루 빨라 만료로 오판해도 401 → refresh로 정상 복구된다', async () => {
     const { ff, client, clock } = makeApiEnv(memberSession());
     clock.setWallClock(NOW + 86_400_000);
-    ff.route('GET /notifications', byToken({ 'access-2': jsonResponse(200, body) }));
+    ff.route('GET /notifications', byToken({ 'fixture-access-token-2': jsonResponse(200, body) }));
     ff.route('POST /auth/refresh', () => jsonResponse(200, refreshSuccessBody));
     const result = track(client().request({ method: 'GET', path: '/notifications' }, ok));
     await clock.advance(0);
@@ -91,9 +91,9 @@ describe('401 갱신', () => {
 
   it('TC-NET-015 TC-NET-029 동시 401 세 건은 refresh 1건이고 원 요청은 각각 새 토큰으로 1회씩만 재전송된다', async () => {
     const { ff, client, clock } = makeApiEnv(memberSession());
-    ff.route('GET /a', byToken({ 'access-2': jsonResponse(200, body) }));
-    ff.route('GET /b', byToken({ 'access-2': jsonResponse(200, body) }));
-    ff.route('GET /c', byToken({ 'access-2': jsonResponse(200, body) }));
+    ff.route('GET /a', byToken({ 'fixture-access-token-2': jsonResponse(200, body) }));
+    ff.route('GET /b', byToken({ 'fixture-access-token-2': jsonResponse(200, body) }));
+    ff.route('GET /c', byToken({ 'fixture-access-token-2': jsonResponse(200, body) }));
     ff.route('POST /auth/refresh', async () => {
       await clock.sleep(300);
       return jsonResponse(200, refreshSuccessBody);
@@ -103,7 +103,7 @@ describe('401 갱신', () => {
     await clock.advance(300);
     expect(ff.callsTo('POST /auth/refresh')).toHaveLength(1);
     for (const p of ['a', 'b', 'c']) {
-      expect(ff.callsTo(`GET /${p}`).map((x) => x.headers['authorization'])).toEqual(['Bearer access-1', 'Bearer access-2']);
+      expect(ff.callsTo(`GET /${p}`).map((x) => x.headers['authorization'])).toEqual(['Bearer fixture-access-token-1', 'Bearer fixture-access-token-2']);
     }
     expect(rs.map((r) => r.state)).toEqual(['fulfilled', 'fulfilled', 'fulfilled']);
   });
@@ -112,10 +112,10 @@ describe('401 갱신', () => {
     const { ff, client, clock, store } = makeApiEnv(memberSession());
     let first = true;
     ff.route('GET /notifications', async (req) => {
-      if (req.headers['authorization'] === 'Bearer access-2') return jsonResponse(200, body);
+      if (req.headers['authorization'] === 'Bearer fixture-access-token-2') return jsonResponse(200, body);
       if (first) {
         first = false;
-        await store.write({ userId: 'user-1', tokens: tokens({ accessToken: 'access-2', refreshToken: 'refresh-2' }), isGuest: false });
+        await store.write({ userId: ME, tokens: tokens({ accessToken: 'fixture-access-token-2', refreshToken: 'fixture-refresh-token-2' }), isGuest: false });
       }
       return jsonResponse(401, errorBodies.unauthorized);
     });
@@ -140,7 +140,7 @@ describe('401 갱신', () => {
 
   it('TC-NET-018 재전송한 요청이 REAUTHENTICATION_REQUIRED면 세션을 지우고 로그인 이벤트를 1번 낸다', async () => {
     const { ff, client, clock, store, expired } = makeApiEnv(memberSession());
-    ff.route('GET /notifications', byToken({ 'access-2': jsonResponse(401, errorBodies.reauth) }));
+    ff.route('GET /notifications', byToken({ 'fixture-access-token-2': jsonResponse(401, errorBodies.reauth) }));
     ff.route('POST /auth/refresh', () => jsonResponse(200, refreshSuccessBody));
     const result = track(client().request({ method: 'GET', path: '/notifications' }, ok));
     await clock.advance(0);
@@ -154,10 +154,10 @@ describe('401 갱신', () => {
     const { ff, client, clock, store, expired } = makeApiEnv(memberSession());
     let first = true;
     ff.route('GET /notifications', async (req) => {
-      if (req.headers['authorization'] === 'Bearer access-2') return jsonResponse(200, body);
+      if (req.headers['authorization'] === 'Bearer fixture-access-token-2') return jsonResponse(200, body);
       if (first) {
         first = false;
-        await store.write({ userId: 'user-1', tokens: tokens({ accessToken: 'access-2', refreshToken: 'refresh-2' }), isGuest: false });
+        await store.write({ userId: ME, tokens: tokens({ accessToken: 'fixture-access-token-2', refreshToken: 'fixture-refresh-token-2' }), isGuest: false });
       }
       return jsonResponse(401, errorBodies.reauth);
     });
@@ -203,7 +203,7 @@ describe('401 갱신', () => {
     expect(ff.callsTo('POST /auth/refresh')).toHaveLength(1);
     expect(store.clearCount).toBe(0);
     expect(expired.count).toBe(0);
-    expect((await store.read()).tokens?.refreshToken).toBe('refresh-1');
+    expect((await store.read()).tokens?.refreshToken).toBe('fixture-refresh-token-1');
   });
 
   it('TC-NET-024 refresh가 5xx면 그 요청만 실패하고 세션을 유지한다', async () => {
@@ -212,7 +212,8 @@ describe('401 갱신', () => {
     ff.route('POST /auth/refresh', () => jsonResponse(500, errorBodies.internal500));
     const result = track(client().request({ method: 'GET', path: '/notifications' }, ok));
     await clock.advance(30_000);
-    expect(result.state).toBe('rejected');
+    expect(result.error).toBeInstanceOf(ApiError);
+    expect(result.error).toMatchObject({ status: 500, errorCode: 'INTERNAL_ERROR' });
     expect(ff.callsTo('POST /auth/refresh')).toHaveLength(1);
     expect(store.clearCount).toBe(0);
     expect(expired.count).toBe(0);
@@ -224,9 +225,9 @@ describe('401 갱신', () => {
     ff.route('POST /auth/refresh', () => jsonResponse(200, { accessToken: 'only-access', expiresIn: 900 }));
     const result = track(client().request({ method: 'GET', path: '/notifications' }, ok));
     await clock.advance(0);
-    expect(result.state).toBe('rejected');
+    expect(result.error).toBeInstanceOf(InvalidResponseError);
     expect(store.writes).toHaveLength(0);
-    expect((await store.read()).tokens?.accessToken).toBe('access-1');
+    expect((await store.read()).tokens?.accessToken).toBe('fixture-access-token-1');
   });
 
   it('TC-NET-026 refresh가 400이어도 로그아웃하지 않고 요청만 실패시킨다', async () => {
@@ -235,7 +236,8 @@ describe('401 갱신', () => {
     ff.route('POST /auth/refresh', () => jsonResponse(400, errorBodies.business400));
     const result = track(client().request({ method: 'GET', path: '/notifications' }, ok));
     await clock.advance(0);
-    expect(result.state).toBe('rejected');
+    expect(result.error).toBeInstanceOf(ApiError);
+    expect(result.error).toMatchObject({ status: 400, errorCode: 'BUSINESS_ERROR' });
     expect(store.clearCount).toBe(0);
     expect(expired.count).toBe(0);
   });
@@ -251,7 +253,7 @@ describe('401 갱신', () => {
     await clock.advance(100);
     await store.clear();
     await clock.advance(500);
-    expect(result.state).toBe('rejected');
+    expect(result.error).toBeInstanceOf(SessionChangedError);
     expect(store.writes).toHaveLength(0);
     expect((await store.read()).tokens).toBeNull();
     expect(ff.callsTo('GET /notifications')).toHaveLength(1);
@@ -259,8 +261,8 @@ describe('401 갱신', () => {
 
   it('TC-NET-028 refresh 중 한 요청이 취소돼도 AbortError만 받고 다른 요청은 같은 refresh로 성공한다', async () => {
     const { ff, client, clock } = makeApiEnv(memberSession());
-    ff.route('GET /a', byToken({ 'access-2': jsonResponse(200, body) }));
-    ff.route('GET /b', byToken({ 'access-2': jsonResponse(200, body) }));
+    ff.route('GET /a', byToken({ 'fixture-access-token-2': jsonResponse(200, body) }));
+    ff.route('GET /b', byToken({ 'fixture-access-token-2': jsonResponse(200, body) }));
     ff.route('POST /auth/refresh', async () => {
       await clock.sleep(300);
       return jsonResponse(200, refreshSuccessBody);
@@ -281,7 +283,7 @@ describe('401 갱신', () => {
 
   it.each(['/posts', '/topics'])('TC-NET-030 토큰을 보낸 비로그인 허용 API(GET %s)도 만료 토큰 401이면 갱신 후 재전송한다', async (path) => {
     const { ff, client, clock } = makeApiEnv(memberSession());
-    ff.route(`GET ${path}`, byToken({ 'access-2': jsonResponse(200, body) }));
+    ff.route(`GET ${path}`, byToken({ 'fixture-access-token-2': jsonResponse(200, body) }));
     ff.route('POST /auth/refresh', () => jsonResponse(200, refreshSuccessBody));
     const result = track(client().request({ method: 'GET', path }, ok));
     await clock.advance(0);

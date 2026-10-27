@@ -3,7 +3,7 @@ import { act, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AnalyticsProvider } from './AnalyticsContext';
 import { AnalyticsReporter } from './AnalyticsReporter';
-import { FakeAnalyticsTracker } from './AnalyticsTracker';
+import { FakeAnalyticsTracker } from '../../test/FakeAnalyticsTracker';
 import { useScreenView } from './useScreenView';
 
 function Screen({ name }: { name: 'home' | 'feed' }) {

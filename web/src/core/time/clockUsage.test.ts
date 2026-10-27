@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 /** TC-TIME-029: 시스템 시계를 직접 부르는 곳의 허용 목록. 새 항목을 늘리지 않는다. */
-const ALLOWED = new Set(['core/time/SystemClock.ts', 'core/time/FakeClock.ts', 'core/time/withTimeZone.ts', 'core/ids.ts']);
+const ALLOWED = new Set(['core/time/SystemClock.ts', 'core/ids.ts']);
 const FORBIDDEN = /\bDate\.now\s*\(|\bnew Date\s*\(\s*\)|\bperformance\.now\s*\(|\bsetTimeout\s*\(|\bsetInterval\s*\(|\bqueueMicrotask\b/;
 
 function sourceFiles(dir: string, out: string[] = []): string[] {

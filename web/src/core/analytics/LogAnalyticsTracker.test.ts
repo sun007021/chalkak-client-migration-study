@@ -1,6 +1,6 @@
-import { createAnalyticsTracker, LogAnalyticsTracker } from './LogAnalyticsTracker';
+import { LogAnalyticsTracker } from './LogAnalyticsTracker';
 import { AnalyticsReporter } from './AnalyticsReporter';
-import { RecordingLogger } from '../net/Logger';
+import { RecordingLogger } from '../../test/RecordingLogger';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -13,10 +13,9 @@ describe('LogAnalyticsTracker', () => {
     expect(logger.entries[0]!.fields).toEqual({ screen_name: 'home' });
   });
 
-  it('TC-ANL-020 Firebase 설정이 없으면 로그 구현으로 동작하고 크래시하지 않는다', () => {
+  it('TC-ANL-020 Firebase 설정 없이 로그 구현만으로 동작하고 크래시하지 않는다', () => {
     const logger = new RecordingLogger();
-    const tracker = createAnalyticsTracker({ logger });
-    expect(tracker).toBeInstanceOf(LogAnalyticsTracker);
+    const tracker = new LogAnalyticsTracker(logger);
     const reporter = new AnalyticsReporter({ tracker, logger });
     expect(() => {
       reporter.screenView('login');

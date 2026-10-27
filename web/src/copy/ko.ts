@@ -1,14 +1,12 @@
-// common-infra.md "문구" 표. 공용 shared/copy/ko.json이 생기면 그 값과 대조한다.
-export const ko = {
-  'common.error.network': '네트워크 연결을 확인해 주세요.',
-  'common.error.generic': '요청을 처리하지 못했어요. 다시 시도해 주세요.',
-  'common.error.config': 'API 설정을 확인해 주세요.',
-  'common.retry': '다시 시도',
-  'common.confirm': '확인',
-} as const;
+// 사용자 문구는 다섯 클라이언트 공용 shared/copy/ko.json이 기준이다(키 규칙은 shared/README.md).
+import koJson from '../../../shared/copy/ko.json';
 
-export type CopyKey = keyof typeof ko;
+export const ko = koJson;
+export type CopyKey = keyof typeof koJson;
 
-export function t(key: CopyKey): string {
-  return ko[key];
+/** 문구 표에 `{주제}`, `{M월 d일}`처럼 적힌 플레이스홀더를 params로 치환한다. params에 없는 자리는 그대로 둔다. */
+export function t(key: CopyKey, params?: Readonly<Record<string, string | number>>): string {
+  const template: string = ko[key];
+  if (!params) return template;
+  return template.replace(/\{([^{}]+)\}/g, (whole, name: string) => (name in params ? String(params[name]) : whole));
 }

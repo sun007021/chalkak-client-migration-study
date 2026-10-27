@@ -9,11 +9,14 @@ export const POST_IMAGE_MAX_BYTES = 5_242_880;
 export const POST_IMAGE_MAX_LONG_EDGE = 4096;
 export const WEBP_QUALITY_LADDER = [90, 80, 60, 40] as const;
 export const WEBP_DOWNSCALE_FACTOR = 0.85;
-export const WEBP_DOWNSCALE_MAX_TRIES = 3;
+export const WEBP_DOWNSCALE_MAX_ATTEMPTS = 3;
 export const UPLOAD_URL_SAFETY_MARGIN_MS = 5_000;
-export const SIGNATURE_PNG = { width: 1024, height: 512, padding: 48, strokeWidth: 14 } as const;
+export const UPLOAD_ID_CLAIM_TTL_MS = 3_600_000;
+export const SIGNATURE_PNG_SIZE = { width: 1024, height: 512, padding: 48, strokeWidth: 14 } as const;
+export const SIGNATURE_CONTENT_TYPE = 'image/png';
 export const SIGNATURE_MAX_BYTES = 1_048_576;
-export const SIGNUP_PENDING_RETRY = { intervalMs: 1_000, maxTries: 10 } as const;
+export const SIGNUP_PENDING_RETRY_INTERVAL_MS = 1_000;
+export const SIGNUP_PENDING_RETRY_MAX = 10;
 export const AI_REVIEW_POLL_INTERVAL_MS = 3_000;
 export const AI_REVIEW_POLL_WINDOW_MS = 300_000;
 export const PAGE_SIZE = 20;
@@ -21,15 +24,25 @@ export const BANNER_PAGE_SIZE = 10;
 export const TOAST_DURATION_MS = 2_500;
 export const SPLASH_PRELOAD_MAX_MS = 700;
 
-// D-21 네트워크. fetch는 연결/응답 타임아웃을 나누지 못하므로 응답(헤더 도착)까지 15초 하나로 적용한다.
+// D-21 네트워크. fetch는 연결/응답 타임아웃을 나누지 못하므로 응답(헤더 도착 + 본문 수신)까지 15초 하나로 적용한다.
+// HTTP_CONNECT_TIMEOUT_MS는 shared 값과 대조하기 위한 것일 뿐 Web 코드는 쓰지 않는다.
 export const HTTP_CONNECT_TIMEOUT_MS = 10_000;
 export const HTTP_RESPONSE_TIMEOUT_MS = 15_000;
-export const PRESIGNED_PUT_TIMEOUT_MS = 60_000;
-export const RETRY_BACKOFF_MS = [500, 1_000] as const; // 최대 2회 재시도
-export const RETRY_AFTER_MAX_SECONDS = 30; // 확인 필요 2: 넘으면 기다리지 않고 실패
+export const UPLOAD_PUT_TIMEOUT_MS = 60_000;
+export const RETRY_BACKOFF_MS = [500, 1_000] as const;
+export const RETRY_MAX = 2;
+export const VERSION_LOOKUP_TIMEOUT_MS = 3_000;
+/** Web 전용(shared에 없음). Retry-After가 이보다 길면 기다리지 않고 실패(확인 필요 2). */
+export const RETRY_AFTER_MAX_MS = 30_000;
+
+export const TERMS_ALLOWED_HOSTS = ['notion.com', 'notion.so', 'notion.site'] as const;
+export const TERMS_URLS = {
+  service: 'https://app.notion.com/p/3c66b8e8e3678064b543c26b5c0f932d?source=copy_link',
+  privacy: 'https://app.notion.com/p/3b56b8e8e36780af8ec8ea0bf92b97a9?source=copy_link',
+} as const;
 
 // D-22 분석
-export const SCREEN_NAMES = [
+export const ANALYTICS_SCREEN_NAMES = [
   'login',
   'terms',
   'terms_of_service',
@@ -50,7 +63,7 @@ export const SCREEN_NAMES = [
   'photo_upload',
   'photo_upload_success',
 ] as const;
-export type ScreenName = (typeof SCREEN_NAMES)[number];
+export type ScreenName = (typeof ANALYTICS_SCREEN_NAMES)[number];
 
-export const TAB_DESTINATIONS = ['home', 'display', 'record', 'settings'] as const;
-export type TabDestination = (typeof TAB_DESTINATIONS)[number];
+export const ANALYTICS_TAB_DESTINATIONS = ['home', 'display', 'record', 'settings'] as const;
+export type TabDestination = (typeof ANALYTICS_TAB_DESTINATIONS)[number];

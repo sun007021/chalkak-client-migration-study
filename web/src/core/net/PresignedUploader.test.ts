@@ -1,7 +1,7 @@
 import { PresignedUploader } from './PresignedUploader';
 import { ApiError } from './errors';
-import { RecordingLogger } from './Logger';
-import { FakeClock } from '../time/FakeClock';
+import { RecordingLogger } from '../../test/RecordingLogger';
+import { FakeClock } from '../../test/FakeClock';
 import { FakeFetch, emptyResponse, textResponse } from '../../test/fakeFetch';
 import { track } from '../../test/track';
 import { NOW } from '../../test/fixtures';

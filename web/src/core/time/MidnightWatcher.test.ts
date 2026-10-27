@@ -1,5 +1,6 @@
 import { MidnightWatcher } from './MidnightWatcher';
-import { FakeClock } from './FakeClock';
+import { RecordingLogger } from '../../test/RecordingLogger';
+import { FakeClock } from '../../test/FakeClock';
 
 const utc = (iso: string) => Date.parse(iso);
 
@@ -59,5 +60,38 @@ describe('MidnightWatcher', () => {
     watcher.start();
     await clock.advance(1_000);
     expect(changes).toEqual(['2026-11-01']);
+  });
+
+  it('onDateChanged가 던져도 로그만 남기고 다음 자정에도 계속 알린다', async () => {
+    const clock = new FakeClock(utc('2026-10-27T14:59:59Z'));
+    const logger = new RecordingLogger();
+    const seen: string[] = [];
+    const watcher = new MidnightWatcher({
+      clock,
+      logger,
+      onDateChanged: (d) => {
+        seen.push(d);
+        if (seen.length === 1) throw new Error('listener bug');
+      },
+    });
+    watcher.start();
+    await clock.advance(1_000);
+    await clock.advance(24 * 3_600_000);
+    expect(seen).toEqual(['2026-10-28', '2026-10-29']);
+    expect(logger.entries.some((e) => e.level === 'error')).toBe(true);
+  });
+
+  it('sleep이 AbortError 아닌 예외로 실패하면 기록하고 멈춘다(바쁜 루프 없음)', async () => {
+    const clock = new FakeClock(utc('2026-10-27T14:59:59Z'));
+    const logger = new RecordingLogger();
+    let calls = 0;
+    clock.sleep = () => {
+      calls += 1;
+      return Promise.reject(new Error('timer broke'));
+    };
+    new MidnightWatcher({ clock, logger, onDateChanged: () => {} }).start();
+    await clock.advance(10);
+    expect(calls).toBe(1);
+    expect(logger.entries.some((e) => e.level === 'error')).toBe(true);
   });
 });

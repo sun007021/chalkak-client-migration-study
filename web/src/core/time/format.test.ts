@@ -1,5 +1,5 @@
 import { calendarImageFileName, notificationTimeLabel, todayTopicLabel, topicDateLabel, WEEKDAY_HEADERS } from './format';
-import { DEVICE_TIME_ZONES, withHostileLocale, withTimeZone } from './withTimeZone';
+import { DEVICE_TIME_ZONES, withHostileLocale, withTimeZone } from '../../test/withTimeZone';
 
 describe('날짜 포맷 (D-09)', () => {
   it('TC-TIME-023 "M월 d일의 주제"는 월·일을 0 패딩하지 않는다', () => {

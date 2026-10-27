@@ -3,8 +3,8 @@ import { ConfigError, isCancellation, NetworkError } from './errors';
 
 export type ErrorPresentation =
   | { kind: 'none' }
-  | { kind: 'toast'; copyKey: CopyKey }
-  | { kind: 'error_screen'; copyKey: CopyKey };
+  | { kind: 'toast'; copy: CopyKey }
+  | { kind: 'error_screen'; copy: CopyKey };
 
 /**
  * 사용자에게 보일 공통 문구 키. 서버 message는 쓰지 않는다(D-02, 화면별 문구는 기능 쪽이 fallback으로 준다).
@@ -21,6 +21,6 @@ export function userMessageKey(error: unknown, fallback?: CopyKey): CopyKey {
  */
 export function decideErrorPresentation(input: { error: unknown; hasContent: boolean; fallback?: CopyKey }): ErrorPresentation {
   if (isCancellation(input.error)) return { kind: 'none' };
-  const copyKey = userMessageKey(input.error, input.fallback);
-  return { kind: input.hasContent ? 'toast' : 'error_screen', copyKey };
+  const copy = userMessageKey(input.error, input.fallback);
+  return { kind: input.hasContent ? 'toast' : 'error_screen', copy };
 }

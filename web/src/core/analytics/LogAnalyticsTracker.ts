@@ -9,8 +9,3 @@ export class LogAnalyticsTracker implements AnalyticsTracker {
     this.logger.log('info', `analytics ${event.name}`, { ...event.params });
   }
 }
-
-/** 설정이 없으면 로그 구현을 돌려준다. Web 기본 빌드는 항상 이 경로(자동 page_view 없음). */
-export function createAnalyticsTracker(deps: { logger: Logger; firebaseConfig?: unknown }): AnalyticsTracker {
-  return new LogAnalyticsTracker(deps.logger);
-}

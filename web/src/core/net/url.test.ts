@@ -1,5 +1,5 @@
 import { parseApiBaseUrl } from '../config/apiBaseUrl';
-import { buildUrl, toWireUuid } from './url';
+import { buildUrl, path, toWireUuid } from './url';
 
 const base = parseApiBaseUrl('https://mock.local');
 
@@ -31,5 +31,14 @@ describe('buildUrl', () => {
     } finally {
       Number.prototype.toLocaleString = toLocale;
     }
+  });
+});
+
+describe('path 태그', () => {
+  it('UUID는 소문자로, 그 밖의 값은 세그먼트로 인코딩한다', () => {
+    expect(path`/posts/${'3F2504E0-4F89-11D3-9A0C-0305E82C3301'}/likes`).toBe('/posts/3f2504e0-4f89-11d3-9a0c-0305e82c3301/likes');
+    expect(path`/users/${'a/b?c#d'}`).toBe('/users/a%2Fb%3Fc%23d');
+    expect(path`/page/${3}`).toBe('/page/3');
+    expect(path`/static`).toBe('/static');
   });
 });

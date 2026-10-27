@@ -1,8 +1,5 @@
-import { ApiClient } from './ApiClient';
 import { d } from './decode';
 import { ApiError, ConfigError, InvalidResponseError, NetworkError, isCancellation } from './errors';
-import { AuthCoordinator } from './AuthCoordinator';
-import { HttpTokenRefresher } from './TokenRefresher';
 import { parseApiBaseUrl } from '../config/apiBaseUrl';
 import { emptyResponse, jsonResponse, networkFailure, textResponse } from '../../test/fakeFetch';
 import { makeApiEnv } from '../../test/apiEnv';
@@ -81,16 +78,10 @@ describe('요청 구성', () => {
     expect(ff.calls.map((x) => x.url.startsWith('https://mock.local:4010/api/v1/'))).toEqual([true, true]);
   });
 
-  it('TC-NET-051 REQ-NET-002 loopback 외 http·경로가 붙은 기준 주소는 생성 시 ConfigError이고 요청도 Authorization도 나가지 않는다', () => {
-    const { ff, clock, store } = makeApiEnv(memberSession());
-    const auth = new AuthCoordinator({
-      store,
-      refresher: new HttpTokenRefresher({ fetch: ff.fetch, clock, baseUrl: parseApiBaseUrl('https://mock.local') }),
-      clock,
-      onSessionExpired: () => {},
-    });
+  it('TC-NET-051 REQ-NET-002 loopback 외 http·경로가 붙은 기준 주소는 파싱 단계에서 ConfigError이고 요청도 Authorization도 나가지 않는다', () => {
+    const { ff } = makeApiEnv(memberSession());
     for (const baseUrl of ['http://mock.local', 'https://mock.local/api/v1/', 'ftp://mock.local']) {
-      expect(() => new ApiClient({ baseUrl, fetch: ff.fetch, clock, auth })).toThrow(ConfigError);
+      expect(() => parseApiBaseUrl(baseUrl)).toThrow(ConfigError);
     }
     expect(ff.calls).toHaveLength(0);
   });
@@ -102,13 +93,13 @@ describe('요청 구성', () => {
     ff.route('GET /banners', () => jsonResponse(200, { id: '1', kind: 'A' }));
     ff.route('GET /notifications', () => jsonResponse(200, { id: '1', kind: 'A' }));
     const c = client();
-    track(c.requestVoid({ method: 'POST', path: '/auth/logout', body: { refreshToken: 'refresh-1' } }));
+    track(c.requestVoid({ method: 'POST', path: '/auth/logout', body: { refreshToken: 'fixture-refresh-token-1' } }));
     track(c.request({ method: 'GET', path: '/banners' }, item));
     track(c.request({ method: 'GET', path: '/notifications' }, item));
     await clock.advance(0);
     expect(ff.callsTo('POST /auth/logout')[0]!.headers['authorization']).toBeUndefined();
     expect(ff.callsTo('GET /banners')[0]!.headers['authorization']).toBeUndefined();
-    expect(ff.callsTo('GET /notifications')[0]!.headers['authorization']).toBe('Bearer access-1');
+    expect(ff.callsTo('GET /notifications')[0]!.headers['authorization']).toBe('Bearer fixture-access-token-1');
   });
 });
 

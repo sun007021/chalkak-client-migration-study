@@ -21,4 +21,11 @@ export interface SessionStore {
   read(): Promise<StoredSession>;
   write(session: StoredSession): Promise<void>;
   clear(): Promise<void>;
+  /**
+   * 저장된 refresh token이 expectedRefreshToken과 같을 때만 next로 바꾼다(비교-후-쓰기, 원자적). 바꿨으면 true.
+   * refresh 도중 로그아웃·계정 전환·다른 탭의 갱신이 끼어들었으면 false이고 아무것도 쓰지 않는다.
+   */
+  updateIf(expectedRefreshToken: string, next: StoredSession): Promise<boolean>;
+  /** 저장된 refresh token이 expectedRefreshToken과 같을 때만 지운다. 지웠으면 true. */
+  clearIf(expectedRefreshToken: string): Promise<boolean>;
 }

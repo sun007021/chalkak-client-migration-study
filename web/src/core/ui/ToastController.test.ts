@@ -1,5 +1,5 @@
 import { ToastController } from './ToastController';
-import { FakeClock } from '../time/FakeClock';
+import { FakeClock } from '../../test/FakeClock';
 import { SequentialIdGenerator } from '../../test/sequentialIds';
 import { TOAST_DURATION_MS } from '../../constants';
 

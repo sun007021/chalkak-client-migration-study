@@ -1,5 +1,5 @@
 import { MonotonicDeadline } from './MonotonicDeadline';
-import { FakeClock } from './FakeClock';
+import { FakeClock } from '../../test/FakeClock';
 import { UPLOAD_URL_SAFETY_MARGIN_MS } from '../../constants';
 
 describe('MonotonicDeadline', () => {

@@ -3,7 +3,7 @@ import { act, render } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router';
 import { AnalyticsProvider } from './AnalyticsContext';
 import { AnalyticsReporter } from './AnalyticsReporter';
-import { FakeAnalyticsTracker } from './AnalyticsTracker';
+import { FakeAnalyticsTracker } from '../../test/FakeAnalyticsTracker';
 import { RouteScreenViewTracker } from './RouteScreenViewTracker';
 import type { ScreenName } from '../../constants';
 
@@ -58,8 +58,18 @@ describe('RouteScreenViewTracker', () => {
     expect(names()).toEqual(['home']);
   });
 
-  it('TC-ANL-025 같은 경로로 이동하지 않는 한 쿼리만 바뀌는 재렌더로는 중복 전송하지 않는다', () => {
+  it('TC-ANL-025 쿼리·해시만 바뀌는 이동은 같은 화면이라 다시 보내지 않는다', () => {
     const { names } = setup('/display');
     expect(names()).toEqual(['display']);
+    act(() => void nav('/display?date=2026-10-26'));
+    act(() => void nav('/display?date=2026-10-25#top'));
+    expect(names()).toEqual(['display']);
+  });
+
+  it('TC-ANL-017 TC-ANL-025 다른 화면에 갔다가 같은 화면으로 돌아오면(쿼리가 붙어 있어도) 다시 보낸다', () => {
+    const { names } = setup('/display');
+    act(() => void nav('/settings'));
+    act(() => void nav('/display?date=2026-10-26'));
+    expect(names()).toEqual(['display', 'settings', 'display']);
   });
 });
