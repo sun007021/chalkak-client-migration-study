@@ -16,7 +16,7 @@ export function ToastHost({ controller }: { controller: ToastController }): Reac
         position: 'fixed',
         left: 16,
         right: 16,
-        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)',
+        bottom: 'calc(env(safe-area-inset-bottom, 0px) + var(--bottom-bar-height, 0px) + 24px)',
         display: 'flex',
         justifyContent: 'center',
         pointerEvents: 'none',

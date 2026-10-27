@@ -6,11 +6,14 @@ import { ANALYTICS_SCREEN_NAMES } from '../constants';
 import type { ScreenName } from '../constants';
 import { AnalyticsProvider } from '../core/analytics/AnalyticsContext';
 import { RouteScreenViewTracker } from '../core/analytics/RouteScreenViewTracker';
+import { bindToastVisibility } from '../core/ui/bindToastVisibility';
 import { ToastHost } from '../core/ui/ToastHost';
 import { KakaoCallbackScreen, LoginScreen } from '../features/auth/LoginScreen';
 import { resolveAuthGate } from '../features/boot/authGate';
 import type { AuthGateDecision } from '../features/boot/authGate';
 import { BootScreen, SplashView } from '../features/boot/BootScreen';
+import { BottomBarSlotContext, HomePlaceholder, MainShell, TabGate, TabPlaceholder } from '../features/shell/MainShell';
+import type { TabRouteHandle } from '../features/shell/MainShell';
 import { ContainerProvider } from './AppContext';
 import type { AppContainer } from './container';
 import { DEV_SESSION_PATH } from './devSession';
@@ -18,13 +21,13 @@ import { ROUTES } from './paths';
 
 export { ROUTES };
 
+/** 전역 경로 추적이 보내는 화면. 탭 4개는 게이트를 통과해 그려진 탭 화면이 useScreenView로 보낸다(차단된 URL 진입은 0건). */
 const PATH_SCREEN_NAMES: Readonly<Record<string, ScreenName>> = {
   [ROUTES.login]: 'login',
   [ROUTES.terms]: 'terms',
-  [ROUTES.home]: 'home',
 };
 
-/** pathname → 분석 screen_name. '/login' → 'login', '/signup/terms' → 'terms', '/home' → 'home', 그 밖(부팅 '/', 콜백, 개발 화면)은 null. */
+/** pathname → 분석 screen_name(비탭 화면만). '/login' → 'login', '/signup/terms' → 'terms', 그 밖(부팅 '/', 콜백, 탭 경로, 개발 화면)은 null. */
 export function screenNameForPath(pathname: string): ScreenName | null {
   const name = PATH_SCREEN_NAMES[pathname];
   return name && (ANALYTICS_SCREEN_NAMES as readonly string[]).includes(name) ? name : null;
@@ -44,20 +47,33 @@ function devSessionRoutes(container: AppContainer): RouteObject[] {
   return [];
 }
 
+const homeHandle: TabRouteHandle = { tab: 'home' };
+const displayHandle: TabRouteHandle = { tab: 'display' };
+const recordHandle: TabRouteHandle = { tab: 'record' };
+const settingsHandle: TabRouteHandle = { tab: 'settings' };
+
 function RootLayout({ container }: { container: AppContainer }): ReactNode {
   const navigate = useNavigate();
+  const [bottomBarSlot, setBottomBarSlot] = useState<HTMLElement | null>(null);
   useEffect(
-    () => container.sessionEvents.subscribe(() => void navigate(ROUTES.login, { replace: true })),
+    // 다른 탭이 계정을 바꾸면 부팅 경로에서 인증 게이트를 다시 판정하고, 그 밖에는 로그인으로 보낸다.
+    () => container.sessionEvents.subscribe((reason) => void navigate(reason === 'changed' ? ROUTES.boot : ROUTES.login, { replace: true })),
     [container, navigate],
   );
+  // 다른 탭의 로그아웃·계정 전환(REQ-NAV-022)과 문서 가시성에 따른 토스트(D-20). 정리 함수로 구독이 하나만 남는다(StrictMode 포함).
+  useEffect(() => container.crossTabSync.start(), [container]);
+  useEffect(() => bindToastVisibility(container.toast, document), [container]);
   return (
     <ContainerProvider container={container}>
       <AnalyticsProvider reporter={container.analytics}>
         <RouteScreenViewTracker resolve={screenNameForPath} />
-        <main>
-          <Outlet />
-        </main>
-        <ToastHost controller={container.toast} />
+        <BottomBarSlotContext.Provider value={bottomBarSlot}>
+          <main>
+            <Outlet />
+          </main>
+          <div ref={setBottomBarSlot} />
+          <ToastHost controller={container.toast} />
+        </BottomBarSlotContext.Provider>
       </AnalyticsProvider>
     </ContainerProvider>
   );
@@ -66,7 +82,7 @@ function RootLayout({ container }: { container: AppContainer }): ReactNode {
 /**
  * 앱 라우트 정의. 루트 레이아웃이 Provider(컨테이너, 분석, 토스트 호스트), RouteScreenViewTracker, SessionEvents 구독(→ /login으로 replace 이동)을 둔다.
  * '/': BootScreen(스플래시 → 판정에 따라 /login 또는 /home으로 replace). '/login': LoginScreen. '/login/kakao-callback': KakaoCallbackScreen.
- * '/signup/terms': 자리표시(다음 PR). '/home': RequireSession 안의 HomePlaceholder. '/dev/session': container.devSessionEnabled일 때만 존재.
+ * '/signup/terms': 자리표시(다음 PR). 탭 4개('/home', '/display', '/record', '/settings'): RequireSession 안 MainShell(하단 바) 레이아웃의 자리표시 화면. '/dev/session': container.devSessionEnabled일 때만 존재.
  * 그 밖의 경로는 '/'로 replace.
  */
 export function createAppRoutes(container: AppContainer): RouteObject[] {
@@ -79,7 +95,23 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
         { path: ROUTES.login, element: <LoginScreen /> },
         { path: ROUTES.kakaoCallback, element: <KakaoCallbackScreen /> },
         { path: ROUTES.terms, element: <TermsPlaceholder /> },
-        { path: ROUTES.home, element: <RequireSession container={container}>{(mode) => <HomePlaceholder mode={mode} />}</RequireSession> },
+        {
+          element: <RequireSession container={container}>{(mode) => <MainShell mode={mode} />}</RequireSession>,
+          children: [
+            { path: ROUTES.home, handle: homeHandle, element: <HomePlaceholder /> },
+            { path: ROUTES.display, handle: displayHandle, element: <TabPlaceholder tab="display" testId="display.root" /> },
+            {
+              path: ROUTES.record,
+              handle: recordHandle,
+              element: (
+                <TabGate tab="record">
+                  <TabPlaceholder tab="record" testId="record.root" />
+                </TabGate>
+              ),
+            },
+            { path: ROUTES.settings, handle: settingsHandle, element: <TabPlaceholder tab="settings" testId="settings.root" /> },
+          ],
+        },
         ...devSessionRoutes(container),
         { path: '*', element: <Navigate to={ROUTES.boot} replace /> },
       ],
@@ -108,9 +140,4 @@ export function RequireSession({ container, children }: { container: AppContaine
   if (!decision) return <SplashView />;
   if (decision.destination === 'login') return <Navigate to={ROUTES.login} replace />;
   return children(decision.mode);
-}
-
-/** 메인(홈 탭) 자리표시. data-testid="home.root", 회원/게스트는 data-mode="member|guest". 탭·게스트 제한은 다음 PR. */
-export function HomePlaceholder({ mode }: { mode: 'member' | 'guest' }): ReactNode {
-  return <div data-testid="home.root" data-mode={mode} />;
 }

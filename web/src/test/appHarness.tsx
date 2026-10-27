@@ -10,6 +10,7 @@ import { FakeAnalyticsTracker } from './FakeAnalyticsTracker';
 import { FakeClock } from './FakeClock';
 import { FakeHomePreloader } from './FakeHomePreloader';
 import { FakeSessionStore } from './FakeSessionStore';
+import { FakeUploadEntry } from './FakeUploadEntry';
 import { FakeSocialLoginClient } from './FakeSocialLoginClient';
 import { FakeFetch } from './fakeFetch';
 import { MOCK_BASE } from './apiEnv';
@@ -25,6 +26,7 @@ export interface Harness {
   store: FakeSessionStore;
   social: FakeSocialLoginClient;
   preloader: FakeHomePreloader;
+  upload: FakeUploadEntry;
   tracker: FakeAnalyticsTracker;
   logger: RecordingLogger;
 }
@@ -36,6 +38,7 @@ export function makeHarness(options: { session?: StoredSession; env?: Partial<Ap
   const store = new FakeSessionStore(options.session ?? EMPTY_SESSION);
   const social = new FakeSocialLoginClient();
   const preloader = new FakeHomePreloader().resolveImmediately();
+  const upload = new FakeUploadEntry();
   const tracker = new FakeAnalyticsTracker();
   const logger = new RecordingLogger();
   const container = createAppContainer({
@@ -51,12 +54,13 @@ export function makeHarness(options: { session?: StoredSession; env?: Partial<Ap
     socialLogin: social,
     resumeKakaoRedirect: options.resume,
     preloader,
+    uploadEntry: upload,
   });
-  return { container, clock, ff, store, social, preloader, tracker, logger };
+  return { container, clock, ff, store, social, preloader, upload, tracker, logger };
 }
 
 /** 라우터를 만들어 그린다. router.state로 현재 경로·이동 방식(PUSH/REPLACE)을 확인한다. */
-export function renderApp(container: AppContainer, initialPath = '/', options: { strict?: boolean } = {}) {
+export function renderApp(container: AppContainer, initialPath: string | { pathname: string; state?: unknown } = '/', options: { strict?: boolean } = {}) {
   const router = createMemoryRouter(createAppRoutes(container), { initialEntries: [initialPath] });
   const tree = <RouterProvider router={router} />;
   const view = render(options.strict ? <StrictMode>{tree}</StrictMode> : tree);

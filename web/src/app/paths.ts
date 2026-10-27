@@ -5,4 +5,7 @@ export const ROUTES = {
   kakaoCallback: '/login/kakao-callback',
   terms: '/signup/terms',
   home: '/home',
+  display: '/display',
+  record: '/record',
+  settings: '/settings',
 } as const;

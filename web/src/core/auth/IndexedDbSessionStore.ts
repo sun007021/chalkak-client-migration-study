@@ -1,4 +1,5 @@
 import { EMPTY_SESSION } from './SessionStore';
+import type { SessionChannel } from './SessionChannel';
 import type { SessionStore, StoredSession } from './SessionStore';
 
 /** 세션 DB 배치(Q-03 임시안). 테스트가 손상·부분 레코드를 직접 심을 때도 이 상수를 쓴다. */
@@ -12,6 +13,8 @@ export interface IndexedDbSessionStoreDeps {
   /** 기본 globalThis.indexedDB. 테스트는 fake-indexeddb의 IDBFactory를 넣는다. */
   indexedDB?: IDBFactory;
   dbName?: string;
+  /** 계정이 바뀐 쓰기·삭제를 다른 탭에 알린다(SessionChannel 참고). 없으면 알리지 않는다. */
+  channel?: SessionChannel;
 }
 
 interface Record5 {
@@ -48,6 +51,12 @@ function parseRecord(raw: unknown): Parsed {
   if (hasTokens !== (userId !== null && userId !== '')) return { kind: 'corrupt' };
   if (!hasTokens && !guest) return { kind: 'empty' };
   return { kind: 'ok', record: { userId, refreshToken, accessTokenExpiresAt, refreshTokenExpiresAt, guest } };
+}
+
+/** 저장된 원본 레코드의 계정. 비었거나 손상이면 null. */
+function accountOf(raw: unknown): string | null {
+  const parsed = parseRecord(raw);
+  return parsed.kind === 'ok' ? parsed.record.userId : null;
 }
 
 function toRecord(session: StoredSession): Record5 {
@@ -88,47 +97,69 @@ export class IndexedDbSessionStore implements SessionStore {
   }
 
   async write(session: StoredSession): Promise<void> {
-    await this.transact<void>('readwrite', (store, done) => {
-      store.put(toRecord(session), SESSION_RECORD_KEY);
-      done(undefined);
+    const previous = await this.transact<string | null>('readwrite', (store, done) => {
+      const req = store.get(SESSION_RECORD_KEY);
+      req.onsuccess = () => {
+        store.put(toRecord(session), SESSION_RECORD_KEY);
+        done(accountOf(req.result));
+      };
     });
     this.remember(session);
+    this.notify(previous, session.userId);
   }
 
   async clear(): Promise<void> {
-    await this.transact<void>('readwrite', (store, done) => {
-      store.delete(SESSION_RECORD_KEY);
-      done(undefined);
+    const previous = await this.transact<string | null>('readwrite', (store, done) => {
+      const req = store.get(SESSION_RECORD_KEY);
+      req.onsuccess = () => {
+        store.delete(SESSION_RECORD_KEY);
+        done(accountOf(req.result));
+      };
     });
     this.memory = null;
+    this.notify(previous, null);
   }
 
   async updateIf(expectedRefreshToken: string, next: StoredSession): Promise<boolean> {
-    const ok = await this.transact<boolean>('readwrite', (store, done) => {
+    const previous = await this.transact<{ userId: string | null } | null>('readwrite', (store, done) => {
       const req = store.get(SESSION_RECORD_KEY);
       req.onsuccess = () => {
         const parsed = parseRecord(req.result);
-        if (parsed.kind !== 'ok' || parsed.record.refreshToken !== expectedRefreshToken) return done(false);
+        if (parsed.kind !== 'ok' || parsed.record.refreshToken !== expectedRefreshToken) return done(null);
         store.put(toRecord(next), SESSION_RECORD_KEY);
-        done(true);
+        done({ userId: parsed.record.userId });
       };
     });
-    if (ok) this.remember(next);
-    return ok;
+    if (!previous) return false;
+    this.remember(next);
+    this.notify(previous.userId, next.userId);
+    return true;
   }
 
   async clearIf(expectedRefreshToken: string): Promise<boolean> {
-    const ok = await this.transact<boolean>('readwrite', (store, done) => {
+    const previous = await this.transact<{ userId: string | null } | null>('readwrite', (store, done) => {
       const req = store.get(SESSION_RECORD_KEY);
       req.onsuccess = () => {
         const parsed = parseRecord(req.result);
-        if (parsed.kind !== 'ok' || parsed.record.refreshToken !== expectedRefreshToken) return done(false);
+        if (parsed.kind !== 'ok' || parsed.record.refreshToken !== expectedRefreshToken) return done(null);
         store.delete(SESSION_RECORD_KEY);
-        done(true);
+        done({ userId: parsed.record.userId });
       };
     });
-    if (ok) this.memory = null;
-    return ok;
+    if (!previous) return false;
+    this.memory = null;
+    this.notify(previous.userId, null);
+    return true;
+  }
+
+  /** 계정이 바뀐 쓰기·삭제만 다른 탭에 알린다. 알림 실패는 저장 결과에 영향을 주지 않는다. */
+  private notify(previousUserId: string | null, userId: string | null): void {
+    if (previousUserId === userId) return;
+    try {
+      this.deps.channel?.post({ previousUserId, userId });
+    } catch {
+      // 다른 탭이 늦게 알아도 저장은 이미 끝났다.
+    }
   }
 
   private remember(session: StoredSession): void {
