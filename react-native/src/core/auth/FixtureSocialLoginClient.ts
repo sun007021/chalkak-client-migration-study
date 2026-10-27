@@ -4,8 +4,7 @@ import type { SocialLoginClient, SocialLoginResult } from './SocialLoginClient';
 export class FixtureSocialLoginClient implements SocialLoginClient {
   constructor(private readonly idToken: string) {}
 
-  login(_nonceHash: string): Promise<SocialLoginResult> {
-    void this.idToken;
-    throw new Error('not implemented');
+  async login(_nonceHash: string): Promise<SocialLoginResult> {
+    return { kind: 'success', idToken: this.idToken };
   }
 }

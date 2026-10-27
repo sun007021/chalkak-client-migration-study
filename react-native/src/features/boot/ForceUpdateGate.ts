@@ -1,5 +1,5 @@
 import { Observable } from '../../core/state/Observable';
-import type { UpdateChecker } from './UpdateChecker';
+import type { UpdateChecker, UpdateCheckResult } from './UpdateChecker';
 
 export type ForceUpdateGateState = { blocked: boolean };
 
@@ -16,9 +16,14 @@ export class ForceUpdateGate extends Observable<ForceUpdateGateState> {
   }
 
   /** 시작, 앱 재활성화(iOS), 온라인 복귀(Android)마다 부른다. 검사기가 throw해도 통과로 본다. */
-  check(): Promise<void> {
-    void this.checker;
-    void this.enabled;
-    throw new Error('not implemented');
+  async check(): Promise<void> {
+    if (!this.enabled || this.getSnapshot().blocked) return;
+    let result: UpdateCheckResult;
+    try {
+      result = await this.checker.check();
+    } catch {
+      return;
+    }
+    if (result === 'update-required') this.setState({ blocked: true });
   }
 }

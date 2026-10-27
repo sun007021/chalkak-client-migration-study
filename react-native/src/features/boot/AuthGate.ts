@@ -15,9 +15,15 @@ export class AuthGate {
     private readonly clock: Clock,
   ) {}
 
-  resolve(): Promise<AuthGateDecision> {
-    void this.sessionStore;
-    void this.clock;
-    throw new Error('not implemented');
+  async resolve(): Promise<AuthGateDecision> {
+    const { state, discarded } = await this.sessionStore.loadChecked();
+    if (discarded || state.kind === 'none') return { kind: 'signed-out' };
+    if (state.kind === 'guest') return { kind: 'guest' };
+    const { credentials } = state;
+    if (credentials.refreshTokenExpiresAt.getTime() <= this.clock.now().getTime()) {
+      await this.sessionStore.clear();
+      return { kind: 'signed-out' };
+    }
+    return { kind: 'authenticated', userId: credentials.userId };
   }
 }

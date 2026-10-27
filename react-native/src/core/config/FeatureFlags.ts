@@ -9,6 +9,12 @@ export type FeatureFlags = {
 export type FeatureFlagsExtra =
   { forceUpdateCheckEnabled?: unknown; e2eKakaoIdToken?: unknown } | null | undefined;
 
-export function readFeatureFlags(_extra: FeatureFlagsExtra): FeatureFlags {
-  throw new Error('not implemented');
+export function readFeatureFlags(extra: FeatureFlagsExtra): FeatureFlags {
+  const forceUpdate = extra?.forceUpdateCheckEnabled;
+  const e2eToken = extra?.e2eKakaoIdToken;
+  const trimmed = typeof e2eToken === 'string' ? e2eToken.trim() : '';
+  return {
+    forceUpdateCheckEnabled: forceUpdate === true || forceUpdate === 'true',
+    e2eKakaoIdToken: trimmed === '' ? null : trimmed,
+  };
 }
