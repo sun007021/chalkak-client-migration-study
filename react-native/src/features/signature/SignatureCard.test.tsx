@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import { createNetHarness } from '../../core/http/__testing__/createNetHarness';
 import { deferred } from '../../core/http/__testing__/FakeTransport';
@@ -73,5 +73,15 @@ describe('SignatureCard', () => {
     await pending;
     expect(await screen.findByTestId('settings.signature-image')).toBeOnTheScreen();
     expect(screen.queryByTestId('settings.signature-loading')).not.toBeOnTheScreen();
+  });
+
+  it('이미지 로드 실패 뒤 다시 조회하면(같은 URL도) 이미지를 다시 시도한다', async () => {
+    const { vm } = await setup('signature/users-me-signature__get-success');
+    await vm.refresh();
+    await render(<SignatureCard viewModel={vm} />);
+    await fireEvent(screen.getByTestId('settings.signature-image'), 'error');
+    expect(screen.queryByTestId('settings.signature-image')).not.toBeOnTheScreen();
+    await act(async () => vm.refresh());
+    expect(await screen.findByTestId('settings.signature-image')).toBeOnTheScreen();
   });
 });

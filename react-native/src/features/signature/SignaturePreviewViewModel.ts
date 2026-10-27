@@ -38,9 +38,15 @@ export type SignaturePreviewDeps = {
 export class SignaturePreviewViewModel extends Observable<SignaturePreviewState> {
   private readonly abortController = new AbortController();
   private errorSeq = 0;
+  private committingNow = false;
 
   constructor(private readonly deps: SignaturePreviewDeps) {
     super({ mode: deps.mode, busy: false, error: null });
+  }
+
+  /** 서버가 요청을 받아 준 뒤 세션 저장·완료 통지 중. 이때는 취소하지 않으므로 호출자는 뒤로가기를 막는다. */
+  get committing(): boolean {
+    return this.committingNow;
   }
 
   get png(): Uint8Array {
@@ -56,11 +62,17 @@ export class SignaturePreviewViewModel extends Observable<SignaturePreviewState>
     if (this.getSnapshot().busy || this.isDisposed()) return;
     this.setState({ ...this.getSnapshot(), busy: true, error: null });
     try {
-      await this.deps.submitter.submit(this.deps.png, this.abortController.signal);
+      await this.deps.submitter.submit(this.deps.png, this.abortController.signal, {
+        onCommit: () => {
+          this.committingNow = true;
+        },
+      });
     } catch (error) {
+      this.committingNow = false;
       if (!this.isDisposed()) this.handleFailure(error);
       return;
     }
+    this.committingNow = false;
     if (this.isDisposed()) return;
     this.setState({ ...this.getSnapshot(), busy: false });
     this.deps.host.onCompleted();

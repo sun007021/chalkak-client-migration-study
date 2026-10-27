@@ -10,6 +10,8 @@ export type WebViewComponentProps = {
   url: string;
   onLoad: () => void;
   onError: () => void;
+  /** 문서 안에서 허용 호스트가 아닌 곳으로 이동하려 할 때 그 URL(외부 브라우저로 연다). */
+  onExternalLink: (url: string) => void;
 };
 
 /** 플랫폼 웹뷰(react-native-webview 등)는 구현 단계에서 정한다. 화면은 인터페이스만 안다. */
@@ -71,6 +73,7 @@ export function LegalDocSheet({ viewModel, WebView, onClose }: LegalDocSheetProp
               url={inAppUrl}
               onLoad={() => viewModel.onWebViewLoaded()}
               onError={() => viewModel.onWebViewFailed()}
+              onExternalLink={(target) => void viewModel.openExternal(target)}
             />
             {status === 'loading' ? (
               <ActivityIndicator testID="legal-doc.loading" style={styles.loading} />

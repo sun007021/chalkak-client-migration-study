@@ -56,3 +56,13 @@ describe('SignatureEncoder', () => {
     );
   });
 });
+
+describe('SignatureEncoder: 비유한 좌표', () => {
+  it('유한한 좌표가 없으면 래스터라이저를 부르지 않고 거부한다', async () => {
+    const rasterizer = new FakeSignatureRasterizer();
+    await expect(
+      new SignatureEncoder(rasterizer).encode([[{ x: NaN, y: 1 }]], CANVAS),
+    ).rejects.toThrow();
+    expect(rasterizer.requests).toHaveLength(0);
+  });
+});

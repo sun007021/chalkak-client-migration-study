@@ -14,12 +14,9 @@ export class SignatureEncoder {
     const drawable = strokes.filter((stroke) => stroke.length > 0);
     if (drawable.length === 0) throw new Error('저장할 사인이 없습니다.');
     const { width, height, strokeWidth } = SIGNATURE_PNG_SIZE;
-    const png = await this.rasterizer.rasterize({
-      width,
-      height,
-      strokeWidth,
-      strokes: fitStrokesToPng(drawable, canvas, SIGNATURE_PNG_SIZE),
-    });
+    const fitted = fitStrokesToPng(drawable, canvas, SIGNATURE_PNG_SIZE);
+    if (fitted.length === 0) throw new Error('저장할 사인이 없습니다.'); // 유한한 좌표가 하나도 없다
+    const png = await this.rasterizer.rasterize({ width, height, strokeWidth, strokes: fitted });
     if (png.byteLength > SIGNATURE_MAX_BYTES) throw new SignatureTooLargeError();
     return png;
   }

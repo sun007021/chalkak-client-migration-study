@@ -63,6 +63,8 @@ export class SignatureDrawViewModel extends Observable<SignatureDrawState> {
     this.setState({ ...this.getSnapshot(), encoding: true, canSubmit: false, error: null });
     let png: Uint8Array;
     try {
+      // 래스터라이즈는 JS 스레드를 오래 잡을 수 있다. 진행 표시(encoding)가 먼저 그려지도록 한 번 양보한다.
+      await yieldToUi();
       png = await this.deps.encoder.encode(this.model.validStrokes, this.deps.canvas);
     } catch (error) {
       const message =
@@ -109,3 +111,6 @@ function project(
     error,
   };
 }
+
+/** 렌더가 끝나도록 다음 매크로태스크로 넘긴다. */
+const yieldToUi = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));

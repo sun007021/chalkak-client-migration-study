@@ -158,3 +158,32 @@ describe('fitStrokesToPng', () => {
     expect(JSON.stringify(input)).toBe(copy);
   });
 });
+
+describe('fitStrokesToPng: 입력 방어', () => {
+  it('유한하지 않은 점은 버리고 나머지로 정규화한다(NaN이 번지지 않는다)', () => {
+    const fitted = fitStrokesToPng(
+      [
+        [
+          { x: 10, y: 10 },
+          { x: NaN, y: 50 },
+          { x: 110, y: 30 },
+        ],
+        [{ x: Infinity, y: 1 }],
+      ],
+      canvas,
+      spec,
+    );
+    expect(fitted).toHaveLength(1);
+    expect(fitted[0]).toHaveLength(2);
+    for (const p of fitted[0]) expect(Number.isFinite(p.x) && Number.isFinite(p.y)).toBe(true);
+  });
+
+  it('유한한 점이 하나도 없으면 빈 배열이다', () => {
+    expect(fitStrokesToPng([[{ x: NaN, y: NaN }]], canvas, spec)).toEqual([]);
+  });
+
+  it('점이 수십만 개여도 spread 인자 한도에 걸리지 않는다', () => {
+    const big: Stroke = Array.from({ length: 300_000 }, (_, i) => ({ x: i % 300, y: i % 150 }));
+    expect(() => fitStrokesToPng([big], canvas, spec)).not.toThrow();
+  });
+});

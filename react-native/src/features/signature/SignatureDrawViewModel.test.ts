@@ -157,3 +157,17 @@ describe('SignatureDrawViewModel', () => {
     expect(vm.getSnapshot().error).toBeNull();
   });
 });
+
+describe('SignatureDrawViewModel: 진행 표시를 위한 양보', () => {
+  it('confirm은 encoding 상태를 먼저 알리고 한 번 양보한 뒤에 래스터라이즈를 시작한다', async () => {
+    const rasterizer = new FakeSignatureRasterizer();
+    const { vm, confirmed } = setup(rasterizer);
+    drawLine(vm);
+    const pending = vm.confirm();
+    expect(vm.getSnapshot().encoding).toBe(true);
+    expect(rasterizer.requests).toHaveLength(0); // 아직 JS 스레드를 잡지 않았다
+    await pending;
+    expect(rasterizer.requests).toHaveLength(1);
+    expect(confirmed).toHaveLength(1);
+  });
+});

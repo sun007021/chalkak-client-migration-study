@@ -3,25 +3,30 @@ import type { SignUpRepository } from '../../data/auth/SignUpRepository';
 import type { SignatureRepository } from '../../data/signature/SignatureRepository';
 import { CancelledError, HttpError, NetworkError } from '../../core/http/ApiError';
 import type { Sleeper } from '../../core/http/Sleeper';
+import {
+  AlreadyRegisteredUnresolvedError,
+  SignatureUploadError,
+  SignupPendingTimeoutError,
+} from './SignatureErrors';
 import { SIGNUP_PENDING_RETRY } from '../../shared/constants';
+
+// 오류 클래스는 SignatureErrors에 있다. 기존 import 경로를 위해 다시 내보낸다.
+export {
+  AlreadyRegisteredUnresolvedError,
+  SignatureUploadError,
+  SignupPendingTimeoutError,
+} from './SignatureErrors';
+
+export type SubmitHooks = { onCommit?: () => void };
 
 /** 미리보기의 "시작하기"/"사인 변경하기"가 하는 서버 작업. 모드마다 구현이 다르다. 실패는 throw. */
 export interface SignatureSubmitter {
-  submit(png: Uint8Array, signal: AbortSignal): Promise<void>;
+  /**
+   * `hooks.onCommit`은 서버가 요청을 받아 준 직후(세션 저장 직전)에 불린다. 그 뒤의 저장·완료 통지는
+   * 취소하지 않으므로 화면은 이 시점부터 뒤로가기·다시 그리기를 막는다.
+   */
+  submit(png: Uint8Array, signal: AbortSignal, hooks?: SubmitHooks): Promise<void>;
 }
-
-/** presigned PUT 단계의 실패(만료·서명 불일치 등). 네트워크·취소는 그대로 전달하고 나머지를 이것으로 감싼다. */
-export class SignatureUploadError extends Error {
-  constructor(override readonly cause: unknown) {
-    super('signature upload failed');
-  }
-}
-
-/** SIGNATURE_PROCESSING_PENDING을 최대 횟수만큼 다시 요청했지만 끝나지 않았다. */
-export class SignupPendingTimeoutError extends Error {}
-
-/** uploads가 400(이미 가입된 계정)이라 social-login을 다시 불렀지만 로그인되지 않았다(SIGN_UP_REQUIRED). 일반 실패로 보인다. */
-export class AlreadyRegisteredUnresolvedError extends Error {}
 
 export type SignUpSubmitterDeps = {
   signUpRepository: SignUpRepository;
@@ -38,7 +43,7 @@ export type SignUpSubmitterDeps = {
 export class SignUpSubmitter implements SignatureSubmitter {
   constructor(private readonly deps: SignUpSubmitterDeps) {}
 
-  async submit(png: Uint8Array, signal: AbortSignal): Promise<void> {
+  async submit(png: Uint8Array, signal: AbortSignal, hooks?: SubmitHooks): Promise<void> {
     const { signUpRepository, authRepository, pending, sleeper } = this.deps;
     let ticket;
     try {
@@ -46,7 +51,7 @@ export class SignUpSubmitter implements SignatureSubmitter {
     } catch (error) {
       // 400은 이미 가입된 소셜 계정이다. 문구가 아니라 호출 API(uploads)로 분기하고 로그인으로 돌려 본다(D-02).
       if (error instanceof HttpError && error.status === 400) {
-        const outcome = await authRepository.socialLoginKakao(pending, signal);
+        const outcome = await authRepository.socialLoginKakao(pending, signal, hooks?.onCommit);
         if (outcome.kind === 'logged-in') return;
         throw new AlreadyRegisteredUnresolvedError();
       }
@@ -57,7 +62,7 @@ export class SignUpSubmitter implements SignatureSubmitter {
     const { intervalMs, maxAttempts } = SIGNUP_PENDING_RETRY;
     for (let retry = 0; ; retry += 1) {
       try {
-        await signUpRepository.confirm(ticket.signupToken, signal);
+        await signUpRepository.confirm(ticket.signupToken, signal, hooks?.onCommit);
         return;
       } catch (error) {
         if (!isProcessingPending(error)) throw error;

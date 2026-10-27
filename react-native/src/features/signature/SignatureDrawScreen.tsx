@@ -1,12 +1,5 @@
-import { useMemo, useState } from 'react';
-import {
-  type GestureResponderEvent,
-  PanResponder,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { memo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
@@ -14,8 +7,9 @@ import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
 import type { SignatureMode } from './mapSignatureError';
 import type { SignatureDrawViewModel } from './SignatureDrawViewModel';
+import { SignaturePadGesture } from './SignaturePadGesture';
 import { strokeToSvgPath } from './SignatureStrokePath';
-import type { Point, Stroke } from './Stroke';
+import type { Stroke } from './Stroke';
 
 export type SignatureDrawScreenProps = {
   viewModel: SignatureDrawViewModel;
@@ -35,25 +29,8 @@ const otherLines = (text: string): string => text.split('\n').slice(1).join('\n'
 export function SignatureDrawScreen({ viewModel, mode, onBack }: SignatureDrawScreenProps) {
   const { strokes, canUndo, canClear, canSubmit, error } = useViewModelState(viewModel);
   const insets = useSafeAreaInsets();
-  const [padWidth, setPadWidth] = useState(0);
+  const [gesture] = useState(() => new SignaturePadGesture(viewModel));
   const canvas = viewModel.canvas;
-
-  const panResponder = useMemo(() => {
-    // 터치 좌표(화면 픽셀)를 ViewModel의 논리 캔버스 크기로 환산한다.
-    const toCanvas = (event: GestureResponderEvent): Point => {
-      const scale = padWidth > 0 ? canvas.width / padWidth : 1;
-      return { x: event.nativeEvent.locationX * scale, y: event.nativeEvent.locationY * scale };
-    };
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: (event) => viewModel.beginStroke(toCanvas(event)),
-      onPanResponderMove: (event) => viewModel.appendPoint(toCanvas(event)),
-      onPanResponderRelease: () => viewModel.endStroke(),
-      onPanResponderTerminate: () => viewModel.endStroke(),
-    });
-  }, [viewModel, canvas.width, padWidth]);
 
   const viewBox = `0 0 ${canvas.width} ${canvas.height}`;
   const titleText = t('onb.sign.title');
@@ -88,8 +65,8 @@ export function SignatureDrawScreen({ viewModel, mode, onBack }: SignatureDrawSc
       <View
         testID="signature.canvas"
         style={styles.pad}
-        onLayout={(event) => setPadWidth(event.nativeEvent.layout.width)}
-        {...panResponder.panHandlers}
+        onLayout={(event) => gesture.setWidth(event.nativeEvent.layout.width)}
+        {...gesture.responder.panHandlers}
       >
         <Svg width="100%" height="100%" viewBox={viewBox} pointerEvents="none">
           {strokes.map((stroke, index) => (
@@ -140,7 +117,8 @@ export function SignatureDrawScreen({ viewModel, mode, onBack }: SignatureDrawSc
   );
 }
 
-function StrokeShape({ stroke }: { stroke: Stroke }) {
+/** 획 하나. 그리는 중에는 마지막 획만 바뀌므로 memo로 나머지 획의 다시 그리기를 막는다. */
+const StrokeShape = memo(function StrokeShape({ stroke }: { stroke: Stroke }) {
   const d = strokeToSvgPath(stroke);
   if (d === null) {
     if (stroke.length === 0) return null;
@@ -158,7 +136,7 @@ function StrokeShape({ stroke }: { stroke: Stroke }) {
       fill="none"
     />
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#FFFFFF', paddingHorizontal: 24 },

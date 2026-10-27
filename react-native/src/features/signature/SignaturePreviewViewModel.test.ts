@@ -221,4 +221,20 @@ describe('SignaturePreviewViewModel', () => {
     gate.resolve();
     await pending;
   });
+
+  it('서버가 받아 준 뒤 세션 저장 중(committing)에는 committing이 true이고, 끝나면 false로 돌아온다', async () => {
+    const gate = deferred<void>();
+    const { vm, host } = setup(
+      'onboarding',
+      new FakeSignatureSubmitter().commitBeforeHold().holdUntil(gate.promise),
+    );
+    const pending = vm.confirm();
+    expect(vm.committing).toBe(true);
+    vm.redraw();
+    expect(host.onRedraw).not.toHaveBeenCalled();
+    gate.resolve();
+    await pending;
+    expect(vm.committing).toBe(false);
+    expect(host.onCompleted).toHaveBeenCalledTimes(1);
+  });
 });

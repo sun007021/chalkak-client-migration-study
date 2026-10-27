@@ -40,11 +40,17 @@ export class SignUpRepository {
   }
 
   /** POST /auth/social-signup {signupToken}. 200이면 세션을 저장하고 userId를 돌려준다(추가 로그인 호출 없음). */
-  async confirm(signupToken: string, signal?: AbortSignal): Promise<{ userId: string }> {
+  async confirm(
+    signupToken: string,
+    signal?: AbortSignal,
+    onAccepted?: () => void,
+  ): Promise<{ userId: string }> {
     const issued = await this.deps.api.requestJson(
       { method: 'POST', path: '/auth/social-signup', body: { signupToken }, signal },
       decodeIssuedTokens,
     );
+    // 서버가 가입을 마쳤다. 여기서부터 세션 저장은 취소하지 않는다(서버엔 가입된 채 토큰만 잃는 상태 방지).
+    onAccepted?.();
     await this.deps.authRepository.saveIssuedSession(issued.userId, issued);
     return { userId: issued.userId };
   }

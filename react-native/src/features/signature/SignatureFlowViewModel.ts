@@ -67,6 +67,8 @@ export class SignatureFlowViewModel extends Observable<SignatureFlowState> {
   /** 하드웨어/화면 뒤로: 미리보기면 그리기로(진행 중 요청은 취소), 그리기면 onExit. */
   back(): void {
     if (this.released) return;
+    // 서버가 받아 준 뒤 세션을 저장하는 동안은 되돌아가지 않는다(저장과 화면이 어긋나는 것 방지).
+    if (this.previewViewModel?.committing) return;
     if (this.getSnapshot().step === 'preview') this.backToDraw();
     else this.deps.onExit();
   }

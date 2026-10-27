@@ -137,6 +137,10 @@ export class AppContainer {
   /** phase가 sign-up인 동안 가입 흐름(약관 -> 사인 -> 미리보기) ViewModel을 만들고 버린다. */
   readonly signUpFlowOwner: SignUpFlowOwner;
   readonly signatureRepository: SignatureRepository;
+  private readonly signUpRepository: SignUpRepository;
+  private readonly externalLinkOpener: LegalExternalLinkOpener;
+  private readonly sleeper: Sleeper;
+  private readonly signatureRasterizer: SignatureRasterizer;
   private readonly socialLoginClient: SocialLoginClient;
   private readonly nonceGenerator: NonceGenerator;
   private readonly pushRegistrar: PushRegistrar;
@@ -148,6 +152,9 @@ export class AppContainer {
     this.dependencies = dependencies;
     this.toast = dependencies.toast;
     this.toastCenter = toastCenter;
+    this.externalLinkOpener = dependencies.externalLinkOpener;
+    this.sleeper = dependencies.sleeper;
+    this.signatureRasterizer = dependencies.signatureRasterizer;
     this.config = dependencies.config;
     this.clock = dependencies.clock;
     this.sessionStore = dependencies.sessionStore;
@@ -182,6 +189,10 @@ export class AppContainer {
       this.createLoginViewModel(),
     );
     this.signatureRepository = new SignatureRepository({ api: this.api });
+    this.signUpRepository = new SignUpRepository({
+      api: this.api,
+      authRepository: this.authRepository,
+    });
     this.signUpFlowOwner = new SignUpFlowOwner(this.bootViewModel, (pending) =>
       this.createSignUpFlow(pending),
     );
@@ -194,26 +205,22 @@ export class AppContainer {
 
   /** 소유자(signUpFlowOwner)만 부른다. 가입이 끝나거나 버려지면 소유자가 dispose한다. */
   private createSignUpFlow(pending: PendingSignUp): SignUpFlowViewModel {
-    const signUpRepository = new SignUpRepository({
-      api: this.api,
-      authRepository: this.authRepository,
-    });
     return new SignUpFlowViewModel({
       pending,
       analytics: this.analytics,
       authNavigator: this.bootViewModel,
       pushRegistrar: this.pushRegistrar,
-      externalLinkOpener: this.dependencies.externalLinkOpener,
+      externalLinkOpener: this.externalLinkOpener,
       createSignatureFlow: (host) =>
         new SignatureFlowViewModel({
           mode: 'onboarding',
           canvas: SIGNATURE_CANVAS,
-          encoder: new SignatureEncoder(this.dependencies.signatureRasterizer),
+          encoder: new SignatureEncoder(this.signatureRasterizer),
           submitter: new SignUpSubmitter({
-            signUpRepository,
+            signUpRepository: this.signUpRepository,
             authRepository: this.authRepository,
             pending,
-            sleeper: this.dependencies.sleeper,
+            sleeper: this.sleeper,
           }),
           analytics: this.analytics,
           toast: this.toast,
@@ -235,7 +242,7 @@ export class AppContainer {
     return new SignatureFlowViewModel({
       mode: 'change',
       canvas: SIGNATURE_CANVAS,
-      encoder: new SignatureEncoder(this.dependencies.signatureRasterizer),
+      encoder: new SignatureEncoder(this.signatureRasterizer),
       submitter: new SignatureChangeSubmitter(this.signatureRepository),
       analytics: this.analytics,
       toast: this.toast,

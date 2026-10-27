@@ -74,3 +74,13 @@ describe('TermsDocumentViewModel', () => {
     expect(vm.getSnapshot()).toMatchObject({ status: 'loaded', loadAttempt: 0 });
   });
 });
+
+describe('TermsDocumentViewModel.openExternal', () => {
+  it('허용 호스트 밖 링크만 정규화한 값으로 외부에 열고, 해석 불가·허용 호스트 링크는 열지 않는다', async () => {
+    const { vm, opener } = setup('service');
+    await vm.openExternal('  https://evil.example/x ');
+    await vm.openExternal('javascript:alert(1)');
+    await vm.openExternal('https://notion.so/inner');
+    expect(opener.opened).toEqual(['https://evil.example/x']);
+  });
+});

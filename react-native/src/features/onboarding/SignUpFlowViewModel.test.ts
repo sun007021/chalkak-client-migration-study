@@ -416,3 +416,27 @@ describe('SignUpFlowViewModel: 사인 -> 미리보기 -> 가입', () => {
     expect(PENDING.idToken).not.toBe('tok-A');
   });
 });
+
+describe('SignUpFlowViewModel: 서버 수락 뒤 세션 저장 구간', () => {
+  it('TC-ONB-044 가입이 서버에서 받아들여진 뒤 세션을 저장하는 동안 뒤로가기는 무시되고, 저장 뒤 메인으로 간다', async () => {
+    const h = createSignUpHarness();
+    const preview = await h.reachPreview();
+    routeFixtures(h.transport, OK);
+    // 세션 저장을 붙잡아 "서버는 받았고 저장 중"인 순간을 만든다.
+    const gate = deferred<void>();
+    const original = h.sessionStore.saveAuthenticated.bind(h.sessionStore);
+    h.sessionStore.saveAuthenticated = async (credentials) => {
+      await gate.promise;
+      return original(credentials);
+    };
+    const pending = preview.confirm();
+    await flush();
+    expect(preview.committing).toBe(true);
+    h.flow.back(); // 무시돼야 한다
+    expect(h.flow.signature!.getSnapshot().step).toBe('preview');
+    gate.resolve();
+    await pending;
+    expect((await h.sessionStore.load()).kind).toBe('authenticated');
+    expect(h.navigator.calls).toEqual(['main:member']);
+  });
+});

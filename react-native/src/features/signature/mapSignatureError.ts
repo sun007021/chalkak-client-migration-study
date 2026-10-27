@@ -6,7 +6,7 @@ import {
   ReauthenticationRequiredError,
 } from '../../core/http/ApiError';
 import { t } from '../../shared/copy';
-import { SignupPendingTimeoutError } from './SignatureSubmitter';
+import { SignupPendingTimeoutError } from './SignatureErrors';
 
 export type SignatureMode = 'onboarding' | 'change';
 

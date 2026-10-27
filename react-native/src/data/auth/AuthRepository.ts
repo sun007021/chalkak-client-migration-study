@@ -30,7 +30,11 @@ export class AuthRepository {
   constructor(private readonly deps: AuthRepositoryDeps) {}
 
   /** POST /auth/social-login {provider:"KAKAO", idToken, rawNonce}. LOGIN_SUCCESS면 캐시를 비우고 세션 저장(게스트 플래그 제거). */
-  async socialLoginKakao(input: PendingSignUp, signal?: AbortSignal): Promise<SocialLoginOutcome> {
+  async socialLoginKakao(
+    input: PendingSignUp,
+    signal?: AbortSignal,
+    onAccepted?: () => void,
+  ): Promise<SocialLoginOutcome> {
     const response = await this.deps.api.requestJson(
       {
         method: 'POST',
@@ -46,6 +50,8 @@ export class AuthRepository {
         pending: { idToken: input.idToken, rawNonce: input.rawNonce },
       };
     }
+    // 서버가 로그인을 받아 줬다: 이제부터 세션 저장은 취소 대상이 아니다(호출자가 화면 이탈을 막는 데 쓴다).
+    onAccepted?.();
     await this.saveIssuedSession(response.userId, response);
     return { kind: 'logged-in', userId: response.userId };
   }

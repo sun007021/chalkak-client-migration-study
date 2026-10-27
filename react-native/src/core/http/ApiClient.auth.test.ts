@@ -72,6 +72,41 @@ describe('ApiClient 인증 헤더와 401 갱신', () => {
       await expect(call).rejects.toBeInstanceOf(CancelledError);
     });
 
+    it('오류 응답(HttpError)과 네트워크 오류도 로그아웃 뒤에 도착하면 CancelledError다', async () => {
+      for (const failure of [() => json(500, { errorCode: 'INTERNAL_ERROR' }), networkFailure()]) {
+        h = createNetHarness();
+        await h.signIn();
+        const gate = deferred<void>();
+        h.transport.respond(async () => {
+          await gate.promise;
+          if (typeof failure !== 'function') throw failure;
+          return failure();
+        });
+        const call = getNotifications();
+        await flush();
+        await h.sessionStore.clear();
+        gate.resolve();
+        await expect(call).rejects.toBeInstanceOf(CancelledError);
+      }
+    });
+
+    it('Authorization을 붙이지 않는 요청(level none)은 세션이 바뀌어도 결과를 그대로 돌려준다', async () => {
+      await h.signIn();
+      const gate = deferred<void>();
+      h.transport.respond(async () => {
+        await gate.promise;
+        return json(200, OK_BODY);
+      });
+      const call = h.api.requestJson(
+        { method: 'POST', path: '/auth/social-login', body: {} },
+        identity,
+      );
+      await flush();
+      await h.sessionStore.clear();
+      gate.resolve();
+      await expect(call).resolves.toEqual(OK_BODY);
+    });
+
     it('같은 계정의 토큰 갱신 뒤 재전송된 응답은 통과한다', async () => {
       await h.signIn();
       useRotatingServer();

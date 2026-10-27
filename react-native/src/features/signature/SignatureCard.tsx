@@ -12,6 +12,12 @@ import type { SignatureCardViewModel } from './SignatureCardViewModel';
 export function SignatureCard({ viewModel }: { viewModel: SignatureCardViewModel }) {
   const { imageUrl, loading } = useViewModelState(viewModel);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const [wasLoading, setWasLoading] = useState(loading);
+  // 다시 조회할 때마다 이미지 로드 실패 기록을 지운다(같은 URL도 다시 시도한다). 렌더 중 상태 보정 패턴.
+  if (loading !== wasLoading) {
+    setWasLoading(loading);
+    if (loading) setFailedUrl(null);
+  }
   const showImage = imageUrl !== null && imageUrl !== failedUrl;
   return (
     <View style={styles.wrapper}>

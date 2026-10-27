@@ -1,7 +1,7 @@
 import type { AnalyticsTracker } from '../../core/analytics/AnalyticsTracker';
 import type { ExternalLinkOpener } from '../../core/link/ExternalLinkOpener';
 import { Observable } from '../../core/state/Observable';
-import { decideDocumentTarget } from './TermsDocumentPolicy';
+import { decideDocumentTarget, normalizeDocumentUrl } from './TermsDocumentPolicy';
 import type { TermsKind } from './TermsViewModel';
 
 export type TermsDocumentState = {
@@ -36,7 +36,9 @@ export class TermsDocumentViewModel extends Observable<TermsDocumentState> {
    * 외부 브라우저로 열렸으면 status는 loaded이고 inAppUrl은 null이다(소유자가 시트를 닫는다).
    */
   async start(): Promise<void> {
-    const { kind, url, analytics, externalLinkOpener } = this.deps;
+    const { kind, analytics, externalLinkOpener } = this.deps;
+    // 판정한 값과 실제로 여는 값이 같도록 한 번만 정규화한다.
+    const url = normalizeDocumentUrl(this.deps.url);
     analytics.screenView(kind === 'service' ? 'terms_of_service' : 'privacy_policy');
     const target = decideDocumentTarget(url);
     if (target === 'in-app') {
@@ -45,6 +47,13 @@ export class TermsDocumentViewModel extends Observable<TermsDocumentState> {
     }
     const opened = target === 'external' && (await openSafely(externalLinkOpener, url));
     this.setState({ ...this.getSnapshot(), status: opened ? 'loaded' : 'cannot-open' });
+  }
+
+  /** 문서 안에서 허용 호스트 밖으로 가려는 링크. 외부 브라우저로만 열고(실패해도 조용히), 해석할 수 없는 값은 열지 않는다. */
+  async openExternal(url: string): Promise<void> {
+    const value = normalizeDocumentUrl(url);
+    if (decideDocumentTarget(value) !== 'external') return;
+    await openSafely(this.deps.externalLinkOpener, value);
   }
 
   onWebViewLoaded(): void {

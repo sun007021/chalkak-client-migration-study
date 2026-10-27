@@ -1,11 +1,11 @@
 import type { ToastPresenter } from './ToastPresenter';
 
 /**
- * 화면에 그리지 않고 로그만 남기는 임시 토스트 구현. 토스트를 실제로 그리는 구현(ToastCenter + ToastHost)이
- * 들어오면 AppContainer 기본값을 그것으로 바꾼다.
+ * 임시 구현: 홈 PR의 ToastCenter(+ToastHost)로 교체 예정이다. 화면에 그리지 않고 개발 빌드에서만 로그를 남긴다.
+ * 실제 호스트는 홈 머지 후에 붙인다.
  */
 export class ConsoleToastPresenter implements ToastPresenter {
   show(message: string): void {
-    console.log(`[toast] ${message}`);
+    if (__DEV__) console.log(`[toast] ${message}`);
   }
 }

@@ -1,4 +1,4 @@
-import { SignatureStrokes } from './SignatureStrokes';
+import { MAX_SIGNATURE_POINTS, SignatureStrokes } from './SignatureStrokes';
 import { CANVAS } from './__testing__/draw';
 
 const empty = () => SignatureStrokes.empty(CANVAS);
@@ -79,5 +79,37 @@ describe('SignatureStrokes', () => {
   it('REQ-SIGN-002 그리는 중에 begin을 다시 부르면 이전 획을 끝내고 새 획을 시작한다', () => {
     const s = empty().beginStroke({ x: 1, y: 1 }).beginStroke({ x: 9, y: 9 }).endStroke();
     expect(s.validStrokes).toEqual([[{ x: 1, y: 1 }], [{ x: 9, y: 9 }]]);
+  });
+});
+
+describe('SignatureStrokes: 입력 방어', () => {
+  it('유한하지 않은 좌표(NaN, Infinity)는 버리고 획을 만들지 않는다', () => {
+    let s = SignatureStrokes.empty(CANVAS).beginStroke({ x: NaN, y: 1 });
+    expect(s.hasSignature).toBe(false);
+    s = s
+      .beginStroke({ x: 5, y: 5 })
+      .appendPoint({ x: Infinity, y: 1 })
+      .appendPoint({ x: 1, y: NaN });
+    expect(s.validStrokes).toEqual([[{ x: 5, y: 5 }]]);
+  });
+
+  it('이웃한 점과의 거리가 최소 거리보다 작으면 샘플링에서 뺀다', () => {
+    const s = SignatureStrokes.empty(CANVAS)
+      .beginStroke({ x: 10, y: 10 })
+      .appendPoint({ x: 10.3, y: 10.3 })
+      .appendPoint({ x: 12, y: 10 })
+      .endStroke();
+    expect(s.validStrokes[0]).toEqual([
+      { x: 10, y: 10 },
+      { x: 12, y: 10 },
+    ]);
+  });
+
+  it('총 점 수는 5000개까지만 받는다', () => {
+    let s = SignatureStrokes.empty(CANVAS).beginStroke({ x: 0, y: 0 });
+    for (let i = 1; i < 6000; i += 1)
+      s = s.appendPoint({ x: (i % 300) + (i % 2), y: (i % 150) + 10 * (i % 2) });
+    s = s.endStroke().beginStroke({ x: 1, y: 1 }).endStroke();
+    expect(s.validStrokes.flat().length).toBe(MAX_SIGNATURE_POINTS);
   });
 });
