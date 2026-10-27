@@ -47,6 +47,8 @@ function decodeBanner(raw: unknown): Banner {
   const thumbnail = o.thumbnailUrl;
   return {
     id: str(o, 'id'),
+    // title·subtitle은 서버가 1자 이상으로 검증해 등록한다(BANNER-002: title 1~50, subtitle 1~100, 네 항목 모두 필수).
+    // 빈 문자열은 계약 위반이므로 str()(비어 있지 않은 문자열)로 받아 응답 전체를 잘못된 응답으로 본다.
     title: str(o, 'title'),
     subtitle: str(o, 'subtitle'),
     webViewUrl,

@@ -1,7 +1,13 @@
 import type { AppVisibility } from '../../core/lifecycle/AppVisibility';
 import type { UserDataCache } from '../../core/push/UserDataCache';
 import { Observable } from '../../core/state/Observable';
-import { CancelledError, HttpError, NetworkError } from '../../core/http/ApiError';
+import {
+  AuthenticationRequiredError,
+  CancelledError,
+  HttpError,
+  NetworkError,
+  ReauthenticationRequiredError,
+} from '../../core/http/ApiError';
 import type { ToastPresenter } from '../../core/toast/ToastPresenter';
 import type { Clock } from '../../core/time/Clock';
 import type { KstDate } from '../../core/time/KstDate';
@@ -13,7 +19,7 @@ import type { Topic } from '../../data/topic/Topic';
 import type { TopicRepository } from '../../data/topic/TopicRepository';
 import { format, t } from '../../shared/copy';
 import type { AiReviewPoller } from '../ai-review/AiReviewPoller';
-import type { MainMode } from '../auth/AuthFlowNavigator';
+import type { AuthFlowNavigator, MainMode } from '../auth/AuthFlowNavigator';
 import type { BannerFeedViewModel } from '../banner/BannerFeedViewModel';
 import type { LikeChange, LikeController } from '../like/LikeController';
 import type { HomeNavigator } from './HomeNavigator';
@@ -33,6 +39,8 @@ export type HomeViewModelDeps = {
   visibility: AppVisibility;
   navigator: HomeNavigator;
   toast: ToastPresenter;
+  /** 남은 401 UNAUTHORIZED(AuthenticationRequiredError)일 때 로그인으로 보내는 통로(임시 동작, REQ-NET-023). */
+  authFlow: Pick<AuthFlowNavigator, 'toLogin'>;
 };
 
 /** 홈이 요청 결과로 보여 주는 섹션. 순서는 화면에 위에서 아래로 나타나는 순서다(실패 토스트의 우선순위). */
@@ -82,12 +90,18 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
   private calendarEntries: readonly CalendarEntry[] = [];
   /** AI 폴러를 시작해 둔 게시물. 같은 게시물로 폴러를 또 시작하지 않으려는 기록이다. */
   private polledPostId: string | null = null;
+  /** 로그인 이동을 이미 요청한 세대. 같은 세트의 여러 요청이 모두 401이어도 한 번만 보낸다. */
+  private loginRequestedGeneration = -1;
 
   constructor(private readonly deps: HomeViewModelDeps) {
     const today = todayKst(deps.clock);
     super(initialHomeState(today, today.plusDays(-1)));
   }
 
+  /**
+   * 홈이 소유한 ISSUE 섹션 ViewModel. 컨테이너가 만들어 주입하지만 수명은 홈에 묶인다:
+   * 홈이 로드·새로고침·초기화·dispose를 대신 시키고, 화면(HomeScreen)은 이 getter로 구독만 한다.
+   */
   get bannerFeed(): BannerFeedViewModel {
     return this.deps.bannerFeed;
   }
@@ -127,8 +141,9 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
    * 연결 실패면 common.error.network). 홈이 안 보이면 토스트를 띄우지 않는다.
    */
   refresh(): Promise<void> {
-    if (this.refreshInFlight) return this.refreshInFlight;
+    // 날짜 변경 판정이 먼저다: 자정을 지났다면 진행 중이던 새로고침(이전 날짜 기준)을 버리고 새로 시작한다.
     this.ensureCurrentDay();
+    if (this.refreshInFlight) return this.refreshInFlight;
     const ctx = this.beginRequests();
     this.setState((s) => ({ ...s, refreshing: true }));
     const run = (async () => {
@@ -175,10 +190,20 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
   }
 
   async retryRanking(key: RankingKey): Promise<void> {
-    this.setState((s) => ({ ...s, [key]: { status: 'loading' } }));
-    const ctx = this.currentContext();
-    if (key === 'popular') await this.loadTodayGroup(ctx, { topicSettled: true });
-    else await this.loadYesterday(ctx);
+    if (key === 'popular') {
+      // 오늘 인기는 화면에 보이는 오늘 주제의 날짜로 받는다. 주제를 다시 받으면 주제 표시와 인기 목록이 어긋날 수 있으므로,
+      // 주제가 이미 있으면 그 주제로 인기만 다시 받고, 주제가 오류 상태면 주제부터 함께 다시 받는다(retryTopic).
+      const { topic } = this.getSnapshot();
+      if (topic.status !== 'ready') {
+        await this.retryTopic();
+        return;
+      }
+      this.setState((s) => ({ ...s, popular: { status: 'loading' } }));
+      await this.loadRanking(this.currentContext(), 'popular', topic.topic);
+      return;
+    }
+    this.setState((s) => ({ ...s, yesterday: { status: 'loading' } }));
+    await this.loadYesterday(this.currentContext());
   }
 
   async retryBanners(): Promise<void> {
@@ -285,6 +310,9 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
       return;
     }
     void this.quietReload();
+    // 재조회가 실패해도(히어로·달력 모두) 화면에 남아 있는 AI 카드의 폴러는 되살린다.
+    // quietReload가 날짜 변경을 먼저 반영하므로, 날짜가 바뀌어 카드가 사라졌다면 aiCardPostId는 null이다.
+    this.syncAiPoller(this.getSnapshot().aiCardPostId);
   }
 
   /** 모든 섹션을 병렬로 요청한다. 내용이 있던 섹션의 실패만 돌려준다. */
@@ -300,10 +328,7 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
     return results.flat();
   }
 
-  private async loadTodayGroup(
-    ctx: RequestContext,
-    options: { topicSettled?: boolean } = {},
-  ): Promise<Failure[]> {
+  private async loadTodayGroup(ctx: RequestContext): Promise<Failure[]> {
     const date = this.getSnapshot().todayDate;
     const outcome = await this.attempt(ctx, (signal) => this.deps.topics.findByDate(date, signal));
     if (outcome.kind === 'cancelled') return [];
@@ -318,7 +343,7 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
       return failures;
     }
     const topic = outcome.value;
-    if (!options.topicSettled) this.setState((s) => ({ ...s, topic: { status: 'ready', topic } }));
+    this.setState((s) => ({ ...s, topic: { status: 'ready', topic } }));
     return this.loadRanking(ctx, 'popular', topic);
   }
 
@@ -453,8 +478,26 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
       if (ctx.token !== this.generation || error instanceof CancelledError) {
         return { kind: 'cancelled' };
       }
+      // 401 처리는 섹션 오류가 아니다(오류 상태·토스트 없음). 결과는 취소와 같이 그대로 둔다.
+      if (this.handleAuthError(ctx, error)) return { kind: 'cancelled' };
       return { kind: 'error', error };
     }
+  }
+
+  /**
+   * - AuthenticationRequiredError(갱신·재전송 뒤에도 남은 401 UNAUTHORIZED): 세션은 지우지 않고 화면이 로그인으로 보낸다.
+   *   임시 동작이다(boot-auth.md 확인 필요 5, REQ-NET-023, home.md 오류 표). 세션 정리는 세션 계층의 몫이라 여기서 하지 않는다.
+   * - ReauthenticationRequiredError(401 REAUTHENTICATION_REQUIRED): 세션이 이미 지워지고 session-expired 이벤트로
+   *   부트 흐름이 로그인으로 보내므로 홈은 오류로 보이지 않기만 한다.
+   */
+  private handleAuthError(ctx: RequestContext, error: unknown): boolean {
+    if (error instanceof ReauthenticationRequiredError) return true;
+    if (!(error instanceof AuthenticationRequiredError)) return false;
+    if (this.loginRequestedGeneration !== ctx.token) {
+      this.loginRequestedGeneration = ctx.token;
+      this.deps.authFlow.toLogin();
+    }
+    return true;
   }
 
   // ---- 세대·날짜 ----
@@ -552,8 +595,14 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
     this.deps.aiReview.start(postId);
   }
 
+  /**
+   * 홈이 보이는 동안은 이 홈이 시작한 폴러가 있을 때만 멈춘다. 홈이 안 보이게 된 뒤(onHidden·dispose)에는
+   * 시작 기록이 없어도 정지를 보장한다(상태가 비워진 계정 전환 직후 등에서 폴러가 남지 않게).
+   */
   private stopAiPoller(): void {
-    if (this.polledPostId === null && this.shown) return;
+    const startedByHome = this.polledPostId !== null;
+    const mustEnsureStopped = !this.shown;
+    if (!startedByHome && !mustEnsureStopped) return;
     this.polledPostId = null;
     this.deps.aiReview.stop();
   }

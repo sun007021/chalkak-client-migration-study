@@ -1,4 +1,5 @@
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -6,53 +7,42 @@ import { useViewModelState } from '../core/state/useViewModelState';
 import { t } from '../shared/copy';
 import { colors, spacing } from '../shared/ui/theme';
 import { useAppContainer } from './AppContainerContext';
+import { BottomTabPolicy } from './BottomTabPolicy';
 import type { TabRouteName } from './navigation/routes';
 
-type TabSpec = {
-  testID: string;
-  label: string;
-  destination: 'home' | 'display' | 'record' | 'settings';
-};
+type TabSpec = { testID: string; label: string };
 
 /** testID는 docs/testing/testids.md의 bottom-bar.* 그대로, 라벨은 nav.tab.*. */
 const TABS: Record<TabRouteName, TabSpec> = {
-  Home: { testID: 'bottom-bar.tab-home', label: t('nav.tab.home'), destination: 'home' },
-  Display: {
-    testID: 'bottom-bar.tab-display',
-    label: t('nav.tab.display'),
-    destination: 'display',
-  },
-  Record: { testID: 'bottom-bar.tab-record', label: t('nav.tab.record'), destination: 'record' },
-  Settings: {
-    testID: 'bottom-bar.tab-settings',
-    label: t('nav.tab.settings'),
-    destination: 'settings',
-  },
+  Home: { testID: 'bottom-bar.tab-home', label: t('nav.tab.home') },
+  Display: { testID: 'bottom-bar.tab-display', label: t('nav.tab.display') },
+  Record: { testID: 'bottom-bar.tab-record', label: t('nav.tab.record') },
+  Settings: { testID: 'bottom-bar.tab-settings', label: t('nav.tab.settings') },
 };
 
 /**
  * 하단 바: 홈, 전시, [업로드 버튼], 기록, 설정. 선택 표시는 탭 네 개 중 하나에만 있고 업로드 버튼은 탭이 아니다(REQ-NAV-001~002).
- * 게스트는 기록 탭이 막히고(토스트), 업로드 버튼은 토스트만 띄운다(D-05). 탭을 누를 때마다(재선택 포함) 분석 이벤트를 보낸다(REQ-NAV-009).
+ * 게스트 차단·토스트·분석 이벤트는 BottomTabPolicy가 정하고(순수 TS, 단위 테스트), 이 컴포넌트는 그 결과대로 이동만 한다.
  */
 export function BottomBar({ state, navigation }: BottomTabBarProps) {
   const { bootViewModel, analytics, toast } = useAppContainer();
   const { mode } = useViewModelState(bootViewModel);
+  const policy = useMemo(
+    () => new BottomTabPolicy({ mode, analytics, toast }),
+    [mode, analytics, toast],
+  );
   const insets = useSafeAreaInsets();
   const focusedName = state.routes[state.index]?.name;
 
   const onTabPress = (name: TabRouteName, routeKey: string) => {
-    if (name === 'Record' && mode === 'guest') {
-      toast.show(t('nav.guest.record'));
-      return;
-    }
-    analytics.logEvent('bottom_navigation_selected', { destination: TABS[name].destination });
+    if (policy.onTabPress(name) === 'blocked') return;
     const event = navigation.emit({ type: 'tabPress', target: routeKey, canPreventDefault: true });
     if (focusedName !== name && !event.defaultPrevented) navigation.navigate(name);
   };
 
   const onUploadPress = () => {
-    if (mode === 'guest') toast.show(t('nav.guest.upload'));
-    else navigation.getParent()?.navigate('Upload' as never);
+    if (policy.onUploadPress() === 'open-upload')
+      navigation.getParent()?.navigate('Upload' as never);
   };
 
   const tab = (name: TabRouteName) => {

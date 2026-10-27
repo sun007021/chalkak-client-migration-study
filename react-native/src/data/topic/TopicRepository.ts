@@ -10,7 +10,8 @@ export class TopicRepository {
 
   /**
    * GET /topics?date=yyyy-MM-dd (비로그인 허용, 토큰이 있으면 붙인다).
-   * 404 BUSINESS_ERROR(주제 없음)이면 null. 응답의 topicDate가 요청 날짜와 다르면 InvalidResponseError.
+   * 404이고 errorCode가 BUSINESS_ERROR(주제 없음, api-contract 5.2)일 때만 null. 알 수 없는 errorCode도 BUSINESS_ERROR로
+   * 정규화되므로(parseErrorBody) 오류 본문이 있는 404는 모두 해당한다. 본문이 없는 404(게이트웨이 등)는 오류로 던진다. 응답의 topicDate가 요청 날짜와 다르면 InvalidResponseError.
    * 그 밖의 실패(400 미래 날짜, 5xx, 네트워크 ...)는 ApiError를 그대로 던진다.
    */
   async findByDate(date: KstDate, signal?: AbortSignal): Promise<Topic | null> {
@@ -24,7 +25,13 @@ export class TopicRepository {
         },
       );
     } catch (error) {
-      if (error instanceof HttpError && error.status === 404) return null;
+      if (
+        error instanceof HttpError &&
+        error.status === 404 &&
+        error.errorCode === 'BUSINESS_ERROR'
+      ) {
+        return null;
+      }
       throw error;
     }
   }

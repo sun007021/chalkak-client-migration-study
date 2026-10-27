@@ -21,14 +21,16 @@ export type IssueNavigationDecision = 'allow-in-app' | 'open-external' | 'block'
 /**
  * 배너 웹뷰 링크 정책(순수 함수, TC-BANR-017~022). 다섯 플랫폼이 같은 입력 표로 검증한다.
  * - 첫 로드: https이고 호스트가 있으면 allow-in-app, 아니면 block.
- * - 하위 프레임: allow-in-app.
- * - 그 밖(첫 로드 이후 최상위): http(s)가 아닌 스킴은 block, 사용자 제스처 없는 이동·새 창은 block,
+ * - 그 밖: http(s)가 아닌 스킴은 하위 프레임이든 최상위든 block.
+ * - 하위 프레임의 http(s) 이동: allow-in-app.
+ * - 첫 로드 이후 최상위: 사용자 제스처 없는 이동·새 창은 block,
  *   같은 문서 앵커(#)는 allow-in-app(새 창 앵커는 open-external), 나머지 http(s) 링크는 open-external.
  */
 export function decideIssueNavigation(request: IssueNavigationRequest): IssueNavigationDecision {
   if (request.isInitialLoad) return isSafeIssueUrl(request.url) ? 'allow-in-app' : 'block';
-  if (!request.isMainFrame) return 'allow-in-app';
+  // 비 http(s) 스킴(tel:, intent: 등)은 하위 프레임에서도 막는다(REQ-BANR-017). iframe 안의 앱 실행 시도를 차단한다.
   if (!isWebUrl(request.url)) return 'block';
+  if (!request.isMainFrame) return 'allow-in-app';
   if (!request.hasUserGesture) return 'block';
   if (!request.opensNewWindow && isSameDocumentAnchor(request.url, request.currentUrl)) {
     return 'allow-in-app';

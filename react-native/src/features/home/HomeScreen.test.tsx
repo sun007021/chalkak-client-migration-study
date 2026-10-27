@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
 import { deferred } from '../../core/http/__testing__/FakeTransport';
@@ -439,6 +439,103 @@ describe('HomeScreen ISSUE 배너', () => {
     expect(await screen.findByTestId('home.issue-section')).toBeOnTheScreen();
   });
 });
+
+describe('HomeScreen ISSUE 프리패치(스크롤·레이아웃)', () => {
+  const P2 = 'GET /banners?page=2&pageSize=10';
+  const CARD_HEIGHT = 100;
+
+  /** 뷰포트 1000, 섹션 y=0, 카드 i는 y=100*i로 레이아웃을 알린다. 카드 10장이 모두 보인다(마지막 index 9). */
+  async function layoutAll(count = 10) {
+    await fireEvent(screen.getByTestId('home.scroll'), 'layout', {
+      nativeEvent: { layout: { height: 1000 } },
+    });
+    await fireEvent(await screen.findByTestId('home.issue-section'), 'layout', {
+      nativeEvent: { layout: { y: 0 } },
+    });
+    for (let i = 1; i <= count; i += 1) {
+      const id = BANNER(String(i).padStart(2, '0'));
+      await fireEvent(screen.getByTestId(`home.issue-item-${id}`), 'layout', {
+        nativeEvent: { layout: { y: (i - 1) * CARD_HEIGHT } },
+      });
+    }
+  }
+  const scrollBy = (y: number, height = 1000) =>
+    fireEvent.scroll(screen.getByTestId('home.scroll'), {
+      nativeEvent: {
+        contentOffset: { y },
+        layoutMeasurement: { height },
+        contentSize: { height: 3000 },
+      },
+    });
+
+  it('REQ-BANR-010 끝에 닿으면 page=2를 요청한다', async () => {
+    const h = await createHomeHarness();
+    await renderHome(h);
+    await layoutAll();
+    await act(async () => {});
+    expect(h.router.calls(P2)).toHaveLength(1);
+    expect(await screen.findByTestId(`home.issue-item-${BANNER('11')}`)).toBeOnTheScreen();
+  });
+
+  it('REQ-BANR-009 TC-BANR-013 추가 페이지가 실패하면 같은 자리에서 다시 스크롤할 때 재요청한다(보이는 인덱스가 같아도)', async () => {
+    const h = await createHomeHarness();
+    h.router.set(P2, 'banner/banners__400-bad-query'); // 재시도 없는 실패(요청 횟수를 그대로 센다)
+    await renderHome(h);
+    await layoutAll();
+    await act(async () => {});
+    expect(h.router.calls(P2).length).toBeGreaterThan(0);
+
+    h.router.set(P2, 'banner/banners__page2-last'); // set이 호출 기록을 비운다
+    await scrollBy(5);
+    await act(async () => {});
+    expect(h.router.calls(P2)).toHaveLength(1);
+    expect(await screen.findByTestId(`home.issue-item-${BANNER('11')}`)).toBeOnTheScreen();
+  });
+
+  it('REQ-BANR-009 실패 직후에는 스크롤이 없으면 스스로 재요청하지 않는다', async () => {
+    const h = await createHomeHarness();
+    h.router.set(P2, 'banner/banners__400-bad-query');
+    await renderHome(h);
+    await layoutAll();
+    await act(async () => {});
+    const before = h.router.calls(P2).length;
+    await act(async () => {});
+    await act(async () => {});
+    expect(h.router.calls(P2)).toHaveLength(before);
+  });
+
+  it('TC-BANR-015 새로고침으로 목록이 처음 10개로 돌아온 뒤에도 끝에 닿으면 page=2를 다시 요청한다', async () => {
+    const h = await createHomeHarness();
+    await renderHome(h);
+    await layoutAll();
+    await act(async () => {});
+    await screen.findByTestId(`home.issue-item-${BANNER('11')}`);
+    expect(h.router.calls(P2)).toHaveLength(1);
+    // 11~13번째 카드도 레이아웃을 알린 상태(index 12까지 보임)
+    for (let i = 11; i <= 13; i += 1) {
+      await fireEvent(screen.getByTestId(`home.issue-item-${BANNER(String(i))}`), 'layout', {
+        nativeEvent: { layout: { y: (i - 1) * CARD_HEIGHT } },
+      });
+    }
+    await scrollBy(1, 1300); // 마지막 카드(index 12)까지 보인다
+
+    await act(async () => {
+      screen.getByTestId('home.scroll').props.refreshControl.props.onRefresh();
+    });
+    await screen.findByTestId('home.hero-photo');
+    await waitForRefreshEnd();
+
+    // 새 목록은 10장뿐인데 이전 카드 위치(index 10~12)가 남아 있으면 "여전히 12번째가 보임"으로 오해한다.
+    await scrollBy(1, 1300);
+    await act(async () => {});
+    expect(h.router.calls(P2)).toHaveLength(2);
+    expect(await screen.findByTestId(`home.issue-item-${BANNER('11')}`)).toBeOnTheScreen();
+  });
+});
+
+async function waitForRefreshEnd() {
+  await waitFor(() => expect(screen.queryByTestId('home.refresh-indicator')).not.toBeOnTheScreen());
+}
 
 describe('HomeScreen 알림 버튼·새로고침', () => {
   it('TC-HOME-050 hasUnread=true면 미읽음 점이 있고 false면 요소 자체가 없다', async () => {

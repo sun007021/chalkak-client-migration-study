@@ -175,12 +175,14 @@ export class AppContainer {
       topics: new TopicRepository({ api }),
       posts: new PostRepository({ api }),
       notifications: new NotificationRepository({ api }),
+      // ISSUE 목록 ViewModel은 홈이 소유한다(홈이 로드·정리·dispose를 시키고 HomeScreen은 홈을 통해서만 받는다).
       bannerFeed: new BannerFeedViewModel({ repository: new BannerRepository({ api }) }),
       likes,
       aiReview,
       visibility,
       navigator: this.homeNavigator,
       toast: this.toast,
+      authFlow: this.bootViewModel,
     });
   }
 

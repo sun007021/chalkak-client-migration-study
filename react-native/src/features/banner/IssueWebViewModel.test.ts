@@ -138,3 +138,68 @@ describe('IssueWebViewModel 이동 요청', () => {
     expect(h.viewModel.getSnapshot()).toMatchObject({ phase: 'ready', errorKind: null });
   });
 });
+
+describe('IssueWebViewModel 로드 중 차단', () => {
+  const redirect = (url: string, extra: Partial<IssueNavigationRequest> = {}) =>
+    click(url, { hasUserGesture: false, ...extra });
+
+  it('최초 로드가 정책에 막히면 load-failed로 바꿔 스피너가 계속 돌지 않게 한다', () => {
+    const h = createIssueWebHarness();
+    const decision = h.viewModel.onNavigationRequest(
+      redirect('http://web.example.test/issues/1', { isInitialLoad: true, currentUrl: null }),
+    );
+    expect(decision).toBe('block');
+    expect(h.viewModel.getSnapshot()).toMatchObject({ phase: 'error', errorKind: 'load-failed' });
+  });
+
+  it('로드 중 리다이렉트가 막혀도 load-failed', () => {
+    const h = createIssueWebHarness();
+    h.viewModel.onNavigationRequest(
+      redirect('https://web.example.test/issues/1', { isInitialLoad: true }),
+    );
+    h.viewModel.onNavigationRequest(redirect('intent://x#Intent;end'));
+    expect(h.viewModel.getSnapshot()).toMatchObject({ phase: 'error', errorKind: 'load-failed' });
+  });
+
+  it('로드를 마친 뒤(ready) 막힌 스크립트 이동은 화면 상태를 바꾸지 않는다', () => {
+    const h = createIssueWebHarness();
+    h.viewModel.onLoadEnd();
+    h.viewModel.onNavigationRequest(redirect('https://x.test/'));
+    expect(h.viewModel.getSnapshot()).toMatchObject({ phase: 'ready', errorKind: null });
+  });
+
+  it('로드 중이라도 사용자가 누른 링크·하위 프레임·새 창의 차단은 로드 실패가 아니다', () => {
+    const h = createIssueWebHarness();
+    h.viewModel.onNavigationRequest(click('tel:0212345678'));
+    h.viewModel.onNavigationRequest(redirect('tel:1', { isMainFrame: false }));
+    h.viewModel.onNavigationRequest(redirect('tel:1', { opensNewWindow: true }));
+    expect(h.viewModel.getSnapshot()).toMatchObject({ phase: 'loading', errorKind: null });
+  });
+
+  it('차단 뒤 다시 시도하면 loading으로 돌아간다', () => {
+    const h = createIssueWebHarness();
+    h.viewModel.onNavigationRequest(redirect('tel:1'));
+    h.viewModel.retry();
+    expect(h.viewModel.getSnapshot()).toMatchObject({ phase: 'loading', errorKind: null });
+  });
+});
+
+describe('IssueWebViewModel dispose', () => {
+  it('dispose 뒤에는 외부 열기 결과를 토스트로 보이지 않는다', async () => {
+    const h = createIssueWebHarness();
+    h.linkOpener.result = 'failed';
+    h.viewModel.onNavigationRequest(click('https://other.example.test/x'));
+    h.viewModel.dispose();
+    await flush();
+    expect(h.toast.messages).toEqual([]);
+  });
+
+  it('dispose 뒤에는 로드 이벤트와 분석도 무시한다', () => {
+    const h = createIssueWebHarness();
+    h.viewModel.dispose();
+    h.viewModel.onScreenShown();
+    h.viewModel.onLoadEnd();
+    expect(h.analytics.screenNames).toEqual([]);
+    expect(h.viewModel.getSnapshot().phase).toBe('loading');
+  });
+});

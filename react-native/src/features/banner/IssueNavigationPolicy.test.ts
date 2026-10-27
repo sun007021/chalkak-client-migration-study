@@ -117,4 +117,14 @@ describe('decideIssueNavigation', () => {
       ),
     ).toBe('allow-in-app');
   });
+
+  it.each(['tel:0212345678', 'intent://scan/#Intent;end', 'sms:010', 'javascript:alert(1)'])(
+    'REQ-BANR-017 하위 프레임에서도 비 http(s) 스킴(%s)은 block',
+    (url) => {
+      expect(decideIssueNavigation(req({ isMainFrame: false, url }))).toBe('block');
+      expect(decideIssueNavigation(req({ isMainFrame: false, hasUserGesture: true, url }))).toBe(
+        'block',
+      );
+    },
+  );
 });

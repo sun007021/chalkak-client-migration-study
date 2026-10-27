@@ -56,6 +56,15 @@ describe('TopicRepository.findByDate', () => {
     expect(h.transport.requests).toHaveLength(1);
   });
 
+  it('본문 없는 404(게이트웨이·프록시 등)는 "주제 없음"이 아니라 오류로 던진다(spec: 404 BUSINESS_ERROR만 주제 없음)', async () => {
+    const h = setup();
+    h.transport.script({ status: 404, headers: {}, bodyText: '<html>Not Found</html>' });
+    await expect(h.repository.findByDate(TODAY)).rejects.toMatchObject({
+      status: 404,
+      errorCode: null,
+    });
+  });
+
   it('REQ-HOME-005 400(미래 날짜)은 null이 아니라 HttpError이고 재시도하지 않는다', async () => {
     const h = setup();
     h.transport.script(

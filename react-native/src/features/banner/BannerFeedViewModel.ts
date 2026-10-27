@@ -56,7 +56,7 @@ export class BannerFeedViewModel extends Observable<BannerFeedState> {
       this.nextPage = 2;
       this.setState({
         status: 'ready',
-        banners: page.banners,
+        banners: dedupeById(page.banners),
         hasNext: page.hasNext && page.banners.length > 0,
         loadingMore: false,
       });
@@ -82,7 +82,7 @@ export class BannerFeedViewModel extends Observable<BannerFeedState> {
       this.nextPage = 2;
       this.setState({
         status: 'ready',
-        banners: page.banners,
+        banners: dedupeById(page.banners),
         hasNext: page.hasNext && page.banners.length > 0,
         loadingMore: false,
       });
@@ -113,8 +113,7 @@ export class BannerFeedViewModel extends Observable<BannerFeedState> {
       if (token !== this.generation) return;
       const current = this.getSnapshot();
       if (current.status !== 'ready') return;
-      const known = new Set(current.banners.map((b) => b.id));
-      const added = page.banners.filter((b) => !known.has(b.id));
+      const added = dedupeById(page.banners, current.banners);
       this.nextPage += 1;
       this.setState({
         status: 'ready',
@@ -160,3 +159,13 @@ export class BannerFeedViewModel extends Observable<BannerFeedState> {
 
 /** 마지막으로 보이는 카드가 마지막에서 이 거리 이내면 다음 페이지를 요청한다(AN ISSUE_PREFETCH_DISTANCE). */
 const PREFETCH_DISTANCE = 2;
+
+/** 같은 id는 처음 나온 것만 남긴다. `existing`에 이미 있는 id도 뺀다. */
+function dedupeById(banners: readonly Banner[], existing: readonly Banner[] = []): Banner[] {
+  const seen = new Set(existing.map((b) => b.id));
+  return banners.filter((b) => {
+    if (seen.has(b.id)) return false;
+    seen.add(b.id);
+    return true;
+  });
+}

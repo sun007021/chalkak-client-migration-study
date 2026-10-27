@@ -125,6 +125,23 @@ describe('BannerRepository.list', () => {
     await expect(h.repository.list(1)).rejects.toBeInstanceOf(InvalidResponseError);
   });
 
+  it.each(['title', 'subtitle'])(
+    'BANNER-002 %s가 빈 문자열이면 계약 위반이라 InvalidResponseError(서버는 1자 이상만 등록한다)',
+    async (field) => {
+      const h = setup();
+      const body = fixtureBody<{ banners: Record<string, unknown>[] }>(
+        'banner/banners__page2-last',
+      );
+      body.banners[0][field] = '';
+      h.transport.script({
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+        bodyText: JSON.stringify(body),
+      });
+      await expect(h.repository.list(2)).rejects.toBeInstanceOf(InvalidResponseError);
+    },
+  );
+
   it('TC-BANR-006 필수 필드(webViewUrl)가 빠진 배너가 있으면 InvalidResponseError', async () => {
     const h = setup();
     const body = fixtureBody<{ banners: Record<string, unknown>[] }>('banner/banners__page2-last');

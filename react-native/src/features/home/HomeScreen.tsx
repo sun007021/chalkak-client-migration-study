@@ -38,6 +38,13 @@ export function HomeScreen({ viewModel, renderAiCard }: HomeScreenProps) {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollViewInstance>(null);
   const issue = useIssuePrefetch(viewModel);
+  const { report: reportVisibleCards } = issue;
+  // 목록이 바뀌면(새로고침·추가 페이지) 스크롤 없이도 보이는 마지막 카드를 다시 알린다.
+  // 실패로 loadingMore만 바뀌는 경우에는 banners 참조가 그대로라 재시도가 스스로 반복되지 않는다.
+  const banners = feed.status === 'ready' ? feed.banners : null;
+  useEffect(() => {
+    reportVisibleCards();
+  }, [banners, reportVisibleCards]);
 
   useEffect(() => {
     void viewModel.onShown();
@@ -115,26 +122,30 @@ export function HomeScreen({ viewModel, renderAiCard }: HomeScreenProps) {
 
 /**
  * ISSUE 카드는 세로로 쌓이므로 "화면에 보이는 마지막 카드"를 스크롤 위치와 카드 위치로 계산해 ViewModel에 알린다.
- * 같은 카드가 마지막으로 보이는 동안에는 다시 알리지 않는다(실패한 요청을 스크롤마다 되풀이하지 않기 위해).
+ * 스크롤·레이아웃마다 그대로 알린다. 같은 카드가 마지막이어도 건너뛰지 않는다: 중복 요청은 ViewModel이
+ * `loadingMore`/`hasNext`로 막고, 다음 페이지가 실패한 뒤에는 끝에서 다시 스크롤할 때 재시도해야 한다(REQ-BANR-009/010).
+ * 새로고침으로 목록이 줄면 사라진 카드의 옛 위치가 남지 않도록 현재 개수 밖의 인덱스는 버린다.
  */
 function useIssuePrefetch(viewModel: HomeViewModel) {
   const sectionY = useRef(0);
   const cardYs = useRef(new Map<number, number>());
   const viewport = useRef({ top: 0, height: 0 });
-  const lastReported = useRef(-1);
 
   const report = useCallback(() => {
+    const feed = viewModel.bannerFeed.getSnapshot();
+    const count = feed.status === 'ready' ? feed.banners.length : 0;
     const bottom = viewport.current.top + viewport.current.height;
     let last = -1;
     cardYs.current.forEach((y, index) => {
-      if (sectionY.current + y < bottom && index > last) last = index;
+      if (index >= count) cardYs.current.delete(index);
+      else if (sectionY.current + y < bottom && index > last) last = index;
     });
-    if (last < 0 || last === lastReported.current) return;
-    lastReported.current = last;
+    if (last < 0) return;
     void viewModel.bannerFeed.onLastVisibleIndexChanged(last);
   }, [viewModel]);
 
   return {
+    report,
     onScrollLayout: (e: { nativeEvent: { layout: { height: number } } }) => {
       viewport.current.height = e.nativeEvent.layout.height;
       report();

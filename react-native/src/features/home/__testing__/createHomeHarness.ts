@@ -6,6 +6,7 @@ import { FixtureRouter, type RouteValue } from '../../../data/__testing__/Fixtur
 import { NotificationRepository } from '../../../data/notification/NotificationRepository';
 import { PostRepository } from '../../../data/post/PostRepository';
 import { TopicRepository } from '../../../data/topic/TopicRepository';
+import { FakeAuthFlowNavigator } from '../../auth/__testing__/FakeAuthFlowNavigator';
 import { FakeAiReviewPoller } from '../../ai-review/__testing__/FakeAiReviewPoller';
 import type { MainMode } from '../../auth/AuthFlowNavigator';
 import { BannerFeedViewModel } from '../../banner/BannerFeedViewModel';
@@ -57,6 +58,7 @@ export async function createHomeHarness(options: HomeHarnessOptions = {}) {
   const visibility = new FakeAppVisibility();
   const navigator = new FakeHomeNavigator();
   const toast = new FakeToastPresenter();
+  const authFlow = new FakeAuthFlowNavigator();
   const viewModel = new HomeViewModel({
     mode,
     clock: net.clock,
@@ -69,8 +71,20 @@ export async function createHomeHarness(options: HomeHarnessOptions = {}) {
     visibility,
     navigator,
     toast,
+    authFlow,
   });
-  return { ...net, router, bannerFeed, likes, aiReview, visibility, navigator, toast, viewModel };
+  return {
+    ...net,
+    router,
+    bannerFeed,
+    likes,
+    aiReview,
+    visibility,
+    navigator,
+    toast,
+    authFlow,
+    viewModel,
+  };
 }
 
 export type HomeHarness = Awaited<ReturnType<typeof createHomeHarness>>;

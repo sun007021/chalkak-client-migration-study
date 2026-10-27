@@ -1,7 +1,7 @@
 import { FixtureRouter } from '../../data/__testing__/FixtureRouter';
 import { BannerRepository } from '../../data/banner/BannerRepository';
 import { createNetHarness } from '../../core/http/__testing__/createNetHarness';
-import { deferred, networkFailure } from '../../core/http/__testing__/FakeTransport';
+import { deferred, json, networkFailure } from '../../core/http/__testing__/FakeTransport';
 import { fixtureResponse } from '../../core/http/__testing__/loadFixture';
 import { BannerFeedViewModel, type BannerFeedState } from './BannerFeedViewModel';
 
@@ -40,6 +40,29 @@ describe('BannerFeedViewModel 첫 페이지', () => {
     expect(state.banners).toHaveLength(10);
     expect(state).toMatchObject({ hasNext: true, loadingMore: false });
     expect(h.router.calls(P1)[0].headers.Authorization).toBeUndefined();
+  });
+
+  it('REQ-BANR-009 첫 페이지 응답 안에 같은 id가 두 번 오면 한 번만 보여 준다(새로고침도 같다)', async () => {
+    const banner = (id: string) => ({
+      id: `44444444-4444-4444-8444-4444444444${id}`,
+      title: `이슈 ${id}`,
+      subtitle: '부제',
+      webViewUrl: 'https://web.example.test/issues/1',
+      thumbnailUrl: null,
+      createdAt: '2026-10-27T01:00:00Z',
+    });
+    const page = async () =>
+      json(200, {
+        currentPage: 1,
+        pageSize: 10,
+        hasNext: false,
+        banners: [banner('01'), banner('02'), banner('01')],
+      });
+    const h = setup({ [P1]: page });
+    await h.viewModel.load();
+    expect(ids(h.viewModel.getSnapshot())).toEqual(['01', '02']);
+    await h.viewModel.refresh();
+    expect(ids(h.viewModel.getSnapshot())).toEqual(['01', '02']);
   });
 
   it('TC-BANR-010 REQ-BANR-005 빈 성공이면 ready + 빈 목록(섹션 숨김)', async () => {
