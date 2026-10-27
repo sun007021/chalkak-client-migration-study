@@ -1,0 +1,36 @@
+name: react-native
+
+on:
+  pull_request:
+    paths:
+      - 'react-native/**'
+      - '.github/workflows/react-native.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'react-native/**'
+      - '.github/workflows/react-native.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: react-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: react-native
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: react-native/.nvmrc
+          cache: npm
+          cache-dependency-path: react-native/package-lock.json
+      - run: npm ci
+      - run: npm run verify
