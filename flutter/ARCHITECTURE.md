@@ -47,11 +47,16 @@ flutter/
 - ViewModel 상태는 불변 값 객체(또는 sealed class)로 노출한다. 화면 일회성 이벤트(토스트, 이동)는 별도 이벤트 스트림/콜백으로 내보내고 상태에 섞지 않는다.
 - Fake 우선. mocktail 등 mock은 "API를 부르지 않았다", 분석 이벤트처럼 호출 자체가 요구사항일 때만 쓴다.
 - 모든 상호작용 요소에 [testids.md](../docs/testing/testids.md)의 id를 `TestIds` 상수로 단다: `Semantics(identifier: id, ...)` + `Key(id)`. 상태 표시 요소는 해당 상태일 때만 트리에 존재한다.
-- 사용자 문구는 `shared/copy/ko.json`이 생기면 그 키를 쓴다. 그 전에는 `lib/core/copy/` 한 곳에 모은다.
+- 사용자 문구는 `shared/copy/ko.json`이 원본이다. `dart run tool/gen_copy.dart`가 `lib/core/copy/ko.g.dart`의 `Copy`(정적 const)를 만든다. 키 `ai.card.completed` -> `Copy.aiCardCompleted`(`.`·`-`로 나눠 lowerCamel), 원래 키는 doc 주석. `{주제}` 같은 플레이스홀더는 값에 그대로 있고 `Copy.fill(template, {'주제': ...})`로 치환한다. 문구를 코드에 직접 쓰지 않는다. 생성 파일은 커밋하고 `copy_sync_test`와 `tool/check.sh`(`gen_copy.dart --check`)가 ko.json과의 동기화를 검사한다.
+- 상수는 `AppConstants`가 `shared/constants.json`과 같은 값을 갖고, `test/core/constants/shared_constants_test.dart`가 대조한다(기간 `_MS`는 `Duration`). json에 키가 늘면 이 테스트가 실패하므로 AppConstants에 추가한다.
 
 ## 4. 테스트 이름과 실행
 
 - 테스트 이름에 카탈로그 `TC-` ID를 넣는다: `test('TC-TIME-001 UTC 15:00Z는 KST 다음 날이다', ...)`.
 - 한 테스트가 여러 TC를 덮으면 이름에 모두 적는다(`TC-NET-012 TC-NET-021 ...`).
-- `tool/check.sh`: `dart format --set-exit-if-changed`, `flutter analyze`, `flutter test`. PR마다 통과해야 머지한다.
-- fixture는 `shared/fixtures/`가 생기면 `test/support/fixtures.dart`의 로더로 `../shared/fixtures/<영역>/<파일>.json`을 읽는다. 복제하지 않는다.
+- `tool/check.sh`: `dart run tool/gen_copy.dart --check` -> `dart format --set-exit-if-changed` -> `flutter analyze` -> `flutter test` -> (node가 있으면) `node ../shared/scripts/check-testids.mjs flutter --root ..`. PR마다 통과해야 머지한다.
+- TC 커버리지: 저장소 루트에서 `node shared/scripts/check-tc-coverage.mjs flutter`. testID 검사: `node shared/scripts/check-testids.mjs flutter`.
+- fixture는 복제하지 않고 `test/support/fixtures.dart`가 `flutter/` 기준 `../shared/fixtures/`(테스트 실행 위치와 무관)에서 읽는다.
+  - `Fixture.load('common/error__business-400.json')`: 파일을 파싱한 JSON(서버 응답 본문 그대로).
+  - `Fixture.route(name)`: `manifest.json` 항목(`method`, `path`, `status`, `query`, `headers`, `delayMs`, `tc`). 상태·메서드·경로는 파일이 아니라 manifest에 있다.
+  - `Fixture.response(name)`: 예약 키 해석. `_raw`(`rawBody`, 빈 문자열 = 본문 없음), `_contentType`, `_fault`(`timeout`/`disconnect`, 응답 없음), `_kind`(`push`/`request`/`case`/`storage`/`native` = HTTP 응답 아님, `isHttpResponse == false`). `bodyText`가 앱이 실제로 받을 본문 문자열이다.

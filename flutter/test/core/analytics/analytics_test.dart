@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/fake_analytics_tracker.dart';
 
 void main() {
-  // TODO(shared): shared/constants.json이 생기면 TC-ANL-002, TC-ANL-023 철자 대조를 추가한다.
   test('TC-ANL-002 screen_name 허용 목록은 19종(철자 고정)', () {
     expect(ScreenNames.all, hasLength(19));
     expect(ScreenNames.all.toSet(), hasLength(19));

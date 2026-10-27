@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 
 import '../constants/app_constants.dart';
-import '../copy/ko.dart';
+import '../copy/ko.g.dart';
 
 /// 유니코드 code point 수(grapheme·UTF-16 길이 아님).
 int codePointLength(String text) => text.runes.length;
@@ -22,7 +22,8 @@ abstract final class PostTitle {
       strippedCodePointLength(input) <= AppConstants.postTitleMax;
 
   /// 표시용: null·빈 값이면 '무제'.
-  static String display(String? title) => normalize(title ?? '') ?? Ko.untitled;
+  static String display(String? title) =>
+      normalize(title ?? '') ?? Copy.feedEditUntitled;
 
   /// 입력 변경 처리. 한 글자씩 입력해 한도를 넘으면 [previous] 유지,
   /// 한꺼번에 들어온 붙여넣기는 strip 후 10 code point까지 앞에서 자른다.

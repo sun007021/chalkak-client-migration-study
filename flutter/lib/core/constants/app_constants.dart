@@ -1,5 +1,5 @@
 /// 00-overview §6 공통 상수. 하드코딩하지 말고 여기서만 가져다 쓴다.
-// TODO(shared): shared/constants.json이 생기면 test/core/constants/app_constants_test.dart에서 대조한다.
+/// 값은 shared/constants.json과 같아야 하며 test/core/constants/shared_constants_test.dart가 대조한다.
 abstract final class AppConstants {
   static const serviceTimeZone = 'Asia/Seoul';
 
@@ -19,7 +19,9 @@ abstract final class AppConstants {
   static const webpShrinkMaxAttempts = 3;
 
   static const uploadUrlSafetyMargin = Duration(seconds: 5);
+  static const uploadIdClaimTtl = Duration(hours: 1);
 
+  static const signatureContentType = 'image/png';
   static const signaturePngWidth = 1024;
   static const signaturePngHeight = 512;
   static const signaturePadding = 48;
@@ -37,4 +39,24 @@ abstract final class AppConstants {
 
   static const toastDuration = Duration(milliseconds: 2500);
   static const splashPreloadMax = Duration(milliseconds: 700);
+
+  static const httpConnectTimeout = Duration(seconds: 10);
+  static const httpResponseTimeout = Duration(seconds: 15);
+  static const uploadPutTimeout = Duration(seconds: 60);
+  static const retryBackoff = <Duration>[
+    Duration(milliseconds: 500),
+    Duration(seconds: 1),
+  ];
+  static const retryMax = 2;
+  static const versionLookupTimeout = Duration(seconds: 3);
+
+  static const termsAllowedHosts = <String>[
+    'notion.com',
+    'notion.so',
+    'notion.site',
+  ];
+  static const termsServiceUrl =
+      'https://app.notion.com/p/3c66b8e8e3678064b543c26b5c0f932d?source=copy_link';
+  static const termsPrivacyUrl =
+      'https://app.notion.com/p/3b56b8e8e36780af8ec8ea0bf92b97a9?source=copy_link';
 }

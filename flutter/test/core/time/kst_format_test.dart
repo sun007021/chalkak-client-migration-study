@@ -1,4 +1,4 @@
-import 'package:chalkak/core/copy/ko.dart';
+import 'package:chalkak/core/copy/ko.g.dart';
 import 'package:chalkak/core/time/kst_date.dart';
 import 'package:chalkak/core/time/kst_format.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -71,6 +71,7 @@ void main() {
   });
 
   test('고정 문구', () {
-    expect(Ko.datePickerTitle, '날짜 선택');
+    expect(Copy.displayPickerTitle, '날짜 선택');
+    expect(Copy.recordPickerTitle, '날짜 선택');
   });
 }
