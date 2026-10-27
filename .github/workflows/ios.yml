@@ -1,0 +1,44 @@
+name: iOS
+
+on:
+  pull_request:
+    paths: ["ios/**", "shared/**", ".github/workflows/ios.yml"]
+  push:
+    branches: [main]
+    paths: ["ios/**", "shared/**", ".github/workflows/ios.yml"]
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kit-linux:
+    name: ChalkakKit (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.2-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: swift test
+        working-directory: ios/ChalkakKit
+        run: swift test
+
+  app-macos:
+    name: App build + tests (macOS)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)"
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: ChalkakKit tests (macOS)
+        working-directory: ios/ChalkakKit
+        run: swift test
+      - name: Generate project
+        working-directory: ios/App
+        run: xcodegen generate
+      - name: Build and UI test
+        working-directory: ios/App
+        run: |
+          DEST="platform=iOS Simulator,name=$(xcrun simctl list devices available -j | python3 -c 'import json,sys;d=json.load(sys.stdin)["devices"];print(next(x["name"] for k,v in d.items() if "iOS" in k for x in v if x["name"].startswith("iPhone")))')"
+          xcodebuild test -project Chalkak.xcodeproj -scheme Chalkak -destination "$DEST" CODE_SIGNING_ALLOWED=NO -quiet

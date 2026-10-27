@@ -1,0 +1,4 @@
+// git에 올리는 공통 설정. 로컬 값은 Secrets.xcconfig(무시됨)에서 읽는다.
+API_BASE_URL =
+KAKAO_NATIVE_APP_KEY =
+#include? "Secrets.xcconfig"
