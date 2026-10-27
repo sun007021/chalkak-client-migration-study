@@ -39,7 +39,9 @@
     "format": "prettier --write .",
     "verify": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run test:tz",
     "test:tz": "for tz in America/Los_Angeles Pacific/Kiritimati Pacific/Pago_Pago UTC Asia/Seoul; do TZ=$tz jest src/core/time || exit 1; done",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "coverage:tc": "node ../shared/scripts/check-tc-coverage.mjs react-native",
+    "check:testids": "node ../shared/scripts/check-testids.mjs react-native"
   },
   "private": true,
   "engines": {

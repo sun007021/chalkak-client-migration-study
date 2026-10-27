@@ -9,7 +9,7 @@
 | 영역 | 카탈로그 | TC | A 포함 | AG | iOS | Android | Flutter | RN | Web |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | BOOT | [boot-auth.md](catalog/boot-auth.md) | 39 | 2 | 2 | 0/39 | 0/39 | 0/39 | 0/39 | 0/39 |
-| AUTH | [boot-auth.md](catalog/boot-auth.md) | 65 | 5 | 5 | 0/65 | 0/65 | 0/65 | 0/65 | 0/65 |
+| AUTH | [boot-auth.md](catalog/boot-auth.md) | 65 | 5 | 5 | 0/65 | 0/65 | 0/65 | 1/65 | 0/65 |
 | ONB | [onboarding-signature.md](catalog/onboarding-signature.md) | 52 | 3 | 2 | 0/52 | 0/52 | 0/52 | 0/52 | 0/52 |
 | SIGN | [onboarding-signature.md](catalog/onboarding-signature.md) | 45 | 2 | 2 | 0/45 | 0/45 | 0/45 | 0/45 | 0/45 |
 | NAV | [navigation.md](catalog/navigation.md) | 50 | 0 | 0 | 0/50 | 0/50 | 0/50 | 0/50 | 0/50 |
@@ -26,8 +26,8 @@
 | PUSH | [notification-push.md](catalog/notification-push.md) | 77 | 4 | 6 | 0/77 | 0/77 | 0/77 | 0/77 | 0/77 |
 | SET | [settings-feedback.md](catalog/settings-feedback.md) | 56 | 3 | 3 | 0/56 | 0/56 | 0/56 | 0/56 | 0/56 |
 | FDBK | [settings-feedback.md](catalog/settings-feedback.md) | 37 | 2 | 2 | 0/37 | 0/37 | 1/37 | 0/37 | 0/37 |
-| NET | [common-infra.md](catalog/common-infra.md) | 62 | 2 | 2 | 0/62 | 0/62 | 0/62 | 0/62 | 0/62 |
-| TIME | [common-infra.md](catalog/common-infra.md) | 30 | 0 | 0 | 0/30 | 0/30 | 20/30 | 0/30 | 0/30 |
+| NET | [common-infra.md](catalog/common-infra.md) | 62 | 2 | 2 | 0/62 | 0/62 | 0/62 | 2/62 | 0/62 |
+| TIME | [common-infra.md](catalog/common-infra.md) | 30 | 0 | 0 | 0/30 | 0/30 | 20/30 | 16/30 | 0/30 |
 | ANL | [common-infra.md](catalog/common-infra.md) | 25 | 0 | 0 | 0/25 | 0/25 | 8/25 | 0/25 | 0/25 |
 
 ## 허용된 차이
