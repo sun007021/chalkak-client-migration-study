@@ -154,6 +154,38 @@ export class ApiClient {
       retryable: isRetryable(request.method, request.path),
       timeoutMs: { connect: HTTP_CONNECT_TIMEOUT_MS, response: HTTP_RESPONSE_TIMEOUT_MS },
     };
+    return this.sendWithSessionCheck(attempt, request, session);
+  }
+
+  /**
+   * 요청을 보내고, 인증 요청이었다면 응답이 도착했을 때도 같은 계정의 세션인지 확인한다.
+   * 로그아웃·계정 전환 뒤에 도착한 이전 계정의 응답은 CancelledError로 버려 화면이 반영하지 못하게 한다.
+   * 토큰 갱신으로 토큰이 바뀐 것은 같은 계정이므로 통과한다.
+   */
+  private async sendWithSessionCheck(
+    attempt: Attempt,
+    request: ApiRequest,
+    session: Awaited<ReturnType<SessionStore['load']>>,
+  ): Promise<HttpResponse> {
+    const response = await this.sendWithRefresh(attempt, request, session);
+    if (session.kind === 'authenticated') {
+      const current = await this.deps.sessionStore.load();
+      if (
+        current.kind !== 'authenticated' ||
+        current.credentials.userId !== session.credentials.userId
+      ) {
+        throw new CancelledError('session changed');
+      }
+    }
+    return response;
+  }
+
+  private async sendWithRefresh(
+    attempt: Attempt,
+    request: ApiRequest,
+    session: Awaited<ReturnType<SessionStore['load']>>,
+  ): Promise<HttpResponse> {
+    const { clock } = this.deps;
     try {
       return await this.sendWithRetry(attempt);
     } catch (error) {

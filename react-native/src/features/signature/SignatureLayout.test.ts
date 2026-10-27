@@ -3,7 +3,8 @@ import { fitStrokesToPng } from './SignatureLayout';
 import type { Point, Stroke } from './Stroke';
 
 const spec = SIGNATURE_PNG_SIZE; // 1024x512, padding 48, strokeWidth 14
-const canvas = { width: 300, height: 150 };
+// 기존 앱의 그리기 영역은 정사각형이다(Android aspectRatio(1f)). 정사각형이면 비율 좌표 정규화가 픽셀 비율을 유지한다.
+const canvas = { width: 300, height: 300 };
 const { width: W, height: H, padding: P } = spec;
 const all = (strokes: readonly Stroke[]): Point[] => strokes.flatMap((s) => [...s]);
 const bounds = (points: Point[]) => ({
@@ -66,9 +67,11 @@ describe('fitStrokesToPng', () => {
     expect(b.maxY - b.minY).toBeCloseTo(H - 2 * P, 3);
   });
 
-  it('TC-SIGN-011 점 하나는 정확히 중앙에 놓이고 폭주하지 않는다', () => {
+  it('TC-SIGN-011 점 하나는 폭주하지 않고, 최소 박스(0.02 -> 416x416)를 가운데에 둔 뒤 그 왼쪽 위 모서리에 놓인다(원본 동작)', () => {
+    // 근거: Android/iOS SignaturePngEncoder. 배율 = min(928/0.02, 416/0.02) = 20800,
+    // offsetX = (1024-0.02*20800)/2 = 304, offsetY = (512-416)/2 = 48 -> 점은 (304, 48).
     const fitted = fitStrokesToPng([[{ x: 77, y: 33 }]], canvas, spec);
-    expect(fitted).toEqual([[{ x: W / 2, y: H / 2 }]]);
+    expect(fitted).toEqual([[{ x: 304, y: 48 }]]);
   });
 
   it('TC-SIGN-011 직선(가로/세로 한 변이 0)도 최소 정규화 크기 0.02로 취급해 NaN·무한대가 없다', () => {
@@ -88,12 +91,13 @@ describe('fitStrokesToPng', () => {
     }
     expect(b.maxX - b.minX).toBeCloseTo(W - 2 * P, 3);
     expect(b.maxY - b.minY).toBeCloseTo(0, 6);
-    expect((b.minY + b.maxY) / 2).toBeCloseTo(H / 2, 3);
+    // 원본: 세로 박스를 0.02로 올려(= 0.02 * 배율 높이) 가운데에 두고 선은 그 위쪽 변에 놓인다.
+    const scale = (W - 2 * P) / 0.6;
+    expect(b.minY).toBeCloseTo((H - 0.02 * scale) / 2, 3);
   });
 
-  it('TC-SIGN-011 박스 한 변이 캔버스의 0.02보다 작으면 0.02로 취급한다(최소 박스 6x3px -> 배율 min(928/6, 416/3))', () => {
-    // [가정: 확인 필요 1] 박스를 캔버스 픽셀로 보고 각 변을 max(변, 0.02*캔버스 변)로 올린 뒤 비율 유지로 패딩 영역에 맞춘다.
-    // 1x1px 박스: 가로 최소 6px, 세로 최소 3px -> 배율 = min(928/6, 416/3) = 138.667 -> 결과 크기 138.667x138.667.
+  it('TC-SIGN-011 박스 한 변이 캔버스의 0.02보다 작으면 0.02로 취급한다(1x1px 박스 -> 배율 20800)', () => {
+    // 비율 박스 0.00333 -> 양 변 모두 0.02로 올림 -> 배율 min(928/0.02, 416/0.02) = 20800. 실제 점 간격은 0.00333*20800.
     const fitted = fitStrokesToPng(
       [
         [
@@ -105,10 +109,29 @@ describe('fitStrokesToPng', () => {
       spec,
     );
     const b = bounds(all(fitted));
-    const scale = Math.min((W - 2 * P) / 6, (H - 2 * P) / 3);
-    expect(b.maxX - b.minX).toBeCloseTo(scale, 2);
-    expect(b.maxY - b.minY).toBeCloseTo(scale, 2);
-    expect((b.minX + b.maxX) / 2).toBeCloseTo(W / 2, 2);
+    expect(b.maxX - b.minX).toBeCloseTo((1 / 300) * 20800, 2);
+    expect(b.maxY - b.minY).toBeCloseTo((1 / 300) * 20800, 2);
+    expect(b.minX).toBeCloseTo(304, 2);
+    expect(b.minY).toBeCloseTo(48, 2);
+  });
+
+  it('TC-SIGN-011 좌표는 캔버스 크기로 나눈 비율로 정규화한다(가로로 긴 캔버스에서도 박스가 패딩 안쪽)', () => {
+    const wide = { width: 600, height: 150 };
+    const fitted = fitStrokesToPng(
+      [
+        [
+          { x: 0, y: 0 },
+          { x: 600, y: 150 },
+        ],
+      ],
+      wide,
+      spec,
+    );
+    const b = bounds(all(fitted));
+    // 비율 박스 1x1 -> 배율 min(928, 416) = 416 -> 416x416 정사각형으로 가운데.
+    expect(b.maxX - b.minX).toBeCloseTo(416, 3);
+    expect(b.maxY - b.minY).toBeCloseTo(416, 3);
+    expect((b.minX + b.maxX) / 2).toBeCloseTo(W / 2, 3);
   });
 
   it('REQ-SIGN-007 여러 획의 상대 위치와 점 개수를 보존한다', () => {

@@ -22,5 +22,5 @@ export const drawLine = (vm: SignatureDrawViewModel): void =>
 
 /** 비동기 연쇄(await 사이의 마이크로태스크)를 모두 흘려보낸다. */
 export const flush = async (): Promise<void> => {
-  for (let i = 0; i < 30; i += 1) await Promise.resolve();
+  for (let i = 0; i < 100; i += 1) await Promise.resolve();
 };

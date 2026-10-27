@@ -116,3 +116,13 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
 - **React Compiler lint(`react-hooks/refs`)**: 컨테이너처럼 `...Ref` 이름의 프로퍼티(내비게이션 ref)를 가진 객체를 렌더 중 읽으면 "refs during render" 오류가 난다. 그런 값은 `useAppContainer()`로 자식 컴포넌트에서 꺼내 쓰고, 프로퍼티 이름도 `navigationHandle`처럼 Ref로 끝내지 않는다.
 - **토스트**: `ToastCenter`(ToastPresenter 구현)가 상태를 들고 `ToastHost`가 그린다(`toast.container`/`toast.message`, 2.5초, 같은 문구도 id가 달라 다시 그림, 백그라운드면 버림).
 - **앱 생명주기**: `ReactNativeAppVisibility`는 `active`/`background` 전환만 알린다. iOS `inactive`(알림 센터·앱 전환기)는 곧 돌아오는 상태라 알리지 않는다(알리면 그때마다 홈이 다시 불러온다).
+
+## 가입·사인 (`src/features/onboarding`, `src/features/signature`, `src/data/auth/SignUpRepository`)
+
+- 흐름: `SignUpFlowOwner`가 phase `sign-up`(pending과 함께)에 들어갈 때 `SignUpFlowViewModel`을 만들고 버린다(약관 -> 사인 흐름). 사인 흐름(`SignatureFlowViewModel`)은 가입(`onboarding`)과 설정의 사인 변경(`change`)이 같이 쓰고, `AppContainer.createSignatureChangeFlow(host)`로 만든다(호출한 설정 내비게이션이 소유). 화면(`SignUpRoute`)은 구독만 한다.
+- 사인 PNG: 순수 TS `SoftwareSignatureRasterizer`(RGBA 버퍼 + 이차 곡선 근사 + 둥근 끝 캡슐의 합집합 + `pako` deflate). 네이티브 의존성이 없어 다섯 플랫폼이 같은 알고리즘을 쓰기 쉽다. 일반 사인(획 수십 개)은 jest에서 1초 안쪽이다. 무압축이면 1024x512 RGBA가 2 MiB라 1 MiB 한도를 넘으므로 압축이 필수다.
+- 정규화 식(`fitStrokesToPng`)은 **기존 iOS/Android `SignaturePngEncoder`와 같다**: 점을 캔버스 크기로 나눈 비율로 바꾸고, 박스 한 변이 0.02보다 작으면 0.02로 올리며, 배율 `min((W-2P)/박스폭, (H-2P)/박스높이)`를 비율 좌표에 곱한다. 박스(올린 크기)를 가운데에 두고 점은 박스 왼쪽 위 모서리 기준이라 **한 점이나 직선은 정확히 중앙이 아니다**(원본 동작 그대로). 그리기 영역은 정사각형(`SIGNATURE_CANVAS`)이어야 화면 비율이 유지된다.
+- 약관 URL 판정(`decideDocumentTarget`)은 Hermes의 `URL` 접근자에 기대지 않고 authority를 직접 해석한다. userinfo(`@`)·비 443 포트·http는 앱 안에서 열지 않는다.
+- 웹뷰는 `react-native-webview`(Expo 번들 버전 고정). `jest.setup.ts`가 네이티브 모듈이 없을 때 던지는 import를 mock으로 막는다.
+- 응답 도착 시 세션 확인: 인증 요청은 응답이 돌아왔을 때 같은 계정의 세션인지 한 번 더 보고, 로그아웃·계정 전환 뒤라면 `CancelledError`로 버린다(이전 계정 사인이 카드에 반영되는 것 방지). 토큰 갱신은 같은 계정이라 통과한다.
+- 화면 테스트는 `toHaveTextContent('문자열')`이 **전체 일치**라서, 여러 줄 제목·안내(`\n`)는 첫 줄만 testID 요소에 두고 나머지는 다음 요소에 둔다.

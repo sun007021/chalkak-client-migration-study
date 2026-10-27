@@ -18,35 +18,45 @@ export class SignatureStrokes {
   ) {}
 
   /** 새 획을 시작한다. 그리는 중이던 획이 있으면 먼저 끝낸다. */
-  beginStroke(_point: Point): SignatureStrokes {
-    throw new Error('not implemented');
+  beginStroke(point: Point): SignatureStrokes {
+    return new SignatureStrokes(this.canvas, [...this.strokes, [this.clamp(point)]], true);
   }
 
   /** 그리는 중인 획에 점을 더한다. 그리는 중이 아니면 새 획을 시작한다. */
-  appendPoint(_point: Point): SignatureStrokes {
-    throw new Error('not implemented');
+  appendPoint(point: Point): SignatureStrokes {
+    if (!this.drawing || this.strokes.length === 0) return this.beginStroke(point);
+    const last = this.strokes[this.strokes.length - 1];
+    const strokes = [...this.strokes.slice(0, -1), [...last, this.clamp(point)]];
+    return new SignatureStrokes(this.canvas, strokes, true);
   }
 
   endStroke(): SignatureStrokes {
-    throw new Error('not implemented');
+    return this.drawing ? new SignatureStrokes(this.canvas, this.strokes, false) : this;
   }
 
   /** 마지막 획 하나를 지운다. */
   undo(): SignatureStrokes {
-    throw new Error('not implemented');
+    return new SignatureStrokes(this.canvas, this.strokes.slice(0, -1), false);
   }
 
   clear(): SignatureStrokes {
-    throw new Error('not implemented');
+    return SignatureStrokes.empty(this.canvas);
   }
 
   /** 점이 하나라도 있는 획이 있으면 true. */
   get hasSignature(): boolean {
-    throw new Error('not implemented');
+    return this.validStrokes.length > 0;
   }
 
   /** 점이 있는 획만. */
   get validStrokes(): readonly Stroke[] {
-    throw new Error('not implemented');
+    return this.strokes.filter((stroke) => stroke.length > 0);
+  }
+
+  private clamp(point: Point): Point {
+    return {
+      x: Math.min(Math.max(point.x, 0), this.canvas.width),
+      y: Math.min(Math.max(point.y, 0), this.canvas.height),
+    };
   }
 }

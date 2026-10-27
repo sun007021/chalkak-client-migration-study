@@ -1,3 +1,5 @@
+import { SIGNATURE_MAX_BYTES, SIGNATURE_PNG_SIZE } from '../../shared/constants';
+import { fitStrokesToPng } from './SignatureLayout';
 import type { Size, Stroke } from './Stroke';
 import type { SignatureRasterizer } from './SignatureRasterizer';
 
@@ -8,7 +10,17 @@ export class SignatureTooLargeError extends Error {}
 export class SignatureEncoder {
   constructor(private readonly rasterizer: SignatureRasterizer) {}
 
-  async encode(_strokes: readonly Stroke[], _canvas: Size): Promise<Uint8Array> {
-    throw new Error('not implemented');
+  async encode(strokes: readonly Stroke[], canvas: Size): Promise<Uint8Array> {
+    const drawable = strokes.filter((stroke) => stroke.length > 0);
+    if (drawable.length === 0) throw new Error('저장할 사인이 없습니다.');
+    const { width, height, strokeWidth } = SIGNATURE_PNG_SIZE;
+    const png = await this.rasterizer.rasterize({
+      width,
+      height,
+      strokeWidth,
+      strokes: fitStrokesToPng(drawable, canvas, SIGNATURE_PNG_SIZE),
+    });
+    if (png.byteLength > SIGNATURE_MAX_BYTES) throw new SignatureTooLargeError();
+    return png;
   }
 }

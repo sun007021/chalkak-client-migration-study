@@ -1,3 +1,13 @@
+import {
+  AuthenticationRequiredError,
+  CancelledError,
+  HttpError,
+  NetworkError,
+  ReauthenticationRequiredError,
+} from '../../core/http/ApiError';
+import { t } from '../../shared/copy';
+import { SignupPendingTimeoutError } from './SignatureSubmitter';
+
 export type SignatureMode = 'onboarding' | 'change';
 
 /** 실패를 사용자에게 어떻게 보일지. 분기는 errorCode·HTTP 상태·단계로만 한다(D-02, message 파싱 금지). */
@@ -12,6 +22,43 @@ export type SignatureFailure =
   | { kind: 'ignore' };
 
 /** REQ-ONB-016/022~026, REQ-SIGN-024~028 및 두 문서의 오류 표. */
-export function mapSignatureError(_error: unknown, _mode: SignatureMode): SignatureFailure {
-  throw new Error('not implemented');
+export function mapSignatureError(error: unknown, mode: SignatureMode): SignatureFailure {
+  const onboarding = mode === 'onboarding';
+  const generic = (): SignatureFailure =>
+    message(t(onboarding ? 'onb.signup.error.generic' : 'sign.change.error.generic'));
+
+  if (error instanceof CancelledError) return { kind: 'ignore' };
+  if (error instanceof SignupPendingTimeoutError) return message(t('onb.signup.error.timeout'));
+  if (
+    error instanceof AuthenticationRequiredError ||
+    error instanceof ReauthenticationRequiredError
+  ) {
+    return { kind: 'login', message: t('sign.error.expired') };
+  }
+  if (error instanceof NetworkError) return message(t('sign.error.network'));
+  if (!(error instanceof HttpError)) return generic();
+
+  switch (error.status) {
+    case 401:
+      return { kind: 'login', message: t('sign.error.expired') };
+    case 403:
+      // 가입: 차단된 소셜 계정이라 서버 message를 그대로 보이고 로그인으로(확인 필요 3). 변경: 정지 회원.
+      if (!onboarding) return { kind: 'toast', message: t('auth.banned.signature') };
+      return { kind: 'login', message: error.serverMessage ?? t('onb.signup.error.generic') };
+    case 404:
+      return message(t(onboarding ? 'onb.signup.error.reupload' : 'sign.change.error.not-found'));
+    case 400:
+      if (error.errorCode === 'SIGNATURE_REUPLOAD_REQUIRED') {
+        return message(t('onb.signup.error.reupload'));
+      }
+      // 서버 message로 나누지 않는다(D-02): 사용할 수 없는 사인·사용된 토큰·탈퇴 회원 모두 같은 문구.
+      if (error.errorCode === 'BUSINESS_ERROR') return message(t('sign.error.invalid'), true);
+      return generic();
+    default:
+      return generic();
+  }
+}
+
+function message(text: string, backToDraw = false): SignatureFailure {
+  return { kind: 'message', message: text, backToDraw };
 }

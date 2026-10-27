@@ -1,7 +1,7 @@
 import type { ToastPresenter } from '../../core/toast/ToastPresenter';
 import { Observable } from '../../core/state/Observable';
 import type { AuthFlowNavigator } from '../auth/AuthFlowNavigator';
-import type { SignatureMode } from './mapSignatureError';
+import { mapSignatureError, type SignatureMode } from './mapSignatureError';
 import type { SignatureSubmitter } from './SignatureSubmitter';
 
 export type SignaturePreviewState = {
@@ -36,6 +36,9 @@ export type SignaturePreviewDeps = {
  * dispose되면 진행 중 요청을 취소하고 이후 결과는 세션 저장·이동·오류 표시 모두 하지 않는다.
  */
 export class SignaturePreviewViewModel extends Observable<SignaturePreviewState> {
+  private readonly abortController = new AbortController();
+  private errorSeq = 0;
+
   constructor(private readonly deps: SignaturePreviewDeps) {
     super({ mode: deps.mode, busy: false, error: null });
   }
@@ -44,15 +47,62 @@ export class SignaturePreviewViewModel extends Observable<SignaturePreviewState>
     return this.deps.png;
   }
 
+  override dispose(): void {
+    this.abortController.abort();
+    super.dispose();
+  }
+
   async confirm(): Promise<void> {
-    throw new Error('not implemented');
+    if (this.getSnapshot().busy || this.isDisposed()) return;
+    this.setState({ ...this.getSnapshot(), busy: true, error: null });
+    try {
+      await this.deps.submitter.submit(this.deps.png, this.abortController.signal);
+    } catch (error) {
+      if (!this.isDisposed()) this.handleFailure(error);
+      return;
+    }
+    if (this.isDisposed()) return;
+    this.setState({ ...this.getSnapshot(), busy: false });
+    this.deps.host.onCompleted();
   }
 
   redraw(): void {
-    throw new Error('not implemented');
+    if (this.getSnapshot().busy || this.isDisposed()) return;
+    this.deps.host.onRedraw();
   }
 
   dismissError(): void {
-    throw new Error('not implemented');
+    this.setState({ ...this.getSnapshot(), error: null });
+  }
+
+  private handleFailure(error: unknown): void {
+    const { host, toast, authNavigator, mode } = this.deps;
+    const failure = mapSignatureError(error, mode);
+    this.setState({ ...this.getSnapshot(), busy: false });
+    switch (failure.kind) {
+      case 'ignore':
+        return;
+      case 'toast':
+        toast.show(failure.message);
+        return;
+      case 'login':
+        toast.show(failure.message);
+        authNavigator.toLogin();
+        return;
+      case 'message':
+        if (failure.backToDraw) {
+          host.onRejected(failure.message);
+        } else {
+          this.errorSeq += 1;
+          this.setState({
+            ...this.getSnapshot(),
+            error: { id: this.errorSeq, message: failure.message },
+          });
+        }
+    }
+  }
+
+  private isDisposed(): boolean {
+    return this.abortController.signal.aborted;
   }
 }

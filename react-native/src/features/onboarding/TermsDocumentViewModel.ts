@@ -1,6 +1,7 @@
 import type { AnalyticsTracker } from '../../core/analytics/AnalyticsTracker';
 import type { ExternalLinkOpener } from '../../core/link/ExternalLinkOpener';
 import { Observable } from '../../core/state/Observable';
+import { decideDocumentTarget } from './TermsDocumentPolicy';
 import type { TermsKind } from './TermsViewModel';
 
 export type TermsDocumentState = {
@@ -32,20 +33,42 @@ export class TermsDocumentViewModel extends Observable<TermsDocumentState> {
   /**
    * 소유자가 만든 직후 한 번 부른다: screen_view(terms_of_service | privacy_policy)를 보내고 열 곳을 정한다.
    * in-app이면 inAppUrl 설정, external이면 외부 브라우저로 열고 실패하면 cannot-open, reject면 cannot-open.
+   * 외부 브라우저로 열렸으면 status는 loaded이고 inAppUrl은 null이다(소유자가 시트를 닫는다).
    */
   async start(): Promise<void> {
-    throw new Error('not implemented');
+    const { kind, url, analytics, externalLinkOpener } = this.deps;
+    analytics.screenView(kind === 'service' ? 'terms_of_service' : 'privacy_policy');
+    const target = decideDocumentTarget(url);
+    if (target === 'in-app') {
+      this.setState({ ...this.getSnapshot(), status: 'loading', inAppUrl: url });
+      return;
+    }
+    const opened = target === 'external' && (await openSafely(externalLinkOpener, url));
+    this.setState({ ...this.getSnapshot(), status: opened ? 'loaded' : 'cannot-open' });
   }
 
   onWebViewLoaded(): void {
-    throw new Error('not implemented');
+    if (this.getSnapshot().status === 'loading')
+      this.setState({ ...this.getSnapshot(), status: 'loaded' });
   }
 
   onWebViewFailed(): void {
-    throw new Error('not implemented');
+    if (this.getSnapshot().status === 'loading')
+      this.setState({ ...this.getSnapshot(), status: 'error' });
   }
 
+  /** 오류 상태에서만 동작한다. */
   retry(): void {
-    throw new Error('not implemented');
+    const state = this.getSnapshot();
+    if (state.status !== 'error') return;
+    this.setState({ ...state, status: 'loading', loadAttempt: state.loadAttempt + 1 });
+  }
+}
+
+async function openSafely(opener: ExternalLinkOpener, url: string): Promise<boolean> {
+  try {
+    return await opener.open(url);
+  } catch {
+    return false;
   }
 }

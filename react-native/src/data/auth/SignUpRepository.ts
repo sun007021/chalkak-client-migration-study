@@ -1,5 +1,6 @@
 import type { ApiClient } from '../../core/http/ApiClient';
-import type { AuthRepository, PendingSignUp } from './AuthRepository';
+import { SIGNATURE_CONTENT_TYPE } from '../../shared/constants';
+import { decodeIssuedTokens, type AuthRepository, type PendingSignUp } from './AuthRepository';
 
 export type SignUpUploadTicket = {
   uploadId: string;
@@ -16,17 +17,55 @@ export class SignUpRepository {
   constructor(private readonly deps: SignUpRepositoryDeps) {}
 
   /** POST /auth/social-signup/signature/uploads {provider:"KAKAO", idToken, rawNonce}. 인증 헤더 없음. */
-  async requestUpload(_pending: PendingSignUp, _signal?: AbortSignal): Promise<SignUpUploadTicket> {
-    throw new Error('not implemented');
+  requestUpload(pending: PendingSignUp, signal?: AbortSignal): Promise<SignUpUploadTicket> {
+    return this.deps.api.requestJson(
+      {
+        method: 'POST',
+        path: '/auth/social-signup/signature/uploads',
+        body: { provider: 'KAKAO', idToken: pending.idToken, rawNonce: pending.rawNonce },
+        signal,
+      },
+      decodeTicket,
+    );
   }
 
   /** presigned PUT. SIGNATURE_CONTENT_TYPE, 인증 헤더 없음. */
-  async uploadPng(_url: string, _png: Uint8Array, _signal?: AbortSignal): Promise<void> {
-    throw new Error('not implemented');
+  uploadPng(url: string, png: Uint8Array, signal?: AbortSignal): Promise<void> {
+    return this.deps.api.uploadToPresignedUrl({
+      url,
+      contentType: SIGNATURE_CONTENT_TYPE,
+      body: png,
+      signal,
+    });
   }
 
   /** POST /auth/social-signup {signupToken}. 200이면 세션을 저장하고 userId를 돌려준다(추가 로그인 호출 없음). */
-  async confirm(_signupToken: string, _signal?: AbortSignal): Promise<{ userId: string }> {
-    throw new Error('not implemented');
+  async confirm(signupToken: string, signal?: AbortSignal): Promise<{ userId: string }> {
+    const issued = await this.deps.api.requestJson(
+      { method: 'POST', path: '/auth/social-signup', body: { signupToken }, signal },
+      decodeIssuedTokens,
+    );
+    await this.deps.authRepository.saveIssuedSession(issued.userId, issued);
+    return { userId: issued.userId };
   }
 }
+
+function decodeTicket(raw: unknown): SignUpUploadTicket {
+  const o = asRecord(raw);
+  const { uploadId, uploadUrl, expiresInSeconds, signupToken } = o;
+  if (
+    !isNonEmptyString(uploadId) ||
+    !isNonEmptyString(uploadUrl) ||
+    typeof expiresInSeconds !== 'number' ||
+    !isNonEmptyString(signupToken)
+  ) {
+    throw new Error('missing upload ticket fields');
+  }
+  return { uploadId, uploadUrl, expiresInSeconds, signupToken };
+}
+
+const asRecord = (raw: unknown): Record<string, unknown> => {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('not object');
+  return raw as Record<string, unknown>;
+};
+const isNonEmptyString = (v: unknown): v is string => typeof v === 'string' && v !== '';

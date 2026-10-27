@@ -43,6 +43,47 @@ describe('ApiClient 인증 헤더와 401 갱신', () => {
     });
   }
 
+  describe('응답 도착 시 세션 확인', () => {
+    it('인증 요청의 2xx 응답이 로그아웃 뒤에 도착하면 CancelledError로 버린다', async () => {
+      await h.signIn();
+      const gate = deferred<void>();
+      h.transport.respond(async () => {
+        await gate.promise;
+        return json(200, OK_BODY);
+      });
+      const call = getNotifications();
+      await flush();
+      await h.sessionStore.clear();
+      gate.resolve();
+      await expect(call).rejects.toBeInstanceOf(CancelledError);
+    });
+
+    it('다른 계정으로 바뀐 뒤 도착한 응답도 버린다', async () => {
+      await h.signIn();
+      const gate = deferred<void>();
+      h.transport.respond(async () => {
+        await gate.promise;
+        return json(200, OK_BODY);
+      });
+      const call = getNotifications();
+      await flush();
+      await h.signIn({ userId: 'user-b', refreshToken: 'refresh-b' });
+      gate.resolve();
+      await expect(call).rejects.toBeInstanceOf(CancelledError);
+    });
+
+    it('같은 계정의 토큰 갱신 뒤 재전송된 응답은 통과한다', async () => {
+      await h.signIn();
+      useRotatingServer();
+      await expect(getNotifications()).resolves.toEqual(OK_BODY);
+    });
+
+    it('게스트·세션 없음 요청은 확인하지 않는다', async () => {
+      h.transport.script(json(200, OK_BODY));
+      await expect(getNotifications()).resolves.toEqual(OK_BODY);
+    });
+  });
+
   describe('헤더 부착', () => {
     it('TC-NET-014 만료된 access token은 Authorization을 붙이지 않고 서버 401로 갱신 경로에 들어간다', async () => {
       await h.signIn({ accessTokenExpiresAt: new Date(h.clock.now().getTime() - 1000) });

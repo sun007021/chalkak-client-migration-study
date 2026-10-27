@@ -1,11 +1,12 @@
 import type { AnalyticsTracker } from '../../core/analytics/AnalyticsTracker';
 import type { ToastPresenter } from '../../core/toast/ToastPresenter';
+import { t } from '../../shared/copy';
 import { Observable } from '../../core/state/Observable';
 import type { AuthFlowNavigator } from '../auth/AuthFlowNavigator';
 import type { SignatureMode } from './mapSignatureError';
-import type { SignatureDrawViewModel } from './SignatureDrawViewModel';
+import { SignatureDrawViewModel } from './SignatureDrawViewModel';
 import type { SignatureEncoder } from './SignatureEncoder';
-import type { SignaturePreviewViewModel } from './SignaturePreviewViewModel';
+import { SignaturePreviewViewModel } from './SignaturePreviewViewModel';
 import type { SignatureSubmitter } from './SignatureSubmitter';
 import type { Size } from './Stroke';
 
@@ -31,8 +32,17 @@ export type SignatureFlowDeps = {
  * 가입: onboarding_signature, onboarding_signature_preview / 변경: change_signature, change_signature_preview.
  */
 export class SignatureFlowViewModel extends Observable<SignatureFlowState> {
+  private readonly drawViewModel: SignatureDrawViewModel;
+  private previewViewModel: SignaturePreviewViewModel | null = null;
+  private released = false;
+
   constructor(private readonly deps: SignatureFlowDeps) {
     super({ step: 'draw' });
+    this.drawViewModel = new SignatureDrawViewModel({
+      canvas: deps.canvas,
+      encoder: deps.encoder,
+      onConfirmed: (png) => this.openPreview(png),
+    });
   }
 
   get mode(): SignatureMode {
@@ -41,21 +51,73 @@ export class SignatureFlowViewModel extends Observable<SignatureFlowState> {
 
   /** 항상 존재한다(미리보기에서 돌아와도 같은 인스턴스, 획 유지). */
   get draw(): SignatureDrawViewModel {
-    throw new Error('not implemented');
+    return this.drawViewModel;
   }
 
   /** step이 'preview'인 동안에만 값이 있다. */
   get preview(): SignaturePreviewViewModel | null {
-    throw new Error('not implemented');
+    return this.previewViewModel;
   }
 
   /** 소유자가 만든 직후 한 번 부른다: 첫 단계의 screen_view를 보낸다. */
   start(): void {
-    throw new Error('not implemented');
+    this.deps.analytics.screenView(this.screenName('draw'));
   }
 
   /** 하드웨어/화면 뒤로: 미리보기면 그리기로(진행 중 요청은 취소), 그리기면 onExit. */
   back(): void {
-    throw new Error('not implemented');
+    if (this.released) return;
+    if (this.getSnapshot().step === 'preview') this.backToDraw();
+    else this.deps.onExit();
+  }
+
+  override dispose(): void {
+    this.released = true;
+    this.previewViewModel?.dispose();
+    this.previewViewModel = null;
+    this.drawViewModel.dispose();
+    super.dispose();
+  }
+
+  private openPreview(png: Uint8Array): void {
+    if (this.released || this.getSnapshot().step !== 'draw') return;
+    const { mode, submitter, authNavigator, toast, analytics } = this.deps;
+    this.previewViewModel = new SignaturePreviewViewModel({
+      mode,
+      png,
+      submitter,
+      authNavigator,
+      toast,
+      host: {
+        onRedraw: () => {
+          this.drawViewModel.clear();
+          this.backToDraw();
+        },
+        onRejected: (message) => {
+          this.backToDraw();
+          this.drawViewModel.showError(message);
+        },
+        onCompleted: () => this.complete(),
+      },
+    });
+    this.setState({ step: 'preview' });
+    analytics.screenView(this.screenName('preview'));
+  }
+
+  private backToDraw(): void {
+    this.previewViewModel?.dispose();
+    this.previewViewModel = null;
+    this.setState({ step: 'draw' });
+    this.deps.analytics.screenView(this.screenName('draw'));
+  }
+
+  private complete(): void {
+    if (this.deps.mode === 'change') this.deps.toast.show(t('sign.change.done'));
+    this.deps.onCompleted();
+  }
+
+  private screenName(step: 'draw' | 'preview'): string {
+    const base = this.deps.mode === 'onboarding' ? 'onboarding_signature' : 'change_signature';
+    return step === 'draw' ? base : `${base}_preview`;
   }
 }
