@@ -1,5 +1,6 @@
 package kr.chalkak.feature.auth
 
+import kr.chalkak.core.common.analytics.AnalyticsTracker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
