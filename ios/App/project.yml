@@ -11,6 +11,9 @@ configs:
 packages:
   ChalkakKit:
     path: ../ChalkakKit
+  KakaoSDK:
+    url: https://github.com/kakao/kakao-ios-sdk
+    from: 2.29.0
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -35,6 +38,15 @@ targets:
         UIUserInterfaceStyle: Light
         API_BASE_URL: $(API_BASE_URL)
         KAKAO_NATIVE_APP_KEY: $(KAKAO_NATIVE_APP_KEY)
+        FORCE_UPDATE_ENABLED: $(FORCE_UPDATE_ENABLED)
+        APP_STORE_URL: $(APP_STORE_URL)
+        LSApplicationQueriesSchemes:
+          - kakaokompassauth
+          - kakaolink
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLSchemes:
+              - kakao$(KAKAO_NATIVE_APP_KEY)
         UIAppFonts:
           - Continuous-Regular.otf
           - GriunXHangeulBanguri-Regular.ttf
@@ -56,6 +68,10 @@ targets:
         product: ChalkakData
       - package: ChalkakKit
         product: ChalkakFeatures
+      - package: KakaoSDK
+        product: KakaoSDKAuth
+      - package: KakaoSDK
+        product: KakaoSDKUser
   ChalkakUITests:
     type: bundle.ui-testing
     platform: iOS

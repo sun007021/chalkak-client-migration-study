@@ -67,7 +67,7 @@ public actor AuthRefresher {
         let response = try await sendRefreshRequest(refreshToken: current.refreshToken)
         guard ResponseDecoding.isSuccess(response) else {
             let error = ResponseDecoding.failure(for: response)
-            if case .http(_, .reauthenticationRequired, _) = error {
+            if case .http(401, .reauthenticationRequired, _) = error { // 401일 때만 세션을 지운다.
                 guard await clearAndNotify(current) else { throw AuthError.sessionChanged }
             }
             throw error

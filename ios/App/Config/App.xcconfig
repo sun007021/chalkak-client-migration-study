@@ -1,4 +1,8 @@
-// git에 올리는 공통 설정. 로컬 값은 Secrets.xcconfig(무시됨)에서 읽는다.
-API_BASE_URL =
+// git에 올리는 공통 설정. 로컬 값은 Secrets.xcconfig(무시됨)에서 읽어 아래 값을 덮어쓴다.
+// 서버 origin(앱이 /api/v1/을 붙인다). `//`가 주석으로 잘리지 않도록 빈 확장 $()로 나눈다.
+API_BASE_URL = https:/$()/chalkak-dev.pysun.kr
 KAKAO_NATIVE_APP_KEY =
+// 이 레포의 앱은 스토어에 없으므로 강제 업데이트 게이트는 기본 꺼 둔다(D-15).
+FORCE_UPDATE_ENABLED = NO
+APP_STORE_URL =
 #include? "Secrets.xcconfig"

@@ -8,8 +8,8 @@
 
 | 영역 | 카탈로그 | TC | A 포함 | AG | iOS | Android | Flutter | RN | Web |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| BOOT | [boot-auth.md](catalog/boot-auth.md) | 39 | 2 | 2 | 0/39 | 27/39 | 34/39 | 33/39 | 17/39 |
-| AUTH | [boot-auth.md](catalog/boot-auth.md) | 65 | 5 | 5 | 1/65 | 52/65 | 56/65 | 53/65 | 54/65 |
+| BOOT | [boot-auth.md](catalog/boot-auth.md) | 39 | 2 | 2 | 30/39 | 27/39 | 34/39 | 33/39 | 17/39 |
+| AUTH | [boot-auth.md](catalog/boot-auth.md) | 65 | 5 | 5 | 48/65 | 52/65 | 56/65 | 53/65 | 54/65 |
 | ONB | [onboarding-signature.md](catalog/onboarding-signature.md) | 52 | 3 | 2 | 0/52 | 0/52 | 46/52 | 0/52 | 0/52 |
 | SIGN | [onboarding-signature.md](catalog/onboarding-signature.md) | 45 | 2 | 2 | 0/45 | 0/45 | 42/45 | 0/45 | 0/45 |
 | NAV | [navigation.md](catalog/navigation.md) | 50 | 0 | 0 | 0/50 | 0/50 | 0/50 | 0/50 | 0/50 |
