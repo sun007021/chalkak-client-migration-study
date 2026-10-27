@@ -15,9 +15,9 @@ npm run e2e                  # Playwright(E). 빌드 후 preview 서버로 돈�
 
 ## 서버 연결(Q-01)
 
-개발 서버는 `/api/v1/admin/**` 외에는 CORS를 열지 않는다. 그래서 브라우저는 항상 **같은 출처의 `/api/v1/`** 로 요청하고, Vite dev·preview 서버가 `PROXY_TARGET`으로 넘긴다.
+개발 서버는 `/api/v1/admin/**` 외에는 CORS를 열지 않는다. 그래서 브라우저는 기본적으로 **현재 페이지와 같은 출처의 `/api/v1/`** 로 요청하고, Vite dev·preview 서버가 `PROXY_TARGET`으로 넘긴다.
 
-- `VITE_API_BASE_URL`: 브라우저가 쓰는 기준 주소. 기본 `/api/v1/`(같은 출처 상대 경로). 절대 주소를 쓰면 `https://`만 허용한다(REQ-NET-001). 값이 없거나 잘못되면 요청을 보내지 않고 설정 오류를 보인다(REQ-NET-002).
+- `VITE_API_BASE_URL`: **서버 origin만**(경로 없음) 적고 앱이 `/api/v1`을 붙인다(REQ-NET-003). 허용은 `https://`와 loopback(`localhost`, `127.0.0.1`)의 `http://`뿐이고 그 밖의 http·경로 포함·잘못된 값은 요청을 보내지 않고 설정 오류를 보인다(REQ-NET-001/002). presigned 업로드 URL도 같은 규칙이다. Web 특례: 비어 있거나 `same-origin`이면 현재 페이지 출처를 쓰고(Vite 프록시 경유) 그 뒤에 `/api/v1`을 붙인다. 기본값은 비움.
 - `PROXY_TARGET`: 프록시가 넘길 실제 서버. mock 서버로 돌릴 때 이 값만 바꾼다(REQ-NET-004).
 
 ## 구조
