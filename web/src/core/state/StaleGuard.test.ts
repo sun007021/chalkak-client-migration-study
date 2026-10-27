@@ -23,7 +23,7 @@ describe('StaleGuard', () => {
     expect(ticketB.isCurrent()).toBe(true);
   });
 
-  it('TC-NET-057 계정 전환(invalidate) 전에 시작한 요청의 응답은 전환 뒤 반영되지 않는다', () => {
+  it('TC-NET-057 TC-AUTH-042 계정 전환(invalidate) 전에 시작한 요청의 응답은 전환 뒤 반영되지 않는다', () => {
     const guard = new StaleGuard();
     const accountA = guard.begin();
     guard.invalidate();
