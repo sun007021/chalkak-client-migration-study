@@ -6,5 +6,5 @@ abstract final class RecordMonths {
   static List<KstMonth> options({
     required List<KstMonth> serverMonths,
     required KstMonth current,
-  }) => throw UnimplementedError();
+  }) => ({...serverMonths, current}.toList()..sort((a, b) => b.compareTo(a)));
 }

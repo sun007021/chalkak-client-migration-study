@@ -1,16 +1,27 @@
+import 'package:flutter/foundation.dart';
+
 import 'analytics_constants.dart';
 
 class AnalyticsEvent {
   const AnalyticsEvent(this.name, this.parameters);
 
   /// `screen_view`. [screenName]이 허용 목록 밖이면 ArgumentError.
-  factory AnalyticsEvent.screenView(String screenName, {String? screenClass}) =>
-      throw UnimplementedError();
+  factory AnalyticsEvent.screenView(String screenName, {String? screenClass}) {
+    if (!ScreenNames.all.contains(screenName)) {
+      throw ArgumentError.value(screenName, 'screenName', '허용 목록에 없는 화면 이름');
+    }
+    return AnalyticsEvent(AnalyticsNames.screenViewEvent, {
+      AnalyticsNames.screenNameParam: screenName,
+      AnalyticsNames.screenClassParam: ?screenClass,
+    });
+  }
 
   /// `bottom_navigation_selected {destination}`.
   factory AnalyticsEvent.bottomNavigationSelected(
     BottomDestination destination,
-  ) => throw UnimplementedError();
+  ) => AnalyticsEvent(AnalyticsNames.bottomNavigationSelectedEvent, {
+    AnalyticsNames.destinationParam: destination.value,
+  });
 
   final String name;
 
@@ -26,19 +37,25 @@ abstract interface class AnalyticsTracker {
 /// 어떤 tracker 예외도 삼켜 앱 흐름에 영향을 주지 않는다(TC-ANL-021).
 class SafeAnalyticsTracker implements AnalyticsTracker {
   SafeAnalyticsTracker(this._inner);
-  // ignore: unused_field
   final AnalyticsTracker _inner;
 
   @override
-  void logEvent(AnalyticsEvent event) => throw UnimplementedError();
+  void logEvent(AnalyticsEvent event) {
+    try {
+      _inner.logEvent(event);
+    } catch (_) {
+      // 분석 실패는 앱 흐름에 영향을 주지 않는다.
+    }
+  }
 }
 
 /// 기본 구현: 로그 출력만 한다(Firebase 설정 없을 때, TC-ANL-020).
 class LogAnalyticsTracker implements AnalyticsTracker {
-  LogAnalyticsTracker({this._sink});
-  // ignore: unused_field
-  final void Function(String line)? _sink;
+  LogAnalyticsTracker({void Function(String line)? sink})
+    : _sink = sink ?? debugPrint;
+  final void Function(String line) _sink;
 
   @override
-  void logEvent(AnalyticsEvent event) => throw UnimplementedError();
+  void logEvent(AnalyticsEvent event) =>
+      _sink('analytics ${event.name} ${event.parameters}');
 }
