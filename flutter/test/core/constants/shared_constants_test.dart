@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:chalkak/core/analytics/analytics_constants.dart';
 import 'package:chalkak/core/constants/app_constants.dart';
+import 'package:chalkak/core/network/network_config.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/fixtures.dart';
@@ -59,6 +60,7 @@ void main() {
         Duration(milliseconds: v as int),
     ]);
     expect(AppConstants.retryMax, c['RETRY_MAX']);
+    expect(NetworkConfig.maxRetryAfter, ms('RETRY_AFTER_MAX_MS'));
     expect(AppConstants.versionLookupTimeout, ms('VERSION_LOOKUP_TIMEOUT_MS'));
     expect(AppConstants.termsAllowedHosts, c['TERMS_ALLOWED_HOSTS']);
     final terms = c['TERMS_URLS'] as Map<String, dynamic>;
@@ -87,7 +89,10 @@ void main() {
       'AI_REVIEW_POLL_WINDOW_MS', 'PAGE_SIZE', 'BANNER_PAGE_SIZE',
       'TOAST_DURATION_MS', 'SPLASH_PRELOAD_MAX_MS', 'HTTP_CONNECT_TIMEOUT_MS',
       'HTTP_RESPONSE_TIMEOUT_MS', 'UPLOAD_PUT_TIMEOUT_MS', 'RETRY_BACKOFF_MS',
-      'RETRY_MAX', 'VERSION_LOOKUP_TIMEOUT_MS', 'TERMS_ALLOWED_HOSTS',
+      'RETRY_MAX',
+      'RETRY_AFTER_MAX_MS',
+      'VERSION_LOOKUP_TIMEOUT_MS',
+      'TERMS_ALLOWED_HOSTS',
       'TERMS_URLS', 'ANALYTICS_SCREEN_NAMES', 'ANALYTICS_TAB_DESTINATIONS',
       'FIXTURE_NOW', // 테스트 시계 기준. AppConstants 대상 아님
     };
