@@ -66,5 +66,5 @@ src/
 | 약관 문서 | 새 탭 | D-25 |
 | 네트워크 타임아웃 | fetch는 연결/응답 분리 불가 → 응답 15초(헤더+본문 수신 포함) 하나로 적용. `HTTP_CONNECT_TIMEOUT_MS`는 shared 값과 대조용으로만 둔다 | D-21 |
 | refresh 동시성 | 탭이 여러 개라 메모리 single-flight로는 부족 → Web Locks(`chalkak-auth-refresh`) 안에서 재읽기→refresh→비교 후 쓰기. 미지원이면 탭 안 뮤텍스 | D-17 |
-| Retry-After 상한 | `RETRY_AFTER_MAX_MS`(30초, Web 전용 상수) 초과는 기다리지 않고 실패 | 확인 필요 2 |
+| Retry-After 상한 | `RETRY_AFTER_MAX_MS`(30초, shared 상수) 초과는 기다리지 않고 실패 | D-21(임시) |
 | 카메라 | 카메라 없는 기기·데스크톱은 버튼 숨김 | D-14 |

@@ -11,9 +11,8 @@ describe('shared/constants.json 대조', () => {
     expect(exported[key], `constants.ts에 ${key}가 없거나 값이 다르다`).toEqual(value);
   });
 
-  it('shared에 없는 상수는 Web 전용 RETRY_AFTER_MAX_MS뿐이다', () => {
+  it('constants.ts의 상수는 모두 shared에 있다(Web 전용 상수 없음)', () => {
     const extra = Object.keys(c).filter((key) => !(key in shared));
-    expect(extra.sort()).toEqual(['RETRY_AFTER_MAX_MS']);
-    expect(c.RETRY_AFTER_MAX_MS).toBe(30_000);
+    expect(extra).toEqual([]);
   });
 });
