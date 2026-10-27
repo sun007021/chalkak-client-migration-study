@@ -1,4 +1,5 @@
 import { EMPTY_SESSION } from './SessionStore';
+import type { SessionChannel } from './SessionChannel';
 import type { SessionStore, StoredSession } from './SessionStore';
 
 /** 세션 DB 배치(Q-03 임시안). 테스트가 손상·부분 레코드를 직접 심을 때도 이 상수를 쓴다. */
@@ -12,6 +13,8 @@ export interface IndexedDbSessionStoreDeps {
   /** 기본 globalThis.indexedDB. 테스트는 fake-indexeddb의 IDBFactory를 넣는다. */
   indexedDB?: IDBFactory;
   dbName?: string;
+  /** 계정이 바뀐 쓰기·삭제를 다른 탭에 알린다(SessionChannel 참고). 없으면 알리지 않는다. */
+  channel?: SessionChannel;
 }
 
 interface Record5 {
