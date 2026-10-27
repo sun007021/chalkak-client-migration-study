@@ -94,16 +94,33 @@ class LoginUseCase {
         );
       case SocialLoginSucceeded(:final session):
         if (cancelToken?.isCancelled ?? false) return const LoginCancelled();
-        final previous = await _sessions.read();
-        if (previous != null &&
-            !previous.isGuest &&
-            previous.userId != session.userId) {
-          await _cleaner.clearAll();
+        try {
+          await _replaceSession(session);
+        } on Object {
+          // 저장소를 읽거나 쓰지 못하면 로그인 실패로 알린다(진행 표시가 남지 않게).
+          return const LoginFailed(LoginFailure(LoginFailureKind.generic));
         }
-        await _sessions.save(session);
         _startPushRegistration();
         return LoginSucceeded(session);
     }
+  }
+
+  /// 이전 세션이 다른 회원이거나 읽을 수 없으면 사용자 캐시를 먼저 지우고 저장한다.
+  Future<void> _replaceSession(Session session) async {
+    Session? previous;
+    var unreadable = false;
+    try {
+      previous = await _sessions.read();
+    } on Object {
+      unreadable = true;
+    }
+    if (unreadable ||
+        (previous != null &&
+            !previous.isGuest &&
+            previous.userId != session.userId)) {
+      await _cleaner.clearAll();
+    }
+    await _sessions.save(session);
   }
 
   void _startPushRegistration() {

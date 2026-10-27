@@ -68,7 +68,6 @@ class _LoginScreenState extends State<LoginScreen> {
       showDialog<void>(
         context: context,
         barrierDismissible: false,
-        animationStyle: AnimationStyle.noAnimation,
         builder: (_) => _ErrorDialog(message: error.message),
       ).then((_) {
         // 확인 버튼이든 시스템 뒤로가기든 닫히면 오류를 소비한다.

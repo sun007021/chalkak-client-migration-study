@@ -10,6 +10,9 @@ import '../../../support/app_harness.dart';
 import '../../../support/auth_fakes.dart';
 import '../../../support/fixtures.dart';
 
+/// 다이얼로그 닫힘 애니메이션(플랫폼 기본)이 끝나도록 흘리는 프레임 수(16ms x 30).
+const _dialogCloseFrames = 30;
+
 Future<AppHarness> _openLogin(WidgetTester tester) async {
   final h = AppHarness();
   await pumpApp(tester, h);
@@ -157,7 +160,7 @@ void main() {
       findsOneWidget,
     );
     await tester.tap(byId(TestIds.loginErrorDialogConfirmButton));
-    await settleUi(tester);
+    await settleUi(tester, frames: _dialogCloseFrames);
     expect(byId(TestIds.loginErrorDialog), findsNothing);
     expect(isEnabled(tester, TestIds.loginKakaoButton), isTrue);
   });
@@ -174,7 +177,7 @@ void main() {
         reason: '${i + 1}번째',
       );
       await tester.tap(byId(TestIds.loginErrorDialogConfirmButton));
-      await settleUi(tester);
+      await settleUi(tester, frames: _dialogCloseFrames);
       expect(byId(TestIds.loginErrorDialog), findsNothing);
     }
     expect(h.kakao.calls, 2);

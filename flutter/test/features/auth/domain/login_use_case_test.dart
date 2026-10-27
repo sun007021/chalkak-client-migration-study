@@ -516,6 +516,17 @@ void main() {
       expect(r.push.calls, 0);
     });
   });
+
+  group('저장소 실패', () {
+    test('세션 저장에 실패하면 던지지 않고 일반 실패로 돌려주며 푸시 등록을 하지 않는다', () async {
+      final r = _Rig();
+      r.http.onSocialLogin('auth/social-login__login-success.json');
+      r.http.store.writeError = StateError('keystore');
+      final outcome = await r.login();
+      expect(r.failure(outcome).kind, LoginFailureKind.generic);
+      expect(r.push.calls, 0);
+    });
+  });
 }
 
 /// ApiError 생성 단축(테스트 전용).

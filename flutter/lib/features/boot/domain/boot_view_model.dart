@@ -64,8 +64,10 @@ class BootViewModel extends ChangeNotifier {
   Future<void> start() => _starting ??= _start();
 
   Future<void> _start() async {
+    if (_disposed) return;
     _updateGate.addListener(_onGateChanged);
     await _updateGate.check();
+    if (_disposed) return;
     if (_updateGate.status == UpdateGateStatus.forced) {
       _setState(const BootForceUpdate());
       return;
@@ -83,6 +85,7 @@ class BootViewModel extends ChangeNotifier {
 
   Future<void> _proceed() async {
     final auth = await _authGate.resolve();
+    if (_disposed) return;
     switch (auth) {
       case SignedOut():
         _setState(const BootReady(BootDestination.login));
