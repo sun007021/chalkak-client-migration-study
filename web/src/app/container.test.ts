@@ -76,13 +76,35 @@ describe('앱 조립 (container)', () => {
   });
 
   it('TC-AUTH-059 개발 플래그가 꺼져 있으면 devSession 서비스를 만들지 않는다', () => {
-    const off = makeHarness({ env: { DEV: false } }).container;
+    const off = makeHarness({ devSession: false }).container;
     expect(off.devSessionEnabled).toBe(false);
-    expect(off.devSession).toBeNull();
-    const flagged = makeHarness({ env: { DEV: false, VITE_ENABLE_DEV_SESSION: 'true' } }).container;
-    expect(flagged.devSessionEnabled).toBe(true);
-    expect(flagged.devSession).not.toBeNull();
-    const dev = makeHarness({ env: { DEV: true } }).container;
-    expect(dev.devSessionEnabled).toBe(true);
+    expect(off.devSessionDeps).toBeNull();
+    const on = makeHarness({ devSession: true }).container;
+    expect(on.devSessionEnabled).toBe(true);
+    expect(on.devSessionDeps).not.toBeNull();
+  });
+
+  it('REQ-AUTH-004 로그아웃·만료·탈퇴 이벤트가 나면 가입 대기 중이던 idToken·rawNonce를 지운다', () => {
+    const { container } = makeHarness();
+    for (const reason of ['logout', 'expired', 'withdrawn'] as const) {
+      container.signupDraft.set({ idToken: 'i', rawNonce: 'n' });
+      container.sessionEvents.emit(reason);
+      expect(container.signupDraft.get()).toBeNull();
+    }
+  });
+
+  it('페이지 출처를 알 수 없으면 ConfigError를 던진다', () => {
+    vi.stubGlobal('location', undefined);
+    try {
+      expect(() => createAppContainer({ env: { VITE_API_BASE_URL: MOCK_BASE }, indexedDB: new IDBFactory() })).toThrow(ConfigError);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('화면용 ViewModel 팩토리는 현재 컨테이너 값(덮어쓴 preloader 포함)을 쓴다', () => {
+    const { container } = makeHarness();
+    expect(container.createLoginViewModel().state).toEqual({ busy: 'none', error: null });
+    expect(container.createBootViewModel().state).toEqual({ phase: 'splash' });
   });
 });

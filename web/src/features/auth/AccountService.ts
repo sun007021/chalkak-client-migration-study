@@ -1,7 +1,7 @@
 import type { SessionEvents } from '../../core/auth/SessionEvents';
 import type { SessionStore } from '../../core/auth/SessionStore';
 import type { UserCaches } from '../../core/auth/UserCaches';
-import { ApiError, isCancellation } from '../../core/net/errors';
+import { ApiError, errorName, isCancellation } from '../../core/net/errors';
 import type { Logger } from '../../core/net/Logger';
 import type { ToastController } from '../../core/ui/ToastController';
 import { t } from '../../copy/ko';
@@ -22,8 +22,6 @@ export interface AccountServiceDeps {
   logger?: Logger;
 }
 
-const errorName = (error: unknown): string => (error instanceof Error ? error.name : 'unknown');
-
 /** 설정 화면(다음 PR)이 쓸 로그아웃·탈퇴(D-16). 진행 중 중복 호출은 같은 작업을 돌려준다(REQ-AUTH-040). */
 export class AccountService {
   private logoutFlight: Promise<void> | null = null;
@@ -31,7 +29,7 @@ export class AccountService {
 
   constructor(private readonly deps: AccountServiceDeps) {}
 
-  /** 로컬 세션·캐시를 먼저 지우고 POST /auth/logout을 보낸다. 실패는 무시. 끝나면 sessionEvents.emit('logout'). refresh token이 없으면 서버 호출 없이 로컬만. */
+  /** 로컬 세션·캐시를 먼저 지우고 POST /auth/logout을 보내되 응답을 기다리지 않는다(실패는 무시, D-16). 로컬 정리 직후 sessionEvents.emit('logout'). refresh token이 없으면 서버 호출 없이 로컬만. */
   logout(): Promise<void> {
     this.logoutFlight ??= this.doLogout().finally(() => {
       this.logoutFlight = null;
@@ -57,11 +55,10 @@ export class AccountService {
     }
     await this.clearLocal();
     if (refreshToken) {
-      try {
-        await authApi.logout(refreshToken);
-      } catch (error) {
+      // 로그인 화면으로 가는 것을 서버 응답에 묶지 않는다. 실패해도 이미 로컬 세션은 지워졌다.
+      authApi.logout(refreshToken).catch((error: unknown) => {
         logger?.log('warn', 'logout request failed (ignored)', { error: errorName(error), status: error instanceof ApiError ? error.status : undefined });
-      }
+      });
     }
     sessionEvents.emit('logout');
   }

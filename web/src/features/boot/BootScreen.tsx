@@ -6,7 +6,7 @@ import { useContainer } from '../../app/AppContext';
 import { t } from '../../copy/ko';
 import { useOwnedViewModel } from '../../core/state/useOwnedViewModel';
 import { useViewModel } from '../../core/state/useViewModel';
-import { BootViewModel } from './BootViewModel';
+import type { BootViewModel } from './BootViewModel';
 
 /** 스플래시 화면: data-testid="splash.logo"만. 세션을 읽는 동안에도 로그인 화면이 번쩍이지 않는다. */
 export function SplashView(): ReactNode {
@@ -21,8 +21,8 @@ export function SplashView(): ReactNode {
 
 /** '/' 라우트. BootViewModel을 만들어 start()하고 ready가 되면 판정에 따라 /login 또는 /home으로 replace 이동한다. */
 export function BootScreen(): ReactNode {
-  const { store, clock, preloader, logger } = useContainer();
-  const create = useCallback(() => new BootViewModel({ store, clock, preloader, logger }), [store, clock, preloader, logger]);
+  const container = useContainer();
+  const create = useCallback(() => container.createBootViewModel(), [container]);
   const vm = useOwnedViewModel(create);
   return vm ? <BootRun vm={vm} /> : <SplashView />;
 }

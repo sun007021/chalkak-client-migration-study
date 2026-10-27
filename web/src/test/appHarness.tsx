@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { render } from '@testing-library/react';
 import { RouterProvider, createMemoryRouter } from 'react-router';
 import { InProcessRefreshLock } from '../core/auth/RefreshLock';
@@ -29,7 +30,7 @@ export interface Harness {
 }
 
 /** 실제 구현을 엮되 시계·fetch·저장소·카카오·프리로드·분석만 Fake로 둔 앱 컨테이너. */
-export function makeHarness(options: { session?: StoredSession; env?: Partial<AppEnv>; resume?: (url: string) => Promise<{ idToken: string; rawNonce: string }> } = {}): Harness {
+export function makeHarness(options: { session?: StoredSession; env?: Partial<AppEnv>; devSession?: boolean; resume?: (url: string) => Promise<{ idToken: string; rawNonce: string }> } = {}): Harness {
   const clock = new FakeClock(NOW);
   const ff = new FakeFetch();
   const store = new FakeSessionStore(options.session ?? EMPTY_SESSION);
@@ -38,7 +39,8 @@ export function makeHarness(options: { session?: StoredSession; env?: Partial<Ap
   const tracker = new FakeAnalyticsTracker();
   const logger = new RecordingLogger();
   const container = createAppContainer({
-    env: { VITE_API_BASE_URL: MOCK_BASE, DEV: false, ...options.env },
+    env: { VITE_API_BASE_URL: MOCK_BASE, ...options.env },
+    devSessionEnabled: options.devSession ?? false,
     fetch: ff.fetch,
     clock,
     store,
@@ -54,9 +56,10 @@ export function makeHarness(options: { session?: StoredSession; env?: Partial<Ap
 }
 
 /** 라우터를 만들어 그린다. router.state로 현재 경로·이동 방식(PUSH/REPLACE)을 확인한다. */
-export function renderApp(container: AppContainer, initialPath = '/') {
+export function renderApp(container: AppContainer, initialPath = '/', options: { strict?: boolean } = {}) {
   const router = createMemoryRouter(createAppRoutes(container), { initialEntries: [initialPath] });
-  const view = render(<RouterProvider router={router} />);
+  const tree = <RouterProvider router={router} />;
+  const view = render(options.strict ? <StrictMode>{tree}</StrictMode> : tree);
   return { router, ...view, path: () => router.state.location.pathname };
 }
 

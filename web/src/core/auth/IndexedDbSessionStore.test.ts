@@ -1,4 +1,4 @@
-import { IDBFactory } from 'fake-indexeddb';
+import { IDBDatabase, IDBFactory } from 'fake-indexeddb';
 import { EMPTY_SESSION } from './SessionStore';
 import { IndexedDbSessionStore, SESSION_DB_NAME, SESSION_DB_VERSION, SESSION_RECORD_KEY, SESSION_STORE_NAME } from './IndexedDbSessionStore';
 import { ME, OTHER_USER, guestSession, memberSession, tokens } from '../../test/fixtures';
@@ -206,5 +206,37 @@ describe('IndexedDbSessionStore 손상·불완전 레코드', () => {
     expect(session.userId).toBe(ME);
     expect(session.isGuest).toBe(true);
     expect(session.tokens?.refreshToken).toBe('fixture-refresh-token-1');
+  });
+});
+
+describe('IndexedDbSessionStore 연결 복구', () => {
+  it('연결이 닫혀 InvalidStateError가 나면 한 번 다시 열어 재시도한다', async () => {
+    const store = newTab(idb);
+    await store.write(memberSession());
+    const spy = vi.spyOn(IDBDatabase.prototype, 'transaction').mockImplementationOnce(() => {
+      throw new DOMException('The database connection is closing.', 'InvalidStateError');
+    });
+    expect(await store.read()).toEqual(memberSession());
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('InvalidStateError가 계속되면 재시도는 한 번뿐이고 오류를 던진다', async () => {
+    const store = newTab(idb);
+    await store.read(); // 연결을 먼저 연다
+    vi.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(() => {
+      throw new DOMException('closed', 'InvalidStateError');
+    });
+    await expect(store.read()).rejects.toMatchObject({ name: 'InvalidStateError' });
+  });
+
+  it('다른 곳에서 DB가 삭제되어 연결이 닫혀도(versionchange) 다음 호출은 새로 연다', async () => {
+    const store = newTab(idb);
+    await store.write(memberSession());
+    await new Promise<void>((resolve, reject) => {
+      const req = idb.deleteDatabase(SESSION_DB_NAME);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+    expect(await store.read()).toEqual(EMPTY_SESSION);
   });
 });

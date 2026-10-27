@@ -28,7 +28,7 @@ export class BootViewModel extends ViewModel<BootState> {
     super({ phase: 'splash' });
   }
 
-  /** 한 번만 시작한다(StrictMode의 이중 호출에도 프리로드·세션 읽기는 한 번). 끝나면 resolve. */
+  /** 이 인스턴스에서 한 번만 시작한다(다시 불러도 같은 Promise). 끝나면 resolve. */
   start(): Promise<void> {
     this.started ??= this.run();
     return this.started;

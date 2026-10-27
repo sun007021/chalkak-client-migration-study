@@ -13,6 +13,7 @@ import type { AuthGateDecision } from '../features/boot/authGate';
 import { BootScreen, SplashView } from '../features/boot/BootScreen';
 import { ContainerProvider } from './AppContext';
 import type { AppContainer } from './container';
+import { DEV_SESSION_PATH } from './devSession';
 import { ROUTES } from './paths';
 
 export { ROUTES };
@@ -29,13 +30,13 @@ export function screenNameForPath(pathname: string): ScreenName | null {
   return name && (ANALYTICS_SCREEN_NAMES as readonly string[]).includes(name) ? name : null;
 }
 
-/** 개발용 세션 주입 라우트. 프로덕션 번들에 화면 코드가 들어가지 않도록 이 조건 안의 동적 import로만 불러온다(Q-02). */
+/** 개발 전용 세션 주입 라우트. DEV_SESSION_ENABLED가 false인 빌드에서는 이 분기와 동적 import가 번들에서 빠진다(Q-02). */
 function devSessionRoutes(container: AppContainer): RouteObject[] {
-  if (!container.devSessionEnabled) return [];
-  if (import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEV_SESSION === 'true') {
+  // 정의 파일(devSession.ts)의 상수와 같은 define 값을 여기서 직접 읽어야 롤업이 청크를 만들기 전에 이 분기를 제거한다.
+  if (__DEV_SESSION_ENABLED__ && container.devSessionEnabled) {
     return [
       {
-        path: ROUTES.devSession,
+        path: DEV_SESSION_PATH,
         lazy: async () => ({ Component: (await import('../features/auth/DevSessionScreen')).DevSessionScreen }),
       },
     ];

@@ -2,7 +2,7 @@ import { LoginViewModel } from './LoginViewModel';
 import type { LoginOutcome } from './LoginViewModel';
 import { AuthApi } from './AuthApi';
 import { SignupDraft } from './SignupDraft';
-import { SocialLoginCancelledError, SocialLoginConfigError, SocialLoginFailedError } from './SocialLoginClient';
+import { SocialLoginCancelledError, SocialLoginConfigError, SocialLoginFailedError, SocialLoginNoPendingError } from './SocialLoginClient';
 import { UserCaches } from '../../core/auth/UserCaches';
 import type { StoredSession } from '../../core/auth/SessionStore';
 import { EMPTY_SESSION } from '../../core/auth/SessionStore';
@@ -22,7 +22,7 @@ function setup(session: StoredSession = EMPTY_SESSION) {
   const order: string[] = [];
   userCaches.register({ clear: () => void order.push(`caches-cleared(writes=${env.store.writes.length})`) });
   const authApi = new AuthApi({ api: env.client(), clock: env.clock });
-  const resume = vi.fn<(url: string) => Promise<{ idToken: string; rawNonce: string }>>();
+  const resume = vi.fn<(url: string, signal?: AbortSignal) => Promise<{ idToken: string; rawNonce: string }>>();
   const vm = new LoginViewModel({ client: social, resume, authApi, store: env.store, signupDraft, userCaches, ids: new SequentialIdGenerator(), logger: env.logger });
   const route = (path: string) => env.ff.route('POST /auth/social-login', () => loadFixture(path).toResponse());
   return { ...env, social, signupDraft, userCaches, order, authApi, resume, vm, route };
@@ -303,7 +303,7 @@ describe('LoginViewModel 리다이렉트 복귀', () => {
     resume.mockResolvedValue({ idToken: 'resumed-id-token', rawNonce: 'resumed-raw-nonce' });
     route('auth/social-login__login-success.json');
     expect(await vm.resumeKakaoRedirect('https://app.test/login/kakao-callback?code=c&state=s')).toEqual({ kind: 'home' });
-    expect(resume).toHaveBeenCalledWith('https://app.test/login/kakao-callback?code=c&state=s');
+    expect(resume).toHaveBeenCalledWith('https://app.test/login/kakao-callback?code=c&state=s', expect.any(AbortSignal));
     expect(JSON.parse(loginCalls(ff)[0]!.body as string)).toEqual({ provider: 'KAKAO', idToken: 'resumed-id-token', rawNonce: 'resumed-raw-nonce' });
   });
 
@@ -321,5 +321,50 @@ describe('LoginViewModel 리다이렉트 복귀', () => {
     await vm.resumeKakaoRedirect('https://app.test/login/kakao-callback?code=c&state=bad');
     expect(vm.state.error?.message).toBe(t('auth.login.error.kakao-failed'));
     expect(ff.calls).toHaveLength(0);
+  });
+});
+
+describe('LoginViewModel 보강', () => {
+  it('reset: 진행 중(카카오 리다이렉트로 페이지를 떠난 상태)이던 상태와 오류를 초기 상태로 되돌린다', async () => {
+    const { vm, social } = setup();
+    social.script(pending);
+    void vm.loginWithKakao();
+    expect(vm.state.busy).toBe('kakao');
+    vm.reset();
+    expect(vm.state).toEqual({ busy: 'none', error: null });
+  });
+
+  it('복귀 처리에서 보관된 시도가 없으면 오류 없이 no_pending이고 세션 유무를 알려 준다', async () => {
+    const none = setup();
+    none.resume.mockRejectedValue(new SocialLoginNoPendingError('none'));
+    expect(await none.vm.resumeKakaoRedirect('https://app.test/cb')).toEqual({ kind: 'no_pending', hasSession: false });
+    expect(none.vm.state).toEqual({ busy: 'none', error: null });
+    expect(none.ff.calls).toHaveLength(0);
+
+    const member = setup(memberSession());
+    member.resume.mockRejectedValue(new SocialLoginNoPendingError('none'));
+    expect(await member.vm.resumeKakaoRedirect('https://app.test/cb')).toEqual({ kind: 'no_pending', hasSession: true });
+
+    const guest = setup(guestSession);
+    guest.resume.mockRejectedValue(new SocialLoginNoPendingError('none'));
+    expect(await guest.vm.resumeKakaoRedirect('https://app.test/cb')).toEqual({ kind: 'no_pending', hasSession: true });
+  });
+
+  it('REQ-AUTH-004 새 로그인 시도를 시작하면 이전 가입 대기 자격 증명을 지운다', async () => {
+    const { vm, signupDraft, social } = setup();
+    signupDraft.set({ idToken: 'old-id-token', rawNonce: 'old-raw-nonce' });
+    social.script(pending);
+    void vm.loginWithKakao();
+    expect(signupDraft.get()).toBeNull();
+  });
+
+  it('복원 시 signal을 resume에 전달하고 dispose하면 abort된다', async () => {
+    const { vm, resume } = setup();
+    resume.mockReturnValue(new Promise(() => {}));
+    void vm.resumeKakaoRedirect('https://app.test/cb');
+    const signal = resume.mock.calls[0]![1]!;
+    expect(signal.aborted).toBe(false);
+    vm.dispose();
+    expect(signal.aborted).toBe(true);
   });
 });

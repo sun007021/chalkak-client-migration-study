@@ -4,12 +4,12 @@ import { ME, loadFixture } from '../../test/fixtures';
 import { EMPTY_SESSION } from '../../core/auth/SessionStore';
 
 // 이 화면의 요소는 testids.md에 없으므로 data-testid 대신 role/label로 찾는다.
-const refreshField = () => screen.getByRole('textbox', { name: 'Refresh token' });
+const refreshField = () => screen.getByLabelText('Refresh token'); // type=password라 textbox 역할이 아니다
 const userIdField = () => screen.getByRole('textbox', { name: 'User ID' });
 const submit = () => screen.getByRole('button', { name: '세션 주입' });
 
-async function openDevSession(env = { DEV: true } as { DEV: boolean; VITE_ENABLE_DEV_SESSION?: string }) {
-  const h = makeHarness({ env });
+async function openDevSession() {
+  const h = makeHarness({ devSession: true });
   const view = renderApp(h.container, '/dev/session');
   await screen.findByRole('button', { name: '세션 주입' });
   return { h, ...view };
@@ -29,9 +29,9 @@ describe('개발용 세션 주입 화면', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('TC-AUTH-059 VITE_ENABLE_DEV_SESSION=true 빌드에서도 화면이 있다', async () => {
-    await openDevSession({ DEV: false, VITE_ENABLE_DEV_SESSION: 'true' });
-    expect(submit()).toBeInTheDocument();
+  it('TC-AUTH-059 refresh token 입력칸은 화면에 값을 드러내지 않는 password 입력이다', async () => {
+    await openDevSession();
+    expect(refreshField()).toHaveAttribute('type', 'password');
   });
 
   it('TC-AUTH-059 붙여 넣고 주입하면 POST /auth/refresh로 받은 토큰을 저장하고 메인(회원)으로 replace 이동한다', async () => {
@@ -93,11 +93,11 @@ describe('개발용 세션 주입 화면', () => {
   });
 
   it('TC-AUTH-059 개발 플래그가 꺼진 빌드에서는 /dev/session에 들어가도 화면이 없고 로그인으로 간다', async () => {
-    const h = makeHarness({ env: { DEV: false } });
+    const h = makeHarness({ devSession: false });
     const { path } = renderApp(h.container, '/dev/session');
     expect(await screen.findByTestId('login.root')).toBeInTheDocument();
     expect(path()).toBe('/login');
-    expect(screen.queryByRole('textbox', { name: 'Refresh token' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Refresh token')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '세션 주입' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('login.dev-bypass-button')).not.toBeInTheDocument();
   });

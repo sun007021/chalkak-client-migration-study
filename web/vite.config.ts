@@ -12,7 +12,10 @@ export default defineConfig(({ mode }) => {
   const proxy = {
     '/api': { target: proxyTarget, changeOrigin: true, secure: true },
   };
+  // 개발용 세션 주입(Q-02) 존재 조건. 정적으로 치환되어 꺼진 빌드에서는 관련 코드(동적 import 포함)가 번들에서 빠진다.
+  const devSessionEnabled = mode !== 'production' || env.VITE_ENABLE_DEV_SESSION === 'true';
   return {
+    define: { __DEV_SESSION_ENABLED__: JSON.stringify(devSessionEnabled) },
     plugins: [react()],
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
     // shared/(constants.json, copy/ko.json)를 레포 루트에서 읽는다.

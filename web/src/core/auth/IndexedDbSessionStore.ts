@@ -173,10 +173,14 @@ export class IndexedDbSessionStore implements SessionStore {
       };
       req.onsuccess = () => {
         const db = req.result;
-        db.onversionchange = () => {
-          db.close();
+        const forget = () => {
           this.dbPromise = null;
         };
+        db.onversionchange = () => {
+          db.close();
+          forget();
+        };
+        db.onclose = forget; // 브라우저가 연결을 닫았다(저장소 정리 등). 다음 호출에서 다시 연다.
         resolve(db);
       };
       req.onerror = () => reject(req.error ?? new Error('IndexedDB open failed'));
@@ -187,8 +191,21 @@ export class IndexedDbSessionStore implements SessionStore {
     return this.dbPromise;
   }
 
-  /** 트랜잭션 하나를 열어 body를 실행하고 트랜잭션이 끝나면(complete) body가 넘긴 값으로 이행한다. */
+  /**
+   * 트랜잭션 하나를 열어 body를 실행하고 트랜잭션이 끝나면(complete) body가 넘긴 값으로 이행한다.
+   * 연결이 닫혀 있어 InvalidStateError가 나면 한 번만 다시 열어 재시도한다.
+   */
   private async transact<T>(mode: IDBTransactionMode, body: (store: IDBObjectStore, done: (value: T) => void) => void): Promise<T> {
+    try {
+      return await this.transactOnce(mode, body);
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'InvalidStateError')) throw error;
+      this.dbPromise = null;
+      return this.transactOnce(mode, body);
+    }
+  }
+
+  private async transactOnce<T>(mode: IDBTransactionMode, body: (store: IDBObjectStore, done: (value: T) => void) => void): Promise<T> {
     const db = await this.openDb();
     return new Promise<T>((resolve, reject) => {
       let result: T;

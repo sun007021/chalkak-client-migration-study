@@ -1,11 +1,12 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { SocialLoginNoPendingError } from './SocialLoginClient';
 import { SocialLoginCancelledError, SocialLoginConfigError, SocialLoginFailedError } from './SocialLoginClient';
 import { t } from '../../copy/ko';
 import { makeHarness, renderApp } from '../../test/appHarness';
 import type { Harness } from '../../test/appHarness';
 import { failWith, pending } from '../../test/FakeSocialLoginClient';
 import { networkFailure } from '../../test/fakeFetch';
-import { ME, loadFixture } from '../../test/fixtures';
+import { ME, guestSession, loadFixture, memberSession } from '../../test/fixtures';
 import { EMPTY_SESSION } from '../../core/auth/SessionStore';
 
 async function openLogin(options: Parameters<typeof makeHarness>[0] = {}) {
@@ -40,12 +41,12 @@ describe('로그인 화면 구성', () => {
   });
 
   it('TC-AUTH-059 개발 플래그가 꺼져 있으면 로그인 우회 버튼이 없다', async () => {
-    await openLogin({ env: { DEV: false } });
+    await openLogin({ devSession: false });
     expect(screen.queryByTestId('login.dev-bypass-button')).not.toBeInTheDocument();
   });
 
   it('TC-AUTH-059 개발 플래그가 켜져 있으면 로그인 우회 버튼이 있고 누르면 /dev/session으로 간다', async () => {
-    const { path } = await openLogin({ env: { DEV: true } });
+    const { path } = await openLogin({ devSession: true });
     fireEvent.click(screen.getByTestId('login.dev-bypass-button'));
     await waitFor(() => expect(path()).toBe('/dev/session'));
   });
@@ -265,5 +266,131 @@ describe('카카오 리다이렉트 콜백 라우트', () => {
     renderApp(h.container, CALLBACK);
     await screen.findByTestId('login.root');
     expect(resume).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('bfcache 복원', () => {
+  const pageshow = (persisted: boolean) => act(() => void window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted })));
+
+  it('카카오로 리다이렉트한 뒤 뒤로 가기로 페이지가 복원되면(pageshow persisted) 진행 상태가 풀리고 버튼이 다시 눌린다', async () => {
+    const { h } = await openLogin();
+    h.social.script(pending); // 리다이렉트로 페이지를 떠난 상태: 끝나지 않는다
+    fireEvent.click(kakao());
+    await waitFor(() => expect(kakao()).toBeDisabled());
+    expect(guest()).toBeDisabled();
+    pageshow(true);
+    await waitFor(() => expect(kakao()).toBeEnabled());
+    expect(guest()).toBeEnabled();
+    expect(screen.queryByTestId('login.error-dialog')).not.toBeInTheDocument();
+  });
+
+  it('persisted가 아닌 pageshow(일반 로드)는 진행 상태를 건드리지 않는다', async () => {
+    const { h } = await openLogin();
+    h.social.script(pending);
+    fireEvent.click(kakao());
+    await waitFor(() => expect(kakao()).toBeDisabled());
+    pageshow(false);
+    expect(kakao()).toBeDisabled();
+  });
+
+  it('복원 뒤 다시 누르면 새로 시작한다', async () => {
+    const { h } = await openLogin();
+    h.social.script(pending, pending);
+    fireEvent.click(kakao());
+    await waitFor(() => expect(kakao()).toBeDisabled());
+    pageshow(true);
+    await waitFor(() => expect(kakao()).toBeEnabled());
+    fireEvent.click(kakao());
+    await waitFor(() => expect(h.social.calls).toBe(2));
+  });
+});
+
+describe('오류 알림 접근성', () => {
+  it('알림이 열리면 확인 버튼으로 포커스가 가고, 닫히면 눌렀던 버튼으로 돌아온다', async () => {
+    const { h } = await openLogin();
+    route(h, 'auth/social-login__unauthorized.json');
+    kakao().focus();
+    fireEvent.click(kakao());
+    const confirm = await screen.findByTestId('login.error-dialog-confirm-button');
+    await waitFor(() => expect(confirm).toHaveFocus());
+    fireEvent.click(confirm);
+    await waitFor(() => expect(screen.queryByTestId('login.error-dialog')).not.toBeInTheDocument());
+    expect(kakao()).toHaveFocus();
+  });
+
+  it('알림은 제목 없이 메시지만 보이고 메시지가 접근 가능한 이름이다', async () => {
+    const { h } = await openLogin();
+    route(h, 'auth/social-login__unauthorized.json');
+    fireEvent.click(kakao());
+    const dialog = await screen.findByRole('alertdialog', { name: t('auth.login.error.kakao-account') });
+    expect(dialog).toHaveTextContent(t('auth.login.error.kakao-account') + t('common.confirm'));
+    expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
+  });
+});
+
+describe('카카오 콜백 화면 보강', () => {
+  const CALLBACK = '/login/kakao-callback?code=secret-code&state=secret-state';
+
+  it('StrictMode에서도 복원 1회·social-login 1회이고 최종적으로 /home(replace)이다', async () => {
+    const resume = vi.fn((_url: string) => Promise.resolve({ idToken: 'resumed-id-token', rawNonce: 'resumed-raw-nonce' }));
+    const h = makeHarness({ resume });
+    route(h, 'auth/social-login__login-success.json');
+    const { path, router } = renderApp(h.container, CALLBACK, { strict: true });
+    expect(await screen.findByTestId('home.root')).toHaveAttribute('data-mode', 'member');
+    expect(resume).toHaveBeenCalledTimes(1);
+    expect(h.ff.callsTo('POST /auth/social-login')).toHaveLength(1);
+    expect(path()).toBe('/home');
+    expect(router.state.historyAction).toBe('REPLACE');
+  });
+
+  it('처리하는 동안 스플래시를 보이고(빈 화면 아님) 인가 코드·state는 주소에서 바로 지워진다', async () => {
+    let finish!: (v: { idToken: string; rawNonce: string }) => void;
+    const resume = vi.fn((_url: string) => new Promise<{ idToken: string; rawNonce: string }>((r) => (finish = r)));
+    const h = makeHarness({ resume });
+    route(h, 'auth/social-login__login-success.json');
+    const { router } = renderApp(h.container, CALLBACK);
+    expect(screen.getByTestId('splash.logo')).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.search).toBe(''));
+    expect(router.state.location.pathname).toBe('/login/kakao-callback');
+    expect(resume.mock.calls[0]![0]).toContain('code=secret-code&state=secret-state'); // 메모리 값으로 복원한다
+    await act(async () => finish({ idToken: 'i', rawNonce: 'n' }));
+    expect(await screen.findByTestId('home.root')).toBeInTheDocument();
+  });
+
+  it('화면을 실제로 떠나면 복원에 넘긴 signal이 abort되고 결과는 버려진다', async () => {
+    let signal: AbortSignal | undefined;
+    const resume = vi.fn((_url: string, s?: AbortSignal) => {
+      signal = s;
+      return new Promise<{ idToken: string; rawNonce: string }>(() => {});
+    });
+    const h = makeHarness({ resume });
+    const { unmount } = renderApp(h.container, CALLBACK, { strict: true });
+    await waitFor(() => expect(resume).toHaveBeenCalledTimes(1));
+    expect(signal?.aborted).toBe(false); // StrictMode의 가짜 언마운트로는 취소되지 않는다
+    unmount();
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it('보관된 시도가 없으면(새로고침·뒤로 가기) 세션이 있을 때 토스트 없이 /home으로 간다', async () => {
+    const h = makeHarness({ session: memberSession(), resume: () => Promise.reject(new SocialLoginNoPendingError('none')) });
+    const { path } = renderApp(h.container, CALLBACK);
+    expect(await screen.findByTestId('home.root')).toBeInTheDocument();
+    expect(path()).toBe('/home');
+    expect(h.container.toast.state.toast).toBeNull();
+    expect(h.ff.calls).toHaveLength(0);
+  });
+
+  it('보관된 시도가 없고 게스트 세션이어도 /home으로 간다', async () => {
+    const h = makeHarness({ session: guestSession, resume: () => Promise.reject(new SocialLoginNoPendingError('none')) });
+    renderApp(h.container, CALLBACK);
+    expect(await screen.findByTestId('home.root')).toHaveAttribute('data-mode', 'guest');
+  });
+
+  it('보관된 시도가 없고 세션도 없으면 토스트 없이 /login으로 간다', async () => {
+    const h = makeHarness({ resume: () => Promise.reject(new SocialLoginNoPendingError('none')) });
+    const { path } = renderApp(h.container, CALLBACK);
+    expect(await screen.findByTestId('login.root')).toBeInTheDocument();
+    expect(path()).toBe('/login');
+    expect(h.container.toast.state.toast).toBeNull();
   });
 });

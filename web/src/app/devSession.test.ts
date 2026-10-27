@@ -1,17 +1,12 @@
-import { isDevSessionEnabled } from './devSession';
+import { DEV_SESSION_ENABLED, DEV_SESSION_PATH } from './devSession';
 
 describe('개발용 세션 주입 플래그 (Q-02)', () => {
-  it.each([
-    { env: { DEV: true }, expected: true },
-    { env: { DEV: false, VITE_ENABLE_DEV_SESSION: 'true' }, expected: true },
-    { env: { VITE_ENABLE_DEV_SESSION: 'true' }, expected: true },
-    { env: {}, expected: false },
-    { env: { DEV: false }, expected: false },
-    { env: { DEV: false, VITE_ENABLE_DEV_SESSION: 'false' }, expected: false },
-    { env: { DEV: false, VITE_ENABLE_DEV_SESSION: '1' }, expected: false },
-    { env: { DEV: false, VITE_ENABLE_DEV_SESSION: 'TRUE' }, expected: false },
-    { env: { DEV: false, VITE_ENABLE_DEV_SESSION: '' }, expected: false },
-  ])('TC-AUTH-059 $env → $expected', ({ env, expected }) => {
-    expect(isDevSessionEnabled(env)).toBe(expected);
+  it('TC-AUTH-059 테스트(DEV) 환경에서는 켜져 있다. 배포 빌드에서 꺼지는 것은 번들 grep으로 확인한다', () => {
+    expect(import.meta.env.DEV).toBe(true);
+    expect(DEV_SESSION_ENABLED).toBe(true);
+  });
+
+  it('TC-AUTH-059 경로는 /dev/session이다', () => {
+    expect(DEV_SESSION_PATH).toBe('/dev/session');
   });
 });

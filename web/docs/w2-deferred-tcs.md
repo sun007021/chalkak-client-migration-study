@@ -36,3 +36,13 @@
 - TC-AUTH-035, TC-AUTH-043 등 로그아웃·탈퇴 — `AccountService`(서비스 단위)까지. 확인 대화상자와 버튼 비활성은 설정 PR(SET)
 - TC-AUTH-053 — Web의 "보안 저장소"는 access=메모리, refresh=IndexedDB(Q-03 임시안)이므로 평문(localStorage·sessionStorage)에 토큰이 없음을 검증
 - TC-ANL-003 — 로그인 단계의 `screen_view(login)`은 `app/boot.test.tsx`의 REQ-BOOT-021 테스트로 검증. 약관·사인·미리보기 단계는 ONB/SIGN PR
+
+## 문서 충돌·이번 PR에서 안 고치는 것
+
+- 탈퇴 중 401 UNAUTHORIZED(토큰 갱신 실패) — boot-auth.md 탈퇴 표와 D-16("실패하면 세션 유지 + 토스트") 충돌 → D-16을 따른다(`AccountService`가 세션을 유지하고 `auth.withdraw.error` 토스트)
+- 다른 탭의 로그아웃·계정 전환 전파(BroadcastChannel) — 이번 범위 밖, 탭 간 상태 동기화는 NAV/설정 PR
+- `/home` 직접 진입 시 가드(`RequireSession`)와 부팅 판정의 이중 읽기·프리로드 — 홈이 생겨야 정리 가능 → 홈 PR
+- 700ms 상한을 넘긴 프리로드를 abort할지 계속 둘지 — 홈 프리로더가 결과를 캐시로 쓸지에 달림 → 홈 PR
+- 카카오 `prompt=login`(항상 재인증) — 제품 결정 대기
+- PKCE(`code_challenge`) — 카카오 웹 로그인이 지원하는지 확인 후
+

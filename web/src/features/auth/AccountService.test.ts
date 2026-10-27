@@ -40,13 +40,14 @@ const toastMessage = (toast: ToastController) => toast.state.toast?.message ?? n
 describe('AccountService.logout', () => {
   it('TC-AUTH-035 로컬 토큰·캐시를 먼저 지운 뒤 POST /auth/logout {refreshToken}을 보내고, 끝나면 로그인으로 보낸다', async () => {
     const s = setup();
-    const atRequest: { storeCleared: boolean; cachesCleared: number; reasons: number }[] = [];
+    const atRequest: { storeCleared: boolean; cachesCleared: number }[] = [];
     s.ff.route('POST /auth/logout', () => {
-      atRequest.push({ storeCleared: s.store.clearCount === 1, cachesCleared: s.cacheClears.count, reasons: s.reasons.length });
+      atRequest.push({ storeCleared: s.store.clearCount === 1, cachesCleared: s.cacheClears.count });
       return loadFixture('auth/logout__no-content.json').toResponse();
     });
     await s.service.logout();
-    expect(atRequest).toEqual([{ storeCleared: true, cachesCleared: 1, reasons: 0 }]);
+    await flushAsync(); // 서버 요청은 기다리지 않으므로 보내진 뒤까지 양보한다
+    expect(atRequest).toEqual([{ storeCleared: true, cachesCleared: 1 }]);
     const [call] = s.ff.callsTo('POST /auth/logout');
     expect(JSON.parse(call!.body as string)).toEqual({ refreshToken: 'fixture-refresh-token-1' });
     expect(call!.headers['authorization']).toBeUndefined();
@@ -87,13 +88,25 @@ describe('AccountService.logout', () => {
     const s = setup();
     s.ff.route('POST /auth/logout', s.fixture('auth/logout__no-content.json'));
     await s.service.logout();
+    await flushAsync();
     expect(s.ff.calls.map((c) => `${c.method} ${c.path}`)).toEqual(['POST /auth/logout']);
+  });
+
+  it('D-16 로그인으로 가는 것은 POST /auth/logout 응답을 기다리지 않는다(응답이 오지 않아도 이동 이벤트가 나간다)', async () => {
+    const s = setup();
+    s.ff.route('POST /auth/logout', () => new Promise<Response>(() => {}));
+    await s.service.logout();
+    expect(s.reasons).toEqual(['logout']);
+    expect(await s.store.read()).toEqual(EMPTY_SESSION);
+    await flushAsync();
+    expect(s.ff.callsTo('POST /auth/logout')).toHaveLength(1);
   });
 
   it('TC-AUTH-040 로그아웃을 연타해도 요청 1회, 로컬 정리 1회, 이동 1회이다', async () => {
     const s = setup();
     s.ff.route('POST /auth/logout', s.fixture('auth/logout__no-content.json'));
     await Promise.all([s.service.logout(), s.service.logout(), s.service.logout()]);
+    await flushAsync();
     expect(s.ff.callsTo('POST /auth/logout')).toHaveLength(1);
     expect(s.store.clearCount).toBe(1);
     expect(s.cacheClears.count).toBe(1);

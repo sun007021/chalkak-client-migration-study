@@ -2,8 +2,7 @@ import { KAKAO_AUTHORIZE_URL, KAKAO_LOGIN_STORAGE_KEY, KakaoWebLoginClient } fro
 import type { KakaoCodeExchanger } from './KakaoWebLoginClient';
 import { sha256Hex } from './nonce';
 import type { NonceGenerator } from './nonce';
-import { SocialLoginCancelledError, SocialLoginConfigError, SocialLoginFailedError } from './SocialLoginClient';
-import { flushAsync } from '../../test/FakeClock';
+import { SocialLoginCancelledError, SocialLoginConfigError, SocialLoginFailedError, SocialLoginNoPendingError } from './SocialLoginClient';
 import { SequentialIdGenerator } from '../../test/sequentialIds';
 
 const REDIRECT_URI = 'https://app.test/login/kakao-callback';
@@ -18,9 +17,11 @@ class CountingNonce implements NonceGenerator {
 
 class FakeExchanger implements KakaoCodeExchanger {
   readonly calls: { code: string; redirectUri: string }[] = [];
+  readonly signals: (AbortSignal | undefined)[] = [];
   result: Promise<{ idToken: string | null }> = Promise.resolve({ idToken: 'kakao-id-token' });
-  exchange(code: string, redirectUri: string) {
+  exchange(code: string, redirectUri: string, signal?: AbortSignal) {
     this.calls.push({ code, redirectUri });
+    this.signals.push(signal);
     return this.result;
   }
 }
@@ -40,8 +41,9 @@ function setup() {
   });
   /** login()은 페이지를 떠나므로 끝나지 않는다. 리다이렉트 직전까지만 진행시킨다. */
   const startLogin = async () => {
+    const before = redirects.length;
     void client.login();
-    await flushAsync();
+    await vi.waitFor(() => expect(redirects.length).toBeGreaterThan(before)); // SHA-256(subtle)은 스레드 풀을 거쳐 리다이렉트가 늦게 나간다
     return new URL(redirects.at(-1)!);
   };
   const stored = () => JSON.parse(sessionStorage.getItem(KAKAO_LOGIN_STORAGE_KEY) ?? 'null') as { rawNonce: string; state: string } | null;
@@ -104,7 +106,7 @@ describe('KakaoWebLoginClient.resume (콜백 처리)', () => {
     const { state } = stored()!;
     await client.resume(callback(state));
     expect(sessionStorage.getItem(KAKAO_LOGIN_STORAGE_KEY)).toBeNull();
-    await expect(client.resume(callback(state))).rejects.toBeInstanceOf(SocialLoginFailedError);
+    await expect(client.resume(callback(state))).rejects.toBeInstanceOf(SocialLoginNoPendingError);
     expect(exchanger.calls).toHaveLength(1);
   });
 
@@ -116,9 +118,17 @@ describe('KakaoWebLoginClient.resume (콜백 처리)', () => {
     expect(sessionStorage.getItem(KAKAO_LOGIN_STORAGE_KEY)).toBeNull();
   });
 
+  it('exchange에 resume의 signal을 전달한다', async () => {
+    const { startLogin, stored, client, exchanger } = setup();
+    await startLogin();
+    const controller = new AbortController();
+    await client.resume(callback(stored()!.state), controller.signal);
+    expect(exchanger.signals).toEqual([controller.signal]);
+  });
+
   it('보관된 로그인 시도가 없으면(새 탭, 만료, 이미 사용) 실패한다', async () => {
     const { client, exchanger } = setup();
-    await expect(client.resume(callback('anything'))).rejects.toBeInstanceOf(SocialLoginFailedError);
+    await expect(client.resume(callback('anything'))).rejects.toBeInstanceOf(SocialLoginNoPendingError);
     expect(exchanger.calls).toHaveLength(0);
   });
 

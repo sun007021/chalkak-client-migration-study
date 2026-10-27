@@ -9,7 +9,7 @@ export interface DevSessionState {
   error: string | null;
 }
 
-/** 개발용 세션 주입 화면의 상태. 개발 빌드에서만 동적으로 불러온다(Q-02). */
+/** 개발 전용: 세션 주입 화면의 상태. DEV_SESSION_ENABLED가 true인 빌드에서만 동적으로 불러온다(Q-02). */
 export class DevSessionViewModel extends ViewModel<DevSessionState> {
   constructor(private readonly service: DevSessionService) {
     super({ refreshToken: '', userId: '', busy: false, error: null });
@@ -28,6 +28,7 @@ export class DevSessionViewModel extends ViewModel<DevSessionState> {
     if (this.state.busy) return false;
     this.setState({ busy: true, error: null });
     const result = await this.service.inject({ refreshToken: this.state.refreshToken, userId: this.state.userId });
+    // 개발 전용 하드코딩 문구(공용 문구 대상 아님)
     const messages = {
       ok: null,
       invalid_input: 'Refresh token과 User ID를 모두 입력해 주세요.',

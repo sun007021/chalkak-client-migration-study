@@ -1,7 +1,9 @@
+import { HTTP_RESPONSE_TIMEOUT_MS } from '../../constants';
 import type { IdGenerator } from '../../core/ids';
+import type { Clock } from '../../core/time/Clock';
 import { sha256Hex } from './nonce';
 import type { NonceGenerator } from './nonce';
-import { SocialLoginCancelledError, SocialLoginConfigError, SocialLoginFailedError } from './SocialLoginClient';
+import { SocialLoginCancelledError, SocialLoginConfigError, SocialLoginFailedError, SocialLoginNoPendingError } from './SocialLoginClient';
 import type { KakaoCredential, SocialLoginClient } from './SocialLoginClient';
 
 /** 리다이렉트 사이에 rawNonce·state를 두는 sessionStorage 키. 값은 JSON { rawNonce, state }. 1회 사용 후 삭제. */
@@ -9,29 +11,52 @@ export const KAKAO_LOGIN_STORAGE_KEY = 'chalkak.kakao-login';
 export const KAKAO_AUTHORIZE_URL = 'https://kauth.kakao.com/oauth/authorize';
 export const KAKAO_TOKEN_URL = 'https://kauth.kakao.com/oauth/token';
 
-/** 인가 코드를 ID 토큰으로 바꾼다(카카오 토큰 엔드포인트). idToken이 없으면 null. */
+/** 인가 코드를 ID 토큰으로 바꾼다(카카오 토큰 엔드포인트). idToken이 없으면 null. signal이 abort되면 AbortError. */
 export interface KakaoCodeExchanger {
-  exchange(code: string, redirectUri: string): Promise<{ idToken: string | null }>;
+  exchange(code: string, redirectUri: string, signal?: AbortSignal): Promise<{ idToken: string | null }>;
 }
 
 /**
  * 실제 교환기: 카카오 토큰 엔드포인트에 form POST. 키가 없으면 SocialLoginConfigError.
+ * 응답(헤더+본문)은 HTTP_RESPONSE_TIMEOUT_MS(15초, clock)를 넘기면 실패한다.
  * 실제 동작(CORS, 서버의 aud 검증)은 Q-02 결론 뒤 E2E에서 확인한다. 이 PR에서는 검증하지 않았다.
  */
 export class KakaoTokenEndpointExchanger implements KakaoCodeExchanger {
-  constructor(private readonly deps: { clientId: string; fetch: typeof fetch }) {}
+  constructor(private readonly deps: { clientId: string; fetch: typeof fetch; clock: Clock }) {}
 
-  async exchange(code: string, redirectUri: string): Promise<{ idToken: string | null }> {
+  async exchange(code: string, redirectUri: string, signal?: AbortSignal): Promise<{ idToken: string | null }> {
     if (!this.deps.clientId) throw new SocialLoginConfigError('kakao client id is not configured');
     const body = new URLSearchParams({ grant_type: 'authorization_code', client_id: this.deps.clientId, redirect_uri: redirectUri, code });
-    const response = await this.deps.fetch(KAKAO_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded;charset=utf-8' },
-      body,
-    });
-    if (!response.ok) throw new SocialLoginFailedError(`token endpoint responded ${response.status}`);
-    const json = (await response.json()) as { id_token?: unknown };
-    return { idToken: typeof json.id_token === 'string' && json.id_token !== '' ? json.id_token : null };
+    const request = new AbortController();
+    const onAbort = () => request.abort();
+    if (signal?.aborted) request.abort();
+    signal?.addEventListener('abort', onAbort, { once: true });
+    const timer = new AbortController();
+    let timedOut = false;
+    void this.deps.clock.sleep(HTTP_RESPONSE_TIMEOUT_MS, timer.signal).then(
+      () => {
+        timedOut = true;
+        request.abort();
+      },
+      () => undefined, // 응답이 먼저 와서 타이머를 취소했다
+    );
+    try {
+      const response = await this.deps.fetch(KAKAO_TOKEN_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded;charset=utf-8' },
+        body,
+        signal: request.signal,
+      });
+      if (!response.ok) throw new SocialLoginFailedError(`token endpoint responded ${response.status}`);
+      const json = (await response.json()) as { id_token?: unknown };
+      return { idToken: typeof json.id_token === 'string' && json.id_token !== '' ? json.id_token : null };
+    } catch (error) {
+      if (timedOut) throw new SocialLoginFailedError('token endpoint timed out');
+      throw error;
+    } finally {
+      timer.abort();
+      signal?.removeEventListener('abort', onAbort);
+    }
   }
 }
 
@@ -68,7 +93,7 @@ function readPending(storage: KakaoWebLoginClientDeps['storage']): PendingLogin 
 /**
  * 카카오 OIDC 인가 리다이렉트(Q-02: 서버가 웹 키 aud를 거절할 수 있어 개발 서버 E2E는 세션 주입을 쓴다).
  * login(): 새 rawNonce·state를 sessionStorage에 두고 authorize URL(response_type=code, scope=openid, nonce=SHA-256(rawNonce) hex, state)로 이동. 끝나지 않는 Promise.
- * resume(url): 콜백 URL의 error/state/code를 검사해 idToken과 보관해 둔 rawNonce를 돌려준다. 보관값은 결과와 상관없이 1회 사용 후 삭제.
+ * resume(url, signal): 보관된 시도가 없으면 SocialLoginNoPendingError. 있으면 콜백 URL의 error/state/code를 검사해 idToken과 보관해 둔 rawNonce를 돌려준다. 보관값은 결과와 상관없이 1회 사용 후 삭제.
  */
 export class KakaoWebLoginClient implements SocialLoginClient {
   constructor(private readonly deps: KakaoWebLoginClientDeps) {}
@@ -95,7 +120,7 @@ export class KakaoWebLoginClient implements SocialLoginClient {
     return new Promise<KakaoCredential>(() => {}); // 페이지를 떠난다
   }
 
-  async resume(callbackUrl: string): Promise<KakaoCredential> {
+  async resume(callbackUrl: string, signal?: AbortSignal): Promise<KakaoCredential> {
     const { storage, exchanger, config } = this.deps;
     const pending = readPending(storage);
     try {
@@ -103,6 +128,7 @@ export class KakaoWebLoginClient implements SocialLoginClient {
     } catch {
       // 지우지 못해도 계속한다.
     }
+    if (!pending) throw new SocialLoginNoPendingError('no pending login');
     let params: URLSearchParams;
     try {
       params = new URL(callbackUrl).searchParams;
@@ -112,13 +138,12 @@ export class KakaoWebLoginClient implements SocialLoginClient {
     const error = params.get('error');
     if (error === 'access_denied') throw new SocialLoginCancelledError('user cancelled');
     if (error) throw new SocialLoginFailedError(`kakao error: ${error}`);
-    if (!pending) throw new SocialLoginFailedError('no pending login');
     if (params.get('state') !== pending.state) throw new SocialLoginFailedError('state mismatch');
     const code = params.get('code');
     if (!code) throw new SocialLoginFailedError('missing code');
     let idToken: string | null;
     try {
-      idToken = (await exchanger.exchange(code, config.redirectUri)).idToken;
+      idToken = (await exchanger.exchange(code, config.redirectUri, signal)).idToken;
     } catch (cause) {
       if (cause instanceof SocialLoginConfigError) throw cause;
       throw new SocialLoginFailedError('code exchange failed');

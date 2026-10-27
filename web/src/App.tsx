@@ -1,11 +1,10 @@
-import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { RouterProvider } from 'react-router';
-import { bootstrapApp } from './app/bootstrap';
+import type { Bootstrap } from './app/bootstrap';
 import { t } from './copy/ko';
 
-export function App(): ReactNode {
-  const [boot] = useState(() => bootstrapApp(import.meta.env));
+/** 조립 결과(main.tsx가 모듈 스코프에서 한 번 만든다)를 그린다. 설정 오류면 오류 화면. */
+export function App({ boot }: { boot: Bootstrap }): ReactNode {
   if (boot.kind === 'config_error') {
     return (
       <main>

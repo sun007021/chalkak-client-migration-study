@@ -1,4 +1,5 @@
 import type { SessionStore, StoredSession } from '../../core/auth/SessionStore';
+import { errorName } from '../../core/net/errors';
 import type { Logger } from '../../core/net/Logger';
 import type { Clock } from '../../core/time/Clock';
 
@@ -19,7 +20,7 @@ export async function resolveAuthGate(deps: { store: SessionStore; clock: Clock;
     try {
       await store.clear();
     } catch (error) {
-      logger?.log('warn', 'failed to clear session', { error: error instanceof Error ? error.name : 'unknown' });
+      logger?.log('warn', 'failed to clear session', { error: errorName(error) });
     }
   };
 
@@ -27,7 +28,7 @@ export async function resolveAuthGate(deps: { store: SessionStore; clock: Clock;
   try {
     session = await store.read();
   } catch (error) {
-    logger?.log('warn', 'failed to read session', { error: error instanceof Error ? error.name : 'unknown' });
+    logger?.log('warn', 'failed to read session', { error: errorName(error) });
     await clearQuietly();
     return { destination: 'login' };
   }

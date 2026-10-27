@@ -25,7 +25,7 @@ const K = new Uint32Array([
 
 const rotr = (x: number, n: number): number => (x >>> n) | (x << (32 - n));
 
-/** 순수 TS SHA-256. subtle.digest는 스레드 풀 왕복이라 리다이렉트 직전 시점이 흔들려서, 짧은 입력(nonce)은 동기 계산한다. */
+/** 순수 TS SHA-256. crypto.subtle이 없는 환경(비보안 컨텍스트 등)에서만 쓰는 폴백이다. */
 function sha256Bytes(message: Uint8Array): Uint8Array {
   const bitLength = message.length * 8;
   const padded = new Uint8Array(Math.ceil((message.length + 9) / 64) * 64);
@@ -65,7 +65,17 @@ function sha256Bytes(message: Uint8Array): Uint8Array {
   return out;
 }
 
-/** SHA-256(UTF-8) 소문자 hex 64자. SDK(카카오 인가 요청)에 보내는 nonce 값(API §2.1). */
+const toHex = (bytes: Uint8Array): string => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+
+/** 폴백 구현을 직접 부른다(NIST 벡터 테스트용). */
+export function sha256HexFallback(text: string): string {
+  return toHex(sha256Bytes(new TextEncoder().encode(text)));
+}
+
+/** SHA-256(UTF-8) 소문자 hex 64자. SDK(카카오 인가 요청)에 보내는 nonce 값(API §2.1). crypto.subtle이 있으면 그것을 쓴다. */
 export async function sha256Hex(text: string): Promise<string> {
-  return Array.from(sha256Bytes(new TextEncoder().encode(text)), (b) => b.toString(16).padStart(2, '0')).join('');
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) return sha256HexFallback(text);
+  const data = new Uint8Array(new TextEncoder().encode(text)); // 다른 realm(jsdom)의 Uint8Array 거부 방지
+  return toHex(new Uint8Array(await subtle.digest('SHA-256', data)));
 }

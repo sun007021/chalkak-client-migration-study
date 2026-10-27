@@ -1,14 +1,14 @@
 import type { SessionStore } from '../../core/auth/SessionStore';
 import type { UserCaches } from '../../core/auth/UserCaches';
 import type { IdGenerator } from '../../core/ids';
-import { ApiError, ConfigError, InvalidResponseError, NetworkError, isCancellation } from '../../core/net/errors';
+import { SessionWriter } from '../../core/auth/SessionWriter';
+import { ApiError, ConfigError, InvalidResponseError, NetworkError, errorName, isCancellation } from '../../core/net/errors';
 import type { Logger } from '../../core/net/Logger';
 import { ViewModel } from '../../core/state/ViewModel';
 import { t } from '../../copy/ko';
-import type { CopyKey } from '../../copy/ko';
 import type { AuthApi, SocialLoginResult } from './AuthApi';
 import type { SignupDraft } from './SignupDraft';
-import { SocialLoginCancelledError, SocialLoginConfigError, SocialLoginFailedError } from './SocialLoginClient';
+import { SocialLoginCancelledError, SocialLoginConfigError, SocialLoginFailedError, SocialLoginNoPendingError } from './SocialLoginClient';
 import type { KakaoCredential, ResumeKakaoRedirect, SocialLoginClient } from './SocialLoginClient';
 
 export interface LoginError {
@@ -29,6 +29,8 @@ export type LoginOutcome =
   | { kind: 'terms' }
   /** 이동 없음(취소, 오류, 이미 진행 중). */
   | { kind: 'stay' }
+  /** 콜백인데 보관된 로그인 시도가 없다(새로고침, 뒤로 가기, 재진입). 오류 문구 없이, 세션이 있으면 홈 없으면 로그인으로 보낸다. */
+  | { kind: 'no_pending'; hasSession: boolean }
   /** dispose 뒤에 끝났다. 세션도 오류도 남기지 않았다. */
   | { kind: 'cancelled' };
 
@@ -45,14 +47,20 @@ export interface LoginViewModelDeps {
 
 const STAY: LoginOutcome = { kind: 'stay' };
 const CANCELLED: LoginOutcome = { kind: 'cancelled' };
-const errorName = (error: unknown): string => (error instanceof Error ? error.name : 'unknown');
 
 export class LoginViewModel extends ViewModel<LoginState> {
   private closed = false;
   private readonly abort = new AbortController();
+  private readonly sessionWriter: SessionWriter;
 
   constructor(private readonly deps: LoginViewModelDeps) {
     super({ busy: 'none', error: null });
+    this.sessionWriter = new SessionWriter({ store: deps.store, userCaches: deps.userCaches });
+  }
+
+  /** bfcache 복원처럼 화면 밖에서 진행 중이던 상태가 끝나지 않은 채 돌아왔을 때 초기 상태로 되돌린다. */
+  reset(): void {
+    this.setState({ busy: 'none', error: null });
   }
 
   /** 카카오 인증 → social-login. 진행 중이면 아무것도 하지 않고 stay. */
@@ -63,7 +71,7 @@ export class LoginViewModel extends ViewModel<LoginState> {
   /** 콜백 라우트에서 호출: resume(url)로 credential을 복원해 social-login을 이어 간다. */
   resumeKakaoRedirect(callbackUrl: string): Promise<LoginOutcome> {
     const { resume } = this.deps;
-    return this.run(() => (resume ? resume(callbackUrl) : Promise.reject(new SocialLoginFailedError('no resume handler'))));
+    return this.run((signal) => (resume ? resume(callbackUrl, signal) : Promise.reject(new SocialLoginFailedError('no resume handler'))));
   }
 
   /** 서버 호출 없이 자격 증명을 지우고 게스트 플래그를 저장한다. */
@@ -71,8 +79,7 @@ export class LoginViewModel extends ViewModel<LoginState> {
     if (this.closed || this.state.busy !== 'none') return STAY;
     this.setState({ busy: 'guest', error: null });
     try {
-      await this.deps.userCaches.clearAll();
-      await this.deps.store.write({ userId: null, tokens: null, isGuest: true });
+      await this.sessionWriter.replace({ userId: null, tokens: null, isGuest: true });
     } catch (error) {
       this.deps.logger?.log('warn', 'guest flag save failed', { error: errorName(error) });
       if (this.closed) return CANCELLED;
@@ -98,30 +105,46 @@ export class LoginViewModel extends ViewModel<LoginState> {
 
   private async run(obtain: (signal: AbortSignal) => Promise<KakaoCredential>): Promise<LoginOutcome> {
     if (this.closed || this.state.busy !== 'none') return STAY;
+    this.deps.signupDraft.clear(); // 이전 시도의 idToken·rawNonce를 남기지 않는다
     this.setState({ busy: 'kakao', error: null });
     let credential: KakaoCredential;
     try {
       credential = await obtain(this.abort.signal);
     } catch (error) {
       if (this.closed) return CANCELLED;
-      return this.failKakao(error);
+      return await this.failKakao(error);
     }
     if (this.closed) return CANCELLED;
     return this.submit(credential);
   }
 
-  private failKakao(error: unknown): LoginOutcome {
+  private async failKakao(error: unknown): Promise<LoginOutcome> {
     if (error instanceof SocialLoginCancelledError) {
       this.setState({ busy: 'none', error: null });
       return STAY;
+    }
+    if (error instanceof SocialLoginNoPendingError) {
+      this.setState({ busy: 'none', error: null });
+      return this.noPending();
     }
     this.deps.logger?.log('warn', 'kakao authentication failed', { error: errorName(error) });
     this.fail(error instanceof SocialLoginConfigError ? t('auth.login.error.config') : t('auth.login.error.kakao-failed'));
     return STAY;
   }
 
+  private async noPending(): Promise<LoginOutcome> {
+    let hasSession = false;
+    try {
+      const session = await this.deps.store.read();
+      hasSession = session.tokens !== null || session.isGuest;
+    } catch {
+      // 읽을 수 없으면 세션 없음으로 본다.
+    }
+    return this.closed ? CANCELLED : { kind: 'no_pending', hasSession };
+  }
+
   private async submit(credential: KakaoCredential): Promise<LoginOutcome> {
-    const { authApi, signupDraft, userCaches, store, logger } = this.deps;
+    const { authApi, signupDraft, logger } = this.deps;
     this.setState({ busy: 'server' });
     let result: SocialLoginResult;
     try {
@@ -139,9 +162,7 @@ export class LoginViewModel extends ViewModel<LoginState> {
       return { kind: 'terms' };
     }
     try {
-      await userCaches.clearAll(); // 새 세션을 쓰기 전에 이전 계정의 캐시를 비운다(TC-AUTH-058)
-      if (this.closed) return CANCELLED;
-      await store.write({ userId: result.userId, tokens: result.tokens, isGuest: false });
+      await this.sessionWriter.replace({ userId: result.userId, tokens: result.tokens, isGuest: false });
     } catch (error) {
       logger?.log('error', 'session save failed', { error: errorName(error) });
       if (this.closed) return CANCELLED;
@@ -161,7 +182,7 @@ export class LoginViewModel extends ViewModel<LoginState> {
       if (error.status === 401) return t('auth.login.error.kakao-account');
       if (error.status === 403 && error.message) return error.message; // 정지 회원 안내는 서버 문구 그대로(D-08)
     }
-    return t('auth.login.error.generic' satisfies CopyKey);
+    return t('auth.login.error.generic');
   }
 
   private fail(message: string): void {

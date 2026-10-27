@@ -14,7 +14,7 @@ export interface SocialLoginClient {
 }
 
 /** 리다이렉트로 돌아온 URL에서 인증 결과를 복원한다(콜백 라우트). */
-export type ResumeKakaoRedirect = (callbackUrl: string) => Promise<KakaoCredential>;
+export type ResumeKakaoRedirect = (callbackUrl: string, signal?: AbortSignal) => Promise<KakaoCredential>;
 
 export class SocialLoginCancelledError extends Error {
   readonly name = 'SocialLoginCancelledError';
@@ -24,4 +24,8 @@ export class SocialLoginConfigError extends Error {
 }
 export class SocialLoginFailedError extends Error {
   readonly name = 'SocialLoginFailedError';
+}
+/** 보관된 로그인 시도가 없다(새로고침, 뒤로 가기, 이미 쓴 콜백, SSO 재진입). 오류 문구를 보이지 않고 세션 유무로 이동한다. */
+export class SocialLoginNoPendingError extends Error {
+  readonly name = 'SocialLoginNoPendingError';
 }

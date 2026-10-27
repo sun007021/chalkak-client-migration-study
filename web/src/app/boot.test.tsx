@@ -209,11 +209,10 @@ describe('라우트 정의', () => {
   });
 
   it('TC-AUTH-059 개발 플래그가 꺼져 있으면 /dev/session 라우트가 없다', () => {
-    expect(paths(makeHarness({ env: { DEV: false } }).container)).not.toContain('/dev/session');
+    expect(paths(makeHarness({ devSession: false }).container)).not.toContain('/dev/session');
   });
 
-  it('TC-AUTH-059 개발 플래그가 켜져 있으면 /dev/session 라우트가 있다', () => {
-    expect(paths(makeHarness({ env: { DEV: true } }).container)).toContain('/dev/session');
-    expect(paths(makeHarness({ env: { DEV: false, VITE_ENABLE_DEV_SESSION: 'true' } }).container)).toContain('/dev/session');
+  it('TC-AUTH-059 개발 플래그가 켜져 있으면(테스트 환경의 DEV_SESSION_ENABLED는 true) /dev/session 라우트가 있다', () => {
+    expect(paths(makeHarness({ devSession: true }).container)).toContain('/dev/session');
   });
 });

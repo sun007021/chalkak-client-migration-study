@@ -12,26 +12,27 @@ import type { IdGenerator } from '../core/ids';
 import { readApiBaseUrl } from '../core/config/apiBaseUrl';
 import { ApiClient } from '../core/net/ApiClient';
 import { AuthCoordinator } from '../core/net/AuthCoordinator';
+import { ConfigError } from '../core/net/errors';
 import { ConsoleLogger } from '../core/net/Logger';
 import type { Logger } from '../core/net/Logger';
 import { HttpTokenRefresher } from '../core/net/TokenRefresher';
+import type { TokenRefresher } from '../core/net/TokenRefresher';
 import type { Clock } from '../core/time/Clock';
 import { SystemClock } from '../core/time/SystemClock';
 import { ToastController } from '../core/ui/ToastController';
 import { AccountService } from '../features/auth/AccountService';
 import { AuthApi } from '../features/auth/AuthApi';
-import { DevSessionService } from '../features/auth/DevSessionService';
 import { SignupDraft } from '../features/auth/SignupDraft';
-import { KakaoTokenEndpointExchanger, KakaoWebLoginClient } from '../features/auth/KakaoWebLoginClient';
-import { WebCryptoNonceGenerator } from '../features/auth/nonce';
+import { createKakaoWebLoginClient } from '../features/auth/createKakaoLogin';
+import { LoginViewModel } from '../features/auth/LoginViewModel';
 import type { ResumeKakaoRedirect, SocialLoginClient } from '../features/auth/SocialLoginClient';
+import { BootViewModel } from '../features/boot/BootViewModel';
 import { NoopHomePreloader } from '../features/boot/HomePreloader';
 import type { HomePreloader } from '../features/boot/HomePreloader';
-import { isDevSessionEnabled } from './devSession';
-import type { DevSessionEnv } from './devSession';
+import { DEV_SESSION_ENABLED } from './devSession';
 import { ROUTES } from './paths';
 
-export interface AppEnv extends DevSessionEnv {
+export interface AppEnv {
   VITE_API_BASE_URL?: string;
   VITE_KAKAO_CLIENT_ID?: string;
 }
@@ -41,6 +42,8 @@ export interface AppContainerOptions {
   env: AppEnv;
   /** same-origin 기준 주소 계산용. 기본 location.origin. */
   pageOrigin?: string;
+  /** 개발용 세션 주입 노출. 기본 DEV_SESSION_ENABLED(빌드 시점 상수). 테스트가 끄거나 켤 때만 쓴다. */
+  devSessionEnabled?: boolean;
   fetch?: typeof fetch;
   clock?: Clock;
   store?: SessionStore;
@@ -74,8 +77,11 @@ export interface AppContainer {
   preloader: HomePreloader;
   accountService: AccountService;
   devSessionEnabled: boolean;
-  /** devSessionEnabled가 false면 null(코드 경로도 만들지 않는다). */
-  devSession: DevSessionService | null;
+  /** 개발용 세션 주입 화면(동적 import)이 서비스를 만들 재료. devSessionEnabled가 false면 null. */
+  devSessionDeps: { refresher: TokenRefresher; store: SessionStore; userCaches: UserCaches } | null;
+  /** 화면이 마운트될 때마다 새 ViewModel을 만든다. 현재 컨테이너 값(this)을 읽는다. */
+  createLoginViewModel(): LoginViewModel;
+  createBootViewModel(): BootViewModel;
 }
 
 /**
@@ -85,6 +91,7 @@ export interface AppContainer {
 export function createAppContainer(options: AppContainerOptions): AppContainer {
   const { env } = options;
   const pageOrigin = options.pageOrigin ?? globalThis.location?.origin;
+  if (!pageOrigin) throw new ConfigError('page origin is unavailable');
   const baseUrl = readApiBaseUrl(env, { pageOrigin });
 
   const fetchImpl: typeof fetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
@@ -118,24 +125,21 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     socialLogin = options.socialLogin;
     resumeKakaoRedirect = options.resumeKakaoRedirect;
   } else {
-    const kakao = new KakaoWebLoginClient({
-      config: { clientId: env.VITE_KAKAO_CLIENT_ID ?? '', redirectUri: `${pageOrigin ?? ''}${ROUTES.kakaoCallback}` },
-      nonce: new WebCryptoNonceGenerator(),
-      state: ids,
-      storage: {
-        getItem: (key) => globalThis.sessionStorage.getItem(key),
-        setItem: (key, value) => globalThis.sessionStorage.setItem(key, value),
-        removeItem: (key) => globalThis.sessionStorage.removeItem(key),
-      },
-      redirect: (url) => globalThis.location.assign(url),
-      exchanger: new KakaoTokenEndpointExchanger({ clientId: env.VITE_KAKAO_CLIENT_ID ?? '', fetch: fetchImpl }),
+    const kakao = createKakaoWebLoginClient({
+      clientId: env.VITE_KAKAO_CLIENT_ID ?? '',
+      redirectUri: `${pageOrigin}${ROUTES.kakaoCallback}`,
+      fetch: fetchImpl,
+      clock,
+      ids,
     });
     socialLogin = kakao;
-    resumeKakaoRedirect = options.resumeKakaoRedirect ?? ((url) => kakao.resume(url));
+    resumeKakaoRedirect = options.resumeKakaoRedirect ?? ((url, signal) => kakao.resume(url, signal));
   }
 
-  const devSessionEnabled = isDevSessionEnabled(env);
-  return {
+  const devSessionEnabled = options.devSessionEnabled ?? DEV_SESSION_ENABLED;
+  const signupDraft = new SignupDraft();
+  sessionEvents.subscribe(() => signupDraft.clear()); // 로그아웃·만료 뒤에는 가입 중이던 자격 증명을 남기지 않는다
+  const container: AppContainer = {
     clock,
     logger,
     ids,
@@ -149,10 +153,26 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     toast,
     socialLogin,
     resumeKakaoRedirect,
-    signupDraft: new SignupDraft(),
+    signupDraft,
     preloader: options.preloader ?? new NoopHomePreloader(),
     accountService: new AccountService({ authApi, store, userCaches, toast, sessionEvents, logger }),
     devSessionEnabled,
-    devSession: devSessionEnabled ? new DevSessionService({ refresher, store, userCaches }) : null,
+    devSessionDeps: devSessionEnabled ? { refresher, store, userCaches } : null,
+    createLoginViewModel() {
+      return new LoginViewModel({
+        client: this.socialLogin,
+        resume: this.resumeKakaoRedirect,
+        authApi: this.authApi,
+        store: this.store,
+        signupDraft: this.signupDraft,
+        userCaches: this.userCaches,
+        ids: this.ids,
+        logger: this.logger,
+      });
+    },
+    createBootViewModel() {
+      return new BootViewModel({ store: this.store, clock: this.clock, preloader: this.preloader, logger: this.logger });
+    },
   };
+  return container;
 }
