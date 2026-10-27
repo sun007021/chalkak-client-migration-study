@@ -7,6 +7,7 @@ struct StoreOpener: StoreOpening {
 
     func openStore() async {
         guard let storeURL else { return }
-        await UIApplication.shared.open(storeURL)
+        // async 판은 non-Sendable options 딕셔너리를 MainActor로 넘겨 Swift 6에서 오류가 난다.
+        await MainActor.run { UIApplication.shared.open(storeURL, options: [:], completionHandler: nil) }
     }
 }
