@@ -1,4 +1,5 @@
 import type { Clock } from './Clock';
+import { kstToday, nextKstMidnight } from './kst';
 import type { DateString } from './kst';
 
 /**
@@ -6,14 +7,54 @@ import type { DateString } from './kst';
  * checkNow()는 포그라운드 복귀 때 호출하며 마지막으로 알린 날짜와 다르면 한 번만 알린다.
  */
 export class MidnightWatcher {
-  constructor(_deps: { clock: Clock; onDateChanged: (today: DateString) => void }) {}
+  private lastDate: DateString | null = null;
+  private abort: AbortController | null = null;
+
+  constructor(private readonly deps: { clock: Clock; onDateChanged: (today: DateString) => void }) {}
+
   start(): void {
-    throw new Error('not implemented');
+    this.stop();
+    this.lastDate = kstToday(this.deps.clock);
+    this.arm();
   }
+
   stop(): void {
-    throw new Error('not implemented');
+    this.abort?.abort();
+    this.abort = null;
   }
+
   checkNow(): void {
-    throw new Error('not implemented');
+    const wasRunning = this.abort !== null;
+    this.notifyIfChanged();
+    // 기기 시각이 바뀌었을 수 있으니 실행 중이면 남은 대기 시간을 다시 계산한다.
+    if (wasRunning) {
+      this.stop();
+      this.arm();
+    }
+  }
+
+  private notifyIfChanged(): void {
+    const today = kstToday(this.deps.clock);
+    if (today === this.lastDate) return;
+    this.lastDate = today;
+    this.deps.onDateChanged(today);
+  }
+
+  private arm(): void {
+    const abort = new AbortController();
+    this.abort = abort;
+    void this.loop(abort.signal);
+  }
+
+  private async loop(signal: AbortSignal): Promise<void> {
+    const { clock } = this.deps;
+    try {
+      while (!signal.aborted) {
+        await clock.sleep(nextKstMidnight(clock.nowMs()) - clock.nowMs(), signal);
+        this.notifyIfChanged();
+      }
+    } catch {
+      // stop()에 의한 취소. 정리할 것 없음.
+    }
   }
 }

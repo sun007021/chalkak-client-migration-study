@@ -56,11 +56,26 @@ export class ConfigError extends Error {
 }
 
 /** 요청 취소(AbortController)는 오류가 아니다. 취소는 AbortError DOMException 그대로 전파한다(D-20). */
-export function isCancellation(_error: unknown): boolean {
-  throw new Error('not implemented');
+export function isCancellation(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { name?: unknown }).name === 'AbortError';
+}
+
+const isKnownErrorCode = (value: string): value is KnownErrorCode => (KNOWN_ERROR_CODES as readonly string[]).includes(value);
+
+function parseJsonObject(bodyText: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(bodyText);
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** 오류 응답 본문(JSON, HTML, 빈 문자열 등)과 HTTP 상태로 ApiError를 만든다. 던지지 않는다. */
-export function parseErrorResponse(_status: number, _bodyText: string): ApiError {
-  throw new Error('not implemented');
+export function parseErrorResponse(status: number, bodyText: string): ApiError {
+  const body = parseJsonObject(bodyText);
+  const message = typeof body?.message === 'string' ? body.message : '';
+  const raw = body?.errorCode;
+  if (typeof raw !== 'string') return new ApiError(status, null, message, null);
+  return new ApiError(status, isKnownErrorCode(raw) ? raw : 'BUSINESS_ERROR', message, raw);
 }

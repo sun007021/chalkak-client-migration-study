@@ -30,22 +30,81 @@ export interface AuthCoordinatorDeps {
   onSessionExpired: () => void;
 }
 
+const abortError = () => new DOMException('The operation was aborted.', 'AbortError');
+
+/** 이 요청만의 signal로 공유 promise 기다림을 끝낸다(공유 promise 자체는 계속 진행). */
+function waitFor<T>(shared: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return shared;
+  if (signal.aborted) return Promise.reject(abortError());
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(abortError());
+    signal.addEventListener('abort', onAbort, { once: true });
+    shared.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
+  });
+}
+
 /** 토큰 헤더 결정과 401 single-flight 갱신(D-17). refresh를 호출하는 곳은 여기뿐이다. */
 export class AuthCoordinator {
-  constructor(_deps: AuthCoordinatorDeps) {}
+  private inflight: Promise<AfterUnauthorized> | null = null;
+
+  constructor(private readonly deps: AuthCoordinatorDeps) {}
 
   /** access가 있고 (clock.nowMs() 기준) 만료 전이면 Authorization을 만든다. */
-  prepare(): Promise<AuthContext> {
-    throw new Error('not implemented');
+  async prepare(): Promise<AuthContext> {
+    const { tokens } = await this.deps.store.read();
+    if (!tokens) return { authorization: null, accessTokenAtRequest: null, canRefresh: false };
+    const now = this.deps.clock.nowMs();
+    return {
+      authorization: now < tokens.accessTokenExpiresAt ? `Bearer ${tokens.accessToken}` : null,
+      accessTokenAtRequest: tokens.accessToken,
+      canRefresh: now < tokens.refreshTokenExpiresAt,
+    };
   }
 
   /** UNAUTHORIZED(401)을 받았을 때. signal은 이 요청만의 취소이며 진행 중 refresh 자체는 취소하지 않는다. */
-  handleUnauthorized(_ctx: AuthContext, _signal?: AbortSignal): Promise<AfterUnauthorized> {
-    throw new Error('not implemented');
+  handleUnauthorized(ctx: AuthContext, signal?: AbortSignal): Promise<AfterUnauthorized> {
+    if (!ctx.canRefresh) return Promise.resolve({ kind: 'not_applicable' });
+    if (!this.inflight) {
+      const flight: Promise<AfterUnauthorized> = this.refreshOnce(ctx).finally(() => {
+        if (this.inflight === flight) this.inflight = null;
+      });
+      this.inflight = flight;
+    }
+    return waitFor(this.inflight, signal);
   }
 
   /** 401 REAUTHENTICATION_REQUIRED를 일반 API에서 받았을 때. 그 사이 토큰이 바뀌었으면 retry, 아니면 세션 삭제. refresh는 부르지 않는다. */
-  handleReauthenticationRequired(_ctx: AuthContext): Promise<AfterUnauthorized> {
-    throw new Error('not implemented');
+  async handleReauthenticationRequired(ctx: AuthContext): Promise<AfterUnauthorized> {
+    const { tokens } = await this.deps.store.read();
+    if (tokens && tokens.accessToken !== ctx.accessTokenAtRequest) return { kind: 'retry' };
+    if (tokens) await this.expireSession();
+    return { kind: 'reauthentication_required' };
+  }
+
+  private async refreshOnce(ctx: AuthContext): Promise<AfterUnauthorized> {
+    const { store, refresher } = this.deps;
+    const started = await store.read();
+    if (!started.tokens) return { kind: 'not_applicable' };
+    if (started.tokens.accessToken !== ctx.accessTokenAtRequest) return { kind: 'retry' };
+
+    const result = await refresher.refresh(started.tokens.refreshToken);
+    if (result.kind === 'transient_failure') return { kind: 'failed', error: result.error };
+
+    // 갱신 도중 로그아웃·계정 전환이 있었으면 결과를 버린다(D-17).
+    const current = await store.read();
+    const unchanged = current.userId === started.userId && current.tokens?.refreshToken === started.tokens.refreshToken;
+    if (!unchanged) return { kind: 'failed', error: new Error('session changed during token refresh') };
+
+    if (result.kind === 'reauthentication_required') {
+      await this.expireSession();
+      return { kind: 'reauthentication_required' };
+    }
+    await store.write({ ...current, tokens: result.tokens });
+    return { kind: 'retry' };
+  }
+
+  private async expireSession(): Promise<void> {
+    await this.deps.store.clear();
+    this.deps.onSessionExpired();
   }
 }

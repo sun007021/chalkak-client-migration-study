@@ -5,6 +5,6 @@ export interface IdGenerator {
 
 export class RandomIdGenerator implements IdGenerator {
   next(): string {
-    throw new Error('not implemented');
+    return globalThis.crypto.randomUUID();
   }
 }
