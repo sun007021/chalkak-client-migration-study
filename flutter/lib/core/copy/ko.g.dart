@@ -136,6 +136,9 @@ abstract final class Copy {
   /// `auth.login.error.config`
   static const authLoginErrorConfig = '카카오 로그인 설정을 확인해 주세요.';
 
+  /// `auth.login.error.title`
+  static const authLoginErrorTitle = '로그인';
+
   /// `auth.login.error.generic`
   static const authLoginErrorGeneric = '로그인하지 못했어요. 다시 시도해 주세요.';
 

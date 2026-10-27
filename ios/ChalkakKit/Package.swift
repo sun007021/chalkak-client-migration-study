@@ -21,7 +21,7 @@ let package = Package(
         .target(name: "ChalkakFeatures", dependencies: ["ChalkakCore", "ChalkakNetwork", "ChalkakData"]),
         .testTarget(name: "ChalkakCoreTests", dependencies: ["ChalkakCore", "ChalkakTestSupport"]),
         .testTarget(name: "ChalkakNetworkTests", dependencies: ["ChalkakCore", "ChalkakNetwork", "ChalkakTestSupport"]),
-        .testTarget(name: "ChalkakDataTests", dependencies: ["ChalkakData"]),
-        .testTarget(name: "ChalkakFeaturesTests", dependencies: ["ChalkakFeatures"]),
+        .testTarget(name: "ChalkakDataTests", dependencies: ["ChalkakCore", "ChalkakNetwork", "ChalkakData", "ChalkakTestSupport"]),
+        .testTarget(name: "ChalkakFeaturesTests", dependencies: ["ChalkakCore", "ChalkakNetwork", "ChalkakData", "ChalkakFeatures", "ChalkakTestSupport"]),
     ]
 )

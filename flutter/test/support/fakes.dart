@@ -12,6 +12,7 @@ class FakeTokenStore implements TokenStore {
   final List<Session> writes = [];
   int clears = 0;
   Future<void>? writeGate;
+  Object? writeError;
 
   @override
   Future<Session?> read() async => current;
@@ -20,6 +21,8 @@ class FakeTokenStore implements TokenStore {
   Future<void> write(Session session) async {
     final gate = writeGate;
     if (gate != null) await gate;
+    final error = writeError;
+    if (error != null) throw error;
     writes.add(session);
     current = session;
   }
