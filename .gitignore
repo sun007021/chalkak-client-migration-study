@@ -1,0 +1,18 @@
+# 비밀값
+*.xcconfig
+!*.example.xcconfig
+local.properties
+GoogleService-Info.plist
+google-services.json
+.env
+.env.*
+!.env.example
+
+# 빌드·IDE
+.DS_Store
+build/
+.gradle/
+.idea/
+DerivedData/
+node_modules/
+.dart_tool/
