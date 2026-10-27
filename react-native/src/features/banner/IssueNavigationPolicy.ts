@@ -1,3 +1,5 @@
+import { isHttpsUrlWithHost } from '../../data/decode';
+
 export type IssueNavigationRequest = {
   /** 이동하려는 주소. */
   url: string;
@@ -23,11 +25,32 @@ export type IssueNavigationDecision = 'allow-in-app' | 'open-external' | 'block'
  * - 그 밖(첫 로드 이후 최상위): http(s)가 아닌 스킴은 block, 사용자 제스처 없는 이동·새 창은 block,
  *   같은 문서 앵커(#)는 allow-in-app(새 창 앵커는 open-external), 나머지 http(s) 링크는 open-external.
  */
-export function decideIssueNavigation(_request: IssueNavigationRequest): IssueNavigationDecision {
-  throw new Error('not implemented');
+export function decideIssueNavigation(request: IssueNavigationRequest): IssueNavigationDecision {
+  if (request.isInitialLoad) return isSafeIssueUrl(request.url) ? 'allow-in-app' : 'block';
+  if (!request.isMainFrame) return 'allow-in-app';
+  if (!isWebUrl(request.url)) return 'block';
+  if (!request.hasUserGesture) return 'block';
+  if (!request.opensNewWindow && isSameDocumentAnchor(request.url, request.currentUrl)) {
+    return 'allow-in-app';
+  }
+  return 'open-external';
+}
+
+const WEB_URL = /^https?:\/\/[^\s/?#]+/i;
+const isWebUrl = (url: string): boolean => WEB_URL.test(url);
+
+const withoutFragment = (url: string): string => {
+  const index = url.indexOf('#');
+  return index < 0 ? url : url.slice(0, index);
+};
+
+/** 현재 문서와 `#` 앞이 같고 `#`가 있는 주소만 같은 문서 앵커다(`#` 없는 같은 주소는 새 이동이다). */
+function isSameDocumentAnchor(url: string, currentUrl: string | null): boolean {
+  if (currentUrl === null || !url.includes('#')) return false;
+  return withoutFragment(url) === withoutFragment(currentUrl);
 }
 
 /** 배너 webViewUrl을 첫 로드해도 되는가: https이고 호스트가 있다(REQ-BANR-013). */
-export function isSafeIssueUrl(_url: string): boolean {
-  throw new Error('not implemented');
+export function isSafeIssueUrl(url: string): boolean {
+  return isHttpsUrlWithHost(url);
 }

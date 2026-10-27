@@ -1,4 +1,5 @@
 import type { ApiClient } from '../../core/http/ApiClient';
+import { asObject, bool } from '../decode';
 
 export type NotificationRepositoryDeps = { api: ApiClient };
 
@@ -7,8 +8,10 @@ export class NotificationRepository {
   constructor(private readonly deps: NotificationRepositoryDeps) {}
 
   /** GET /notifications/unread-status → hasUnread. 실패는 ApiError를 그대로 던진다. */
-  hasUnread(_signal?: AbortSignal): Promise<boolean> {
-    void this.deps;
-    throw new Error('not implemented');
+  hasUnread(signal?: AbortSignal): Promise<boolean> {
+    return this.deps.api.requestJson(
+      { method: 'GET', path: '/notifications/unread-status', signal },
+      (raw) => bool(asObject(raw, 'unread status'), 'hasUnread'),
+    );
   }
 }

@@ -1,3 +1,4 @@
+import { createNavigationContainerRef } from '@react-navigation/native';
 import { getRandomBytes } from 'expo-crypto';
 
 import { ConsoleAnalyticsTracker } from '../core/analytics/ConsoleAnalyticsTracker';
@@ -10,10 +11,32 @@ import type { SocialLoginClient } from '../core/auth/SocialLoginClient';
 import type { AppConfig } from '../core/config/AppConfig';
 import type { AppInfo } from '../core/config/AppInfo';
 import { type FeatureFlags, readFeatureFlags } from '../core/config/FeatureFlags';
+import type { AppVisibility } from '../core/lifecycle/AppVisibility';
+import { ReactNativeAppVisibility } from '../core/lifecycle/ReactNativeAppVisibility';
+import type { ExternalLinkOpener } from '../core/linking/ExternalLinkOpener';
+import { LinkingExternalLinkOpener } from '../core/linking/LinkingExternalLinkOpener';
 import { NoopPushRegistrar } from '../core/push/NoopPushRegistrar';
 import type { PushRegistrar } from '../core/push/PushRegistrar';
 import type { UserDataCache } from '../core/push/UserDataCache';
+import { UserDataCacheRegistry } from '../core/push/UserDataCacheRegistry';
+import { ToastCenter } from '../core/toast/ToastCenter';
+import type { ToastPresenter } from '../core/toast/ToastPresenter';
 import { AuthRepository } from '../data/auth/AuthRepository';
+import { BannerRepository } from '../data/banner/BannerRepository';
+import { NotificationRepository } from '../data/notification/NotificationRepository';
+import { PostRepository } from '../data/post/PostRepository';
+import { TopicRepository } from '../data/topic/TopicRepository';
+import type { AiReviewPoller } from '../features/ai-review/AiReviewPoller';
+import { NoopAiReviewPoller } from '../features/ai-review/NoopAiReviewPoller';
+import type { MainMode } from '../features/auth/AuthFlowNavigator';
+import { BannerFeedViewModel } from '../features/banner/BannerFeedViewModel';
+import { IssueWebViewModel } from '../features/banner/IssueWebViewModel';
+import { HomeViewModel } from '../features/home/HomeViewModel';
+import { HomeViewModelOwner } from '../features/home/HomeViewModelOwner';
+import type { LikeController } from '../features/like/LikeController';
+import { NoopLikeController } from '../features/like/NoopLikeController';
+import { NavigationHomeNavigator } from './NavigationHomeNavigator';
+import type { RootStackParamList } from './navigation/routes';
 import { LoginViewModel } from '../features/auth/LoginViewModel';
 import { LoginViewModelOwner } from '../features/auth/LoginViewModelOwner';
 import { AuthGate } from '../features/boot/AuthGate';
@@ -38,6 +61,7 @@ import { ExpoSecureKeyValueStorage } from '../core/session/ExpoSecureKeyValueSto
 import { SecureSessionStore } from '../core/session/SecureSessionStore';
 import type { SessionStore } from '../core/session/SessionStore';
 import { type Clock, SystemClock } from '../core/time/Clock';
+import { TOAST_DURATION_MS } from '../shared/constants';
 
 /** 컨테이너가 조립하는 의존성 전체. 새 의존성은 여기에 추가한다. */
 export interface Dependencies {
@@ -55,6 +79,13 @@ export interface Dependencies {
   readonly homePreloader: HomePreloader;
   readonly updateChecker: UpdateChecker;
   readonly storeOpener: StoreOpener;
+  readonly visibility: AppVisibility;
+  readonly linkOpener: ExternalLinkOpener;
+  /** 기본은 화면 위에 그리는 ToastCenter(`container.toastCenter`). 테스트는 Fake를 넣는다. */
+  readonly toast: ToastPresenter;
+  /** 좋아요·AI 리뷰 PR이 실제 구현으로 바꾼다. 그 전에는 아무 일도 하지 않는 구현이다. */
+  readonly likes: LikeController;
+  readonly aiReview: AiReviewPoller;
   /** 로그아웃·탈퇴·계정 전환 때 비울 사용자별 캐시. 캐시를 가진 기능 PR이 추가한다. */
   readonly userDataCaches: readonly UserDataCache[];
 }
@@ -72,15 +103,28 @@ export class AppContainer {
   readonly appInfo: AppInfo;
   readonly analytics: AnalyticsTracker;
   readonly authRepository: AuthRepository;
+  readonly toast: ToastPresenter;
+  /** 기본 토스트 구현일 때만 있다(ToastHost가 그린다). */
+  readonly toastCenter: ToastCenter | null;
+  /** 화면 이동의 단일 출처. NavigationContainer의 ref로 연결한다. */
+  readonly navigationHandle = createNavigationContainerRef<RootStackParamList>();
   readonly bootViewModel: BootViewModel;
   readonly updateDialogViewModel: UpdateDialogViewModel;
+  /** 메인에 있는 동안 홈 ViewModel을 만들고 버린다. 홈 탭 화면은 이것을 구독해 받는다. */
+  readonly homeOwner: HomeViewModelOwner;
   /** phase가 login인 동안 로그인 ViewModel을 만들고 버린다. 화면은 이것을 구독해 받는다. */
   readonly loginOwner: LoginViewModelOwner;
   private readonly socialLoginClient: SocialLoginClient;
   private readonly nonceGenerator: NonceGenerator;
   private readonly pushRegistrar: PushRegistrar;
+  private readonly dependencies: Dependencies;
+  private readonly homeNavigator = new NavigationHomeNavigator(this.navigationHandle);
+  private readonly cacheRegistry = new UserDataCacheRegistry();
 
-  private constructor(dependencies: Dependencies) {
+  private constructor(dependencies: Dependencies, toastCenter: ToastCenter | null) {
+    this.dependencies = dependencies;
+    this.toast = dependencies.toast;
+    this.toastCenter = toastCenter;
     this.config = dependencies.config;
     this.clock = dependencies.clock;
     this.sessionStore = dependencies.sessionStore;
@@ -96,7 +140,8 @@ export class AppContainer {
       api: this.api,
       sessionStore: this.sessionStore,
       clock: this.clock,
-      caches: dependencies.userDataCaches,
+      // 소유자가 만들고 버리는 캐시(홈 등)는 레지스트리에 올라간다.
+      caches: [...dependencies.userDataCaches, this.cacheRegistry],
       pushRegistrar: this.pushRegistrar,
     });
     this.bootViewModel = new BootViewModel({
@@ -113,6 +158,40 @@ export class AppContainer {
     this.loginOwner = new LoginViewModelOwner(this.bootViewModel, () =>
       this.createLoginViewModel(),
     );
+    this.homeOwner = new HomeViewModelOwner({
+      boot: this.bootViewModel,
+      create: (mode) => this.createHomeViewModel(mode),
+      registerCache: (cache) => this.cacheRegistry.register(cache),
+    });
+  }
+
+  /** 소유자(homeOwner)만 부른다. */
+  private createHomeViewModel(mode: MainMode): HomeViewModel {
+    const { api, clock } = this;
+    const { likes, aiReview, visibility } = this.dependencies;
+    return new HomeViewModel({
+      mode,
+      clock,
+      topics: new TopicRepository({ api }),
+      posts: new PostRepository({ api }),
+      notifications: new NotificationRepository({ api }),
+      bannerFeed: new BannerFeedViewModel({ repository: new BannerRepository({ api }) }),
+      likes,
+      aiReview,
+      visibility,
+      navigator: this.homeNavigator,
+      toast: this.toast,
+    });
+  }
+
+  /** 웹뷰 라우트(내비게이션)만 부른다. */
+  createIssueWebViewModel(url: string): IssueWebViewModel {
+    return new IssueWebViewModel({
+      url,
+      analytics: this.analytics,
+      toast: this.toast,
+      linkOpener: this.dependencies.linkOpener,
+    });
   }
 
   /** 소유자(loginOwner)만 부른다. 전환 요청은 BootViewModel로 간다. */
@@ -159,25 +238,37 @@ export class AppContainer {
       });
     const featureFlags = overrides.featureFlags ?? readFeatureFlags(undefined);
     const appInfo = overrides.appInfo ?? DEFAULT_APP_INFO;
-    return new AppContainer({
-      config: overrides.config ?? config,
-      clock,
-      sessionStore,
-      events,
-      api,
-      featureFlags,
-      appInfo,
-      analytics: overrides.analytics ?? new ConsoleAnalyticsTracker(),
-      socialLoginClient:
-        overrides.socialLoginClient ??
-        selectSocialLoginClient(featureFlags, new KakaoSocialLoginClient(new SeoulKakaoSdk())),
-      nonceGenerator: overrides.nonceGenerator ?? new SecureNonceGenerator(getRandomBytes),
-      pushRegistrar: overrides.pushRegistrar ?? new NoopPushRegistrar(),
-      homePreloader: overrides.homePreloader ?? new NoopHomePreloader(),
-      updateChecker: overrides.updateChecker ?? createUpdateChecker(appInfo, transport),
-      storeOpener: overrides.storeOpener ?? new LinkingStoreOpener(storeUrlFor(appInfo)),
-      userDataCaches: overrides.userDataCaches ?? [],
-    });
+    const visibility = overrides.visibility ?? new ReactNativeAppVisibility();
+    const toastCenter = overrides.toast
+      ? null
+      : new ToastCenter({ visibility, durationMs: TOAST_DURATION_MS });
+    return new AppContainer(
+      {
+        config: overrides.config ?? config,
+        clock,
+        sessionStore,
+        events,
+        api,
+        featureFlags,
+        appInfo,
+        analytics: overrides.analytics ?? new ConsoleAnalyticsTracker(),
+        socialLoginClient:
+          overrides.socialLoginClient ??
+          selectSocialLoginClient(featureFlags, new KakaoSocialLoginClient(new SeoulKakaoSdk())),
+        nonceGenerator: overrides.nonceGenerator ?? new SecureNonceGenerator(getRandomBytes),
+        pushRegistrar: overrides.pushRegistrar ?? new NoopPushRegistrar(),
+        homePreloader: overrides.homePreloader ?? new NoopHomePreloader(),
+        updateChecker: overrides.updateChecker ?? createUpdateChecker(appInfo, transport),
+        storeOpener: overrides.storeOpener ?? new LinkingStoreOpener(storeUrlFor(appInfo)),
+        userDataCaches: overrides.userDataCaches ?? [],
+        visibility,
+        linkOpener: overrides.linkOpener ?? new LinkingExternalLinkOpener(),
+        toast: overrides.toast ?? toastCenter!,
+        likes: overrides.likes ?? new NoopLikeController(),
+        aiReview: overrides.aiReview ?? new NoopAiReviewPoller(),
+      },
+      toastCenter,
+    );
   }
 }
 

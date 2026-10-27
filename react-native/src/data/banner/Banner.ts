@@ -1,3 +1,15 @@
+import {
+  asArray,
+  asObject,
+  bool,
+  instant,
+  isHttpUrlWithHost,
+  isHttpsUrlWithHost,
+  nonNegInt,
+  str,
+  type Obj,
+} from '../decode';
+
 export type Banner = {
   id: string;
   title: string;
@@ -18,6 +30,27 @@ export type BannerPage = {
 };
 
 /** 깨진 JSON·필수 필드 누락·https가 아닌 webViewUrl이면 throw. thumbnailUrl 오류만 null로 흡수. */
-export function decodeBannerPage(_raw: unknown): BannerPage {
-  throw new Error('not implemented');
+export function decodeBannerPage(raw: unknown): BannerPage {
+  const o = asObject(raw, 'banner page');
+  return {
+    currentPage: nonNegInt(o, 'currentPage'),
+    pageSize: nonNegInt(o, 'pageSize'),
+    hasNext: o.hasNext === undefined || o.hasNext === null ? false : bool(o, 'hasNext'),
+    banners: asArray(o.banners, 'banners').map(decodeBanner),
+  };
+}
+
+function decodeBanner(raw: unknown): Banner {
+  const o: Obj = asObject(raw, 'banner');
+  const webViewUrl = str(o, 'webViewUrl');
+  if (!isHttpsUrlWithHost(webViewUrl)) throw new Error('webViewUrl must be https with a host');
+  const thumbnail = o.thumbnailUrl;
+  return {
+    id: str(o, 'id'),
+    title: str(o, 'title'),
+    subtitle: str(o, 'subtitle'),
+    webViewUrl,
+    thumbnailUrl: typeof thumbnail === 'string' && isHttpUrlWithHost(thumbnail) ? thumbnail : null,
+    createdAt: instant(o, 'createdAt'),
+  };
 }
