@@ -83,16 +83,13 @@ void main() {
     });
   });
 
-  test('fixture 예약 키를 해석한다', () {
-    final r = FakeResponse.fromFixture(502, {
-      '_raw': '<html>bad</html>',
-      '_contentType': 'text/html',
-    });
-    expect(r.body, '<html>bad</html>');
-    expect(r.contentType, 'text/html');
-    expect(
-      FakeResponse.fromFixture(0, {'_fault': 'timeout'}).fault,
-      FakeFault.timeout,
-    );
+  test('fixture 예약 키와 manifest 상태·헤더를 응답으로 옮긴다', () {
+    final html = FakeResponse.fixture('common/error__bad-gateway-html.json');
+    expect(html.status, 502);
+    expect(html.contentType, 'text/html');
+    expect(html.body, startsWith('<html>'));
+    final limited = FakeResponse.fixture('common/error__rate-limited-429.json');
+    expect((limited.status, limited.headers['Retry-After']), (429, '2'));
+    expect(FakeResponse.fixture('common/ok__empty-body.json').body, isEmpty);
   });
 }

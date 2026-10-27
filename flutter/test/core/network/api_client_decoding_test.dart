@@ -17,9 +17,8 @@ void main() {
 
   group('응답 디코딩', () {
     netTest('TC-NET-005 200인데 JSON이 깨지면 InvalidResponse이고 크래시하지 않는다', (h, a) {
-      // fixture: common/ok__malformed-json.json ({"_raw":"{broken"})
       h.adapter.on('GET', p, [
-        FakeResponse.fromFixture(200, {'_raw': '{"id": 1,'}),
+        FakeResponse.fixture('common/ok__malformed-json.json'),
       ]);
       final r = get(h);
       settle(a);
@@ -27,8 +26,9 @@ void main() {
     }, session: sessionAt());
 
     netTest('TC-NET-006 본문이 필요한 API가 200 빈 본문이면 InvalidResponse다', (h, a) {
-      // fixture: common/ok__empty-body.json ({"_raw":""})
-      h.adapter.on('GET', p, [const FakeResponse.empty(200)]);
+      h.adapter.on('GET', p, [
+        FakeResponse.fixture('common/ok__empty-body.json'),
+      ]);
       final r = get(h);
       settle(a);
       expect(errOf(r).isInvalidResponse, isTrue);
@@ -131,12 +131,8 @@ void main() {
     });
 
     netTest('TC-NET-011 Content-Type이 JSON이 아닌 200은 InvalidResponse다', (h, a) {
-      // fixture: common/ok__wrong-content-type.json ({"_raw","_contentType":"text/html"})
       h.adapter.on('GET', p, [
-        FakeResponse.fromFixture(200, {
-          '_raw': '{"id":1}',
-          '_contentType': 'text/html',
-        }),
+        FakeResponse.fixture('common/ok__wrong-content-type.json'),
       ]);
       final r = get(h);
       settle(a);
@@ -171,12 +167,8 @@ void main() {
       h,
       a,
     ) {
-      // fixture: common/error__bad-gateway-html.json
       h.adapter.on('GET', p, [
-        FakeResponse.fromFixture(502, {
-          '_raw': '<html>Bad Gateway</html>',
-          '_contentType': 'text/html',
-        }),
+        FakeResponse.fixture('common/error__bad-gateway-html.json'),
       ]);
       final r = get(h);
       advance(a, const Duration(seconds: 5));

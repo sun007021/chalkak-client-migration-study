@@ -277,7 +277,6 @@ void main() {
     netTest(
       'TC-NET-021 TC-AUTH-056 refresh 자체가 REAUTH면 세션을 지우고 로그인 이벤트를 한 번 낸다',
       (h, a) {
-        // fixture: auth/refresh__reauthentication-required.json
         h.adapter.on('GET', '$v1/a', [unauthorized()]);
         h.adapter.on('POST', '$v1/auth/refresh', [reauth()]);
         final r = get(h, '/a');
@@ -331,10 +330,9 @@ void main() {
       h,
       a,
     ) {
-      // fixture: auth/refresh__internal-error.json
       h.adapter.on('GET', '$v1/a', [unauthorized()]);
       h.adapter.on('POST', '$v1/auth/refresh', [
-        FakeResponse.json(500, internalBody),
+        FakeResponse.fixture('auth/refresh__internal-error.json'),
       ]);
       final r = get(h, '/a');
       advance(a, const Duration(seconds: 60));
@@ -348,10 +346,9 @@ void main() {
     netTest(
       'TC-NET-025 refresh 응답에 필수 토큰 필드가 없으면 InvalidResponse로 실패하고 기존 세션을 덮어쓰지 않는다',
       (h, a) {
-        // fixture: auth/refresh__missing-token-field.json
         h.adapter.on('GET', '$v1/a', [unauthorized()]);
         h.adapter.on('POST', '$v1/auth/refresh', [
-          FakeResponse.json(200, {'accessToken': 'at2', 'expiresIn': 900}),
+          FakeResponse.fixture('auth/refresh__missing-token-field.json'),
         ]);
         final r = get(h, '/a');
         advance(a, const Duration(seconds: 5));
@@ -520,12 +517,8 @@ void main() {
     );
 
     netTest('TC-NET-032 403 FORBIDDEN은 재전송하지 않고 정지 상태를 로컬에 캐시하지 않는다', (h, a) {
-      // fixture: common/error__forbidden-banned.json
       h.adapter.on('GET', '$v1/posts/today', [
-        FakeResponse.json(403, {
-          'errorCode': 'FORBIDDEN',
-          'message': '차단된 회원입니다.',
-        }),
+        FakeResponse.fixture('common/error__forbidden-banned.json'),
         ok(),
       ]);
       final r1 = get(h, '/posts/today');

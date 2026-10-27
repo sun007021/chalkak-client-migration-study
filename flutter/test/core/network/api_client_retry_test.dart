@@ -136,14 +136,15 @@ void main() {
   });
 
   group('Retry-After', () {
-    FakeResponse limited(int status, String retryAfter) => FakeResponse(
-      status: status,
-      body: '{"errorCode":"BUSINESS_ERROR","message":"잠시 후 다시"}',
+    // 상태·본문은 fixture, Retry-After 값만 케이스가 정한다.
+    FakeResponse limited(int status, String retryAfter) => FakeResponse.fixture(
+      status == 429
+          ? 'common/error__rate-limited-429.json'
+          : 'common/error__service-unavailable-503.json',
       headers: {'Retry-After': retryAfter},
     );
 
     netTest('TC-NET-040 503 Retry-After: 2는 0.5초가 아니라 2초 뒤 재시도한다', (h, a) {
-      // fixture: common/error__service-unavailable-503.json
       h.adapter.on('GET', '$v1/x', [limited(503, '2'), ok()]);
       final r = send(h, getX);
       advance(a, const Duration(milliseconds: 1999));
@@ -154,7 +155,6 @@ void main() {
     });
 
     netTest('TC-NET-040 429 Retry-After: 1은 1초 뒤 재시도한다', (h, a) {
-      // fixture: common/error__rate-limited-429.json
       h.adapter.on('GET', '$v1/x', [limited(429, '1'), ok()]);
       final r = send(h, getX);
       advance(a, const Duration(milliseconds: 999));
@@ -191,7 +191,6 @@ void main() {
         h,
         a,
       ) {
-        // fixture: common/error__service-unavailable-503-bad-retry-after.json
         h.adapter.on('GET', '$v1/x', [limited(503, bad), ok()]);
         final r = send(h, getX);
         advance(a, const Duration(milliseconds: 499));

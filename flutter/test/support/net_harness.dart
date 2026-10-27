@@ -11,6 +11,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_adapter.dart';
 import 'fakes.dart';
+import 'fixtures.dart';
+
+Map<String, Object?> _body(String name) =>
+    (Fixture.load(name) as Map).cast<String, Object?>();
 
 /// 모든 네트워크 테스트의 가상 시작 시각.
 final DateTime t0 = DateTime.utc(2026, 10, 27, 3);
@@ -18,31 +22,23 @@ final DateTime t0 = DateTime.utc(2026, 10, 27, 3);
 const String apiHost = 'https://api.test';
 const String v1 = '/api/v1';
 
-// fixture: common/error__unauthorized-token-invalid.json
-final Map<String, Object?> unauthorizedBody = {
-  'errorCode': 'UNAUTHORIZED',
-  'message': '유효하지 않은 인증 정보입니다.',
-};
+final Map<String, Object?> unauthorizedBody = _body(
+  'common/error__unauthorized-token-invalid.json',
+);
 
-// fixture: auth/refresh__reauthentication-required.json
-final Map<String, Object?> reauthBody = {
-  'errorCode': 'REAUTHENTICATION_REQUIRED',
-  'message': '다시 로그인해 주세요.',
-};
+final Map<String, Object?> reauthBody = _body(
+  'auth/refresh__reauthentication-required.json',
+);
 
-// fixture: common/error__internal-500.json
-final Map<String, Object?> internalBody = {
-  'errorCode': 'INTERNAL_ERROR',
-  'message': '서버에서 요청을 처리하지 못했습니다.',
-};
+final Map<String, Object?> internalBody = _body(
+  'common/error__internal-500.json',
+);
 
-// fixture: common/error__business-400.json
-final Map<String, Object?> businessBody = {
-  'errorCode': 'BUSINESS_ERROR',
-  'message': '요청을 처리할 수 없습니다.',
-};
+final Map<String, Object?> businessBody = _body(
+  'common/error__business-400.json',
+);
 
-// fixture: auth/refresh__success.json
+// auth/refresh__success.json과 같은 모양(토큰만 테스트가 정한다).
 Map<String, Object?> refreshBody(String at, String rt) => {
   'accessToken': at,
   'expiresIn': 900,
@@ -50,8 +46,10 @@ Map<String, Object?> refreshBody(String at, String rt) => {
   'refreshTokenExpiresIn': 2592000,
 };
 
-FakeResponse unauthorized() => FakeResponse.json(401, unauthorizedBody);
-FakeResponse reauth() => FakeResponse.json(401, reauthBody);
+FakeResponse unauthorized() =>
+    FakeResponse.fixture('common/error__unauthorized-token-invalid.json');
+FakeResponse reauth() =>
+    FakeResponse.fixture('auth/refresh__reauthentication-required.json');
 FakeResponse ok([Object body = const {'ok': true}]) =>
     FakeResponse.json(200, body);
 

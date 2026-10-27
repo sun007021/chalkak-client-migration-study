@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:clock/clock.dart';
 import 'package:dio/dio.dart';
 
+import 'fixtures.dart';
+
 /// 어댑터가 받은 요청 기록.
 class RecordedRequest {
   RecordedRequest({
@@ -49,7 +51,7 @@ class RecordedRequest {
 enum FakeFault { timeout, disconnect }
 
 /// 스크립트된 응답. 본문이 아닌 응답은 fixture 예약 키(`_raw`, `_contentType`,
-/// `_fault`)와 같은 모양으로 만들 수 있다([FakeResponse.fromFixture]).
+/// `_fault`)와 같은 모양으로 만들 수 있다([FakeResponse.fixture]).
 class FakeResponse {
   const FakeResponse({
     this.status = 200,
@@ -83,27 +85,26 @@ class FakeResponse {
   /// 어댑터가 임의 예외(SocketException 등)를 던진다.
   const FakeResponse.throwing(Object error) : this(throwable: error);
 
-  /// shared/fixtures 형식. `_raw`/`_contentType`/`_fault` 예약 키를 해석한다.
-  factory FakeResponse.fromFixture(
-    int status,
-    Map<String, Object?> fixture, {
-    Map<String, String> headers = const {},
+  /// `shared/fixtures/<name>`을 manifest의 상태·헤더와 함께 응답으로 만든다.
+  /// `_raw`/`_contentType`/`_fault` 해석은 [Fixture.response]가 맡는다.
+  factory FakeResponse.fixture(
+    String name, {
+    Duration delay = Duration.zero,
+    Map<String, String>? headers,
   }) {
-    final fault = fixture['_fault'];
-    if (fault != null) {
+    final f = Fixture.response(name);
+    if (f.fault != null) {
       return FakeResponse.fault(
-        fault == 'timeout' ? FakeFault.timeout : FakeFault.disconnect,
+        f.fault == 'timeout' ? FakeFault.timeout : FakeFault.disconnect,
       );
     }
-    if (fixture.containsKey('_raw')) {
-      return FakeResponse(
-        status: status,
-        body: fixture['_raw']! as String,
-        contentType: (fixture['_contentType'] as String?) ?? 'application/json',
-        headers: headers,
-      );
-    }
-    return FakeResponse.json(status, fixture, headers: headers);
+    return FakeResponse(
+      status: f.route.status ?? 200,
+      body: f.bodyText,
+      contentType: f.contentType ?? 'application/json',
+      headers: headers ?? f.route.headers,
+      delay: delay,
+    );
   }
 
   final int status;
