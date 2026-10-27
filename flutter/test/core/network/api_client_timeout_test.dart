@@ -209,7 +209,7 @@ void main() {
       expect(h.adapter.count('PUT', '/posts/down.webp'), 3);
     });
 
-    netTest('TC-NET-063 loopback 호스트의 http presigned URL(mock 서버)은 허용한다', (
+    netTest('REQ-NET-004 loopback 호스트의 http presigned URL(mock 서버)은 허용한다', (
       h,
       a,
     ) {
@@ -231,23 +231,23 @@ void main() {
       expect(h.adapter.requests, hasLength(3));
     });
 
-    netTest('TC-NET-063 loopback이 아닌 http presigned URL은 요청 없이 config 오류다', (
-      h,
-      a,
-    ) {
-      final r = Probe(
-        h.client.putPresigned(
-          url: Uri.parse(
-            'http://bucket.s3.test/posts/u1.webp?X-Amz-Signature=s',
+    netTest(
+      'REQ-NET-001 loopback이 아닌 http presigned URL은 요청 없이 invalidResponse다',
+      (h, a) {
+        final r = Probe(
+          h.client.putPresigned(
+            url: Uri.parse(
+              'http://bucket.s3.test/posts/u1.webp?X-Amz-Signature=s',
+            ),
+            bytes: bytes,
+            contentType: 'image/webp',
           ),
-          bytes: bytes,
-          contentType: 'image/webp',
-        ),
-      );
-      settle(a);
-      expect((r.error! as ApiError).isConfig, isTrue);
-      expect(h.adapter.requests, isEmpty);
-    });
+        );
+        settle(a);
+        expect((r.error! as ApiError).isInvalidResponse, isTrue);
+        expect(h.adapter.requests, isEmpty);
+      },
+    );
 
     netTest('TC-NET-044 저장소가 403(XML 본문)을 주면 status를 가진 server 오류다', (h, a) {
       h.adapter.on('PUT', '/posts/u1.webp', [

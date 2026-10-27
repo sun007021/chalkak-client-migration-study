@@ -79,4 +79,35 @@ void main() {
     await store.write(Session.guest());
     expect((await store.read())!.isGuest, isTrue);
   });
+
+  test(
+    'TC-AUTH-052 보안 저장소 읽기가 예외를 던지면(Keystore 복원 실패) 세션 없음으로 보고 지운다',
+    () async {
+      final broken = _ThrowingReadStore();
+      final s = SecureTokenStore(storage: broken);
+      expect(await s.read(), isNull);
+      expect(broken.deleted, isTrue);
+    },
+  );
+
+  test('TC-AUTH-052 읽기도 지우기도 실패하면 예외 없이 세션 없음이다', () async {
+    final broken = _ThrowingReadStore(deleteFails: true);
+    expect(await SecureTokenStore(storage: broken).read(), isNull);
+  });
+}
+
+class _ThrowingReadStore implements SecureKeyValueStore {
+  _ThrowingReadStore({this.deleteFails = false});
+  final bool deleteFails;
+  bool deleted = false;
+
+  @override
+  Future<String?> read(String key) async => throw StateError('keystore');
+  @override
+  Future<void> write(String key, String value) async {}
+  @override
+  Future<void> delete(String key) async {
+    deleted = true;
+    if (deleteFails) throw StateError('keystore');
+  }
 }

@@ -324,7 +324,7 @@ void main() {
 
   group('loopback mock 서버', () {
     netTest(
-      'TC-NET-063 http://10.0.2.2 기준 주소로 호출하면 요청이 그 주소로 나가고 토큰도 붙는다',
+      'REQ-NET-004 http://10.0.2.2 기준 주소로 호출하면 요청이 그 주소로 나가고 토큰도 붙는다',
       (h, a) {
         h.adapter.on('GET', '$v1/x', [ok()]);
         Probe(

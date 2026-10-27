@@ -28,7 +28,7 @@ void main() {
       );
     });
 
-    test('TC-NET-063 loopback 호스트(localhost, 127.0.0.1, 10.0.2.2)의 http는 mock 서버용으로 허용한다', () {
+    test('REQ-NET-004 loopback 호스트(localhost, 127.0.0.1, 10.0.2.2)의 http는 mock 서버용으로 허용한다', () {
       for (final (raw, expected) in [
         ('http://localhost:8080', 'http://localhost:8080/api/v1'),
         ('http://127.0.0.1:3000/', 'http://127.0.0.1:3000/api/v1'),
@@ -39,7 +39,7 @@ void main() {
       }
     });
 
-    test('TC-NET-063 loopback이 아닌 http는 사설 IP·유사 호스트도 config 오류다', () {
+    test('REQ-NET-001 loopback이 아닌 http는 사설 IP·유사 호스트도 config 오류다', () {
       for (final raw in [
         'http://192.168.0.5:8080',
         'http://10.0.2.3',

@@ -39,7 +39,7 @@ void main() {
     );
   });
 
-  test('TC-NET-063 loopback 호스트의 http(mock 서버)에는 붙이고 그 밖의 http에는 붙이지 않는다', () {
+  test('REQ-NET-004 loopback 호스트의 http(mock 서버)에는 붙이고 그 밖의 http에는 붙이지 않는다', () {
     for (final host in ['localhost:8080', '127.0.0.1:3000', '10.0.2.2:8080']) {
       expect(
         attaches(Uri.parse('http://$host/api/v1/posts'), HttpMethod.get, live),

@@ -60,7 +60,8 @@ class ApiClient {
   }
 
   /// presigned PUT. 인증·공통 헤더 없이 [contentType]만, 타임아웃 60초.
-  /// URL은 https(또는 loopback의 http)여야 하며 아니면 요청 없이 config 오류.
+  /// URL은 서버가 준 값이므로 https(또는 loopback의 http)가 아니면 요청 없이
+  /// invalidResponse(설정 오류가 아니라 해석 불가 응답)로 본다.
   /// PUT은 멱등이므로 네트워크 오류·5xx에 재시도한다(D-21).
   Future<void> putPresigned({
     required Uri url,
@@ -69,7 +70,9 @@ class ApiClient {
     CancelToken? cancelToken,
   }) async {
     if (!UrlRule.isAllowed(url)) {
-      throw ApiError.config('presigned URL은 https여야 한다(loopback만 http 허용)');
+      throw ApiError.invalidResponse(
+        cause: const FormatException('presigned URL이 허용되지 않는 스킴이다'),
+      );
     }
     await _transport.send(
       TransportRequest(

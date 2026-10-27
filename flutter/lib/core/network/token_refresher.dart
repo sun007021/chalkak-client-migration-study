@@ -45,6 +45,14 @@ class TokenRefresher {
   }
 
   Future<Session> _exchange(Session stale) async {
+    // 호출자가 세션을 읽은 뒤 다른 refresh가 끝나 토큰이 이미 회전했을 수 있다.
+    // 옛 refresh token을 다시 보내면 서버가 재사용으로 보고 세션 전체를 폐기하므로,
+    // 보내기 직전에 저장소를 다시 확인한다.
+    final current = await _sessions.read();
+    if (current == null || current.isGuest || current.userId != stale.userId) {
+      throw ApiError.cancelled();
+    }
+    if (current.refreshToken != stale.refreshToken) return current;
     final RawResponse raw;
     try {
       raw = await _transport.send(
