@@ -55,6 +55,14 @@ export class AuthRepository {
     return { kind: 'logged-in', userId: response.userId };
   }
 
+  /**
+   * 서버가 발급한 토큰(로그인 성공·가입 완료 응답)을 저장한다: 사용자 캐시를 먼저 비우고 세션을 저장하며 게스트 플래그를 지운다.
+   * socialLoginKakao와 SignUpRepository.confirm이 공유한다(구현 단계에서 socialLoginKakao도 이것을 쓰게 정리).
+   */
+  async saveIssuedSession(_userId: string, _tokens: TokenResponse): Promise<void> {
+    throw new Error('not implemented');
+  }
+
   /** 서버 호출 없이 인증 자격을 지우고 게스트 플래그를 저장한다. 저장 실패는 throw. */
   enterGuest(): Promise<void> {
     return this.deps.sessionStore.enterGuest();
