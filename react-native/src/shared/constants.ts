@@ -1,6 +1,10 @@
 // 다섯 클라이언트 공통 상수(docs/spec/00-overview.md §6). 플랫폼 코드에 값을 직접 쓰지 않고 여기서만 읽는다.
 // 시간 값은 이름 끝에 단위(_MS)를 붙인다.
 
+/**
+ * 서비스 시간대 이름(문서·로그·다른 클라이언트와의 대조용). 한국은 서머타임이 없어
+ * 실제 계산은 이 이름으로 시간대 DB를 조회하지 않고 `core/time/kst.ts`의 `KST_OFFSET_MS`(+9시간)를 쓴다.
+ */
 export const SERVICE_TIME_ZONE = 'Asia/Seoul';
 /** 최초 전시일(yyyy-MM-dd, KST). 전시 날짜 이동·선택의 하한(D-12). */
 export const FIRST_TOPIC_DATE = '2026-09-17';

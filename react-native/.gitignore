@@ -1,8 +1,20 @@
 node_modules/
 .expo/
 dist/
-ios/
-android/
+/ios/
+/android/
 *.log
 .env*
+!.env.example
 coverage/
+*.tsbuildinfo
+.DS_Store
+
+# 비밀값·서명 파일은 커밋하지 않는다
+GoogleService-Info.plist
+google-services.json
+*.p8
+*.p12
+*.mobileprovision
+*.jks
+*.keystore

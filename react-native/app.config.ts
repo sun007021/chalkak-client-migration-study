@@ -1,7 +1,5 @@
 import type { ExpoConfig } from 'expo/config';
 
-const DEFAULT_API_BASE_URL = 'https://chalkak-dev.pysun.kr/api/v1/';
-
 const config: ExpoConfig = {
   name: '찰캌',
   slug: 'chalkak-rn',
@@ -12,8 +10,8 @@ const config: ExpoConfig = {
   ios: { bundleIdentifier: 'com.chalkak.study.rn', supportsTablet: false },
   android: { package: 'com.chalkak.study.rn' },
   extra: {
-    // E2E에서는 API_BASE_URL 환경변수로 mock 서버 주소를 넘긴다.
-    apiBaseUrl: process.env.API_BASE_URL ?? DEFAULT_API_BASE_URL,
+    // 기본값을 두지 않는다(REQ-NET-002). 값 검증은 앱 시작 시 readAppConfig()가 한다.
+    apiBaseUrl: process.env.API_BASE_URL,
   },
 };
 

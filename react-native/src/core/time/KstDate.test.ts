@@ -71,3 +71,37 @@ describe('KstDate', () => {
     expect(KstDate.of(2026, 10, 31).dayOfWeek()).toBe(6);
   });
 });
+
+describe('KstDate 불변식', () => {
+  it('plusDays는 정수가 아니면 RangeError', () => {
+    expect(() => KstDate.of(2026, 10, 27).plusDays(1.5)).toThrow(RangeError);
+    expect(() => KstDate.of(2026, 10, 27).plusDays(NaN)).toThrow(RangeError);
+  });
+
+  it('연도 범위는 1~9999이고 밖이면 of는 RangeError, parse는 null', () => {
+    expect(KstDate.of(1, 1, 1).toString()).toBe('0001-01-01');
+    expect(KstDate.of(9999, 12, 31).toString()).toBe('9999-12-31');
+    expect(() => KstDate.of(0, 1, 1)).toThrow(RangeError);
+    expect(() => KstDate.of(10000, 1, 1)).toThrow(RangeError);
+    expect(() => KstDate.of(50, 1, 1)).not.toThrow();
+    expect(KstDate.of(50, 1, 1).year).toBe(50);
+    expect(KstDate.parse('0000-01-01')).toBeNull();
+    expect(() => KstDate.of(9999, 12, 31).plusDays(1)).toThrow(RangeError);
+  });
+
+  it('정수가 아닌 연·월·일은 RangeError', () => {
+    expect(() => KstDate.of(2026.5, 1, 1)).toThrow(RangeError);
+    expect(() => KstDate.of(2026, 1.5, 1)).toThrow(RangeError);
+    expect(() => KstDate.of(2026, 1, NaN)).toThrow(RangeError);
+  });
+
+  it('toJSON은 yyyy-MM-dd이고 JSON.stringify에 그대로 쓰인다', () => {
+    const date = KstDate.of(2026, 1, 5);
+    expect(date.toJSON()).toBe('2026-01-05');
+    expect(JSON.stringify({ date })).toBe('{"date":"2026-01-05"}');
+  });
+
+  it('불변이다(freeze)', () => {
+    expect(Object.isFrozen(KstDate.of(2026, 10, 27))).toBe(true);
+  });
+});
