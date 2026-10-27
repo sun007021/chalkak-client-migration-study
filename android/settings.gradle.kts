@@ -23,6 +23,7 @@ include(":feature:auth")
 include(":feature:onboarding")
 include(":feature:home")
 include(":feature:display")
+include(":feature:settings")
 
 // The Android :app module is NOT part of the scaffold PR. It is included only when an
 // Android SDK is available (local.properties `sdk.dir` or env ANDROID_HOME), so that
