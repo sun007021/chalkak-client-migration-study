@@ -67,3 +67,17 @@ test('ko.json has no invented duplicate keys (only keys from the feature docs co
     'record.title', 'time.weekday'];
   for (const k of removed) assert.ok(!(k in ko), `${k} should be removed`);
 });
+
+test('every key in the feature docs copy tables exists in ko.json', () => {
+  const ko = load('../../copy/ko.json');
+  const dir = new URL('../../../docs/spec/features/', import.meta.url);
+  const placeholders = new Set(['ai.error.server-message']); // shows the server message verbatim, no fixed copy
+  const missing = [];
+  for (const name of fs.readdirSync(dir)) {
+    for (const line of fs.readFileSync(new URL(name, dir), 'utf8').split('\n')) {
+      const m = line.match(/^\| ([a-z]+\.[a-z0-9._-]+) \| /);
+      if (m && !placeholders.has(m[1]) && !(m[1] in ko)) missing.push(`${name}: ${m[1]}`);
+    }
+  }
+  assert.deepEqual(missing, []);
+});
