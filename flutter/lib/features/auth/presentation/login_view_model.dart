@@ -94,6 +94,9 @@ class LoginViewModel extends ChangeNotifier {
   void dismissError() =>
       _setState(LoginState(isSubmitting: _state.isSubmitting));
 
+  /// 다른 화면(가입 등)에서 돌아오며 넘긴 안내 문구를 오류 알림으로 보여 준다.
+  void showNotice(String message) => _fail(message);
+
   /// 화면 전환이 끝난 뒤 다시 제출할 수 있게 한다.
   void resetSubmission() => _setState(const LoginState());
 

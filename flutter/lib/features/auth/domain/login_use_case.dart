@@ -100,7 +100,7 @@ class LoginUseCase {
           // 저장소를 읽거나 쓰지 못하면 로그인 실패로 알린다(진행 표시가 남지 않게).
           return const LoginFailed(LoginFailure(LoginFailureKind.generic));
         }
-        _startPushRegistration();
+        _pushRegistrar.startRegistration();
         return LoginSucceeded(session);
     }
   }
@@ -121,13 +121,5 @@ class LoginUseCase {
       await _cleaner.clearAll();
     }
     await _sessions.save(session);
-  }
-
-  void _startPushRegistration() {
-    try {
-      _pushRegistrar.registerCurrentDevice().catchError((Object _) {});
-    } on Object {
-      // 푸시 등록 실패는 로그인 결과에 영향을 주지 않는다.
-    }
   }
 }
