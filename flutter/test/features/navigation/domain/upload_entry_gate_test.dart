@@ -1,6 +1,7 @@
 import 'package:chalkak/core/copy/ko.g.dart';
 import 'package:chalkak/core/time/kst_date.dart';
 import 'package:chalkak/features/navigation/domain/upload_entry_gate.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/fake_adapter.dart';
@@ -9,19 +10,24 @@ import '../../../support/home_fakes.dart';
 import '../../../support/net_harness.dart';
 
 void main() {
-  UploadGateResult enter(HomeRig r, dynamic async) {
+  UploadGateResult enter(HomeRig r, FakeAsync async) {
     final p = start(async, r.gate.enter());
     advance(async, const Duration(seconds: 3)); // GET 재시도 0.5초·1초 포함
     if (!p.done) fail('게이트가 끝나지 않았다');
     return p.value!;
   }
 
-  fakeTest('TC-NAV-005 확인 통과: GET /posts/today 1회 뒤 응답 topicDate로 Allowed', (async) {
+  fakeTest('TC-NAV-005 확인 통과: GET /posts/today 1회 뒤 응답 topicDate로 Allowed', (
+    async,
+  ) {
     final r = HomeRig();
     r.api.today([fx('home/posts-today__not-posted.json')]);
     final result = enter(r, async);
     expect(result, isA<UploadGateAllowed>());
-    expect((result as UploadGateAllowed).topicDate, KstDate(2026, 10, 27));
+    expect(
+      (result as UploadGateAllowed).topicDate,
+      const KstDate(2026, 10, 27),
+    );
     expect(r.api.todayCalls, 1);
   });
 
@@ -31,7 +37,10 @@ void main() {
     r.api.today([fx('time/posts-today__cross-midnight.json')]);
     async.elapse(const Duration(hours: 13));
     final result = enter(r, async);
-    expect((result as UploadGateAllowed).topicDate, KstDate(2026, 10, 27));
+    expect(
+      (result as UploadGateAllowed).topicDate,
+      const KstDate(2026, 10, 27),
+    );
   });
 
   fakeTest('D-14 이미 이 주제에 게시했으면 Blocked(이미 작성했어요)이다', (async) {
@@ -44,7 +53,10 @@ void main() {
       r.api.today([fx(name)]);
       final result = enter(r, async);
       expect(result, isA<UploadGateBlocked>(), reason: name);
-      expect((result as UploadGateBlocked).message, Copy.uploadGateAlreadyPosted);
+      expect(
+        (result as UploadGateBlocked).message,
+        Copy.uploadGateAlreadyPosted,
+      );
     }
   });
 
@@ -56,7 +68,9 @@ void main() {
     expect(r.api.todayCalls, 1, reason: '404는 재시도하지 않는다');
   });
 
-  fakeTest('TC-HOME-008 D-08 403(정지)이면 Blocked(이용이 정지되어…)이고 재시도하지 않는다', (async) {
+  fakeTest('TC-HOME-008 D-08 403(정지)이면 Blocked(이용이 정지되어…)이고 재시도하지 않는다', (
+    async,
+  ) {
     final r = HomeRig();
     r.api.today([fx('home/posts-today__403-banned.json')]);
     final result = enter(r, async) as UploadGateBlocked;
@@ -100,10 +114,15 @@ void main() {
     expect(result.message, Copy.uploadGateCheckFailed);
   });
 
-  fakeTest('TC-HOME-017 REQ-HOME-017 isPosted=false인데 postId가 있는 잘못된 응답은 확인 실패로 본다', (async) {
-    final r = HomeRig();
-    r.api.today([fx('upload/posts-today__invalid-not-posted-with-post.json')]);
-    final result = enter(r, async) as UploadGateBlocked;
-    expect(result.message, Copy.uploadGateCheckFailed);
-  });
+  fakeTest(
+    'TC-HOME-017 REQ-HOME-017 isPosted=false인데 postId가 있는 잘못된 응답은 확인 실패로 본다',
+    (async) {
+      final r = HomeRig();
+      r.api.today([
+        fx('upload/posts-today__invalid-not-posted-with-post.json'),
+      ]);
+      final result = enter(r, async) as UploadGateBlocked;
+      expect(result.message, Copy.uploadGateCheckFailed);
+    },
+  );
 }

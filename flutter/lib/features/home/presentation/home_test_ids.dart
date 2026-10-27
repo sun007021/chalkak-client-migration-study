@@ -35,6 +35,17 @@ abstract final class HomeTestIds {
   static const popularMoreLink = 'home.popular-more-link';
   static String popularItem(String postId) => 'home.popular-item-$postId';
 
+  // 아래 오류·재시도·빈 상태 id는 아직 testids.md에 없다. RN 스레드가 추가할 이름 규칙에 맞춘 임시 이름이며
+  // testids.md가 확정되면 그 이름으로 맞춘다.
+  static const weekRetryButton = 'home.week-retry-button';
+  static const rankingError = 'home.ranking-error';
+  static const rankingRetryButton = 'home.ranking-retry-button';
+  static const popularEmpty = 'home.popular-empty';
+  static const popularError = 'home.popular-error';
+  static const popularRetryButton = 'home.popular-retry-button';
+  static const issueError = 'home.issue-error';
+  static const issueRetryButton = 'home.issue-retry-button';
+
   static const aiCard = 'home.ai-card';
 
   static const issueSection = 'home.issue-section';

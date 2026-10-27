@@ -10,6 +10,12 @@ import 'home_repository.dart';
 import 'home_state.dart';
 import 'today_post_repository.dart';
 
+/// 랭킹 사진 좋아요 위임 대상. 낙관적 갱신·롤백·직렬화는 공용 like 기능(전시·피드 PR)이 맡고,
+/// 홈은 이 최소 인터페이스에만 의존한다.
+abstract interface class RankingLikeToggler {
+  void toggle(String postId);
+}
+
 /// 홈 탭 ViewModel. 섹션(주제·히어로·이번 주·어제/오늘 랭킹·배너·미읽음)은 서로 기다리지
 /// 않고 병렬로 요청하며 한 섹션의 실패가 다른 섹션을 바꾸지 않는다(REQ-HOME-001~002).
 ///
@@ -35,6 +41,7 @@ class HomeViewModel extends ChangeNotifier {
     required this._isGuest,
     required this._toast,
     this._preloadCache,
+    this._likeToggler,
   });
 
   final HomeRepository _home;
@@ -43,6 +50,7 @@ class HomeViewModel extends ChangeNotifier {
   final bool _isGuest;
   final ToastSink _toast;
   final HomePreloadCache? _preloadCache;
+  final RankingLikeToggler? _likeToggler;
 
   HomeState get state => throw UnimplementedError();
   Stream<HomeEvent> get events => throw UnimplementedError();
@@ -74,7 +82,7 @@ class HomeViewModel extends ChangeNotifier {
   /// 게스트면 Copy.homeGuestFeed 토스트, 아니면 [OpenFeed].
   void onRankingItemPressed(String postId) => throw UnimplementedError();
 
-  /// 게스트면 Copy.homeGuestLike 토스트(API 0건). 로그인 상태의 좋아요는 LIKE PR이 연결한다.
+  /// 게스트면 Copy.homeGuestLike 토스트(API 0건). 로그인 상태는 [RankingLikeToggler.toggle]\(postId)에 위임한다(없으면 무시).
   void onLikePressed(String postId) => throw UnimplementedError();
 
   /// 그 섹션 날짜의 인기순 전시로 가는 [OpenDisplayTab].

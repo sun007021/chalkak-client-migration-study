@@ -159,6 +159,11 @@ class HomeApi {
     banners(2, [fx('banner/banners__page2-last.json', delay: delay)]);
   }
 
+  /// 어제 인기 목록 첫 사진 id(`posts-list__popular-3`의 첫 항목). 화면 테스트의 항목 id 확인용.
+  String popularPostIdForTest(String topicDate) => topicDate == '2026-10-26'
+      ? '22222222-2222-4222-8222-222222222261'
+      : '22222222-2222-4222-8222-222222222202';
+
   // 호출 집계
   int get topicCalls => adapter.count('GET', '$v1/topics');
   int get postsCalls => adapter.count('GET', '$v1/posts');
@@ -211,6 +216,14 @@ class RecordingToast implements ToastSink {
   void show(String message) => messages.add(message);
 
   String? get last => messages.isEmpty ? null : messages.last;
+}
+
+/// 좋아요 위임 Fake.
+class FakeLikeToggler implements RankingLikeToggler {
+  final List<String> toggled = [];
+
+  @override
+  void toggle(String postId) => toggled.add(postId);
 }
 
 /// 외부 브라우저 Fake.
@@ -343,7 +356,7 @@ void fakeTestAt(
 /// 업로드 게이트를 조립한다. [now]는 가상 시계 시작 시각(세션 만료 계산 기준).
 /// `api.standard()`가 이미 걸려 있으므로 테스트는 바꿀 응답만 다시 건다.
 class HomeRig {
-  HomeRig({this.guest = false, DateTime? now, Session? session})
+  HomeRig({this.guest = false, DateTime? now, Session? session, this.sink})
     : http = AuthHttpHarness(
         session: guest
             ? sessionGuest()
@@ -354,11 +367,15 @@ class HomeRig {
   }
 
   final bool guest;
+
+  /// 지정하면 VM들이 [toast] 대신 이 sink(예: 실제 ToastController)를 쓴다.
+  final ToastSink? sink;
   final AuthHttpHarness http;
   late final HomeFakes fakes;
   final RecordingToast toast = RecordingToast();
   final FakeAnalyticsTracker analytics = FakeAnalyticsTracker();
   final HomePreloadCache cache = HomePreloadCache();
+  final FakeLikeToggler likes = FakeLikeToggler();
   final List<HomeEvent> homeEvents = [];
   final List<MainShellEvent> shellEvents = [];
   final List<HomeState> homeStates = [];
@@ -377,8 +394,9 @@ class HomeRig {
       todayPost: fakes.home,
       banners: banners,
       isGuest: guest,
-      toast: toast,
+      toast: sink ?? toast,
       preloadCache: cache,
+      likeToggler: likes,
     );
     vm.events.listen(homeEvents.add);
     vm.addListener(() => homeStates.add(vm.state));
@@ -391,10 +409,10 @@ class HomeRig {
 
   MainShellViewModel _makeShell() {
     final vm = MainShellViewModel(
-      guard: GuestGuard(isGuest: guest, toast: toast),
+      guard: GuestGuard(isGuest: guest, toast: sink ?? toast),
       analytics: analytics,
       uploadGate: gate,
-      toast: toast,
+      toast: sink ?? toast,
     );
     vm.events.listen(shellEvents.add);
     return vm;
