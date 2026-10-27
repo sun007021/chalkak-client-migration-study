@@ -5,10 +5,12 @@ import '../../auth/domain/signup_credentials.dart';
 class SignUpContext {
   SignUpContext();
 
+  SignUpCredentials? _current;
+
   /// 없으면 null(가입 컨텍스트 소실 -> 로그인 화면).
-  SignUpCredentials? get current => throw UnimplementedError();
+  SignUpCredentials? get current => _current;
 
-  void begin(SignUpCredentials credentials) => throw UnimplementedError();
+  void begin(SignUpCredentials credentials) => _current = credentials;
 
-  void discard() => throw UnimplementedError();
+  void discard() => _current = null;
 }

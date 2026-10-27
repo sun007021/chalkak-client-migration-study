@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:ui' show CheckedState, Tristate;
 
 import 'package:chalkak/core/auth/session.dart';
 import 'package:chalkak/core/auth/session_manager.dart';
@@ -13,6 +12,8 @@ import 'package:chalkak/features/auth/domain/signup_credentials.dart';
 import 'package:chalkak/features/onboarding/data/api_sign_up_repository.dart';
 import 'package:chalkak/features/onboarding/domain/legal_document.dart';
 import 'package:chalkak/features/onboarding/domain/sign_up_use_case.dart';
+import 'package:chalkak/features/onboarding/presentation/legal_document_sheet.dart'
+    show LegalWebViewBuilder;
 import 'package:chalkak/features/signature/data/api_signature_repository.dart';
 import 'package:chalkak/features/signature/data/api_signature_uploader.dart';
 import 'package:chalkak/features/signature/domain/change_signature_use_case.dart';
@@ -20,13 +21,13 @@ import 'package:chalkak/features/signature/domain/signature_drawing.dart';
 import 'package:chalkak/features/signature/domain/signature_failure.dart';
 import 'package:chalkak/features/signature/domain/signature_renderer.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/widgets.dart';
 
 import 'fake_adapter.dart';
-import 'fake_async_helpers.dart' show atFixtureNow;
 import 'fakes.dart';
 import 'net_harness.dart' show apiHost, v1;
+
+export 'ui_helpers.dart';
 
 // ---------------------------------------------------------------------------
 // 고정 값 (shared/fixtures/onboarding, signature)
@@ -146,6 +147,15 @@ class FakeExternalLinkLauncher implements ExternalLinkLauncher {
   }
 }
 
+/// 웹뷰 대신 빈 영역을 그리는 [LegalWebViewBuilder]. 로드 성공·실패는 테스트가 부르지 않으면 일어나지 않는다.
+Widget fakeLegalWebView(
+  BuildContext context, {
+  required Uri url,
+  required int reloadCount,
+  required VoidCallback onLoaded,
+  required VoidCallback onError,
+}) => const SizedBox.expand();
+
 /// 서버 대신 스크립트로 답하는 [SignatureSubmitter]. 화면 상태·이벤트 테스트용.
 class FakeSignatureSubmitter implements SignatureSubmitter {
   FakeSignatureSubmitter([SignatureSubmitOutcome? outcome])
@@ -184,45 +194,6 @@ class CountingPushRegistrar implements PushRegistrar {
   }
 }
 
-/// [FakeAdapter]는 요청 본문을 UTF-8 문자열로 읽어 PNG 같은 이진 본문에서 실패한다.
-/// 이 래퍼가 원본 바이트를 [rawBodies]에 남기고, UTF-8이 아니면 자리표시 문자열을 넘긴다.
-/// 인덱스는 `FakeAdapter.requests`의 순서와 같다.
-class BinarySafeAdapter implements HttpClientAdapter {
-  BinarySafeAdapter(this._inner);
-
-  final FakeAdapter _inner;
-  final Map<int, Uint8List> rawBodies = {};
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    Stream<Uint8List>? forward = requestStream;
-    if (requestStream != null) {
-      final bytes = <int>[];
-      await for (final chunk in requestStream) {
-        bytes.addAll(chunk);
-      }
-      final raw = Uint8List.fromList(bytes);
-      rawBodies[_inner.requests.length] = raw;
-      try {
-        utf8.decode(raw);
-        forward = Stream.value(raw);
-      } on FormatException {
-        forward = Stream.value(
-          Uint8List.fromList(utf8.encode('<binary ${raw.length} bytes>')),
-        );
-      }
-    }
-    return _inner.fetch(options, forward, cancelFuture);
-  }
-
-  @override
-  void close({bool force = false}) => _inner.close(force: force);
-}
-
 // ---------------------------------------------------------------------------
 // 실제 ApiClient + FakeAdapter 묶음 (저장소는 메모리)
 // ---------------------------------------------------------------------------
@@ -234,7 +205,7 @@ class OnboardingHarness {
     client = ApiClient(
       config: ApiConfig.parse(baseUrl),
       sessions: sessions,
-      adapter: wire,
+      adapter: adapter,
       logSink: logs,
     );
     sessions.cleared.listen(clearedReasons.add);
@@ -255,7 +226,6 @@ class OnboardingHarness {
   }
 
   final FakeAdapter adapter = FakeAdapter();
-  late final BinarySafeAdapter wire = BinarySafeAdapter(adapter);
   final FakeTokenStore store;
   final FakeLogSink logs = FakeLogSink();
   final CountingPushRegistrar push = CountingPushRegistrar();
@@ -330,8 +300,7 @@ class OnboardingHarness {
   ];
 
   /// [r]의 실제 본문 바이트(PNG 같은 이진 본문 확인용).
-  Uint8List bodyBytes(RecordedRequest r) =>
-      wire.rawBodies[adapter.requests.indexOf(r)]!;
+  Uint8List bodyBytes(RecordedRequest r) => r.bodyBytes!;
 
   /// 어댑터가 받은 요청을 `METHOD path` 문자열 순서로.
   List<String> get sequence => [
@@ -342,44 +311,3 @@ class OnboardingHarness {
   String get allRequestBodies =>
       adapter.requests.map((r) => r.body ?? '').join('\n');
 }
-
-// ---------------------------------------------------------------------------
-// 위젯 테스트 보조 (app_harness.dart는 앱 조립 코드에 의존하므로 쓰지 않는다)
-// ---------------------------------------------------------------------------
-
-Finder byId(String id) => find.byKey(Key(id));
-
-/// `clock.now()`를 FIXTURE_NOW로 고정한 위젯 테스트.
-void widgetTest(String name, Future<void> Function(WidgetTester tester) body) {
-  testWidgets(name, (tester) => atFixtureNow(() => body(tester)));
-}
-
-/// 화면 하나를 단독으로 띄운다. 진행 표시가 계속 도는 화면이 있어 pumpAndSettle은 쓰지 않는다.
-Future<void> pumpScreen(WidgetTester tester, Widget screen) async {
-  await tester.pumpWidget(MaterialApp(home: screen));
-  await settleUi(tester);
-}
-
-Future<void> settleUi(WidgetTester tester, {int frames = 10}) async {
-  for (var i = 0; i < frames; i++) {
-    await tester.pump(const Duration(milliseconds: 16));
-  }
-}
-
-/// testids.md §2: 버튼은 enabled를 접근성 속성으로 노출한다.
-bool isEnabled(WidgetTester tester, String id) =>
-    tester
-        .getSemantics(byId(id))
-        .getSemanticsData()
-        .flagsCollection
-        .isEnabled ==
-    Tristate.isTrue;
-
-/// testids.md §2: 체크는 checked를 접근성 속성으로 노출한다.
-bool isChecked(WidgetTester tester, String id) =>
-    tester
-        .getSemantics(byId(id))
-        .getSemanticsData()
-        .flagsCollection
-        .isChecked ==
-    CheckedState.isTrue;

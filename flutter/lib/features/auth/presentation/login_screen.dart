@@ -42,6 +42,8 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     _events = widget.viewModel.events.listen(widget.onEvent);
     widget.viewModel.addListener(_showErrorIfNeeded);
+    // 화면이 뜨기 전에 이미 있는 안내(가입에서 돌아온 문구)는 첫 프레임 뒤에 보여 준다.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showErrorIfNeeded());
   }
 
   @override

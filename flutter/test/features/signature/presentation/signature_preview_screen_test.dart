@@ -6,11 +6,13 @@ import 'package:chalkak/features/signature/domain/signature_mode.dart';
 import 'package:chalkak/features/signature/presentation/signature_preview_screen.dart';
 import 'package:chalkak/features/signature/presentation/signature_preview_view_model.dart';
 import 'package:chalkak/features/signature/presentation/signature_test_ids.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/fake_analytics_tracker.dart';
 import '../../../support/onboarding_fakes.dart';
+
+/// 다이얼로그 닫힘 애니메이션(플랫폼 기본)이 끝나도록 흘리는 프레임 수(16ms x 30).
+const _dialogCloseFrames = 30;
 
 class _Screen {
   _Screen(this.vm, this.submitter, this.analytics, this.events);
@@ -168,7 +170,7 @@ void main() {
     );
     expect(isEnabled(tester, SignatureTestIds.previewConfirmButton), isTrue);
     await tester.tap(byId(SignatureTestIds.previewErrorDialogConfirmButton));
-    await settleUi(tester);
+    await settleUi(tester, frames: _dialogCloseFrames);
     expect(byId(SignatureTestIds.previewErrorDialog), findsNothing);
     expect(byId(SignatureTestIds.previewErrorMessage), findsNothing);
   });

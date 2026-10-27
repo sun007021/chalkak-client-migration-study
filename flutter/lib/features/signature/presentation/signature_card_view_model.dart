@@ -1,6 +1,10 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+
+import '../../../core/copy/ko.g.dart';
+import '../../../core/network/api_error.dart';
 
 import '../domain/signature_repository.dart';
 import 'signature_draw_view_model.dart' show SignatureMessage;
@@ -43,13 +47,79 @@ class SignatureCardState {
 /// - [onSettingsTabShown]: 설정 탭이 보일 때마다 [load]를 부른다.
 /// - [dispose] 뒤에 도착한 응답은 상태에 반영하지 않는다.
 class SignatureCardViewModel extends ChangeNotifier {
-  SignatureCardViewModel({
-    required SignatureRepository repository,
-    required bool isGuest,
-  });
+  SignatureCardViewModel({required this._repository, required this._isGuest});
 
-  SignatureCardState get state => throw UnimplementedError();
+  final SignatureRepository _repository;
+  final bool _isGuest;
+  final CancelToken _cancelToken = CancelToken();
 
-  Future<void> load() => throw UnimplementedError();
-  Future<void> onSettingsTabShown() => throw UnimplementedError();
+  SignatureCardState _state = const SignatureCardState();
+  SignatureCardStatus _settledStatus = SignatureCardStatus.idle;
+  int _toastSequence = 0;
+  bool _loading = false;
+  bool _disposed = false;
+
+  SignatureCardState get state => _state;
+
+  Future<void> load() async {
+    if (_isGuest || _loading || _disposed) return;
+    _loading = true;
+    _setState(
+      SignatureCardState(
+        status: SignatureCardStatus.loading,
+        imageUrl: _state.imageUrl,
+      ),
+    );
+    try {
+      final signature = await _repository.fetchCurrent(
+        cancelToken: _cancelToken,
+      );
+      _settle(SignatureCardStatus.content, imageUrl: signature.displayUrl);
+    } on ApiError catch (e) {
+      _onFailure(e);
+    } finally {
+      _loading = false;
+    }
+  }
+
+  Future<void> onSettingsTabShown() => load();
+
+  void _onFailure(ApiError error) {
+    if (error.errorCode == ApiErrorCode.signatureRegistrationRequired) {
+      _settle(SignatureCardStatus.registrationRequired);
+    } else if (error.isCancelled || error.status == 401) {
+      // 401의 로그인 이동은 앱이 맡는다. 토스트 없이 이전 모습으로 돌아간다.
+      _settle(_settledStatus, imageUrl: _state.imageUrl);
+    } else {
+      _settle(
+        _settledStatus,
+        imageUrl: _state.imageUrl,
+        toast: SignatureMessage(id: ++_toastSequence, text: Copy.signLoadError),
+      );
+    }
+  }
+
+  void _settle(
+    SignatureCardStatus status, {
+    String? imageUrl,
+    SignatureMessage? toast,
+  }) {
+    _settledStatus = status;
+    _setState(
+      SignatureCardState(status: status, imageUrl: imageUrl, toast: toast),
+    );
+  }
+
+  void _setState(SignatureCardState next) {
+    if (_disposed) return;
+    _state = next;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _cancelToken.cancel();
+    super.dispose();
+  }
 }

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/analytics/analytics_constants.dart';
 import '../../../core/analytics/analytics_tracker.dart';
 import '../domain/legal_document.dart';
 import '../domain/sign_up_context.dart';
@@ -13,10 +14,10 @@ class TermsState {
   final bool agreedPrivacy;
 
   /// 두 필수 항목이 모두 켜져 있을 때만 true("전체 동의" 표시, REQ-ONB-004).
-  bool get agreedAll => throw UnimplementedError();
+  bool get agreedAll => agreedService && agreedPrivacy;
 
   /// 두 필수 항목에 모두 동의해야 "다음"이 활성이다(REQ-ONB-005).
-  bool get canProceed => throw UnimplementedError();
+  bool get canProceed => agreedAll;
 }
 
 sealed class TermsEvent {
@@ -48,19 +49,72 @@ final class OpenLegalDocument extends TermsEvent {
 /// - [openDocument]: 상태를 바꾸지 않고 [OpenLegalDocument]를 낸다(시트를 닫은 뒤에도 체크 유지, TC-ONB-014).
 /// - [onShown]: `screen_view(terms)`를 인스턴스당 한 번만 보낸다.
 class TermsViewModel extends ChangeNotifier {
-  TermsViewModel({
-    required SignUpContext context,
-    required AnalyticsTracker analytics,
-  });
+  TermsViewModel({required this._context, required this._analytics});
 
-  TermsState get state => throw UnimplementedError();
-  Stream<TermsEvent> get events => throw UnimplementedError();
+  final SignUpContext _context;
+  final AnalyticsTracker _analytics;
+  final StreamController<TermsEvent> _events =
+      StreamController<TermsEvent>.broadcast();
 
-  void onShown() => throw UnimplementedError();
-  void toggleAll() => throw UnimplementedError();
-  void toggleService() => throw UnimplementedError();
-  void togglePrivacy() => throw UnimplementedError();
-  void openDocument(LegalDocument document) => throw UnimplementedError();
-  void onNextPressed() => throw UnimplementedError();
-  void onBackPressed() => throw UnimplementedError();
+  TermsState _state = const TermsState();
+  bool _shown = false;
+  bool _disposed = false;
+
+  TermsState get state => _state;
+  Stream<TermsEvent> get events => _events.stream;
+
+  void onShown() {
+    if (_shown) return;
+    _shown = true;
+    _analytics.logEvent(AnalyticsEvent.screenView(ScreenNames.terms));
+  }
+
+  void toggleAll() {
+    final next = !_state.agreedAll;
+    _setState(TermsState(agreedService: next, agreedPrivacy: next));
+  }
+
+  void toggleService() => _setState(
+    TermsState(
+      agreedService: !_state.agreedService,
+      agreedPrivacy: _state.agreedPrivacy,
+    ),
+  );
+
+  void togglePrivacy() => _setState(
+    TermsState(
+      agreedService: _state.agreedService,
+      agreedPrivacy: !_state.agreedPrivacy,
+    ),
+  );
+
+  void openDocument(LegalDocument document) =>
+      _emit(OpenLegalDocument(document));
+
+  void onNextPressed() {
+    if (_state.canProceed) _emit(const NavigateToSignature());
+  }
+
+  void onBackPressed() {
+    _context.discard();
+    _setState(const TermsState());
+    _emit(const ReturnToLogin());
+  }
+
+  void _emit(TermsEvent event) {
+    if (!_disposed) _events.add(event);
+  }
+
+  void _setState(TermsState next) {
+    if (_disposed) return;
+    _state = next;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _events.close();
+    super.dispose();
+  }
 }

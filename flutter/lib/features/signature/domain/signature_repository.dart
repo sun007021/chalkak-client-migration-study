@@ -21,7 +21,7 @@ class CurrentSignature {
   final String? thumbnailUrl;
 
   /// 썸네일이 있으면 썸네일, 없으면(null) 원본(D-18).
-  String get displayUrl => throw UnimplementedError();
+  String get displayUrl => thumbnailUrl ?? originalUrl;
 }
 
 /// 설정의 사인 API. 오류는 [ApiError]로 던진다.

@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../../../core/constants/app_constants.dart';
 import 'signature_drawing.dart';
 
 /// 획을 투명 배경 + 흰 획 1024x512 PNG 바이트로 만든다(REQ-SIGN-006).
@@ -13,5 +14,6 @@ class SignatureImageGuard {
   const SignatureImageGuard._();
 
   /// `SIGNATURE_MAX_BYTES`(1,048,576) 이하이면 true. 초과는 false.
-  static bool isWithinLimit(Uint8List png) => throw UnimplementedError();
+  static bool isWithinLimit(Uint8List png) =>
+      png.length <= AppConstants.signatureMaxBytes;
 }

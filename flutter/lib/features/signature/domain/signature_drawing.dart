@@ -36,25 +36,48 @@ class SignatureDrawing {
   final List<SignatureStroke> strokes;
 
   /// 점이 하나라도 있는 획이 있으면 true(점 하나도 사인이다, TC-SIGN-002~004).
-  bool get hasSignature => throw UnimplementedError();
+  bool get hasSignature => strokes.any((stroke) => !stroke.isEmpty);
 
   /// 새 획을 시작한다. 좌표는 캔버스 안으로 보정한다.
-  SignatureDrawing startStroke(double x, double y) =>
-      throw UnimplementedError();
+  SignatureDrawing startStroke(double x, double y) => _copy(
+    strokes: [
+      ...strokes,
+      SignatureStroke([_clamped(x, y)]),
+    ],
+  );
 
   /// 마지막 획에 점을 잇는다. 획이 없으면 새 획을 시작한다.
-  SignatureDrawing addPoint(double x, double y) => throw UnimplementedError();
+  SignatureDrawing addPoint(double x, double y) {
+    if (strokes.isEmpty) return startStroke(x, y);
+    final last = strokes.last;
+    return _copy(
+      strokes: [
+        ...strokes.sublist(0, strokes.length - 1),
+        SignatureStroke([...last.points, _clamped(x, y)]),
+      ],
+    );
+  }
 
   /// 마지막 획 하나를 지운다. 획이 없으면 같은 값.
-  SignatureDrawing undo() => throw UnimplementedError();
+  SignatureDrawing undo() => strokes.isEmpty
+      ? this
+      : _copy(strokes: strokes.sublist(0, strokes.length - 1));
 
   /// 모든 획을 지운다.
-  SignatureDrawing clear() => throw UnimplementedError();
+  SignatureDrawing clear() => empty;
 
   /// 캔버스 크기만 바꾼 사인(화면 회전·레이아웃 변경). 이미 그린 점은 그대로 둔다.
   SignatureDrawing withCanvas(double width, double height) =>
-      throw UnimplementedError();
+      SignatureDrawing(width: width, height: height, strokes: strokes);
 
   /// 같은 캔버스 크기의 빈 사인.
-  SignatureDrawing get empty => throw UnimplementedError();
+  SignatureDrawing get empty => SignatureDrawing(width: width, height: height);
+
+  SignatureDrawing _copy({required List<SignatureStroke> strokes}) =>
+      SignatureDrawing(width: width, height: height, strokes: strokes);
+
+  SignaturePoint _clamped(double x, double y) => SignaturePoint(
+    x.clamp(0, width).toDouble(),
+    y.clamp(0, height).toDouble(),
+  );
 }

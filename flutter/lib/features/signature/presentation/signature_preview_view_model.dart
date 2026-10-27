@@ -1,11 +1,14 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/analytics/analytics_tracker.dart';
+import '../../../core/copy/ko.g.dart';
 import '../domain/signature_failure.dart';
 import '../domain/signature_mode.dart';
 import 'signature_draw_view_model.dart' show SignatureMessage;
+import 'signature_failure_messages.dart';
 
 class SignaturePreviewState {
   const SignaturePreviewState({
@@ -70,15 +73,106 @@ class SignaturePreviewViewModel extends ChangeNotifier {
   SignaturePreviewViewModel({
     required SignatureMode mode,
     required Uint8List png,
-    required SignatureSubmitter submitter,
-    required AnalyticsTracker analytics,
-  });
+    required this._submitter,
+    required this._analytics,
+  }) : _state = SignaturePreviewState(mode: mode, png: png);
 
-  SignaturePreviewState get state => throw UnimplementedError();
-  Stream<SignaturePreviewEvent> get events => throw UnimplementedError();
+  final SignatureSubmitter _submitter;
+  final AnalyticsTracker _analytics;
+  final StreamController<SignaturePreviewEvent> _events =
+      StreamController<SignaturePreviewEvent>.broadcast();
+  final CancelToken _cancelToken = CancelToken();
 
-  void onShown() => throw UnimplementedError();
-  Future<void> onConfirmPressed() => throw UnimplementedError();
-  void onRedrawPressed() => throw UnimplementedError();
-  void dismissError() => throw UnimplementedError();
+  SignaturePreviewState _state;
+  int _errorSequence = 0;
+  bool _shown = false;
+  bool _disposed = false;
+
+  SignaturePreviewState get state => _state;
+  Stream<SignaturePreviewEvent> get events => _events.stream;
+
+  void onShown() {
+    if (_shown) return;
+    _shown = true;
+    _analytics.logEvent(
+      AnalyticsEvent.screenView(_state.mode.previewScreenName),
+    );
+  }
+
+  Future<void> onConfirmPressed() async {
+    if (_disposed || _state.isSubmitting) return;
+    _set(isSubmitting: true);
+    final outcome = await _submitter.submit(_state.png, _cancelToken);
+    if (_disposed) return;
+    switch (outcome) {
+      case SignatureSubmitSucceeded():
+        _emit(_completedEvent);
+      case SignatureSubmitFailed(:final failure):
+        _fail(failure);
+      case SignatureSubmitCancelled():
+        _set(isSubmitting: false);
+    }
+  }
+
+  void onRedrawPressed() {
+    if (_state.isSubmitting) return;
+    _emit(const PreviewRedraw());
+  }
+
+  void dismissError() => _set(isSubmitting: _state.isSubmitting);
+
+  SignaturePreviewEvent get _completedEvent => switch (_state.mode) {
+    SignatureMode.onboarding => const PreviewSignUpCompleted(),
+    SignatureMode.change => const PreviewChangeCompleted(Copy.signChangeDone),
+  };
+
+  void _fail(SignatureFailure failure) {
+    final message = _messageOf(failure);
+    final onboarding = _state.mode == SignatureMode.onboarding;
+    switch (failure.kind) {
+      case SignatureFailureKind.invalid:
+        _set(isSubmitting: false);
+        _emit(PreviewReturnToDrawing(message));
+      case SignatureFailureKind.expired:
+        _set(isSubmitting: false);
+        _emit(PreviewReturnToLogin(message));
+      case SignatureFailureKind.forbidden when onboarding:
+        _set(isSubmitting: false, error: _newMessage(message));
+        _emit(PreviewReturnToLogin(message));
+      case _:
+        _set(isSubmitting: false, error: _newMessage(message));
+    }
+  }
+
+  String _messageOf(SignatureFailure failure) =>
+      _state.mode == SignatureMode.onboarding
+      ? SignatureFailureMessages.signUp(failure)
+      : SignatureFailureMessages.change(failure);
+
+  SignatureMessage _newMessage(String text) =>
+      SignatureMessage(id: ++_errorSequence, text: text);
+
+  void _emit(SignaturePreviewEvent event) {
+    if (!_disposed) _events.add(event);
+  }
+
+  /// 두 값을 항상 함께 정한다(오류를 남기려면 [_state]의 값을 그대로 넘긴다).
+  void _set({required bool isSubmitting, SignatureMessage? error}) {
+    if (_disposed) return;
+    _state = SignaturePreviewState(
+      mode: _state.mode,
+      png: _state.png,
+      isSubmitting: isSubmitting,
+      error: error,
+    );
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _cancelToken.cancel();
+    _events.close();
+    super.dispose();
+  }
 }
