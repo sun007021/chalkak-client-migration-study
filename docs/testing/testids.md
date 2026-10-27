@@ -148,8 +148,21 @@
 | home | AI 카드: 자세히 보기 | `home.ai-detail-button` |  |
 | home | AI 카드: 실패 | `home.ai-failed` | "AI 피드백을 생성하지 못했어요" |
 | home | AI 카드: 재요청 | `home.ai-retry-button` |  |
-| home | ISSUE 섹션 | `home.issue-section` | 배너 0건·오류면 존재하지 않음 |
+| home | ISSUE 섹션 | `home.issue-section` | 배너 0건이거나 최초 조회 실패면 존재하지 않음(실패는 `home.issue-error`) |
 | home | ISSUE 배너 항목 | `home.issue-item-{bannerId}` |  |
+| home | 이번 주 기록 N/7 | `home.week-count` | 기록이 있는 날 수("1/7") |
+| home | 이번 주 기록 다시 시도 | `home.week-retry-button` | `home.week-error`와 함께 |
+| home | 어제 랭킹 오류 | `home.ranking-error` | "어제 랭킹 사진을 불러오지 못했어요" |
+| home | 어제 랭킹 다시 시도 | `home.ranking-retry-button` |  |
+| home | 어제 랭킹 좋아요 버튼 | `home.ranking-like-button-{postId}` | selected(isLiked) 상태 노출 |
+| home | 어제 랭킹 좋아요 수 | `home.ranking-like-count-{postId}` |  |
+| home | 오늘 인기 빈 상태 | `home.popular-empty` | "아직 올라온 사진이 없어요" |
+| home | 오늘 인기 오류 | `home.popular-error` | "오늘 인기있는 사진 사진을 불러오지 못했어요" |
+| home | 오늘 인기 다시 시도 | `home.popular-retry-button` |  |
+| home | 오늘 인기 좋아요 버튼 | `home.popular-like-button-{postId}` | selected(isLiked) 상태 노출 |
+| home | 오늘 인기 좋아요 수 | `home.popular-like-count-{postId}` |  |
+| home | ISSUE 오류 | `home.issue-error` | 최초 조회 실패 "ISSUE를 불러오지 못했어요. 다시 시도"(REQ-BANR-006). `home.issue-section`은 없다 |
+| home | ISSUE 다시 시도 | `home.issue-retry-button` |  |
 
 ### 배너 웹 화면 (ISSUE)
 
