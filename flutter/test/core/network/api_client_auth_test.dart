@@ -87,11 +87,12 @@ void main() {
           expireAt1(h, p);
         }
         scriptRefresh(h);
+        // 동시에 보낸다: 순차로 보내면 두 번째 요청은 이미 갱신된 토큰으로 나간다.
         final r1 = get(h, '/posts');
-        settle(a);
         final r2 = get(h, '/topics');
         settle(a);
         expect(r1.succeeded && r2.succeeded, isTrue);
+        expect(h.refreshCalls, 1);
         expect(reqs(h, '/posts'), hasLength(2));
         expect(reqs(h, '/topics'), hasLength(2));
         expect(auth(reqs(h, '/posts').last), 'Bearer at2');

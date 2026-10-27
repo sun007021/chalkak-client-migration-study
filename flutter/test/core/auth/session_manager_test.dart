@@ -30,6 +30,43 @@ void main() {
     expect((await sessions.read())!.accessToken, s.accessToken);
   });
 
+  test('TC-NET-027 clearIfCurrent는 같은 로그인일 때만 지우고 이벤트를 낸다', () async {
+    final s = sessionAt();
+    await sessions.save(s);
+    expect(
+      await sessions.clearIfCurrent(
+        s,
+        SessionClearReason.reauthenticationRequired,
+      ),
+      isTrue,
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(await sessions.read(), isNull);
+    expect(events, [SessionClearReason.reauthenticationRequired]);
+  });
+
+  test('TC-NET-057 clearIfCurrent는 다른 계정·다른 refresh token이면 지우지 않는다', () async {
+    final a = sessionAt(userId: 'A', rt: 'rtA');
+    await sessions.save(sessionAt(userId: 'B', rt: 'rtB'));
+    expect(
+      await sessions.clearIfCurrent(
+        a,
+        SessionClearReason.reauthenticationRequired,
+      ),
+      isFalse,
+    );
+    expect(
+      await sessions.clearIfCurrent(
+        sessionAt(userId: 'B', rt: 'old'),
+        SessionClearReason.reauthenticationRequired,
+      ),
+      isFalse,
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect((await sessions.read())!.userId, 'B');
+    expect(events, isEmpty);
+  });
+
   test(
     'TC-NET-022 saveRefreshed는 현재 세션이 previous와 같을 때 next로 교체하고 true',
     () async {

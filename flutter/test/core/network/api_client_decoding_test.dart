@@ -322,6 +322,30 @@ void main() {
     }, baseUrl: 'https://mock.test:8443');
   });
 
+  group('loopback mock 서버', () {
+    netTest(
+      'TC-NET-063 http://10.0.2.2 기준 주소로 호출하면 요청이 그 주소로 나가고 토큰도 붙는다',
+      (h, a) {
+        h.adapter.on('GET', '$v1/x', [ok()]);
+        Probe(
+          h.client.request<Object?>(
+            const ApiRequest.get('/x'),
+            decode: (j) => j,
+          ),
+        );
+        settle(a);
+        final r = h.adapter.requests.single;
+        expect(
+          (r.uri.scheme, r.uri.host, r.uri.port),
+          ('http', '10.0.2.2', 8080),
+        );
+        expect(r.header('authorization'), 'Bearer at1');
+      },
+      baseUrl: 'http://10.0.2.2:8080',
+      session: sessionAt(),
+    );
+  });
+
   group('연결 오류 매핑', () {
     final cases = <String, FakeResponse>{
       '연결 타임아웃': const FakeResponse.fault(FakeFault.timeout),

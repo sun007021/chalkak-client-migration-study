@@ -147,8 +147,106 @@ void main() {
           contentType: 'image/webp',
         ),
       );
-      advance(a, const Duration(seconds: 62));
+      // PUT은 멱등이라 타임아웃을 두 번 재시도한다(D-21): 60s + 0.5s + 60s + 1s + 60s.
+      advance(a, const Duration(seconds: 200));
       expect((slow.error! as ApiError).isNetwork, isTrue);
+    });
+
+    netTest(
+      'TC-NET-037 TC-NET-044 presigned PUT은 멱등이라 5xx에 0.5초 뒤 같은 본문으로 재시도한다',
+      (h, a) {
+        h.adapter.on('PUT', '/posts/u1.webp', [
+          FakeResponse.json(503, internalBody),
+          const FakeResponse.empty(200),
+        ]);
+        final r = Probe(
+          h.client.putPresigned(
+            url: url,
+            bytes: bytes,
+            contentType: 'image/webp',
+          ),
+        );
+        advance(a, const Duration(milliseconds: 499));
+        expect(h.adapter.requests, hasLength(1));
+        advance(a, const Duration(milliseconds: 1));
+        expect(r.succeeded, isTrue);
+        expect(h.adapter.requests, hasLength(2));
+        for (final req in h.adapter.requests) {
+          expect(req.header('content-type'), 'image/webp');
+          expect(req.hasAuthorization, isFalse);
+          expect(req.uri.queryParameters['X-Amz-Signature'], 'sig');
+        }
+      },
+      session: sessionAt(),
+    );
+
+    netTest('TC-NET-037 presigned PUT도 4xx는 재시도하지 않고 5xx가 계속되면 총 3시도 뒤 실패한다', (
+      h,
+      a,
+    ) {
+      h.adapter.on('PUT', '/posts/denied.webp', [
+        const FakeResponse.empty(403),
+      ]);
+      h.adapter.on('PUT', '/posts/down.webp', [const FakeResponse.empty(500)]);
+      final denied = Probe(
+        h.client.putPresigned(
+          url: Uri.parse('https://bucket.s3.test/posts/denied.webp?X=1'),
+          bytes: bytes,
+          contentType: 'image/webp',
+        ),
+      );
+      final down = Probe(
+        h.client.putPresigned(
+          url: Uri.parse('https://bucket.s3.test/posts/down.webp?X=1'),
+          bytes: bytes,
+          contentType: 'image/webp',
+        ),
+      );
+      advance(a, const Duration(seconds: 30));
+      expect((denied.error! as ApiError).status, 403);
+      expect((down.error! as ApiError).status, 500);
+      expect(h.adapter.count('PUT', '/posts/denied.webp'), 1);
+      expect(h.adapter.count('PUT', '/posts/down.webp'), 3);
+    });
+
+    netTest('TC-NET-063 loopback 호스트의 http presigned URL(mock 서버)은 허용한다', (
+      h,
+      a,
+    ) {
+      h.adapter.on('PUT', '/posts/u1.webp', [const FakeResponse.empty(200)]);
+      for (final host in [
+        'localhost:9000',
+        '127.0.0.1:9000',
+        '10.0.2.2:9000',
+      ]) {
+        Probe(
+          h.client.putPresigned(
+            url: Uri.parse('http://$host/posts/u1.webp?X-Amz-Signature=sig'),
+            bytes: bytes,
+            contentType: 'image/webp',
+          ),
+        );
+      }
+      settle(a);
+      expect(h.adapter.requests, hasLength(3));
+    });
+
+    netTest('TC-NET-063 loopback이 아닌 http presigned URL은 요청 없이 config 오류다', (
+      h,
+      a,
+    ) {
+      final r = Probe(
+        h.client.putPresigned(
+          url: Uri.parse(
+            'http://bucket.s3.test/posts/u1.webp?X-Amz-Signature=s',
+          ),
+          bytes: bytes,
+          contentType: 'image/webp',
+        ),
+      );
+      settle(a);
+      expect((r.error! as ApiError).isConfig, isTrue);
+      expect(h.adapter.requests, isEmpty);
     });
 
     netTest('TC-NET-044 저장소가 403(XML 본문)을 주면 status를 가진 server 오류다', (h, a) {
