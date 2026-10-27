@@ -39,7 +39,9 @@ export class BootViewModel extends Observable<BootState> implements AuthFlowNavi
   }
 
   private started = false;
+  private tornDown = false;
   private splashTimer: ReturnType<typeof setTimeout> | null = null;
+  private releaseSplash: (() => void) | null = null;
   private readonly cleanups: (() => void)[] = [];
 
   /** 콜드 스타트. 세션 만료 이벤트(AuthSessionEvents)도 여기서 구독해 로그인으로 보낸다. */
@@ -56,11 +58,13 @@ export class BootViewModel extends Observable<BootState> implements AuthFlowNavi
       }),
     );
 
+    // 각 await 뒤에는 아직 스플래시인지 다시 본다. 대기 중 세션 만료(login)나 강제 업데이트, dispose로 phase가
+    // 바뀌었으면 이후 단계(푸시 등록, 프리로드, 화면 전환)를 진행하지 않는다.
     await forceUpdateGate.check();
-    if (this.isBlocked()) return;
+    if (!this.isSplash()) return;
 
     const decision = await authGate.resolve();
-    if (this.isBlocked()) return;
+    if (!this.isSplash()) return;
     if (decision.kind === 'signed-out') {
       this.toLogin();
       return;
@@ -68,8 +72,7 @@ export class BootViewModel extends Observable<BootState> implements AuthFlowNavi
     const mode: MainMode = decision.kind === 'guest' ? 'guest' : 'member';
     if (mode === 'member') this.registerPush();
     await this.preloadWithinSplashLimit(mode);
-    // 대기 중 세션 만료 등으로 이미 다른 화면이 정해졌으면 덮어쓰지 않는다.
-    if (this.getSnapshot().phase === 'splash') this.toMain(mode);
+    if (this.isSplash()) this.toMain(mode);
   }
 
   /** iOS 계열: 앱 재활성화 시 게이트 재확인. */
@@ -95,22 +98,27 @@ export class BootViewModel extends Observable<BootState> implements AuthFlowNavi
   }
 
   override dispose(): void {
-    this.clearSplashTimer();
+    this.tornDown = true;
     this.cleanups.splice(0).forEach((cleanup) => cleanup());
+    // 스플래시 대기 중이면 풀어서 start()가 영원히 pending되지 않게 한다.
+    this.releaseSplash?.();
     super.dispose();
   }
 
-  private isBlocked(): boolean {
-    return this.getSnapshot().phase === 'update-required';
+  private isSplash(): boolean {
+    return !this.tornDown && this.getSnapshot().phase === 'splash';
   }
 
   private showUpdateRequired(): void {
     this.setState({ phase: 'update-required', mode: null, pendingSignUp: null });
   }
 
-  /** 강제 업데이트 상태에서는 다른 화면으로 가는 요청을 모두 무시한다. */
+  /**
+   * update-required는 앱 안에서 빠져나오지 않는 것이 의도다(D-15: 닫을 수 없는 다이얼로그, 재실행으로만 해제).
+   * 그래서 이 상태에서는 다른 화면으로 가는 요청을 모두 무시한다.
+   */
   private transition(next: BootState): void {
-    if (this.isBlocked()) return;
+    if (this.getSnapshot().phase === 'update-required') return;
     this.setState(next);
   }
 
@@ -118,18 +126,17 @@ export class BootViewModel extends Observable<BootState> implements AuthFlowNavi
     this.deps.pushRegistrar.registerDevice().catch(() => undefined);
   }
 
-  /** 프리로드 시작부터 센다. 프리로드가 끝나거나 실패하거나 상한이 지나면 반환한다. */
+  /** 프리로드 시작부터 센다. 프리로드가 끝나거나 실패하거나 상한이 지나거나 dispose되면 반환한다. */
   private preloadWithinSplashLimit(mode: MainMode): Promise<void> {
     const limitMs = this.deps.splashPreloadMaxMs ?? SPLASH_PRELOAD_MAX_MS;
     return new Promise<void>((resolve) => {
+      this.releaseSplash = resolve;
       this.splashTimer = setTimeout(resolve, limitMs);
       this.deps.homePreloader.preload(mode).then(resolve, resolve);
-    }).finally(() => this.clearSplashTimer());
-  }
-
-  private clearSplashTimer(): void {
-    if (this.splashTimer === null) return;
-    clearTimeout(this.splashTimer);
-    this.splashTimer = null;
+    }).finally(() => {
+      this.releaseSplash = null;
+      if (this.splashTimer !== null) clearTimeout(this.splashTimer);
+      this.splashTimer = null;
+    });
   }
 }

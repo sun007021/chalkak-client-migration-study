@@ -8,6 +8,7 @@ import {
 import { refreshOk, unauthorized } from '../../core/http/__testing__/createNetHarness';
 import { fixtureResponse } from '../../core/http/__testing__/loadFixture';
 import {
+  deferred,
   networkFailure,
   noContent,
   timeoutFailure,
@@ -356,4 +357,71 @@ describe('AuthRepository.withdraw', () => {
     await h.repository.withdraw();
     expect(h.transport.requests).toHaveLength(1);
   });
+});
+
+const flush = async () => {
+  for (let i = 0; i < 30; i += 1) await Promise.resolve();
+};
+
+describe('AuthRepository 로그아웃 경쟁·응답 모양', () => {
+  it('REQ-AUTH-030 TC-AUTH-042 갱신 응답을 기다리는 중 로그아웃하면 풀려도 세션은 none이고 session-expired 이벤트도 없다', async () => {
+    const h = createAuthHarness();
+    await h.signIn();
+    const gate = deferred<void>();
+    h.transport.respond(async (request) => {
+      const path = new URL(request.url).pathname;
+      if (path.endsWith('/auth/refresh')) {
+        await gate.promise;
+        return refreshOk();
+      }
+      if (path.endsWith('/auth/logout')) return noContent();
+      return unauthorized();
+    });
+
+    const inFlight = h.api
+      .requestVoid({ method: 'DELETE', path: '/users/me' })
+      .catch((error: unknown) => error);
+    await flush();
+    expect(h.transport.requestsTo('POST', '/auth/refresh')).toHaveLength(1);
+
+    await h.repository.logout();
+    gate.resolve();
+    await inFlight;
+    await flush();
+
+    expect(await h.sessionStore.load()).toEqual({ kind: 'none' });
+    expect(h.emitted).toEqual([]);
+  });
+
+  it('로컬 정리 단계 하나가 실패해도 나머지를 계속 시도하고 첫 오류를 던진다', async () => {
+    const h = createAuthHarness();
+    await h.signIn();
+    h.cache.clearAll = () => {
+      throw new Error('cache boom');
+    };
+    await expect(h.repository.clearLocalSession()).rejects.toThrow('cache boom');
+    expect(await h.sessionStore.load()).toEqual({ kind: 'none' });
+    expect(h.push.resetCalls).toBe(1);
+  });
+
+  it.each([
+    ['null', 'null'],
+    ['배열', '[]'],
+    ['문자열', '"LOGIN_SUCCESS"'],
+    ['숫자', '42'],
+  ])(
+    'TC-AUTH-011 social-login 응답 본문이 %s이면 InvalidResponseError이고 세션을 저장하지 않는다',
+    async (_name, body) => {
+      const h = createAuthHarness();
+      h.transport.script({
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+        bodyText: body,
+      });
+      await expect(h.repository.socialLoginKakao(INPUT)).rejects.toBeInstanceOf(
+        InvalidResponseError,
+      );
+      expect(await h.sessionStore.load()).toEqual({ kind: 'none' });
+    },
+  );
 });

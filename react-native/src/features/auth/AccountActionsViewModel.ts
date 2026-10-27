@@ -20,6 +20,8 @@ export class AccountActionsViewModel extends Observable<AccountActionsState> {
       authRepository: AuthRepository;
       navigator: AuthFlowNavigator;
       toast: ToastPresenter;
+      /** 로컬 정리 실패 같은 사용자에게 보이지 않는 오류를 남긴다. 기본은 console.error. */
+      reportError?: (message: string, error: unknown) => void;
     },
   ) {
     super({ pending: 'none' });
@@ -27,15 +29,24 @@ export class AccountActionsViewModel extends Observable<AccountActionsState> {
 
   private screenGone = false;
 
-  /** 로컬 정리 후 로그인 화면. 중복 호출은 무시한다. */
+  /**
+   * 로컬 정리가 끝나면 서버 응답을 기다리지 않고 바로 로그인 화면으로 간다. 서버 폐기는 백그라운드로 보낸다.
+   * 로컬 정리가 실패해도 사용자는 로그아웃된 것으로 보고 로그인으로 보낸다(오류는 reportError로만 남긴다).
+   * 중복 호출은 무시한다.
+   */
   async confirmLogout(): Promise<void> {
     if (!this.begin('logout')) return;
+    const { authRepository, navigator } = this.deps;
+    let refreshToken: string | null = null;
     try {
-      await this.deps.authRepository.logout();
+      refreshToken = await authRepository.clearLocalSession();
+    } catch (error) {
+      (this.deps.reportError ?? defaultReportError)('logout: local cleanup failed', error);
     } finally {
       this.end();
     }
-    this.deps.navigator.toLogin();
+    navigator.toLogin();
+    if (refreshToken !== null) void authRepository.revokeRefreshToken(refreshToken);
   }
 
   /** 204면 로그인 화면, 실패면 세션 유지 + 토스트 auth.withdraw.error. 화면이 사라진 뒤의 실패는 토스트하지 않는다. */
@@ -75,4 +86,8 @@ export class AccountActionsViewModel extends Observable<AccountActionsState> {
   private end(): void {
     this.setState({ pending: 'none' });
   }
+}
+
+function defaultReportError(message: string, error: unknown): void {
+  console.error(`[AccountActions] ${message}`, error);
 }

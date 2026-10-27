@@ -45,7 +45,8 @@ function utf8Bytes(text: string): Uint8Array {
 }
 
 /**
- * UTF-8 문자열의 SHA-256 소문자 hex. 순수 TS라 동기이고 네이티브 모듈 없이 테스트된다
+ * UTF-8 문자열의 SHA-256 소문자 hex. 짝 없는 서로게이트(깨진 UTF-16)는 `for...of`가 U+FFFD가 아닌 그 코드 포인트 그대로
+ * 3바이트로 인코딩해 Node `Buffer`(U+FFFD로 치환)와 다를 수 있다. nonce는 base64url ASCII라 해당되지 않는다. 순수 TS라 동기이고 네이티브 모듈 없이 테스트된다
  * (expo-crypto digest는 비동기라 NonceGenerator.generate()의 동기 계약과 맞지 않는다).
  */
 export function sha256Hex(text: string): string {

@@ -46,13 +46,12 @@ describe('AccountActionsViewModel 로그아웃', () => {
     });
 
     const first = h.viewModel.confirmLogout();
-    void h.viewModel.confirmLogout();
-    void h.viewModel.confirmLogout();
-    await flush();
     expect(h.viewModel.getSnapshot().pending).toBe('logout');
+    void h.viewModel.confirmLogout();
+    void h.viewModel.confirmLogout();
+    await first;
 
     gate.resolve();
-    await first;
     await flush();
 
     expect(h.transport.requestsTo('POST', '/auth/logout')).toHaveLength(1);
@@ -160,4 +159,68 @@ describe('AccountActionsViewModel 게스트', () => {
     expect(h.navigator.calls).toEqual(['login']);
     expect(h.transport.requests).toHaveLength(0);
   });
+});
+
+describe('AccountActionsViewModel 로그아웃 이동 시점', () => {
+  it('TC-AUTH-036 서버 폐기 응답을 기다리지 않고 로컬 정리 직후 로그인으로 간다', async () => {
+    const h = setup();
+    await h.signIn({ refreshToken: 'refresh-1' });
+    const gate = deferred<void>();
+    h.transport.respond(async () => {
+      await gate.promise;
+      return fixtureResponse('auth/logout__no-content');
+    });
+
+    await h.viewModel.confirmLogout(); // 서버 응답은 아직 보류 중
+
+    expect(h.navigator.calls).toEqual(['login']);
+    expect(h.viewModel.getSnapshot().pending).toBe('none');
+    expect(await h.sessionStore.load()).toEqual({ kind: 'none' });
+    gate.resolve();
+    await flush();
+    expect(h.transport.requestsTo('POST', '/auth/logout')).toHaveLength(1);
+  });
+
+  it.each([
+    [
+      '세션 clear',
+      (h: ReturnType<typeof setup>) => {
+        jest.spyOn(h.sessionStore, 'clear').mockRejectedValue(new Error('clear boom'));
+      },
+    ],
+    [
+      '캐시 clearAll',
+      (h: ReturnType<typeof setup>) => {
+        h.cache.clearAll = () => {
+          throw new Error('cache boom');
+        };
+      },
+    ],
+  ])(
+    'TC-AUTH-036 로컬 정리(%s)가 실패해도 로그인으로 가고 오류는 보고만 하며 토스트는 없다',
+    async (_name, breakIt) => {
+      const reported: string[] = [];
+      const h = setup();
+      const viewModel = new AccountActionsViewModel({
+        authRepository: h.repository,
+        navigator: h.navigator,
+        toast: h.toast,
+        reportError: (message) => reported.push(message),
+      });
+      await h.signIn();
+      breakIt(h);
+      const unhandled = jest.fn();
+      process.on('unhandledRejection', unhandled);
+
+      await viewModel.confirmLogout();
+      await flush();
+      process.off('unhandledRejection', unhandled);
+
+      expect(h.navigator.calls).toEqual(['login']);
+      expect(reported).toHaveLength(1);
+      expect(h.toast.messages).toEqual([]);
+      expect(viewModel.getSnapshot().pending).toBe('none');
+      expect(unhandled).not.toHaveBeenCalled();
+    },
+  );
 });

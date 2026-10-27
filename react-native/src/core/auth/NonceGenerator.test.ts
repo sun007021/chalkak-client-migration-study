@@ -48,3 +48,28 @@ describe('SecureNonceGenerator', () => {
     expect(toBase64Url(Uint8Array.from([1]))).toBe('AQ');
   });
 });
+
+describe('sha256Hex 벡터', () => {
+  const nodeHex = (text: string) => createHash('sha256').update(text, 'utf8').digest('hex');
+
+  it('TC-AUTH-003 NIST 2블록 벡터', () => {
+    expect(sha256Hex('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq')).toBe(
+      '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1',
+    );
+  });
+
+  it('TC-AUTH-003 길이 0..130 ASCII(패딩 경계 55/56/64/119/120 포함)가 Node와 같다', () => {
+    for (let length = 0; length <= 130; length += 1) {
+      const text = Array.from({ length }, (_, i) =>
+        String.fromCharCode(33 + ((i * 7 + length) % 90)),
+      ).join('');
+      expect(sha256Hex(text)).toBe(nodeHex(text));
+    }
+  });
+
+  it('TC-AUTH-003 3바이트 한글과 4바이트 이모지(서로게이트 쌍)가 Node와 같다', () => {
+    for (const text of ['한글 nonce', '😀', 'a😀b찰칵𝄞', '😀'.repeat(40)]) {
+      expect(sha256Hex(text)).toBe(nodeHex(text));
+    }
+  });
+});

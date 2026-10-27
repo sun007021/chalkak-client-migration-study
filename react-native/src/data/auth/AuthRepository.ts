@@ -65,19 +65,45 @@ export class AuthRepository {
     return this.deps.sessionStore.clear();
   }
 
-  /** 로컬 세션·캐시·푸시 등록 캐시를 먼저 지운 뒤 POST /auth/logout {refreshToken}. 요청 실패는 무시한다. 재시도 없음. */
+  /**
+   * 로그아웃 전체: 로컬 정리(await) 뒤 서버 폐기(응답까지 await, 실패 무시). 화면은 두 단계를 나눠 부른다:
+   * `clearLocalSession()` 직후 로그인으로 이동하고 `revokeRefreshToken()`은 기다리지 않는다.
+   */
   async logout(): Promise<void> {
-    const { api, sessionStore } = this.deps;
+    const refreshToken = await this.clearLocalSession();
+    if (refreshToken !== null) await this.revokeRefreshToken(refreshToken);
+  }
+
+  /**
+   * 로컬 세션·사용자 캐시·푸시 등록 캐시를 지우고, 서버에 폐기할 refresh token(없으면 null)을 돌려준다.
+   * 한 단계가 실패해도 나머지는 계속 시도하고, 끝에서 첫 오류를 던진다(호출자는 로그아웃된 것으로 취급한다).
+   */
+  async clearLocalSession(): Promise<string | null> {
+    const { sessionStore, pushRegistrar } = this.deps;
     const state = await sessionStore.load();
-    await sessionStore.clear();
-    await this.clearUserData();
-    this.deps.pushRegistrar.resetRegistrationCache();
-    if (state.kind !== 'authenticated') return;
+    const refreshToken = state.kind === 'authenticated' ? state.credentials.refreshToken : null;
+    const errors: unknown[] = [];
+    const attempt = async (step: () => Promise<void> | void) => {
+      try {
+        await step();
+      } catch (error) {
+        errors.push(error);
+      }
+    };
+    await attempt(() => sessionStore.clear());
+    await attempt(() => this.clearUserData());
+    await attempt(() => pushRegistrar.resetRegistrationCache());
+    if (errors.length > 0) throw errors[0];
+    return refreshToken;
+  }
+
+  /** POST /auth/logout {refreshToken}. 실패(네트워크·4xx·5xx·취소)는 모두 무시한다. 재시도·갱신 없음. 절대 reject하지 않는다. */
+  async revokeRefreshToken(refreshToken: string): Promise<void> {
     try {
-      await api.requestVoid({
+      await this.deps.api.requestVoid({
         method: 'POST',
         path: '/auth/logout',
-        body: { refreshToken: state.credentials.refreshToken },
+        body: { refreshToken },
       });
     } catch {
       // 서버 폐기는 최선 노력이다. 로컬은 이미 로그아웃됐다.
@@ -102,6 +128,9 @@ type SocialLoginResponse =
   { status: 'SIGN_UP_REQUIRED' } | ({ status: 'LOGIN_SUCCESS'; userId: string } & TokenResponse);
 
 function decodeSocialLogin(raw: unknown): SocialLoginResponse {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('response is not an object');
+  }
   const o = raw as Record<string, unknown>;
   if (o.status === 'SIGN_UP_REQUIRED') return { status: 'SIGN_UP_REQUIRED' };
   if (o.status !== 'LOGIN_SUCCESS') throw new Error('unknown status');

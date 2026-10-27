@@ -1,9 +1,10 @@
 import { NavigationContainer } from '@react-navigation/native';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import type { AppConfigResult } from '../core/config/AppConfig';
+import { useViewModelState } from '../core/state/useViewModelState';
 import { LoginScreen } from '../features/auth/LoginScreen';
 import { ConfigErrorScreen } from '../features/config/ConfigErrorScreen';
 import { PlaceholderScreen } from '../features/placeholder/PlaceholderScreen';
@@ -64,9 +65,9 @@ function AppShell() {
   );
 }
 
-/** 로그인 화면이 열릴 때마다 새 ViewModel을 만든다(화면이 사라지면 LoginScreen이 dispose). */
+/** ViewModel은 소유자(loginOwner)가 phase에 맞춰 만들고 버린다. 이 컴포넌트는 받아서 그리기만 한다. */
 function LoginRoute() {
-  const container = useAppContainer();
-  const viewModel = useMemo(() => container.createLoginViewModel(), [container]);
-  return <LoginScreen viewModel={viewModel} />;
+  const { loginOwner } = useAppContainer();
+  const { viewModel } = useViewModelState(loginOwner);
+  return viewModel ? <LoginScreen viewModel={viewModel} /> : null;
 }

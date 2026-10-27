@@ -15,6 +15,7 @@ import type { PushRegistrar } from '../core/push/PushRegistrar';
 import type { UserDataCache } from '../core/push/UserDataCache';
 import { AuthRepository } from '../data/auth/AuthRepository';
 import { LoginViewModel } from '../features/auth/LoginViewModel';
+import { LoginViewModelOwner } from '../features/auth/LoginViewModelOwner';
 import { AuthGate } from '../features/boot/AuthGate';
 import { BootViewModel } from '../features/boot/BootViewModel';
 import { ForceUpdateGate } from '../features/boot/ForceUpdateGate';
@@ -73,6 +74,8 @@ export class AppContainer {
   readonly authRepository: AuthRepository;
   readonly bootViewModel: BootViewModel;
   readonly updateDialogViewModel: UpdateDialogViewModel;
+  /** phase가 login인 동안 로그인 ViewModel을 만들고 버린다. 화면은 이것을 구독해 받는다. */
+  readonly loginOwner: LoginViewModelOwner;
   private readonly socialLoginClient: SocialLoginClient;
   private readonly nonceGenerator: NonceGenerator;
   private readonly pushRegistrar: PushRegistrar;
@@ -107,10 +110,13 @@ export class AppContainer {
       events: this.events,
     });
     this.updateDialogViewModel = new UpdateDialogViewModel(dependencies.storeOpener);
+    this.loginOwner = new LoginViewModelOwner(this.bootViewModel, () =>
+      this.createLoginViewModel(),
+    );
   }
 
-  /** 로그인 화면이 열릴 때마다 새로 만든다(화면이 사라지면 dispose된다). 전환 요청은 BootViewModel로 간다. */
-  createLoginViewModel(): LoginViewModel {
+  /** 소유자(loginOwner)만 부른다. 전환 요청은 BootViewModel로 간다. */
+  private createLoginViewModel(): LoginViewModel {
     return new LoginViewModel({
       socialLoginClient: this.socialLoginClient,
       nonceGenerator: this.nonceGenerator,

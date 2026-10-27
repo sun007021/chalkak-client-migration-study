@@ -1,19 +1,15 @@
-import { useEffect } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
 import type { LoginViewModel } from './LoginViewModel';
 
-/** testID는 docs/testing/testids.md의 login.* 그대로. 상태는 useViewModelState로 구독만 한다. */
+/**
+ * testID는 docs/testing/testids.md의 login.* 그대로. 상태는 useViewModelState로 구독만 한다.
+ * ViewModel의 생성·dispose·screen_view는 소유자(LoginViewModelOwner)가 하므로 이 화면은 수명주기를 다루지 않는다.
+ */
 export function LoginScreen({ viewModel }: { viewModel: LoginViewModel }) {
   const { busy, error } = useViewModelState(viewModel);
-
-  useEffect(() => {
-    viewModel.onScreenShown();
-    // 화면이 사라지면 진행 중 요청을 취소하고 늦게 온 결과를 버린다.
-    return () => viewModel.dispose();
-  }, [viewModel]);
 
   return (
     <View testID="login.root" style={styles.root}>

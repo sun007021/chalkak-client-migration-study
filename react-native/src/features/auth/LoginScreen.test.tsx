@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { SocialLoginError } from '../../core/auth/SocialLoginClient';
@@ -21,10 +22,20 @@ describe('LoginScreen', () => {
     expect(screen.queryByTestId('login.error-dialog')).not.toBeOnTheScreen();
   });
 
-  it('REQ-BOOT-021 화면이 보이면 screen_view login을 한 번 보낸다(리렌더해도 중복 없음)', async () => {
+  it('REQ-BOOT-021 StrictMode(mount/unmount/mount)에서도 화면은 screen_view를 보내지 않고 버튼이 동작한다(수명주기는 소유자 몫)', async () => {
     const h = createLoginHarness();
-    const { rerender } = await render(<LoginScreen viewModel={h.viewModel} />);
-    await rerender(<LoginScreen viewModel={h.viewModel} />);
+    h.viewModel.onScreenShown(); // 소유자(LoginViewModelOwner)가 phase 진입 때 1회 부른다.
+    h.routes({ 'POST /auth/social-login': 'auth/social-login__login-success' });
+    await render(
+      <StrictMode>
+        <LoginScreen viewModel={h.viewModel} />
+      </StrictMode>,
+    );
+    expect(h.analytics.screenNames).toEqual(['login']);
+
+    await fireEvent.press(screen.getByTestId('login.kakao-button'));
+    expect(await screen.findByTestId('login.kakao-button')).toBeEnabled();
+    expect(h.navigator.calls).toEqual(['main:member']);
     expect(h.analytics.screenNames).toEqual(['login']);
   });
 
@@ -106,22 +117,12 @@ describe('LoginScreen', () => {
     expect(h.transport.requests).toHaveLength(0);
   });
 
-  it('TC-AUTH-031 화면이 사라지면(unmount) 진행 중이던 로그인 결과를 버린다', async () => {
+  it('화면이 언마운트돼도 ViewModel을 dispose하지 않는다(소유자가 phase 이탈 때 dispose)', async () => {
     const h = createLoginHarness();
-    const gate = deferred<void>();
-    h.transport.respond(async () => {
-      await gate.promise;
-      return fixtureResponse('auth/social-login__login-success');
-    });
     const { unmount } = await render(<LoginScreen viewModel={h.viewModel} />);
-    await fireEvent.press(screen.getByTestId('login.kakao-button'));
-    await screen.findByTestId('login.loading');
-
     await unmount();
-    gate.resolve();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(await h.sessionStore.load()).toEqual({ kind: 'none' });
-    expect(h.navigator.calls).toEqual([]);
+    h.routes({ 'POST /auth/social-login': 'auth/social-login__login-success' });
+    await h.viewModel.onKakaoPress();
+    expect(h.navigator.calls).toEqual(['main:member']);
   });
 });

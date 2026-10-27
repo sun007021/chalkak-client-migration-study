@@ -255,3 +255,45 @@ describe('BootViewModel 전환', () => {
     expect(h.viewModel.getSnapshot()).toEqual({ phase: 'login', mode: null, pendingSignUp: null });
   });
 });
+
+describe('BootViewModel 대기 중 상태 변화', () => {
+  it('TC-AUTH-056 스플래시 대기(프리로드) 중 세션 만료로 login이 되면 main으로 덮어쓰지 않고 이후 단계를 진행하지 않는다', async () => {
+    const h = createBootHarness();
+    await h.signIn();
+    h.preloader.gate = new Promise(() => undefined);
+    const started = h.viewModel.start();
+    await flush();
+    h.events.emit({ type: 'session-expired' });
+    advanceTime(h.clock, 700);
+    await flush();
+    await started;
+    expect(h.viewModel.getSnapshot().phase).toBe('login');
+  });
+
+  it('TC-AUTH-056 인증 게이트 판정 중 세션 만료가 오면 푸시 등록·프리로드를 시작하지 않는다', async () => {
+    const h = createBootHarness();
+    await h.signIn();
+    const gate = deferred<void>();
+    h.checker.gate = gate.promise;
+    const started = h.viewModel.start();
+    await flush();
+    h.events.emit({ type: 'session-expired' });
+    gate.resolve();
+    await started;
+
+    expect(h.viewModel.getSnapshot().phase).toBe('login');
+    expect(h.push.registerCalls).toBe(0);
+    expect(h.preloader.calls).toEqual([]);
+  });
+
+  it('dispose하면 스플래시 대기 중이던 start()가 끝나고 화면은 바뀌지 않는다', async () => {
+    const h = createBootHarness();
+    await h.signIn();
+    h.preloader.gate = new Promise(() => undefined);
+    const started = h.viewModel.start();
+    await flush();
+    h.viewModel.dispose();
+    await expect(started).resolves.toBeUndefined();
+    expect(h.viewModel.getSnapshot().phase).toBe('splash');
+  });
+});

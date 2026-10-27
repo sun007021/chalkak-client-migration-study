@@ -1,8 +1,13 @@
 import { KakaoSdkCancelledError, KakaoSdkConfigError } from './KakaoSdk';
 
-const CANCELLED = /cancel/i;
-// iOS: "ClientFailed(MustInitAppKey)" / Info.plist KAKAO_APP_KEY 누락, Android: 앱 키 미설정.
-const MISSING_CONFIG = /MustInitAppKey|KAKAO_APP_KEY|kakao_app_key|app ?key/i;
+// 근거: @react-native-seoul/kakao-login 6.0.4 네이티브 소스.
+// iOS는 SdkError를 "ClientFailed(<reason>): ..." 문자열로 reject한다(RNKakaoLogins.swift describe, 취소는 reason Cancelled,
+// shouldFallBackToAccountLogin 참조). Android는 Kakao SDK ClientError의 message를 그대로 reject하며 원인 이름은 Cancelled다.
+// 둘 다 대소문자를 구분하는 이 토큰만 취소로 본다. Android 실제 문구는 실기기 E2E에서 확정한다.
+const CANCELLED = /ClientFailed\(Cancelled\)|\bCancelled\b/;
+// iOS: "ClientFailed(MustInitAppKey)"(RNKakaoLogins.swift ensureInitialized) 또는 Info.plist `KAKAO_APP_KEY` 누락.
+// Android: string 리소스 `kakao_app_key` 누락(RNKakaoLoginsModule.kt check 메시지).
+const MISSING_CONFIG = /MustInitAppKey|KAKAO_APP_KEY|kakao_app_key/;
 
 /**
  * `@react-native-seoul/kakao-login`이 reject한 값을 KakaoSdk 오류로 분류한다.

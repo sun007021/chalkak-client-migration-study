@@ -5,6 +5,7 @@ describe('readFeatureFlags', () => {
     expect(readFeatureFlags(undefined)).toEqual({
       forceUpdateCheckEnabled: false,
       e2eKakaoIdToken: null,
+      appVariant: null,
     });
     expect(readFeatureFlags(null).forceUpdateCheckEnabled).toBe(false);
     expect(readFeatureFlags({}).forceUpdateCheckEnabled).toBe(false);
@@ -26,6 +27,13 @@ describe('readFeatureFlags', () => {
     expect(readFeatureFlags({ e2eKakaoIdToken: ' tok ' }).e2eKakaoIdToken).toBe('tok');
     for (const value of ['', '   ', 123, null, undefined, {}]) {
       expect(readFeatureFlags({ e2eKakaoIdToken: value }).e2eKakaoIdToken).toBeNull();
+    }
+  });
+
+  it('appVariant는 비어 있지 않은 문자열만 인정한다', () => {
+    expect(readFeatureFlags({ appVariant: 'e2e' }).appVariant).toBe('e2e');
+    for (const value of ['', 1, null, undefined, {}]) {
+      expect(readFeatureFlags({ appVariant: value }).appVariant).toBeNull();
     }
   });
 });
