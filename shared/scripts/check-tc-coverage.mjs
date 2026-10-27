@@ -21,12 +21,21 @@ export function parseCatalog(catalogDir) {
   return tcs;
 }
 
+// Lines that are only comments (e.g. a "deferred TCs" list) must not count as coverage.
+const COMMENT_LINE = /^\s*(\/\/|\/\*|\*|#)/;
+
+function codeLines(text) {
+  return text.split('\n').filter((line) => !COMMENT_LINE.test(line));
+}
+
 export function scanPlatform(root, platform) {
   if (!PLATFORMS[platform]) throw new Error(`unknown platform "${platform}" (expected ${Object.keys(PLATFORMS).join('|')})`);
   const found = new Set();
   const dir = path.join(root, platform);
   for (const rel of walk(dir, { skipDirs: SKIP_DIRS }).filter((r) => SOURCE_EXT.test(r))) {
-    for (const m of fs.readFileSync(path.join(dir, rel), 'utf8').matchAll(TC_RE)) found.add(m[0]);
+    for (const line of codeLines(fs.readFileSync(path.join(dir, rel), 'utf8'))) {
+      for (const m of line.matchAll(TC_RE)) found.add(m[0]);
+    }
   }
   if (MOBILE.includes(platform)) {
     const maestro = path.join(root, 'shared/maestro');
