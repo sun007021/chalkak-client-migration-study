@@ -384,6 +384,33 @@ class SignatureCardStateHolderTest {
     }
 
     @Test
+    fun `reload drops the answer of a GET started before it and shows the fresh one`() = runTest {
+        val r = rig()
+        val gate = CompletableDeferred<Unit>()
+        r.repo.currentGate = gate
+        r.repo.currentResults.add(ApiResult.Success(SignatureImages("https://cdn.example.test/o-fresh.png", "https://cdn.example.test/t-fresh.png")))
+        r.repo.currentResults.add(ApiResult.Success(SignatureImages("https://cdn.example.test/o-stale.png", "https://cdn.example.test/t-stale.png")))
+        r.holder.onTabShown()
+        runCurrent()
+        r.repo.currentGate = null
+        r.holder.reload()
+        runCurrent()
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals("https://cdn.example.test/t-fresh.png", r.state.imageUrl)
+        assertFalse(r.state.loading)
+        assertEquals(2, r.repo.currentCalls)
+    }
+
+    @Test
+    fun `reload is a no-op for guests`() = runTest {
+        val r = rig(isGuest = true)
+        r.holder.reload()
+        advanceUntilIdle()
+        assertEquals(0, r.repo.currentCalls)
+    }
+
+    @Test
     fun `TC-SIGN-027 after a change the card re-reads GET and ignores any URL from the PUT response`() = runTest {
         val log = EventLog()
         val repo = FakeSignatureRepository(log)

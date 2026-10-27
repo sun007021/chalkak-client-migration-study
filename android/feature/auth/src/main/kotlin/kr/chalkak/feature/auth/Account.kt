@@ -46,7 +46,8 @@ class AccountActions(
     val effects: Flow<AccountEffect> = _effects.receiveAsFlow()
 
     // Touched only on [scope]'s dispatcher (main in production).
-    private var screenGone = false
+    // Per attempt: re-armed by every confirmation, so leaving the screen once never mutes the error toast of a later attempt.
+    private var screenGoneSinceConfirm = false
     private var toastCounter = 0L
 
     fun onLogoutClicked() = openConfirm(ConfirmDialog(ConfirmKind.Logout, CopyKeys.LOGOUT_MESSAGE, CopyKeys.LOGOUT_OK, CopyKeys.CONFIRM_CANCEL))
@@ -59,6 +60,7 @@ class AccountActions(
     fun onConfirmed() {
         val kind = _state.value.takeIf { !it.busy }?.confirm?.kind ?: return
         _state.update { it.copy(confirm = null, busy = true) }
+        screenGoneSinceConfirm = false
         scope.launch {
             when (kind) {
                 ConfirmKind.Logout -> { auth.logout(); finish(AccountEffect.GoToLogin) }
@@ -83,8 +85,9 @@ class AccountActions(
 
     fun onToastShown() = _state.update { it.copy(toastKey = null) }
 
+    /** Drops the UI feedback (error toast) of the attempt running now; a later confirmation starts with feedback again. */
     fun onScreenGone() {
-        screenGone = true
+        screenGoneSinceConfirm = true
     }
 
     private fun openConfirm(dialog: ConfirmDialog) = _state.update { if (it.busy) it else it.copy(confirm = dialog) }
@@ -98,7 +101,7 @@ class AccountActions(
 
     private fun failWithdraw() {
         _state.update {
-            if (screenGone) it.copy(busy = false) else it.copy(busy = false, toastKey = CopyKeys.WITHDRAW_ERROR, toastId = ++toastCounter)
+            if (screenGoneSinceConfirm) it.copy(busy = false) else it.copy(busy = false, toastKey = CopyKeys.WITHDRAW_ERROR, toastId = ++toastCounter)
         }
     }
 
