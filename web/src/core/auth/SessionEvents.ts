@@ -2,10 +2,23 @@
 export type SignedOutReason = 'expired' | 'logout' | 'withdrawn';
 
 export class SessionEvents {
-  subscribe(_listener: (reason: SignedOutReason) => void): () => void {
-    throw new Error('not implemented');
+  private readonly listeners = new Set<(reason: SignedOutReason) => void>();
+
+  subscribe(listener: (reason: SignedOutReason) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
-  emit(_reason: SignedOutReason): void {
-    throw new Error('not implemented');
+
+  /** 구독자 하나가 던져도 나머지는 알림을 받는다. */
+  emit(reason: SignedOutReason): void {
+    for (const listener of [...this.listeners]) {
+      try {
+        listener(reason);
+      } catch {
+        // 한 구독자의 오류가 다른 구독자를 막지 않는다.
+      }
+    }
   }
 }

@@ -1,10 +1,15 @@
+import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 import type { AppContainer } from './container';
 
-export function ContainerProvider(_props: { container: AppContainer; children: ReactNode }): ReactNode {
-  throw new Error('not implemented');
+const ContainerContext = createContext<AppContainer | null>(null);
+
+export function ContainerProvider({ container, children }: { container: AppContainer; children: ReactNode }): ReactNode {
+  return <ContainerContext.Provider value={container}>{children}</ContainerContext.Provider>;
 }
 
 export function useContainer(): AppContainer {
-  throw new Error('not implemented');
+  const container = useContext(ContainerContext);
+  if (!container) throw new Error('ContainerProvider가 필요합니다.');
+  return container;
 }

@@ -1,7 +1,9 @@
+import { SPLASH_PRELOAD_MAX_MS } from '../../constants';
 import type { SessionStore } from '../../core/auth/SessionStore';
 import type { Logger } from '../../core/net/Logger';
 import { ViewModel } from '../../core/state/ViewModel';
 import type { Clock } from '../../core/time/Clock';
+import { resolveAuthGate } from './authGate';
 import type { AuthGateDecision } from './authGate';
 import type { HomePreloader } from './HomePreloader';
 
@@ -18,14 +20,48 @@ export type BootState =
  *   프리로드가 거절되면 즉시 ready(preloadFailed: true). 상한이 지난 뒤의 프리로드 결과는 상태를 바꾸지 않는다.
  */
 export class BootViewModel extends ViewModel<BootState> {
-  constructor(_deps: { store: SessionStore; clock: Clock; preloader: HomePreloader; logger?: Logger }) {
+  private started: Promise<void> | null = null;
+  private closed = false;
+  private readonly abort = new AbortController();
+
+  constructor(private readonly deps: { store: SessionStore; clock: Clock; preloader: HomePreloader; logger?: Logger }) {
     super({ phase: 'splash' });
   }
+
   /** 한 번만 시작한다(StrictMode의 이중 호출에도 프리로드·세션 읽기는 한 번). 끝나면 resolve. */
   start(): Promise<void> {
-    throw new Error('not implemented');
+    this.started ??= this.run();
+    return this.started;
   }
+
   override dispose(): void {
-    throw new Error('not implemented');
+    this.closed = true;
+    this.abort.abort();
+    super.dispose();
+  }
+
+  private async run(): Promise<void> {
+    const { store, clock, preloader, logger } = this.deps;
+    const decision = await resolveAuthGate({ store, clock, logger });
+    if (this.closed) return;
+    if (decision.destination === 'login') {
+      this.setState({ phase: 'ready', decision, preloadFailed: false });
+      return;
+    }
+    const preload = Promise.resolve()
+      .then(() => preloader.preload(decision.mode, this.abort.signal))
+      .then(
+        () => 'done' as const,
+        () => 'failed' as const,
+      );
+    const timerAbort = new AbortController();
+    const limit = clock.sleep(SPLASH_PRELOAD_MAX_MS, timerAbort.signal).then(
+      () => 'timeout' as const,
+      () => 'aborted' as const,
+    );
+    const winner = await Promise.race([preload, limit]);
+    timerAbort.abort();
+    if (this.closed) return;
+    this.setState({ phase: 'ready', decision, preloadFailed: winner === 'failed' });
   }
 }

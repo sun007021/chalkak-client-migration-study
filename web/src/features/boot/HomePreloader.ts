@@ -8,6 +8,6 @@ export interface HomePreloader {
 /** 홈이 생기기 전 기본값: 아무것도 받지 않고 바로 끝난다. */
 export class NoopHomePreloader implements HomePreloader {
   preload(_mode: SessionMode, _signal: AbortSignal): Promise<void> {
-    throw new Error('not implemented');
+    return Promise.resolve();
   }
 }

@@ -16,6 +16,13 @@ import type { StoredSession } from '../../core/auth/SessionStore';
 function setup(session: StoredSession = memberSession()) {
   const env = makeApiEnv(session);
   const toast = new ToastController({ clock: env.clock, ids: new SequentialIdGenerator() });
+  // 재시도 대기를 넘기려고 시계를 크게 돌리면 2.5초 토스트가 만료되므로, 띄운 문구를 따로 기록한다.
+  const shownToasts: string[] = [];
+  const show = toast.show.bind(toast);
+  toast.show = (message: string) => {
+    shownToasts.push(message);
+    show(message);
+  };
   const events = new SessionEvents();
   const reasons: SignedOutReason[] = [];
   events.subscribe((r) => reasons.push(r));
@@ -25,7 +32,7 @@ function setup(session: StoredSession = memberSession()) {
   const authApi = new AuthApi({ api: env.client(), clock: env.clock });
   const service = new AccountService({ authApi, store: env.store, userCaches: caches, toast, sessionEvents: events, logger: env.logger });
   const fixture = (path: string) => () => loadFixture(path).toResponse();
-  return { ...env, toast, reasons, cacheClears, service, fixture };
+  return { ...env, toast, shownToasts, reasons, cacheClears, service, fixture };
 }
 
 const toastMessage = (toast: ToastController) => toast.state.toast?.message ?? null;
@@ -133,12 +140,12 @@ describe('AccountService.withdraw', () => {
     const done = s.service.withdraw();
     await s.clock.advance(60_000);
     expect(await done).toEqual({ kind: 'failed' });
-    expect(toastMessage(s.toast)).toBe(t('auth.withdraw.error'));
-    expect(toastMessage(s.toast)).toBe('요청을 처리하지 못했어요. 다시 시도해 주세요.');
+    expect(s.shownToasts).toEqual([t('auth.withdraw.error')]);
+    expect(s.shownToasts).toEqual(['요청을 처리하지 못했어요. 다시 시도해 주세요.']);
     expect(await s.store.read()).toEqual(memberSession());
     expect(s.cacheClears.count).toBe(0);
     expect(s.reasons).toEqual([]);
-    expect(s.ff.callsTo('DELETE /users/me')).toHaveLength(1);
+    expect(s.ff.callsTo('DELETE /users/me')).toHaveLength(3); // DELETE는 멱등이라 5xx에 2회 재시도(D-21)
   });
 
   it('TC-AUTH-044 네트워크 오류도 같은 토스트이고 세션을 유지한다', async () => {
@@ -147,7 +154,7 @@ describe('AccountService.withdraw', () => {
     const done = s.service.withdraw();
     await s.clock.advance(60_000);
     expect(await done).toEqual({ kind: 'failed' });
-    expect(toastMessage(s.toast)).toBe(t('auth.withdraw.error'));
+    expect(s.shownToasts).toEqual([t('auth.withdraw.error')]);
     expect(await s.store.read()).toEqual(memberSession());
   });
 
@@ -169,7 +176,7 @@ describe('AccountService.withdraw', () => {
     await s.clock.advance(60_000);
     expect(await done).toEqual({ kind: 'failed' });
     expect(await s.store.read()).toEqual(memberSession());
-    expect(toastMessage(s.toast)).toBe(t('auth.withdraw.error'));
+    expect(s.shownToasts).toEqual([t('auth.withdraw.error')]);
   });
 
   it('REQ-AUTH-028 REAUTHENTICATION_REQUIRED면 세션 정리는 갱신 계층이 하고, 탈퇴 실패 토스트는 보이지 않는다', async () => {

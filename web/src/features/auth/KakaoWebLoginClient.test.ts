@@ -154,8 +154,9 @@ describe('KakaoWebLoginClient.resume (콜백 처리)', () => {
 
   it('TC-AUTH-019 코드 교환이 실패하면 일반 실패이고 보관값은 지운다', async () => {
     const { startLogin, stored, client, exchanger } = setup();
-    exchanger.result = Promise.reject(new Error('token endpoint down'));
     await startLogin();
+    exchanger.result = Promise.reject(new Error('token endpoint down'));
+    exchanger.result.catch(() => {});
     await expect(client.resume(callback(stored()!.state))).rejects.toBeInstanceOf(SocialLoginFailedError);
     expect(sessionStorage.getItem(KAKAO_LOGIN_STORAGE_KEY)).toBeNull();
   });

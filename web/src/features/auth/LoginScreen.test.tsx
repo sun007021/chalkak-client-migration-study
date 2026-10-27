@@ -72,16 +72,16 @@ describe('카카오 로그인 흐름', () => {
     expect(h.container.signupDraft.get()).toEqual({ idToken: 'fake-id-token-1', rawNonce: 'fake-raw-nonce-1' });
   });
 
-  it('TC-AUTH-027 카카오 버튼을 3회 연타해도 SDK 호출 1회, 요청 1회이고 진행 중에는 두 버튼이 비활성이며 login.loading이 보인다', async () => {
+  it('TC-AUTH-027 카카오 버튼을 3회 연타해도 SDK 호출 1회, 요청 1회이고 진행 중에는 두 버튼이 비활성이다(login.loading은 social-login 요청 중에만)', async () => {
     const { h } = await openLogin();
     h.social.script(pending);
     route(h, 'auth/social-login__login-success.json');
     fireEvent.click(kakao());
     fireEvent.click(kakao());
     fireEvent.click(kakao());
-    expect(await screen.findByTestId('login.loading')).toBeInTheDocument();
-    expect(kakao()).toBeDisabled();
+    await waitFor(() => expect(kakao()).toBeDisabled());
     expect(guest()).toBeDisabled();
+    expect(screen.queryByTestId('login.loading')).not.toBeInTheDocument(); // testids.md: social-login 요청 중에만 보인다(카카오 진행 중에는 없다)
     await act(async () => h.social.resolvePending());
     await screen.findByTestId('home.root');
     expect(h.social.calls).toBe(1);

@@ -1,4 +1,4 @@
-import type { SessionStore } from '../../core/auth/SessionStore';
+import type { SessionStore, StoredSession } from '../../core/auth/SessionStore';
 import type { Logger } from '../../core/net/Logger';
 import type { Clock } from '../../core/time/Clock';
 
@@ -13,6 +13,28 @@ export type AuthGateDecision = { destination: 'login' } | { destination: 'home';
  * - 아니면 login. refresh 만료·불완전 세션(userId만 있고 토큰 없음)·읽기 실패(손상)는 저장소를 clear()한 뒤 login.
  *   세션 없음(빈 저장소)은 clear하지 않는다.
  */
-export function resolveAuthGate(_deps: { store: SessionStore; clock: Clock; logger?: Logger }): Promise<AuthGateDecision> {
-  throw new Error('not implemented');
+export async function resolveAuthGate(deps: { store: SessionStore; clock: Clock; logger?: Logger }): Promise<AuthGateDecision> {
+  const { store, clock, logger } = deps;
+  const clearQuietly = async (): Promise<void> => {
+    try {
+      await store.clear();
+    } catch (error) {
+      logger?.log('warn', 'failed to clear session', { error: error instanceof Error ? error.name : 'unknown' });
+    }
+  };
+
+  let session: StoredSession;
+  try {
+    session = await store.read();
+  } catch (error) {
+    logger?.log('warn', 'failed to read session', { error: error instanceof Error ? error.name : 'unknown' });
+    await clearQuietly();
+    return { destination: 'login' };
+  }
+
+  const { userId, tokens, isGuest } = session;
+  if (userId && tokens && clock.nowMs() < tokens.refreshTokenExpiresAt) return { destination: 'home', mode: 'member' };
+  if (isGuest) return { destination: 'home', mode: 'guest' };
+  if (userId || tokens) await clearQuietly(); // 만료·불완전 세션
+  return { destination: 'login' };
 }
