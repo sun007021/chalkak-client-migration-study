@@ -98,3 +98,21 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
 - 로그아웃: `AuthRepository.clearLocalSession()`(세션·캐시·푸시 등록 캐시, 한 단계가 실패해도 나머지를 시도)을 await한 직후 `toLogin()`하고, 서버 폐기(`revokeRefreshToken`, 실패 무시·절대 reject 없음)는 기다리지 않는다. 로컬 정리가 실패해도 로그인으로 보내고 오류는 `reportError`(기본 console.error)로만 남긴다.
 - 카카오 오류 분류(`mapKakaoSdkError`)는 라이브러리 6.0.4 네이티브 소스에서 확인한 토큰(iOS `ClientFailed(Cancelled)`·`MustInitAppKey`, Android `Cancelled`·`kakao_app_key`)만 쓴다. Android 실제 문구와 시뮬레이터(카카오톡 없음)에서 계정 로그인으로 넘어가는지는 E2E에서 확정한다(`SeoulKakaoSdk.isTalkAvailable()`은 true 고정이라 `login()` 내부 폴백에 의존).
 - E2E 빌드: `APP_VARIANT=e2e E2E_KAKAO_ID_TOKEN=<fixture idToken> API_BASE_URL=http://localhost:4010 npx expo prebuild && npx expo run:ios`. `app.config.ts`는 `APP_VARIANT=e2e`일 때만 토큰을 `extra`에 싣고, `selectSocialLoginClient`도 `appVariant === 'e2e'`일 때만 Fake를 고른다(배포 빌드에서 우회 불가).
+
+## 홈·배너·하단 탭 (`src/features/home`, `src/features/banner`, `src/app`)
+
+- **홈 불러오기 규칙(한 곳)**: 응답이 성공하면 교체, 실패하면 "이미 내용이 있으면 유지 + (당겨서 새로고침일 때만) 토스트, 내용이 없으면 그 섹션만 error". 최초·복귀·날짜 변경은 조용히(`quietReload`), 당겨서 새로고침만 `refreshing`과 토스트를 쓴다. 토스트는 한 번에 최대 1건(화면 순서상 첫 실패 섹션, 연결 실패면 `common.error.network`).
+- **요청 세트와 세대 번호**: `HomeViewModel`은 요청을 한 세트(`RequestContext`: 세대 번호 + `AbortSignal`)로 묶는다. 새로고침·이탈(`onHidden`)·날짜 변경·`clearAll`이 세대를 올려 이전 세트를 취소하고, 그 응답은 버린다. 취소는 오류가 아니다(`CancelledError` -> 조용히 끝).
+- **히어로 = 오늘 응답 + 주간 달력**: 히어로 썸네일은 달력의 같은 `postId`에서 오므로 두 응답이 따로 와도 `publishHero()`가 합쳐서 낸다(달력이 늦으면 썸네일만 나중에 채워진다).
+- **ViewModel 소유**: `HomeViewModelOwner`가 `BootViewModel` phase가 `main`에 들어갈 때(회원/게스트 모드와 함께) 홈을 만들어 `UserDataCacheRegistry`에 올리고, 떠나면 해제·dispose한다. `AuthRepository`의 캐시 목록은 생성 시점에 고정되므로 레지스트리 하나만 넣고 나중에 생기는 캐시는 거기에 등록한다. `HomeScreen`은 마운트=`onShown`, 언마운트=`onHidden`만 부른다. 홈 탭은 포커스일 때만 마운트해(`useIsFocused`) 탭 복귀·알림함/상세에서 돌아옴이 모두 "다시 보임"이 된다(REQ-NAV-004, REQ-HOME-040).
+- **ISSUE 다음 페이지**: 카드는 세로로 쌓이므로 `HomeScreen`이 스크롤 위치와 카드 위치로 "보이는 마지막 카드"를 계산해 `BannerFeedViewModel.onLastVisibleIndexChanged`에 넘긴다(같은 카드가 마지막인 동안은 되풀이하지 않는다).
+- **웹뷰(`react-native-webview` 14.0.1)**: 어댑터(`IssueWebContent`)는 이벤트를 `issueWebBridge`의 순수 함수로 `IssueNavigationRequest`로 바꿔 `IssueWebViewModel.onNavigationRequest`에 넘긴다.
+  - `originWhitelist={['*']}`가 필수다. 기본(http/https만)이면 `tel:`·`intent:` 같은 스킴을 라이브러리가 정책을 거치지 않고 `Linking.openURL`로 열어 버린다(REQ-BANR-017).
+  - 사용자 제스처: iOS는 `navigationType`(`click`·`formsubmit`). **Android는 `onShouldStartLoadWithRequest`에 제스처가 없다**(네이티브 `hasGesture()`를 버림, `isTopFrame`도 항상 true, 첫 `loadUrl`은 이벤트 자체가 없음). 그래서 Android는 `injectedJavaScriptBeforeContentLoaded`로 신뢰된(`isTrusted`) 링크 클릭을 페이지 안에서 잡아 `preventDefault` 후 메시지로 보내고, 네이티브 요청은 모두 "제스처 없음"(리다이렉트·스크립트 이동 -> block)으로 둔다. 메시지로 제스처만 먼저 알리는 방식은 쓰지 않는다: 메시지(이벤트 디스패처)와 shouldOverrideUrlLoading(JS 직접 호출)의 도착 순서가 보장되지 않는다. **Android 실기기/에뮬레이터 E2E로 확정 필요.**
+  - `javaScriptCanOpenWindowsAutomatically={false}`: 제스처 없는 `window.open`은 플랫폼이 막으므로 `onOpenWindow`로 오는 새 창은 제스처가 있는 것으로 본다.
+  - jest에서는 `jest.setup.ts`의 가짜 `WebView`가 마지막 props를 `WebView.lastProps`에 남긴다(네이티브 모듈이 없으면 import에서 던진다).
+- **jest 함정**: RN jest 목에서 `AppState.currentState`와 `Linking.*`는 `jest.fn`이다. `jest.replaceProperty`/`spyOn`이 거부하므로 값을 직접 넣고 afterEach에서 되돌린다. `Linking`의 호출 기록은 `restoreAllMocks`로 지워지지 않아 `mockClear`가 필요하다.
+- **타입 함정(RN 0.88)**: `StyleSheet.absoluteFillObject`가 타입에서 사라졌다. 필요하면 `position: 'absolute', top/left/right/bottom: 0`을 직접 쓴다. `ScrollView` ref 타입은 `ScrollViewInstance`다.
+- **React Compiler lint(`react-hooks/refs`)**: 컨테이너처럼 `...Ref` 이름의 프로퍼티(내비게이션 ref)를 가진 객체를 렌더 중 읽으면 "refs during render" 오류가 난다. 그런 값은 `useAppContainer()`로 자식 컴포넌트에서 꺼내 쓰고, 프로퍼티 이름도 `navigationHandle`처럼 Ref로 끝내지 않는다.
+- **토스트**: `ToastCenter`(ToastPresenter 구현)가 상태를 들고 `ToastHost`가 그린다(`toast.container`/`toast.message`, 2.5초, 같은 문구도 id가 달라 다시 그림, 백그라운드면 버림).
+- **앱 생명주기**: `ReactNativeAppVisibility`는 `active`/`background` 전환만 알린다. iOS `inactive`(알림 센터·앱 전환기)는 곧 돌아오는 상태라 알리지 않는다(알리면 그때마다 홈이 다시 불러온다).

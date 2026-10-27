@@ -1,0 +1,46 @@
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
+import { useCallback } from 'react';
+import { View } from 'react-native';
+
+import { useViewModelState } from '../core/state/useViewModelState';
+import { HomeScreen } from '../features/home/HomeScreen';
+import { PlaceholderScreen } from '../features/placeholder/PlaceholderScreen';
+import { useAppContainer } from './AppContainerContext';
+import { BottomBar } from './BottomBar';
+import type { TabParamList } from './navigation/routes';
+
+const Tab = createBottomTabNavigator<TabParamList>();
+
+/** 하단 탭 네 개의 루트. 홈 외에는 해당 기능 PR이 채우기 전까지 placeholder다. */
+export function MainTabs() {
+  return (
+    <Tab.Navigator
+      tabBar={(props) => <BottomBar {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      <Tab.Screen name="Home" component={HomeTab} />
+      <Tab.Screen name="Display" component={DisplayTab} />
+      <Tab.Screen name="Record" component={RecordTab} />
+      <Tab.Screen name="Settings" component={SettingsTab} />
+    </Tab.Navigator>
+  );
+}
+
+/**
+ * 홈 탭. ViewModel은 소유자(homeOwner)가 메인에 들어올 때 만들고 로그아웃 때 버리므로 여기서는 받아서 그리기만 한다.
+ * 화면은 탭이 포커스일 때만 마운트한다: 선택할 때마다 상태 복원 없이 새로 보이고(REQ-NAV-004), 마운트 = onShown이라
+ * 탭 복귀·알림함/상세에서 돌아옴이 모두 "다시 보임"으로 처리된다(REQ-HOME-040·043·045).
+ */
+function HomeTab() {
+  const { homeOwner, analytics } = useAppContainer();
+  const { viewModel } = useViewModelState(homeOwner);
+  const focused = useIsFocused();
+  useFocusEffect(useCallback(() => analytics.screenView('home'), [analytics]));
+  if (!viewModel || !focused) return <View style={{ flex: 1 }} />;
+  return <HomeScreen viewModel={viewModel} />;
+}
+
+const DisplayTab = () => <PlaceholderScreen label="전시" />;
+const RecordTab = () => <PlaceholderScreen label="기록" />;
+const SettingsTab = () => <PlaceholderScreen label="설정" />;
