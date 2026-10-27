@@ -2,7 +2,6 @@ import 'package:chalkak/core/constants/app_constants.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  // TODO(shared): shared/constants.json 대조 테스트는 파일이 생긴 뒤 추가한다.
   test('00-overview §6 상수 값', () {
     expect(AppConstants.serviceTimeZone, 'Asia/Seoul');
     expect(AppConstants.firstTopicDate, '2026-09-17');

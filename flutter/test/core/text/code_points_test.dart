@@ -1,4 +1,4 @@
-import 'package:chalkak/core/copy/ko.dart';
+import 'package:chalkak/core/copy/ko.g.dart';
 import 'package:chalkak/core/text/code_points.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -64,7 +64,7 @@ void main() {
 
   group('PostTitle.display', () {
     test('TC-FEED-013 TC-FEED-053 null·빈 값은 무제', () {
-      expect(PostTitle.display(null), Ko.untitled);
+      expect(PostTitle.display(null), Copy.feedEditUntitled);
       expect(PostTitle.display(''), '무제');
       expect(PostTitle.display('  '), '무제');
       expect(PostTitle.display('안녕'), '안녕');
