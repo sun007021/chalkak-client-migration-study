@@ -149,8 +149,8 @@
 | record.picker.title | 날짜 선택 | 날짜 선택 시트 제목 |
 | record.pending.badge | 사진 반영 중 | `PENDING` 배지 |
 | record.pending.tooltip | 사진을 반영하고 있어요.\n표시되기까지 조금 시간이 걸릴 수도 있어요! | 배지 안내 풍선 |
-| record.pending.hint_open | 자세한 안내 보기 | 배지 접근성 라벨 |
-| record.pending.hint_close | 자세한 안내 닫기 | 배지 접근성 라벨 |
+| record.pending.hint-open | 자세한 안내 보기 | 배지 접근성 라벨 |
+| record.pending.hint-close | 자세한 안내 닫기 | 배지 접근성 라벨 |
 | record.action.feed | 피드에서 보기 | `APPROVED` 동작 |
 | record.action.display | 전시 보러가기 | `APPROVED` 동작 |
 | record.save | 이미지로 저장 | 달력 이미지 저장 버튼 |
