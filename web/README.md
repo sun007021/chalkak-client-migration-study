@@ -53,7 +53,11 @@ src/
 
 ## 화면 추적(분석)
 
-정식 경로는 **라우트 기반**이다. `RouteScreenViewTracker`가 Router 안에서 pathname이 바뀔 때마다 `screen_view`를 보낸다(쿼리·해시만 바뀌면 보내지 않고, 다른 화면에 갔다 돌아오면 다시 보낸다). 라우트가 아닌 화면(시트·모달 등 별도 `screen_name`이 있는 것)만 `useScreenView`를 쓴다. 한 화면에 둘을 같이 쓰면 중복 전송이다.
+두 경로가 서로 겹치지 않게 나눈다.
+
+- **전역 경로 추적**: `RouteScreenViewTracker`가 Router 안에서 pathname이 바뀔 때마다 `screen_view`를 보낸다(쿼리·해시만 바뀌면 보내지 않고, 다른 화면에 갔다 돌아오면 다시 보낸다). **탭이 아닌 화면**(`/login`, `/signup/terms` 등)만 해당하고 `screenNameForPath`가 그 목록이다.
+- **탭 4개(홈·전시·기록·설정)**: 전역 추적에서 뺐다. 보호(RequireSession)와 접근 게이트(`TabGate`, `canEnterTab`)를 통과해 **실제로 그려진 탭 화면**이 `useScreenView(name)`로 보낸다. 그래서 세션 없이 `/display`로 들어오거나 게스트가 `/record`로 들어와 리다이렉트되는 경우에는 그 화면의 `screen_view`가 나가지 않는다.
+- 라우트가 아닌 화면(시트·모달 등 별도 `screen_name`이 있는 것)도 `useScreenView`를 쓴다. 한 화면을 두 경로로 보내면 중복 전송이다.
 
 ## Web에서 다른 점
 
