@@ -10,7 +10,8 @@ const SKIP_DIRS = ['node_modules', 'build', 'Pods', '.git', '.gradle', '.dart_to
 const WILDCARD = '[A-Za-z0-9_-]+';
 const ID_SHAPE = /^[a-z][a-z0-9-]*\.[a-z0-9][a-z0-9{}\-.]*$/;
 // attribute / call name followed by a string literal (interpolations allowed inside)
-const LITERAL_RE = /(?:testTag|accessibilityIdentifier|testID|data-testid|dataTestId|Key|identifier|getByTestId|queryByTestId|findByTestId|onNodeWithTag|byKey|byValueKey)\s*[(=:]\s*\{?\s*(["'`])((?:(?!\1).)*)\1/g;
+// Flutter `Key('...')`/`ValueKey('...')` only as constructor calls, so fields like `copyKey:` are not mistaken for testIDs.
+const LITERAL_RE = /(?:\b(?:testTag|accessibilityIdentifier|testID|data-testid|dataTestId|identifier|getByTestId|queryByTestId|findByTestId|onNodeWithTag|byKey|byValueKey)\s*[(=:]|\b(?:Key|ValueKey)\s*\()\s*\{?\s*(["'`])((?:(?!\1).)*)\1/g;
 const INTERPOLATION_RE = /\$\{[^}]*\}|\\\([^)]*\)|\$[A-Za-z_][A-Za-z0-9_]*|\{[^}]*\}/g;
 
 const escapeRe = (s) => s.replace(/[.*+?^$()|[\]\\]/g, '\\$&');

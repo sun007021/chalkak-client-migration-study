@@ -55,3 +55,24 @@ test('unknownIds lists TC ids found in source but absent from the catalog', () =
   const tcs = parseCatalog(path.join(repo(), 'docs/testing/catalog'));
   assert.deepEqual(unknownIds(tcs, new Set(['TC-HOME-001', 'TC-HOME-999', 'TC-ABC-001'])), ['TC-ABC-001', 'TC-HOME-999']);
 });
+
+test('scanPlatform ignores TC ids that appear only in comment lines', async () => {
+  const fsm = await import('node:fs');
+  const os = await import('node:os');
+  const root = fsm.mkdtempSync(path.join(os.tmpdir(), 'tc-comments-'));
+  const src = path.join(root, 'android/src/test');
+  fsm.mkdirSync(src, { recursive: true });
+  fsm.writeFileSync(path.join(src, 'A.kt'), [
+    '/**',
+    ' * Deferred: TC-NET-001, TC-NET-002',
+    ' */',
+    '// TC-NET-003 later',
+    'class A {',
+    '  @Test fun `TC-TIME-001 kst today`() {} // also TC-NET-004 in trailing comment counts as code line',
+    '}',
+  ].join('\n'));
+  fsm.writeFileSync(path.join(src, 'b.dart'), "/// TC-NET-005 doc\ntest('TC-TIME-002 x', () {});\n# not dart but fine\n");
+  const found = [...scanPlatform(root, 'android')].sort();
+  assert.ok(found.includes('TC-TIME-001'));
+  for (const id of ['TC-NET-001', 'TC-NET-002', 'TC-NET-003', 'TC-NET-005']) assert.ok(!found.includes(id), id);
+});

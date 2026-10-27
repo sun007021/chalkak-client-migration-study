@@ -28,6 +28,7 @@
   "UPLOAD_PUT_TIMEOUT_MS": 60000,
   "RETRY_BACKOFF_MS": [500, 1000],
   "RETRY_MAX": 2,
+  "RETRY_AFTER_MAX_MS": 30000,
   "VERSION_LOOKUP_TIMEOUT_MS": 3000,
   "TERMS_ALLOWED_HOSTS": ["notion.com", "notion.so", "notion.site"],
   "TERMS_URLS": {
