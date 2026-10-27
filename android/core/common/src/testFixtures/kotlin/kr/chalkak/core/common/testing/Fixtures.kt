@@ -2,7 +2,9 @@ package kr.chalkak.core.common.testing
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
@@ -12,7 +14,7 @@ import java.util.TimeZone
 
 /**
  * Reads the repo-level `shared/` assets (no copies). The `shared.dir` system property is set in Gradle.
- * NOTE: may move to a `:core:testing` module once other modules need it.
+ * Published to other modules via the `java-test-fixtures` plugin (`testFixtures(project(":core:common"))`).
  */
 object Fixtures {
     val sharedDir: File = File(requireNotNull(System.getProperty("shared.dir")) { "shared.dir system property missing" })
@@ -22,6 +24,13 @@ object Fixtures {
     fun constants(): JsonObject = Json.parseToJsonElement(File(sharedDir, "constants.json").readText(Charsets.UTF_8)).jsonObject
 
     val fixtureNow: Instant by lazy { Instant.parse(constants().getValue("FIXTURE_NOW").jsonPrimitive.content) }
+
+    private val manifest: JsonArray by lazy {
+        Json.parseToJsonElement(File(sharedDir, "fixtures/manifest.json").readText(Charsets.UTF_8)).jsonArray
+    }
+
+    fun manifestEntry(path: String): JsonObject =
+        manifest.map { it.jsonObject }.first { it.getValue("fixture").jsonPrimitive.content == path }
 }
 
 /** Runs [block] with the JVM default time zone / locale swapped, then restores them. */
