@@ -36,7 +36,8 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "format": "prettier --write .",
-    "verify": "npm run lint && npm run typecheck && npm test"
+    "verify": "npm run lint && npm run typecheck && npm test && npm run test:tz",
+    "test:tz": "for tz in America/Los_Angeles Pacific/Kiritimati Pacific/Pago_Pago UTC Asia/Seoul; do TZ=$tz jest src/core/time || exit 1; done"
   },
   "private": true,
   "jest": {
