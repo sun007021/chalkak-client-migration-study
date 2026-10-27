@@ -26,10 +26,18 @@ abstract final class PostTitle {
 
   /// 입력 변경 처리. 한 글자씩 입력해 한도를 넘으면 [previous] 유지,
   /// 한꺼번에 들어온 붙여넣기는 strip 후 10 code point까지 앞에서 자른다.
-  static String applyInput({required String previous, required String next}) {
+  ///
+  /// [replaced]는 이번 편집으로 덮어쓴 선택 영역의 code point 수다. 선택 영역을
+  /// 바꿔 붙여넣으면 전체 길이 증가가 1 이하여도 입력된 글자는 여러 개일 수 있다.
+  static String applyInput({
+    required String previous,
+    required String next,
+    int replaced = 0,
+  }) {
     if (isWithinLimit(next)) return next;
-    final added = codePointLength(next) - codePointLength(previous);
-    if (added <= 1) return previous;
+    final inserted =
+        codePointLength(next) - (codePointLength(previous) - replaced);
+    if (inserted <= 1) return previous;
     final kept = next.trim().runes.take(AppConstants.postTitleMax);
     return String.fromCharCodes(kept);
   }
@@ -42,9 +50,14 @@ class PostTitleInputFormatter extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
+    final selection = oldValue.selection;
+    final replaced = selection.isValid && !selection.isCollapsed
+        ? codePointLength(selection.textInside(oldValue.text))
+        : 0;
     final text = PostTitle.applyInput(
       previous: oldValue.text,
       next: newValue.text,
+      replaced: replaced,
     );
     if (text == newValue.text) return newValue;
     if (text == oldValue.text) return oldValue;

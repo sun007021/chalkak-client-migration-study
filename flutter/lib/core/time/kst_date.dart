@@ -2,6 +2,9 @@ import '../constants/app_constants.dart';
 
 const _kstOffset = Duration(hours: 9);
 
+/// 순간을 KST 벽시계 값으로 바꾼 UTC 표기 DateTime(시·분 표시용, 기기 시간대 무관).
+DateTime toKstWallClock(DateTime instant) => instant.toUtc().add(_kstOffset);
+
 String _pad(int value, int width) => value.toString().padLeft(width, '0');
 
 /// KST(UTC+9 고정, 서머타임 없음) 달력 날짜. 기기 시간대와 무관하다.
@@ -14,7 +17,7 @@ class KstDate implements Comparable<KstDate> {
 
   /// 순간(Instant)을 KST 날짜로 바꾼다. 입력의 isUtc 여부와 무관하다.
   factory KstDate.fromInstant(DateTime instant) {
-    final kst = instant.toUtc().add(_kstOffset);
+    final kst = toKstWallClock(instant);
     return KstDate(kst.year, kst.month, kst.day);
   }
 
@@ -38,7 +41,7 @@ class KstDate implements Comparable<KstDate> {
   static final _pattern = RegExp(r'^([0-9]{4})-([0-9]{2})-([0-9]{2})$');
 
   /// D-12 FIRST_TOPIC_DATE.
-  static KstDate get firstTopic => KstDate.parse(AppConstants.firstTopicDate);
+  static final KstDate firstTopic = KstDate.parse(AppConstants.firstTopicDate);
 
   /// 월의 말일을 넘으면 말일로 보정한다(31일 → 30일 달, 2027-02-29 → 02-28).
   factory KstDate.clamped(int year, int month, int day) {

@@ -1,7 +1,5 @@
 import 'kst_date.dart';
 
-const _kstOffset = Duration(hours: 9);
-
 String _two(int v) => v.toString().padLeft(2, '0');
 
 /// 날짜 표시 문자열(common-infra "날짜 포맷 목록"). 0 패딩 없음, 로캘·기기 시간대 무관.
@@ -11,7 +9,7 @@ abstract final class KstFormat {
 
   /// '10월 20일 14:00' (24시간제, 연도 없음, D-09).
   static String notificationTime(DateTime instant) {
-    final kst = instant.toUtc().add(_kstOffset);
+    final kst = toKstWallClock(instant);
     return '${kst.month}월 ${kst.day}일 ${_two(kst.hour)}:${_two(kst.minute)}';
   }
 

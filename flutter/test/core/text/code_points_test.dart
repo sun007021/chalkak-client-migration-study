@@ -128,5 +128,31 @@ void main() {
       expect(result.text, '가나다라마바사아자차');
       expect(result.selection.baseOffset, result.text.length);
     });
+    test(
+      'TC-FEED-020 한도에 찬 상태에서 선택 영역을 더 긴 글로 바꿔 붙여넣으면 10 code point로 자른다',
+      () {
+        const old = '가나다라마바사아자차';
+        // 앞 5자 선택 후 6자 붙여넣기: 전체 길이는 +1이지만 입력은 6자.
+        final result = PostTitleInputFormatter().formatEditUpdate(
+          const TextEditingValue(
+            text: old,
+            selection: TextSelection(baseOffset: 0, extentOffset: 5),
+          ),
+          v('ABCDEF마바사아자차'),
+        );
+        expect(result.text, 'ABCDEF마바사아');
+      },
+    );
+
+    test('TC-FEED-019 선택 영역 1자를 1자로 바꾸는 입력은 한도 안이면 허용', () {
+      final result = PostTitleInputFormatter().formatEditUpdate(
+        const TextEditingValue(
+          text: '가나다라마바사아자차',
+          selection: TextSelection(baseOffset: 0, extentOffset: 1),
+        ),
+        v('A나다라마바사아자차'),
+      );
+      expect(result.text, 'A나다라마바사아자차');
+    });
   });
 }
