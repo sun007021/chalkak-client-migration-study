@@ -1,0 +1,100 @@
+{
+  "_kind": "case",
+  "cases": [
+    {
+      "name": "tabs",
+      "events": [
+        {
+          "name": "bottom_navigation_selected",
+          "params": {
+            "destination": "home"
+          }
+        },
+        {
+          "name": "screen_view",
+          "params": {
+            "screen_name": "home"
+          }
+        },
+        {
+          "name": "bottom_navigation_selected",
+          "params": {
+            "destination": "display"
+          }
+        },
+        {
+          "name": "screen_view",
+          "params": {
+            "screen_name": "display"
+          }
+        },
+        {
+          "name": "bottom_navigation_selected",
+          "params": {
+            "destination": "record"
+          }
+        },
+        {
+          "name": "screen_view",
+          "params": {
+            "screen_name": "record"
+          }
+        },
+        {
+          "name": "bottom_navigation_selected",
+          "params": {
+            "destination": "settings"
+          }
+        },
+        {
+          "name": "screen_view",
+          "params": {
+            "screen_name": "settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "representative-journey",
+      "description": "launch -> login -> guest -> home -> display -> settings",
+      "events": [
+        {
+          "name": "screen_view",
+          "params": {
+            "screen_name": "login"
+          }
+        },
+        {
+          "name": "screen_view",
+          "params": {
+            "screen_name": "home"
+          }
+        },
+        {
+          "name": "bottom_navigation_selected",
+          "params": {
+            "destination": "display"
+          }
+        },
+        {
+          "name": "screen_view",
+          "params": {
+            "screen_name": "display"
+          }
+        },
+        {
+          "name": "bottom_navigation_selected",
+          "params": {
+            "destination": "settings"
+          }
+        },
+        {
+          "name": "screen_view",
+          "params": {
+            "screen_name": "settings"
+          }
+        }
+      ]
+    }
+  ]
+}

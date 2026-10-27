@@ -1,0 +1,136 @@
+[
+  {
+    "fixture": "like/posts-likes-delete__not-liked.json",
+    "method": "DELETE",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/likes",
+    "status": 200,
+    "tc": [
+      "TC-LIKE-033"
+    ]
+  },
+  {
+    "fixture": "like/posts-likes-delete__unliked.json",
+    "method": "DELETE",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/likes",
+    "status": 200,
+    "tc": [
+      "TC-LIKE-001",
+      "TC-LIKE-007",
+      "TC-LIKE-012",
+      "TC-LIKE-016"
+    ]
+  },
+  {
+    "fixture": "like/posts-likes-put__401-unauthorized.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/likes",
+    "status": 401,
+    "headers": {
+      "WWW-Authenticate": "Bearer"
+    },
+    "tc": [
+      "TC-LIKE-013"
+    ]
+  },
+  {
+    "fixture": "like/posts-likes-put__403-banned.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/likes",
+    "status": 403,
+    "tc": [
+      "TC-LIKE-011"
+    ]
+  },
+  {
+    "fixture": "like/posts-likes-put__404-not-found.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/likes",
+    "status": 404,
+    "tc": [
+      "TC-LIKE-010"
+    ]
+  },
+  {
+    "fixture": "like/posts-likes-put__429-retry-after.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/likes",
+    "status": 429,
+    "headers": {
+      "Retry-After": "1"
+    },
+    "tc": [
+      "TC-LIKE-027"
+    ]
+  },
+  {
+    "fixture": "like/posts-likes-put__500-server-error.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/likes",
+    "status": 500,
+    "tc": [
+      "TC-LIKE-009",
+      "TC-LIKE-020",
+      "TC-LIKE-022",
+      "TC-LIKE-026",
+      "TC-LIKE-029",
+      "TC-LIKE-030"
+    ]
+  },
+  {
+    "fixture": "like/posts-likes-put__already-liked.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/likes",
+    "status": 200,
+    "tc": [
+      "TC-LIKE-033"
+    ]
+  },
+  {
+    "fixture": "like/posts-likes-put__inconsistent-state.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/likes",
+    "status": 200,
+    "tc": [
+      "TC-LIKE-002"
+    ]
+  },
+  {
+    "fixture": "like/posts-likes-put__liked.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/likes",
+    "status": 200,
+    "tc": [
+      "TC-LIKE-001",
+      "TC-LIKE-003",
+      "TC-LIKE-004",
+      "TC-LIKE-005",
+      "TC-LIKE-006",
+      "TC-LIKE-013",
+      "TC-LIKE-015",
+      "TC-LIKE-016",
+      "TC-LIKE-018",
+      "TC-LIKE-019",
+      "TC-LIKE-025",
+      "TC-LIKE-026",
+      "TC-LIKE-032"
+    ]
+  },
+  {
+    "fixture": "like/posts-likes-put__liked-count-differs.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/likes",
+    "status": 200,
+    "tc": [
+      "TC-LIKE-008"
+    ]
+  },
+  {
+    "fixture": "like/posts-likes-put__postid-mismatch.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/likes",
+    "status": 200,
+    "tc": [
+      "TC-LIKE-002"
+    ]
+  }
+]

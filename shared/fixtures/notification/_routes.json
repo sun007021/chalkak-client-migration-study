@@ -1,0 +1,351 @@
+[
+  {
+    "fixture": "notification/notifications__page1.json",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "query": {
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-NAV-030",
+      "TC-NET-059",
+      "TC-NOTI-001",
+      "TC-NOTI-002",
+      "TC-NOTI-003",
+      "TC-NOTI-011",
+      "TC-NOTI-019",
+      "TC-NOTI-021"
+    ]
+  },
+  {
+    "fixture": "notification/notifications__page2-last.json",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "query": {
+      "page": "2",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-NOTI-015",
+      "TC-NOTI-016"
+    ]
+  },
+  {
+    "fixture": "notification/notifications__overlap-page2.json",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "query": {
+      "page": "2",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-NOTI-017"
+    ]
+  },
+  {
+    "fixture": "notification/notifications__empty.json",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "query": {
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-NOTI-005"
+    ]
+  },
+  {
+    "fixture": "notification/notifications__unknown-type.json",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "query": {
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-NOTI-024"
+    ]
+  },
+  {
+    "fixture": "notification/notifications__topic-reminder.json",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "query": {
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-NOTI-025"
+    ]
+  },
+  {
+    "fixture": "notification/notifications__null-source.json",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "query": {
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-NOTI-026"
+    ]
+  },
+  {
+    "fixture": "notification/notifications__bad-ai-source.json",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "query": {
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-NOTI-029"
+    ]
+  },
+  {
+    "fixture": "notification/notifications__kst-boundary.json",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "query": {
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-NOTI-012",
+      "TC-NOTI-013",
+      "TC-NOTI-014",
+      "TC-TIME-024"
+    ]
+  },
+  {
+    "fixture": "notification/notifications__30day-boundary.json",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "query": {
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-NOTI-023"
+    ]
+  },
+  {
+    "fixture": "notification/notifications__missing-fields.json",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "query": {
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-NOTI-008"
+    ]
+  },
+  {
+    "fixture": "notification/notifications__not-found.json",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "query": {
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 404,
+    "tc": [
+      "TC-NOTI-010"
+    ]
+  },
+  {
+    "fixture": "notification/notifications__unauthorized.json",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "query": {
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 401,
+    "headers": {
+      "WWW-Authenticate": "Bearer"
+    },
+    "tc": [
+      "TC-NOTI-009"
+    ]
+  },
+  {
+    "fixture": "notification/notifications__internal-error.json",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "query": {
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 500,
+    "tc": [
+      "TC-NOTI-006",
+      "TC-NOTI-018",
+      "TC-NOTI-020"
+    ]
+  },
+  {
+    "fixture": "notification/notification-detail__rejected.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/33333333-3333-4333-8333-333333333302",
+    "status": 200,
+    "tc": [
+      "TC-NAV-037",
+      "TC-NOTI-041",
+      "TC-NOTI-042"
+    ]
+  },
+  {
+    "fixture": "notification/notification-detail__rejected-long-reason.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/33333333-3333-4333-8333-333333333307",
+    "status": 200,
+    "tc": [
+      "TC-NOTI-043"
+    ]
+  },
+  {
+    "fixture": "notification/notification-detail__notice.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/33333333-3333-4333-8333-333333333305",
+    "status": 200,
+    "tc": [
+      "TC-NOTI-030",
+      "TC-NOTI-044"
+    ]
+  },
+  {
+    "fixture": "notification/notification-detail__approved.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/33333333-3333-4333-8333-333333333301",
+    "status": 200,
+    "tc": [
+      "TC-NOTI-047"
+    ]
+  },
+  {
+    "fixture": "notification/notification-detail__not-found.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/33333333-3333-4333-8333-333333333399",
+    "status": 404,
+    "tc": [
+      "TC-NOTI-045"
+    ]
+  },
+  {
+    "fixture": "notification/notification-detail__internal-error.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/33333333-3333-4333-8333-333333333302",
+    "status": 500,
+    "tc": [
+      "TC-NOTI-046"
+    ]
+  },
+  {
+    "fixture": "notification/unread-status__true.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-status",
+    "status": 200,
+    "tc": [
+      "TC-NAV-046",
+      "TC-NOTI-049",
+      "TC-NOTI-050",
+      "TC-NOTI-053",
+      "TC-PUSH-071"
+    ]
+  },
+  {
+    "fixture": "notification/unread-status__false.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-status",
+    "status": 200,
+    "tc": [
+      "TC-NOTI-049",
+      "TC-NOTI-054"
+    ]
+  },
+  {
+    "fixture": "notification/unread-status__unauthorized.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-status",
+    "status": 401,
+    "headers": {
+      "WWW-Authenticate": "Bearer"
+    },
+    "tc": [
+      "TC-NOTI-055"
+    ]
+  },
+  {
+    "fixture": "notification/unread-status__internal-error.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-status",
+    "status": 500,
+    "tc": [
+      "TC-NOTI-052"
+    ]
+  },
+  {
+    "fixture": "notification/notification-read__no-content.json",
+    "method": "PATCH",
+    "path": "/api/v1/notifications/33333333-3333-4333-8333-333333333301/read",
+    "status": 204,
+    "tc": [
+      "TC-NOTI-027",
+      "TC-NOTI-028",
+      "TC-NOTI-030",
+      "TC-NOTI-031",
+      "TC-NOTI-036",
+      "TC-NOTI-037",
+      "TC-NOTI-038",
+      "TC-NOTI-040",
+      "TC-PUSH-053"
+    ]
+  },
+  {
+    "fixture": "notification/notification-read__not-found.json",
+    "method": "PATCH",
+    "path": "/api/v1/notifications/33333333-3333-4333-8333-333333333399/read",
+    "status": 404,
+    "tc": [
+      "TC-NOTI-033",
+      "TC-PUSH-055"
+    ]
+  },
+  {
+    "fixture": "notification/notification-read__unauthorized.json",
+    "method": "PATCH",
+    "path": "/api/v1/notifications/33333333-3333-4333-8333-333333333301/read",
+    "status": 401,
+    "headers": {
+      "WWW-Authenticate": "Bearer"
+    },
+    "tc": [
+      "TC-NOTI-035",
+      "TC-PUSH-057"
+    ]
+  },
+  {
+    "fixture": "notification/notification-read__internal-error.json",
+    "method": "PATCH",
+    "path": "/api/v1/notifications/33333333-3333-4333-8333-333333333301/read",
+    "status": 500,
+    "tc": [
+      "TC-NOTI-034",
+      "TC-PUSH-056"
+    ]
+  }
+]

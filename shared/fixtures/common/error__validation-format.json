@@ -1,0 +1,4 @@
+{
+  "errorCode": "BUSINESS_ERROR",
+  "message": "date: 요청 값의 형식이 올바르지 않습니다."
+}

@@ -1,0 +1,234 @@
+[
+  {
+    "fixture": "common/error__bad-gateway-html.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-login",
+    "status": 502,
+    "tc": [
+      "TC-AUTH-026",
+      "TC-NET-004"
+    ]
+  },
+  {
+    "fixture": "common/error__business-400.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27",
+      "sort": "invalid"
+    },
+    "status": 400,
+    "tc": [
+      "TC-NET-001",
+      "TC-NET-026",
+      "TC-NET-039"
+    ]
+  },
+  {
+    "fixture": "common/error__empty-body-500.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-status",
+    "status": 500,
+    "tc": [
+      "TC-NET-004"
+    ]
+  },
+  {
+    "fixture": "common/error__forbidden-banned.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/likes",
+    "status": 403,
+    "tc": [
+      "TC-NET-032"
+    ]
+  },
+  {
+    "fixture": "common/error__forbidden-no-permission.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-status",
+    "status": 403,
+    "tc": [
+      "TC-NET-033"
+    ]
+  },
+  {
+    "fixture": "common/error__internal-500.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-status",
+    "status": 500,
+    "tc": [
+      "TC-NET-036",
+      "TC-NET-037",
+      "TC-NET-038",
+      "TC-NET-047",
+      "TC-NET-060",
+      "TC-ONB-042"
+    ]
+  },
+  {
+    "fixture": "common/error__not-found-api.json",
+    "method": "GET",
+    "path": "/api/v1/not-an-endpoint",
+    "status": 404,
+    "tc": [
+      "TC-NET-034"
+    ]
+  },
+  {
+    "fixture": "common/error__rate-limited-429.json",
+    "method": "POST",
+    "path": "/api/v1/feedbacks",
+    "status": 429,
+    "headers": {
+      "Retry-After": "2"
+    },
+    "tc": [
+      "TC-NET-040",
+      "TC-NET-042"
+    ]
+  },
+  {
+    "fixture": "common/error__resource-state-changed.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201",
+    "status": 400,
+    "tc": [
+      "TC-NET-003"
+    ]
+  },
+  {
+    "fixture": "common/error__service-unavailable-503.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-status",
+    "status": 503,
+    "headers": {
+      "Retry-After": "2"
+    },
+    "tc": [
+      "TC-NET-040",
+      "TC-FDBK-027"
+    ]
+  },
+  {
+    "fixture": "common/error__service-unavailable-503-bad-retry-after.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-status",
+    "status": 503,
+    "headers": {
+      "Retry-After": "-1"
+    },
+    "tc": [
+      "TC-NET-041"
+    ]
+  },
+  {
+    "fixture": "common/error__unauthorized-token-invalid.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-status",
+    "status": 401,
+    "tc": [
+      "TC-NET-012",
+      "TC-NET-013",
+      "TC-NET-017",
+      "TC-NET-030",
+      "TC-NET-031"
+    ]
+  },
+  {
+    "fixture": "common/error__unknown-error-code.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27"
+    },
+    "status": 400,
+    "tc": [
+      "TC-NET-002"
+    ]
+  },
+  {
+    "fixture": "common/error__validation-format.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "query": {
+      "date": "not-a-date"
+    },
+    "status": 400,
+    "tc": [
+      "TC-NET-035"
+    ]
+  },
+  {
+    "fixture": "common/ok__empty-body.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 200,
+    "tc": [
+      "TC-NET-006"
+    ]
+  },
+  {
+    "fixture": "common/ok__extra-fields.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 200,
+    "tc": [
+      "TC-NET-008"
+    ]
+  },
+  {
+    "fixture": "common/ok__malformed-json.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 200,
+    "tc": [
+      "TC-NET-005"
+    ]
+  },
+  {
+    "fixture": "common/ok__missing-required.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 200,
+    "tc": [
+      "TC-NET-010"
+    ]
+  },
+  {
+    "fixture": "common/ok__unknown-enum.json",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "query": {
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-NET-009"
+    ]
+  },
+  {
+    "fixture": "common/ok__wrong-content-type.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 200,
+    "tc": [
+      "TC-NET-011"
+    ]
+  },
+  {
+    "fixture": "common/presigned-put__ok.json",
+    "method": "PUT",
+    "path": "/__upload/55555555-5555-4555-8555-555555555501",
+    "query": {
+      "X-Amz-Expires": "300"
+    },
+    "status": 200,
+    "headers": {
+      "ETag": "\"fixture-etag-1\""
+    },
+    "tc": [
+      "TC-NET-044"
+    ]
+  }
+]

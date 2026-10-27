@@ -1,0 +1,4 @@
+{
+  "errorCode": "BUSINESS_ERROR",
+  "message": "이미지 처리 중인 게시물은 삭제할 수 없습니다."
+}

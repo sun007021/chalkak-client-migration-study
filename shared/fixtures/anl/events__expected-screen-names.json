@@ -1,0 +1,24 @@
+{
+  "_kind": "case",
+  "cases": [
+    "login",
+    "terms",
+    "terms_of_service",
+    "privacy_policy",
+    "onboarding_signature",
+    "onboarding_signature_preview",
+    "change_signature",
+    "change_signature_preview",
+    "home",
+    "issue",
+    "notifications",
+    "notification_detail",
+    "display",
+    "feed",
+    "record",
+    "settings",
+    "feedback",
+    "photo_upload",
+    "photo_upload_success"
+  ]
+}

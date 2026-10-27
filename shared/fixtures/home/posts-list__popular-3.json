@@ -1,0 +1,47 @@
+{
+  "currentPage": 1,
+  "pageSize": 20,
+  "hasNext": false,
+  "randomSeed": null,
+  "posts": [
+    {
+      "id": "22222222-2222-4222-8222-222222222261",
+      "authorId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "originalImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222261/original.webp",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222261/thumbnail.webp",
+      "signatureOriginalImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/original.png",
+      "signatureThumbnailImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/thumbnail.png",
+      "title": "붉은 단풍",
+      "submittedAt": "2026-10-26T14:59:00Z",
+      "likeCount": 30,
+      "isLiked": false,
+      "isMine": false
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222262",
+      "authorId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "originalImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222262/original.webp",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222262/thumbnail.webp",
+      "signatureOriginalImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/original.png",
+      "signatureThumbnailImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/thumbnail.png",
+      "title": "낙엽 길",
+      "submittedAt": "2026-10-26T14:58:00Z",
+      "likeCount": 20,
+      "isLiked": false,
+      "isMine": false
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222263",
+      "authorId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "originalImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222263/original.webp",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222263/thumbnail.webp",
+      "signatureOriginalImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/original.png",
+      "signatureThumbnailImageUrl": "https://cdn.example.test/signatures/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/thumbnail.png",
+      "title": "가을 산책",
+      "submittedAt": "2026-10-26T14:57:00Z",
+      "likeCount": 12,
+      "isLiked": false,
+      "isMine": false
+    }
+  ]
+}

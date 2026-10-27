@@ -1,0 +1,85 @@
+{
+  "_kind": "case",
+  "clock": "2025-10-29T03:00:00Z",
+  "weekStart": "2025-10-26",
+  "weekEnd": "2025-11-01",
+  "requests": [
+    {
+      "year": 2025,
+      "month": 10
+    },
+    {
+      "year": 2025,
+      "month": 11
+    }
+  ],
+  "responses": {
+    "2025-10": {
+      "year": 2025,
+      "month": 10,
+      "posts": [
+        {
+          "topicDate": "2025-10-27",
+          "postId": "22222222-2222-4222-8222-222222222231",
+          "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222231/thumbnail.webp",
+          "status": "APPROVED"
+        },
+        {
+          "topicDate": "2025-10-31",
+          "postId": "22222222-2222-4222-8222-222222222232",
+          "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222232/thumbnail.webp",
+          "status": "PENDING"
+        }
+      ]
+    },
+    "2025-11": {
+      "year": 2025,
+      "month": 11,
+      "posts": [
+        {
+          "topicDate": "2025-11-01",
+          "postId": "22222222-2222-4222-8222-222222222233",
+          "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222233/thumbnail.webp",
+          "status": "APPROVED"
+        }
+      ]
+    }
+  },
+  "expectedWeek": [
+    {
+      "date": "2025-10-26",
+      "dow": "SUN",
+      "postId": null
+    },
+    {
+      "date": "2025-10-27",
+      "dow": "MON",
+      "postId": "22222222-2222-4222-8222-222222222231"
+    },
+    {
+      "date": "2025-10-28",
+      "dow": "TUE",
+      "postId": null
+    },
+    {
+      "date": "2025-10-29",
+      "dow": "WED",
+      "postId": null
+    },
+    {
+      "date": "2025-10-30",
+      "dow": "THU",
+      "postId": null
+    },
+    {
+      "date": "2025-10-31",
+      "dow": "FRI",
+      "postId": "22222222-2222-4222-8222-222222222232"
+    },
+    {
+      "date": "2025-11-01",
+      "dow": "SAT",
+      "postId": "22222222-2222-4222-8222-222222222233"
+    }
+  ]
+}

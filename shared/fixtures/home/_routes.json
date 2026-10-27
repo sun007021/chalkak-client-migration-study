@@ -1,0 +1,419 @@
+[
+  {
+    "fixture": "home/notifications-unread-status__500-server-error.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-status",
+    "status": 500,
+    "tc": [
+      "TC-HOME-052"
+    ]
+  },
+  {
+    "fixture": "home/notifications-unread-status__false.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-status",
+    "status": 200,
+    "tc": [
+      "TC-HOME-050"
+    ]
+  },
+  {
+    "fixture": "home/notifications-unread-status__true.json",
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-status",
+    "status": 200,
+    "tc": [
+      "TC-HOME-050",
+      "TC-HOME-051"
+    ]
+  },
+  {
+    "fixture": "home/posts-calendar__2026-09-week.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "9"
+    },
+    "status": 200,
+    "tc": [
+      "TC-HOME-026",
+      "TC-HOME-031",
+      "TC-HOME-033"
+    ]
+  },
+  {
+    "fixture": "home/posts-calendar__2026-10-empty.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-HOME-004"
+    ]
+  },
+  {
+    "fixture": "home/posts-calendar__2026-10-week-approved.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-HOME-006",
+      "TC-HOME-026",
+      "TC-HOME-030"
+    ]
+  },
+  {
+    "fixture": "home/posts-calendar__2026-10-week-pending.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "10"
+    },
+    "status": 200,
+    "tc": [
+      "TC-HOME-005"
+    ]
+  },
+  {
+    "fixture": "home/posts-calendar__2026-11-empty.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "11"
+    },
+    "status": 200,
+    "tc": [
+      "TC-HOME-043"
+    ]
+  },
+  {
+    "fixture": "home/posts-calendar__2026-12-week.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2026",
+      "month": "12"
+    },
+    "status": 200,
+    "tc": [
+      "TC-HOME-027"
+    ]
+  },
+  {
+    "fixture": "home/posts-calendar__2027-01-empty.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "query": {
+      "year": "2027",
+      "month": "1"
+    },
+    "status": 200,
+    "tc": [
+      "TC-HOME-027"
+    ]
+  },
+  {
+    "fixture": "home/posts-calendar__500-server-error.json",
+    "method": "GET",
+    "path": "/api/v1/posts/calendar",
+    "status": 500,
+    "tc": [
+      "TC-HOME-007",
+      "TC-HOME-032",
+      "TC-HOME-033"
+    ]
+  },
+  {
+    "fixture": "home/posts-list__500-server-error.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "sort": "popular"
+    },
+    "status": 500,
+    "tc": [
+      "TC-HOME-020"
+    ]
+  },
+  {
+    "fixture": "home/posts-list__popular-0.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "sort": "popular",
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-HOME-019"
+    ]
+  },
+  {
+    "fixture": "home/posts-list__popular-1.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "sort": "popular",
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-HOME-019"
+    ]
+  },
+  {
+    "fixture": "home/posts-list__popular-3.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-26",
+      "sort": "popular",
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-HOME-016"
+    ]
+  },
+  {
+    "fixture": "home/posts-list__popular-5.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27",
+      "sort": "popular",
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-HOME-012"
+    ]
+  },
+  {
+    "fixture": "home/posts-list__popular-8.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "topicDate": "2026-10-27",
+      "sort": "popular",
+      "page": "1",
+      "pageSize": "20"
+    },
+    "status": 200,
+    "tc": [
+      "TC-HOME-015",
+      "TC-HOME-021"
+    ]
+  },
+  {
+    "fixture": "home/posts-popular__internal-error.json",
+    "method": "GET",
+    "path": "/api/v1/posts",
+    "query": {
+      "sort": "popular"
+    },
+    "status": 500,
+    "tc": [
+      "TC-BOOT-012"
+    ]
+  },
+  {
+    "fixture": "home/posts-today__401-unauthorized.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 401,
+    "headers": {
+      "WWW-Authenticate": "Bearer"
+    },
+    "tc": [
+      "TC-HOME-014",
+      "TC-HOME-058",
+      "TC-UPL-006"
+    ]
+  },
+  {
+    "fixture": "home/posts-today__403-banned.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 403,
+    "tc": [
+      "TC-HOME-008",
+      "TC-HOME-058",
+      "TC-UPL-005"
+    ]
+  },
+  {
+    "fixture": "home/posts-today__404-no-open-topic.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 404,
+    "tc": [
+      "TC-HOME-002",
+      "TC-HOME-042",
+      "TC-HOME-058",
+      "TC-UPL-004",
+      "TC-UPL-063"
+    ]
+  },
+  {
+    "fixture": "home/posts-today__500-server-error.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 500,
+    "tc": [
+      "TC-HOME-009",
+      "TC-HOME-035",
+      "TC-HOME-058",
+      "TC-UPL-007",
+      "TC-UPL-071"
+    ]
+  },
+  {
+    "fixture": "home/posts-today__not-posted.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 200,
+    "tc": [
+      "TC-HOME-003",
+      "TC-HOME-046",
+      "TC-HOME-058",
+      "TC-UPL-002",
+      "TC-UPL-009",
+      "TC-UPL-010",
+      "TC-UPL-013",
+      "TC-UPL-070",
+      "TC-UPL-090"
+    ]
+  },
+  {
+    "fixture": "home/posts-today__not-posted-after-reject.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 200,
+    "tc": [
+      "TC-HOME-010",
+      "TC-HOME-058"
+    ]
+  },
+  {
+    "fixture": "home/posts-today__posted-approved.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 200,
+    "tc": [
+      "TC-HOME-001",
+      "TC-HOME-006",
+      "TC-HOME-007",
+      "TC-HOME-009",
+      "TC-HOME-014",
+      "TC-HOME-035",
+      "TC-HOME-054",
+      "TC-HOME-058",
+      "TC-UPL-003"
+    ]
+  },
+  {
+    "fixture": "home/posts-today__posted-pending.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 200,
+    "tc": [
+      "TC-HOME-005",
+      "TC-HOME-054",
+      "TC-HOME-058",
+      "TC-UPL-003",
+      "TC-UPL-061",
+      "TC-UPL-062"
+    ]
+  },
+  {
+    "fixture": "home/posts-today__posted-validating.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 200,
+    "tc": [
+      "TC-HOME-004",
+      "TC-HOME-047",
+      "TC-HOME-058",
+      "TC-UPL-003",
+      "TC-UPL-069"
+    ]
+  },
+  {
+    "fixture": "home/posts-today__unknown-status.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 200,
+    "tc": [
+      "TC-HOME-011",
+      "TC-HOME-058"
+    ]
+  },
+  {
+    "fixture": "home/topics__404-not-found.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "status": 404,
+    "tc": [
+      "TC-HOME-017",
+      "TC-HOME-018",
+      "TC-HOME-042",
+      "TC-UPL-012"
+    ]
+  },
+  {
+    "fixture": "home/topics__open-2026-10-26.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "query": {
+      "date": "2026-10-26"
+    },
+    "status": 200,
+    "tc": [
+      "TC-HOME-016"
+    ]
+  },
+  {
+    "fixture": "home/topics__open-2026-10-27.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "query": {
+      "date": "2026-10-27"
+    },
+    "status": 200,
+    "tc": [
+      "TC-HOME-003",
+      "TC-HOME-012",
+      "TC-HOME-015",
+      "TC-HOME-053",
+      "TC-UPL-011",
+      "TC-UPL-013"
+    ]
+  },
+  {
+    "fixture": "home/topics__open-2026-10-28.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "query": {
+      "date": "2026-10-28"
+    },
+    "status": 200,
+    "tc": [
+      "TC-HOME-041"
+    ]
+  }
+]

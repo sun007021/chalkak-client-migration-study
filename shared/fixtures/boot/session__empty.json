@@ -1,0 +1,7 @@
+{
+  "_kind": "storage",
+  "stored": {},
+  "expect": {
+    "destination": "login"
+  }
+}

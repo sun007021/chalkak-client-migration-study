@@ -1,0 +1,29 @@
+{
+  "currentPage": 1,
+  "pageSize": 20,
+  "hasNext": false,
+  "notifications": [
+    {
+      "id": "33333333-3333-4333-8333-333333333301",
+      "type": "POST_APPROVED",
+      "sourceType": "POST",
+      "sourceId": "22222222-2222-4222-8222-222222222201",
+      "title": "게시물이 승인되었어요",
+      "body": "가을 하늘 주제의 게시물이 승인되었어요.",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222201/thumbnail.webp",
+      "readAt": null,
+      "createdAt": "2026-10-27T02:00:00Z"
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333302",
+      "type": "SOMETHING_NEW",
+      "sourceType": "SOMETHING_NEW",
+      "sourceId": null,
+      "title": "새로운 알림",
+      "body": "알 수 없는 유형의 알림이에요.",
+      "thumbnailImageUrl": null,
+      "readAt": null,
+      "createdAt": "2026-10-27T01:00:00Z"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+{
+  "errorCode": "BUSINESS_ERROR",
+  "message": "이미 사용된 회원가입 토큰입니다."
+}

@@ -1,0 +1,31 @@
+{
+  "currentPage": 2,
+  "pageSize": 10,
+  "hasNext": false,
+  "banners": [
+    {
+      "id": "44444444-4444-4444-8444-444444444411",
+      "title": "이슈 11",
+      "subtitle": "찰칵 소식 11",
+      "webViewUrl": "https://web.example.test/issues/11",
+      "thumbnailUrl": "https://cdn.example.test/banners/44444444-4444-4444-8444-444444444411/thumbnail.webp",
+      "createdAt": "2026-10-17T01:00:00Z"
+    },
+    {
+      "id": "44444444-4444-4444-8444-444444444412",
+      "title": "이슈 12",
+      "subtitle": "찰칵 소식 12",
+      "webViewUrl": "https://web.example.test/issues/12",
+      "thumbnailUrl": "https://cdn.example.test/banners/44444444-4444-4444-8444-444444444412/thumbnail.webp",
+      "createdAt": "2026-10-16T01:00:00Z"
+    },
+    {
+      "id": "44444444-4444-4444-8444-444444444413",
+      "title": "이슈 13",
+      "subtitle": "찰칵 소식 13",
+      "webViewUrl": "https://web.example.test/issues/13",
+      "thumbnailUrl": "https://cdn.example.test/banners/44444444-4444-4444-8444-444444444413/thumbnail.webp",
+      "createdAt": "2026-10-15T01:00:00Z"
+    }
+  ]
+}

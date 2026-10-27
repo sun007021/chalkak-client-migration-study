@@ -1,0 +1,165 @@
+[
+  {
+    "fixture": "onboarding/presigned-put__content-type-mismatch.json",
+    "method": "PUT",
+    "path": "/__upload/55555555-5555-4555-8555-555555555512",
+    "query": {
+      "X-Amz-Expires": "300"
+    },
+    "status": 403,
+    "tc": [
+      "TC-ONB-040"
+    ]
+  },
+  {
+    "fixture": "onboarding/presigned-put__expired.json",
+    "method": "PUT",
+    "path": "/__upload/55555555-5555-4555-8555-555555555512",
+    "query": {
+      "X-Amz-Expires": "300"
+    },
+    "status": 403,
+    "tc": [
+      "TC-ONB-040"
+    ]
+  },
+  {
+    "fixture": "onboarding/presigned-put__ok.json",
+    "method": "PUT",
+    "path": "/__upload/55555555-5555-4555-8555-555555555512",
+    "query": {
+      "X-Amz-Expires": "300"
+    },
+    "status": 200,
+    "headers": {
+      "ETag": "\"fixture-etag-2\""
+    },
+    "tc": [
+      "TC-ONB-022"
+    ]
+  },
+  {
+    "fixture": "onboarding/signup-uploads__already-registered.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-signup/signature/uploads",
+    "status": 400,
+    "tc": [
+      "TC-ONB-031"
+    ]
+  },
+  {
+    "fixture": "onboarding/signup-uploads__forbidden-banned.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-signup/signature/uploads",
+    "status": 403,
+    "tc": [
+      "TC-ONB-032"
+    ]
+  },
+  {
+    "fixture": "onboarding/signup-uploads__success.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-signup/signature/uploads",
+    "status": 200,
+    "tc": [
+      "TC-ONB-019",
+      "TC-ONB-020",
+      "TC-ONB-021",
+      "TC-ONB-029"
+    ]
+  },
+  {
+    "fixture": "onboarding/signup-uploads__unauthorized.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-signup/signature/uploads",
+    "status": 401,
+    "tc": [
+      "TC-ONB-033"
+    ]
+  },
+  {
+    "fixture": "onboarding/signup__already-registered-withdrawn.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-signup",
+    "status": 400,
+    "tc": [
+      "TC-ONB-039"
+    ]
+  },
+  {
+    "fixture": "onboarding/signup__already-used-token.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-signup",
+    "status": 400,
+    "tc": [
+      "TC-ONB-034"
+    ]
+  },
+  {
+    "fixture": "onboarding/signup__forbidden-banned.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-signup",
+    "status": 403,
+    "tc": [
+      "TC-ONB-037"
+    ]
+  },
+  {
+    "fixture": "onboarding/signup__invalid-signature.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-signup",
+    "status": 400,
+    "tc": [
+      "TC-ONB-035"
+    ]
+  },
+  {
+    "fixture": "onboarding/signup__signature-processing-pending.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-signup",
+    "status": 400,
+    "tc": [
+      "TC-ONB-026",
+      "TC-ONB-027",
+      "TC-ONB-028"
+    ]
+  },
+  {
+    "fixture": "onboarding/signup__success.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-signup",
+    "status": 200,
+    "tc": [
+      "TC-NAV-040",
+      "TC-PUSH-010",
+      "TC-PUSH-013",
+      "TC-ONB-019",
+      "TC-ONB-023",
+      "TC-ONB-024",
+      "TC-ONB-025",
+      "TC-ONB-027",
+      "TC-ONB-038",
+      "TC-ONB-043",
+      "TC-ONB-044",
+      "TC-ONB-047"
+    ]
+  },
+  {
+    "fixture": "onboarding/signup__unauthorized.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-signup",
+    "status": 401,
+    "tc": [
+      "TC-ONB-030"
+    ]
+  },
+  {
+    "fixture": "onboarding/signup__upload-not-found.json",
+    "method": "POST",
+    "path": "/api/v1/auth/social-signup",
+    "status": 404,
+    "tc": [
+      "TC-ONB-036"
+    ]
+  }
+]

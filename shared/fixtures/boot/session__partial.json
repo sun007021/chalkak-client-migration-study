@@ -1,0 +1,11 @@
+{
+  "_kind": "storage",
+  "stored": {
+    "userId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "accessToken": "fixture-access-token-1"
+  },
+  "expect": {
+    "destination": "login",
+    "storageCleared": true
+  }
+}

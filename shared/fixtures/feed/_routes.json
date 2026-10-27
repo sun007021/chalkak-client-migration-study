@@ -1,0 +1,269 @@
+[
+  {
+    "fixture": "feed/posts-delete__204.json",
+    "method": "DELETE",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201",
+    "status": 204,
+    "tc": [
+      "TC-FEED-036",
+      "TC-FEED-037",
+      "TC-FEED-038",
+      "TC-FEED-043",
+      "TC-FEED-045",
+      "TC-HOME-046"
+    ]
+  },
+  {
+    "fixture": "feed/posts-delete__400-rejected.json",
+    "method": "DELETE",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201",
+    "status": 400,
+    "tc": [
+      "TC-FEED-039"
+    ]
+  },
+  {
+    "fixture": "feed/posts-delete__400-validating.json",
+    "method": "DELETE",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201",
+    "status": 400,
+    "tc": [
+      "TC-FEED-039"
+    ]
+  },
+  {
+    "fixture": "feed/posts-delete__401-unauthorized.json",
+    "method": "DELETE",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201",
+    "status": 401,
+    "headers": {
+      "WWW-Authenticate": "Bearer"
+    },
+    "tc": [
+      "TC-FEED-042"
+    ]
+  },
+  {
+    "fixture": "feed/posts-delete__403-not-owner.json",
+    "method": "DELETE",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222202",
+    "status": 403,
+    "tc": [
+      "TC-FEED-040"
+    ]
+  },
+  {
+    "fixture": "feed/posts-delete__404-not-found.json",
+    "method": "DELETE",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201",
+    "status": 404,
+    "tc": [
+      "TC-FEED-041"
+    ]
+  },
+  {
+    "fixture": "feed/posts-delete__500-server-error.json",
+    "method": "DELETE",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201",
+    "status": 500,
+    "tc": [
+      "TC-FEED-042"
+    ]
+  },
+  {
+    "fixture": "feed/posts-detail__400-invalid-id.json",
+    "method": "GET",
+    "path": "/api/v1/posts/not-a-uuid",
+    "status": 400,
+    "tc": [
+      "TC-FEED-008"
+    ]
+  },
+  {
+    "fixture": "feed/posts-detail__401-unauthorized.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222202",
+    "status": 401,
+    "headers": {
+      "WWW-Authenticate": "Bearer"
+    },
+    "tc": [
+      "TC-FEED-005",
+      "TC-FEED-006",
+      "TC-FEED-056"
+    ]
+  },
+  {
+    "fixture": "feed/posts-detail__404-not-found.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222202",
+    "status": 404,
+    "tc": [
+      "TC-FEED-007"
+    ]
+  },
+  {
+    "fixture": "feed/posts-detail__500-server-error.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222202",
+    "status": 500,
+    "tc": [
+      "TC-FEED-008",
+      "TC-FEED-010"
+    ]
+  },
+  {
+    "fixture": "feed/posts-detail__invalid-schema.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222202",
+    "status": 200,
+    "tc": [
+      "TC-FEED-009"
+    ]
+  },
+  {
+    "fixture": "feed/posts-detail__mine-past.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222290",
+    "status": 200,
+    "tc": [
+      "TC-AIR-016",
+      "TC-FEED-016"
+    ]
+  },
+  {
+    "fixture": "feed/posts-detail__mine-today.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201",
+    "status": 200,
+    "tc": [
+      "TC-FEED-004",
+      "TC-FEED-013",
+      "TC-FEED-014",
+      "TC-FEED-016",
+      "TC-FEED-017",
+      "TC-FEED-018",
+      "TC-FEED-026",
+      "TC-FEED-034",
+      "TC-HOME-021",
+      "TC-LIKE-023",
+      "TC-REC-034"
+    ]
+  },
+  {
+    "fixture": "feed/posts-detail__no-title.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222204",
+    "status": 200,
+    "tc": [
+      "TC-FEED-013",
+      "TC-FEED-053"
+    ]
+  },
+  {
+    "fixture": "feed/posts-detail__null-thumbnail.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222205",
+    "status": 200,
+    "tc": [
+      "TC-FEED-003"
+    ]
+  },
+  {
+    "fixture": "feed/posts-detail__other.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222202",
+    "status": 200,
+    "tc": [
+      "TC-DISP-055",
+      "TC-FEED-001",
+      "TC-FEED-002",
+      "TC-FEED-004",
+      "TC-FEED-011",
+      "TC-FEED-015",
+      "TC-FEED-016",
+      "TC-FEED-034",
+      "TC-LIKE-024"
+    ]
+  },
+  {
+    "fixture": "feed/posts-title-update__200.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201",
+    "status": 200,
+    "tc": [
+      "TC-FEED-021",
+      "TC-FEED-023",
+      "TC-FEED-024",
+      "TC-FEED-025",
+      "TC-FEED-026",
+      "TC-FEED-033"
+    ]
+  },
+  {
+    "fixture": "feed/posts-title-update__200-null-title.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201",
+    "status": 200,
+    "tc": [
+      "TC-FEED-022"
+    ]
+  },
+  {
+    "fixture": "feed/posts-title-update__400-not-editable.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201",
+    "status": 400,
+    "tc": [
+      "TC-FEED-027"
+    ]
+  },
+  {
+    "fixture": "feed/posts-title-update__400-title-too-long.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201",
+    "status": 400,
+    "tc": [
+      "TC-FEED-028"
+    ]
+  },
+  {
+    "fixture": "feed/posts-title-update__401-unauthorized.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201",
+    "status": 401,
+    "headers": {
+      "WWW-Authenticate": "Bearer"
+    },
+    "tc": [
+      "TC-FEED-031"
+    ]
+  },
+  {
+    "fixture": "feed/posts-title-update__403-banned.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201",
+    "status": 403,
+    "tc": [
+      "TC-FEED-029"
+    ]
+  },
+  {
+    "fixture": "feed/posts-title-update__404-not-found.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201",
+    "status": 404,
+    "tc": [
+      "TC-FEED-030"
+    ]
+  },
+  {
+    "fixture": "feed/posts-title-update__500-server-error.json",
+    "method": "PUT",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201",
+    "status": 500,
+    "tc": [
+      "TC-FEED-032"
+    ]
+  }
+]

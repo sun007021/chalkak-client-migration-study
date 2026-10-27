@@ -1,0 +1,13 @@
+{
+  "_kind": "native",
+  "source": "play-core AppUpdateInfo",
+  "data": {
+    "updateAvailability": "UPDATE_AVAILABLE",
+    "updatePriority": 0,
+    "availableVersionCode": 20,
+    "isImmediateUpdateAllowed": true
+  },
+  "expect": {
+    "gate": "pass"
+  }
+}

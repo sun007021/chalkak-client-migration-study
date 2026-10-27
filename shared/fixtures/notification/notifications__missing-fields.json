@@ -1,0 +1,17 @@
+{
+  "currentPage": 1,
+  "pageSize": 20,
+  "hasNext": false,
+  "notifications": [
+    {
+      "id": "33333333-3333-4333-8333-333333333301",
+      "type": "POST_APPROVED",
+      "sourceType": "POST",
+      "sourceId": "22222222-2222-4222-8222-222222222201",
+      "body": "오늘의 사진이 전시에 올라갔어요.",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222201/thumbnail.webp",
+      "readAt": null,
+      "createdAt": "2026-10-27T01:30:00Z"
+    }
+  ]
+}

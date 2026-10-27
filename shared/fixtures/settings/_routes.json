@@ -1,0 +1,118 @@
+[
+  {
+    "fixture": "settings/notification-settings__get-ai-off.json",
+    "method": "GET",
+    "path": "/api/v1/notification-settings",
+    "status": 200,
+    "tc": [
+      "TC-SET-014"
+    ]
+  },
+  {
+    "fixture": "settings/notification-settings__get-all-true.json",
+    "method": "GET",
+    "path": "/api/v1/notification-settings",
+    "status": 200,
+    "tc": [
+      "TC-SET-001",
+      "TC-SET-002",
+      "TC-SET-018",
+      "TC-SET-032"
+    ]
+  },
+  {
+    "fixture": "settings/notification-settings__get-field-missing.json",
+    "method": "GET",
+    "path": "/api/v1/notification-settings",
+    "status": 200,
+    "tc": [
+      "TC-SET-015"
+    ]
+  },
+  {
+    "fixture": "settings/notification-settings__get-internal-error.json",
+    "method": "GET",
+    "path": "/api/v1/notification-settings",
+    "status": 500,
+    "tc": [
+      "TC-SET-016",
+      "TC-SET-033"
+    ]
+  },
+  {
+    "fixture": "settings/notification-settings__get-null-field.json",
+    "method": "GET",
+    "path": "/api/v1/notification-settings",
+    "status": 200,
+    "tc": [
+      "TC-SET-015"
+    ]
+  },
+  {
+    "fixture": "settings/notification-settings__get-topic-off.json",
+    "method": "GET",
+    "path": "/api/v1/notification-settings",
+    "status": 200,
+    "tc": [
+      "TC-SET-037"
+    ]
+  },
+  {
+    "fixture": "settings/notification-settings__get-unauthorized.json",
+    "method": "GET",
+    "path": "/api/v1/notification-settings",
+    "status": 401,
+    "tc": [
+      "TC-SET-034"
+    ]
+  },
+  {
+    "fixture": "settings/notification-settings__patch-bad-request-empty.json",
+    "method": "PATCH",
+    "path": "/api/v1/notification-settings",
+    "status": 400,
+    "tc": [
+      "TC-SET-036"
+    ]
+  },
+  {
+    "fixture": "settings/notification-settings__patch-internal-error.json",
+    "method": "PATCH",
+    "path": "/api/v1/notification-settings",
+    "status": 500,
+    "tc": [
+      "TC-PUSH-006",
+      "TC-SET-024",
+      "TC-SET-025",
+      "TC-SET-026",
+      "TC-SET-027",
+      "TC-SET-035"
+    ]
+  },
+  {
+    "fixture": "settings/notification-settings__patch-no-content.json",
+    "method": "PATCH",
+    "path": "/api/v1/notification-settings",
+    "status": 204,
+    "tc": [
+      "TC-PUSH-005",
+      "TC-SET-019",
+      "TC-SET-020",
+      "TC-SET-021",
+      "TC-SET-022",
+      "TC-SET-023",
+      "TC-SET-028",
+      "TC-SET-029",
+      "TC-SET-031"
+    ]
+  },
+  {
+    "fixture": "settings/notification-settings__patch-unauthorized.json",
+    "method": "PATCH",
+    "path": "/api/v1/notification-settings",
+    "status": 401,
+    "tc": [
+      "TC-SET-034"
+    ]
+  }
+]

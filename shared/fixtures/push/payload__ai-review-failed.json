@@ -1,0 +1,14 @@
+{
+  "_kind": "push",
+  "notification": {
+    "title": "AI 피드백을 생성하지 못했어요",
+    "body": "다시 요청해 보세요."
+  },
+  "data": {
+    "eventId": "66666666-6666-4666-8666-666666666604",
+    "notificationId": "33333333-3333-4333-8333-333333333304",
+    "type": "AI_REVIEW_FAILED",
+    "sourceType": "POST",
+    "sourceId": "22222222-2222-4222-8222-222222222201"
+  }
+}

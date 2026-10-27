@@ -1,0 +1,29 @@
+{
+  "currentPage": 1,
+  "pageSize": 20,
+  "hasNext": false,
+  "notifications": [
+    {
+      "id": "33333333-3333-4333-8333-333333333303",
+      "type": "AI_REVIEW_COMPLETED",
+      "sourceType": "NOTICE",
+      "sourceId": "22222222-2222-4222-8222-222222222201",
+      "title": "AI 피드백이 도착했어요",
+      "body": "찰칵AI가 사진을 분석했어요.",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222201/thumbnail.webp",
+      "readAt": null,
+      "createdAt": "2026-10-27T00:30:00Z"
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333308",
+      "type": "AI_REVIEW_COMPLETED",
+      "sourceType": "POST",
+      "sourceId": "not-a-uuid",
+      "title": "AI 피드백이 도착했어요",
+      "body": "찰칵AI가 사진을 분석했어요.",
+      "thumbnailImageUrl": "https://cdn.example.test/posts/22222222-2222-4222-8222-222222222210/thumbnail.webp",
+      "readAt": "2026-10-26T22:10:00Z",
+      "createdAt": "2026-10-26T22:00:00Z"
+    }
+  ]
+}

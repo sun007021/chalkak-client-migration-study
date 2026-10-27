@@ -1,0 +1,355 @@
+[
+  {
+    "fixture": "upload/posts-today__not-posted.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 200,
+    "tc": [
+      "TC-NAV-005",
+      "TC-NAV-006",
+      "TC-NAV-007"
+    ]
+  },
+  {
+    "fixture": "upload/posts-today__invalid-not-posted-with-post.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 200,
+    "tc": [
+      "TC-UPL-008"
+    ]
+  },
+  {
+    "fixture": "upload/posts-today__topic-date-changed.json",
+    "method": "GET",
+    "path": "/api/v1/posts/today",
+    "status": 200,
+    "tc": [
+      "TC-UPL-063",
+      "TC-UPL-075"
+    ]
+  },
+  {
+    "fixture": "upload/topics__mismatch-date.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "query": {
+      "date": "2026-10-27"
+    },
+    "status": 200,
+    "tc": [
+      "TC-UPL-011"
+    ]
+  },
+  {
+    "fixture": "upload/topics__500-server-error.json",
+    "method": "GET",
+    "path": "/api/v1/topics",
+    "query": {
+      "date": "2026-10-27"
+    },
+    "status": 500,
+    "tc": [
+      "TC-UPL-012"
+    ]
+  },
+  {
+    "fixture": "upload/posts-uploads__issued.json",
+    "method": "POST",
+    "path": "/api/v1/posts/uploads",
+    "status": 200,
+    "tc": [
+      "TC-EDIT-006",
+      "TC-UPL-023",
+      "TC-UPL-024",
+      "TC-UPL-028",
+      "TC-UPL-029",
+      "TC-UPL-048",
+      "TC-UPL-049",
+      "TC-UPL-050",
+      "TC-UPL-051",
+      "TC-UPL-052",
+      "TC-UPL-076",
+      "TC-UPL-077"
+    ]
+  },
+  {
+    "fixture": "upload/posts-uploads__issued-new.json",
+    "method": "POST",
+    "path": "/api/v1/posts/uploads",
+    "status": 200,
+    "tc": [
+      "TC-UPL-050"
+    ]
+  },
+  {
+    "fixture": "upload/posts-uploads__issued-small-max.json",
+    "method": "POST",
+    "path": "/api/v1/posts/uploads",
+    "status": 200,
+    "tc": [
+      "TC-UPL-052"
+    ]
+  },
+  {
+    "fixture": "upload/posts-uploads__issued-large-max.json",
+    "method": "POST",
+    "path": "/api/v1/posts/uploads",
+    "status": 200,
+    "tc": [
+      "TC-UPL-024"
+    ]
+  },
+  {
+    "fixture": "upload/posts-uploads__content-type-png.json",
+    "method": "POST",
+    "path": "/api/v1/posts/uploads",
+    "status": 200,
+    "tc": [
+      "TC-UPL-025",
+      "TC-UPL-053"
+    ]
+  },
+  {
+    "fixture": "upload/posts-uploads__missing-fields.json",
+    "method": "POST",
+    "path": "/api/v1/posts/uploads",
+    "status": 200,
+    "tc": [
+      "TC-UPL-026"
+    ]
+  },
+  {
+    "fixture": "upload/posts-uploads__insecure-upload-url.json",
+    "method": "POST",
+    "path": "/api/v1/posts/uploads",
+    "status": 200,
+    "tc": [
+      "TC-UPL-056"
+    ]
+  },
+  {
+    "fixture": "upload/posts-uploads__401-unauthorized.json",
+    "method": "POST",
+    "path": "/api/v1/posts/uploads",
+    "status": 401,
+    "headers": {
+      "WWW-Authenticate": "Bearer"
+    },
+    "tc": [
+      "TC-UPL-027"
+    ]
+  },
+  {
+    "fixture": "upload/posts-uploads__403-banned.json",
+    "method": "POST",
+    "path": "/api/v1/posts/uploads",
+    "status": 403,
+    "tc": [
+      "TC-UPL-027"
+    ]
+  },
+  {
+    "fixture": "upload/posts-uploads__500-server-error.json",
+    "method": "POST",
+    "path": "/api/v1/posts/uploads",
+    "status": 500,
+    "tc": [
+      "TC-UPL-027",
+      "TC-UPL-029"
+    ]
+  },
+  {
+    "fixture": "upload/s3-put__200.json",
+    "method": "PUT",
+    "path": "/__upload/55555555-5555-4555-8555-555555555501",
+    "status": 200,
+    "tc": [
+      "TC-UPL-054",
+      "TC-UPL-057",
+      "TC-UPL-077"
+    ]
+  },
+  {
+    "fixture": "upload/s3-put__403-signature-mismatch.json",
+    "method": "PUT",
+    "path": "/__upload/55555555-5555-4555-8555-555555555501",
+    "status": 403,
+    "tc": [
+      "TC-UPL-055"
+    ]
+  },
+  {
+    "fixture": "upload/s3-put__500-server-error.json",
+    "method": "PUT",
+    "path": "/__upload/55555555-5555-4555-8555-555555555501",
+    "status": 500,
+    "tc": [
+      "TC-UPL-055"
+    ]
+  },
+  {
+    "fixture": "upload/posts-create__201-pending.json",
+    "method": "POST",
+    "path": "/api/v1/posts",
+    "status": 201,
+    "tc": [
+      "TC-UPL-059",
+      "TC-UPL-060",
+      "TC-UPL-072",
+      "TC-UPL-073",
+      "TC-UPL-075",
+      "TC-UPL-077",
+      "TC-UPL-079",
+      "TC-UPL-082",
+      "TC-UPL-085"
+    ]
+  },
+  {
+    "fixture": "upload/posts-create__201-validating.json",
+    "method": "POST",
+    "path": "/api/v1/posts",
+    "status": 201,
+    "tc": [
+      "TC-UPL-060",
+      "TC-UPL-085"
+    ]
+  },
+  {
+    "fixture": "upload/posts-create__201-unknown-status.json",
+    "method": "POST",
+    "path": "/api/v1/posts",
+    "status": 201,
+    "tc": [
+      "TC-UPL-061"
+    ]
+  },
+  {
+    "fixture": "upload/posts-create__400-already-posted.json",
+    "method": "POST",
+    "path": "/api/v1/posts",
+    "status": 400,
+    "tc": [
+      "TC-UPL-062",
+      "TC-UPL-071"
+    ]
+  },
+  {
+    "fixture": "upload/posts-create__400-topic-not-open.json",
+    "method": "POST",
+    "path": "/api/v1/posts",
+    "status": 400,
+    "tc": [
+      "TC-UPL-063",
+      "TC-UPL-075"
+    ]
+  },
+  {
+    "fixture": "upload/posts-create__400-upload-expired.json",
+    "method": "POST",
+    "path": "/api/v1/posts",
+    "status": 400,
+    "tc": [
+      "TC-UPL-064",
+      "TC-UPL-072"
+    ]
+  },
+  {
+    "fixture": "upload/posts-create__400-upload-used.json",
+    "method": "POST",
+    "path": "/api/v1/posts",
+    "status": 400,
+    "tc": [
+      "TC-UPL-064"
+    ]
+  },
+  {
+    "fixture": "upload/posts-create__400-rejected-unsupported-format.json",
+    "method": "POST",
+    "path": "/api/v1/posts",
+    "status": 400,
+    "tc": [
+      "TC-UPL-064"
+    ]
+  },
+  {
+    "fixture": "upload/posts-create__400-rejected-too-large.json",
+    "method": "POST",
+    "path": "/api/v1/posts",
+    "status": 400,
+    "tc": [
+      "TC-UPL-064"
+    ]
+  },
+  {
+    "fixture": "upload/posts-create__400-title-too-long.json",
+    "method": "POST",
+    "path": "/api/v1/posts",
+    "status": 400,
+    "tc": [
+      "TC-UPL-083"
+    ]
+  },
+  {
+    "fixture": "upload/posts-create__404-upload-not-found.json",
+    "method": "POST",
+    "path": "/api/v1/posts",
+    "status": 404,
+    "tc": [
+      "TC-UPL-065"
+    ]
+  },
+  {
+    "fixture": "upload/posts-create__404-topic-not-found.json",
+    "method": "POST",
+    "path": "/api/v1/posts",
+    "status": 404,
+    "tc": [
+      "TC-UPL-065"
+    ]
+  },
+  {
+    "fixture": "upload/posts-create__401-unauthorized.json",
+    "method": "POST",
+    "path": "/api/v1/posts",
+    "status": 401,
+    "headers": {
+      "WWW-Authenticate": "Bearer"
+    },
+    "tc": [
+      "TC-UPL-066",
+      "TC-UPL-076",
+      "TC-UPL-078"
+    ]
+  },
+  {
+    "fixture": "upload/posts-create__403-banned.json",
+    "method": "POST",
+    "path": "/api/v1/posts",
+    "status": 403,
+    "tc": [
+      "TC-UPL-067"
+    ]
+  },
+  {
+    "fixture": "upload/posts-create__500-server-error.json",
+    "method": "POST",
+    "path": "/api/v1/posts",
+    "status": 500,
+    "tc": [
+      "TC-UPL-068",
+      "TC-UPL-074"
+    ]
+  },
+  {
+    "fixture": "upload/posts-create__timeout.json",
+    "method": "POST",
+    "path": "/api/v1/posts",
+    "delayMs": 20000,
+    "tc": [
+      "TC-UPL-069",
+      "TC-UPL-070",
+      "TC-UPL-071"
+    ]
+  }
+]

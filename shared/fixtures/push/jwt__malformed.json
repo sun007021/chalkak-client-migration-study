@@ -1,0 +1,36 @@
+{
+  "_kind": "case",
+  "cases": [
+    {
+      "name": "empty",
+      "token": ""
+    },
+    {
+      "name": "one-segment",
+      "token": "abc"
+    },
+    {
+      "name": "two-segments",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhYWFhYWFhYS1hYWFhLTRhYWEtOGFhYS1hYWFhYWFhYWFhYWEiLCJzY29wZSI6IlVTRVIiLCJpYXQiOjE3OTMwNzAwMDAsImV4cCI6MTc5MzA3MTgwMCwic2Vzc2lvbl9pZCI6Ijg4ODg4ODg4LTg4ODgtNDg4OC04ODg4LTg4ODg4ODg4ODgwMSJ9"
+    },
+    {
+      "name": "four-segments",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhYWFhYWFhYS1hYWFhLTRhYWEtOGFhYS1hYWFhYWFhYWFhYWEiLCJzY29wZSI6IlVTRVIiLCJpYXQiOjE3OTMwNzAwMDAsImV4cCI6MTc5MzA3MTgwMCwic2Vzc2lvbl9pZCI6Ijg4ODg4ODg4LTg4ODgtNDg4OC04ODg4LTg4ODg4ODg4ODgwMSJ9.fixture-unsigned-signature.extra"
+    },
+    {
+      "name": "base64-error",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.@@@not-base64@@@.sig"
+    },
+    {
+      "name": "payload-not-json",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.bm90IGpzb24.sig"
+    },
+    {
+      "name": "payload-json-array",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.WzEsMiwzXQ.sig"
+    }
+  ],
+  "expect": {
+    "hasSessionId": false
+  }
+}

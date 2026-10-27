@@ -1,0 +1,28 @@
+[
+  {
+    "fixture": "anl/events__expected-screen-names.json",
+    "method": "NONE",
+    "path": "-",
+    "tc": [
+      "TC-ANL-002"
+    ]
+  },
+  {
+    "fixture": "anl/events__journey-signup.json",
+    "method": "NONE",
+    "path": "-",
+    "tc": [
+      "TC-ANL-003"
+    ]
+  },
+  {
+    "fixture": "anl/events__journey-tabs.json",
+    "method": "NONE",
+    "path": "-",
+    "tc": [
+      "TC-ANL-005",
+      "TC-ANL-013",
+      "TC-ANL-024"
+    ]
+  }
+]

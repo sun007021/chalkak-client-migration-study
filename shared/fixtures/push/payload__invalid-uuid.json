@@ -1,0 +1,14 @@
+{
+  "_kind": "push",
+  "notification": {
+    "title": "사진이 반려되었어요",
+    "body": "자세한 사유를 확인해 주세요."
+  },
+  "data": {
+    "eventId": "66666666-6666-4666-8666-666666666609",
+    "notificationId": "not-a-uuid",
+    "type": "POST_REJECTED",
+    "sourceType": "POST",
+    "sourceId": "also-not-a-uuid"
+  }
+}

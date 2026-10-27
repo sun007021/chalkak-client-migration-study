@@ -1,0 +1,5 @@
+# Maestro workspace config (run: maestro test shared/maestro --env APP_ID=<bundle id>)
+flows:
+  - "**/TC-*.yaml"
+excludeTags:
+  - wip

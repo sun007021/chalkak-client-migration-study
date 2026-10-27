@@ -1,0 +1,4 @@
+{
+  "errorCode": "BUSINESS_ERROR",
+  "message": "제목은 10자 이하여야 합니다."
+}

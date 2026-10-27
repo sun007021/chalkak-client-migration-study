@@ -1,0 +1,4 @@
+{
+  "errorCode": "BUSINESS_ERROR",
+  "message": "사진 업로드 유효 시간이 지났습니다."
+}

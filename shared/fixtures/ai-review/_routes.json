@@ -1,0 +1,299 @@
+[
+  {
+    "fixture": "ai-review/ai-review-get__none.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 200,
+    "tc": [
+      "TC-AIR-001",
+      "TC-AIR-002",
+      "TC-AIR-011",
+      "TC-AIR-012",
+      "TC-AIR-045"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__processing.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 200,
+    "tc": [
+      "TC-AIR-013",
+      "TC-AIR-018",
+      "TC-AIR-030",
+      "TC-AIR-032",
+      "TC-AIR-033",
+      "TC-AIR-035",
+      "TC-AIR-036",
+      "TC-AIR-037",
+      "TC-AIR-038",
+      "TC-AIR-042",
+      "TC-AIR-043",
+      "TC-AIR-046",
+      "TC-AIR-055"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__processing-old-requested-at.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 200,
+    "tc": [
+      "TC-AIR-034"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__completed.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 200,
+    "tc": [
+      "TC-AIR-003",
+      "TC-AIR-010",
+      "TC-AIR-014",
+      "TC-AIR-018",
+      "TC-AIR-019",
+      "TC-AIR-027",
+      "TC-AIR-038",
+      "TC-AIR-039",
+      "TC-AIR-043",
+      "TC-AIR-044",
+      "TC-AIR-046",
+      "TC-AIR-049",
+      "TC-AIR-050",
+      "TC-AIR-051",
+      "TC-AIR-052",
+      "TC-AIR-058",
+      "TC-AIR-059"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__completed-not-distinct.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 200,
+    "tc": [
+      "TC-AIR-051"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__completed-fractional-seconds.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 200,
+    "tc": [
+      "TC-AIR-003"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__completed-score-0.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 200,
+    "tc": [
+      "TC-AIR-005"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__completed-score-10.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 200,
+    "tc": [
+      "TC-AIR-005"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__completed-long-text.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 200,
+    "tc": [
+      "TC-AIR-010"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__completed-no-result.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 200,
+    "tc": [
+      "TC-AIR-004"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__score-out-of-range.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 200,
+    "tc": [
+      "TC-AIR-005"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__failed-can-retry.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 200,
+    "tc": [
+      "TC-AIR-006",
+      "TC-AIR-015",
+      "TC-AIR-016",
+      "TC-AIR-025",
+      "TC-AIR-053",
+      "TC-AIR-058"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__failed-cannot-retry.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 200,
+    "tc": [
+      "TC-AIR-006",
+      "TC-AIR-015"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__missing-can-request-again.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 200,
+    "tc": [
+      "TC-AIR-006"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__unknown-status.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 200,
+    "tc": [
+      "TC-AIR-007"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__404-not-found.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 404,
+    "tc": [
+      "TC-AIR-017",
+      "TC-AIR-041"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__500-server-error.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 500,
+    "tc": [
+      "TC-AIR-039",
+      "TC-AIR-040"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-get__503-retry-after.json",
+    "method": "GET",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 503,
+    "headers": {
+      "Retry-After": "1"
+    },
+    "tc": [
+      "TC-AIR-047"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-post__202-processing.json",
+    "method": "POST",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 202,
+    "tc": [
+      "TC-AIR-001",
+      "TC-AIR-008",
+      "TC-AIR-020",
+      "TC-AIR-022",
+      "TC-AIR-023",
+      "TC-AIR-025"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-post__200-completed.json",
+    "method": "POST",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 200,
+    "tc": [
+      "TC-AIR-008",
+      "TC-AIR-024"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-post__400-limit-reached.json",
+    "method": "POST",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 400,
+    "tc": [
+      "TC-AIR-009",
+      "TC-AIR-026"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-post__400-disabled.json",
+    "method": "POST",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 400,
+    "tc": [
+      "TC-AIR-026"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-post__403-banned.json",
+    "method": "POST",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 403,
+    "tc": [
+      "TC-AIR-009",
+      "TC-AIR-027"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-post__404-not-found.json",
+    "method": "POST",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 404,
+    "tc": [
+      "TC-AIR-028"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-post__401-unauthorized.json",
+    "method": "POST",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 401,
+    "headers": {
+      "WWW-Authenticate": "Bearer"
+    },
+    "tc": [
+      "TC-AIR-029"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-post__500-server-error.json",
+    "method": "POST",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "status": 500,
+    "tc": [
+      "TC-AIR-031"
+    ]
+  },
+  {
+    "fixture": "ai-review/ai-review-post__timeout.json",
+    "method": "POST",
+    "path": "/api/v1/posts/22222222-2222-4222-8222-222222222201/ai-review",
+    "delayMs": 20000,
+    "tc": [
+      "TC-AIR-030"
+    ]
+  }
+]

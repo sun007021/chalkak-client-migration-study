@@ -1,0 +1,23 @@
+{
+  "status": "COMPLETED",
+  "requestedAt": "2026-10-27T02:58:00Z",
+  "completedAt": "2026-10-27T02:58:21Z",
+  "result": {
+    "overallScore": 7.5,
+    "criteria": [
+      {
+        "key": "COMPOSITION",
+        "label": "구도",
+        "score": 7.5
+      }
+    ],
+    "distinctivePerspective": false,
+    "feedback": {
+      "summary": "빛을 따라 시선이 흐르는 안정적인 구도",
+      "strength": "빛이 들어오는 방향을 따라 시선이 자연스럽게 이어집니다.",
+      "weakness": "수평선이 살짝 기울어 안정감이 조금 떨어집니다.",
+      "suggestion": "카메라를 낮추고 수평선을 맞춰 한 번 더 찍어 보세요."
+    }
+  },
+  "canRequestAgain": false
+}

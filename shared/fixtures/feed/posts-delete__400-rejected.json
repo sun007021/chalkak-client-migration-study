@@ -1,0 +1,4 @@
+{
+  "errorCode": "BUSINESS_ERROR",
+  "message": "검수 거절된 게시물은 삭제할 수 없습니다."
+}
