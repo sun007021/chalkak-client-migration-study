@@ -218,6 +218,7 @@ D-08의 문구를 이 표의 키로 고정하고, 각 기능 문서는 이 키�
 | auth.login.error.config | 카카오 로그인 설정을 확인해 주세요. | ID Token 없음, SDK 설정 오류. Android 문구 채택(iOS "로그인 설정을 확인해 주세요."보다 구체적) |
 | auth.login.error.kakao-failed | 카카오 로그인에 실패했어요. 다시 시도해 주세요. | SDK 일반 실패. Android 채택 |
 | auth.login.error.invalid-response | 로그인 응답을 확인할 수 없어요. 다시 시도해 주세요. | 응답 해석 불가. iOS 채택(Android에 해당 분기 없음) |
+| auth.login.error.title | 로그인 | 로그인 오류 알림 제목(`login.error-dialog`). 확인 버튼은 `common.confirm` |
 | auth.login.error.generic | 로그인하지 못했어요. 다시 시도해 주세요. | 그 밖의 실패. iOS·Android 동일 |
 | auth.login.error.guest | 화면을 불러오지 못했어요. 다시 시도해 주세요. | 게스트 플래그 저장 실패. Android |
 | auth.logout.confirm.message | 정말 로그아웃 하시겠습니까? | 로그아웃 확인. iOS·Android 동일 |
