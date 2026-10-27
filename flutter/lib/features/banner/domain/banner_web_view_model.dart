@@ -3,8 +3,8 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/analytics/analytics_tracker.dart';
 import '../../../core/ui/toast/toast_controller.dart';
+import 'banner_link_launcher.dart';
 import 'banner_web_policy.dart';
-import 'external_link_launcher.dart';
 
 enum BannerWebStatus {
   /// 최초 로드·다시 시도 중.
@@ -33,7 +33,7 @@ class BannerWebState {
 /// - [start]: `screen_view issue`를 한 번만 보낸다(여러 번 불러도 1회).
 ///   주소가 [BannerWebNavigationPolicy.isLoadable]이 아니면 unsafeUrl로 두고 로드하지 않는다.
 /// - [onLoadFinished]/[onLoadFailed]/[retry]: loading -> shown/loadError, retry는 reloadToken 증가.
-/// - [onNavigationRequest]: 정책으로 판정하고 openExternal이면 [ExternalLinkLauncher]로 연다.
+/// - [onNavigationRequest]: 정책으로 판정하고 openExternal이면 [BannerLinkLauncher]로 연다.
 ///   noBrowser면 토스트 "링크를 열 수 있는 브라우저가 없어요", failed면
 ///   "브라우저에서 링크를 열지 못했어요". block은 아무 일도 없다.
 class BannerWebViewModel extends ChangeNotifier {
@@ -47,7 +47,7 @@ class BannerWebViewModel extends ChangeNotifier {
   final Uri _url;
   final AnalyticsTracker _analytics;
   final ToastSink _toast;
-  final ExternalLinkLauncher _launcher;
+  final BannerLinkLauncher _launcher;
 
   Uri get url => throw UnimplementedError();
   BannerWebState get state => throw UnimplementedError();

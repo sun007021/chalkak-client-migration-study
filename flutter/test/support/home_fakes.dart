@@ -5,9 +5,9 @@ import 'package:chalkak/core/time/kst_date.dart';
 import 'package:chalkak/core/ui/test_id.dart';
 import 'package:chalkak/core/ui/toast/toast_controller.dart';
 import 'package:chalkak/features/banner/data/api_banner_repository.dart';
+import 'package:chalkak/features/banner/domain/banner_link_launcher.dart';
 import 'package:chalkak/features/banner/domain/banner_list_controller.dart';
 import 'package:chalkak/features/banner/domain/banner_models.dart';
-import 'package:chalkak/features/banner/domain/external_link_launcher.dart';
 import 'package:chalkak/features/banner/presentation/banner_test_ids.dart';
 import 'package:chalkak/features/banner/presentation/banner_web_view_builder.dart';
 import 'package:chalkak/features/home/data/api_home_repository.dart';
@@ -227,12 +227,12 @@ class FakeLikeToggler implements RankingLikeToggler {
 }
 
 /// 외부 브라우저 Fake.
-class FakeExternalLinkLauncher implements ExternalLinkLauncher {
+class FakeBannerLinkLauncher implements BannerLinkLauncher {
   final List<Uri> opened = [];
-  ExternalLaunchResult result = ExternalLaunchResult.opened;
+  BannerLaunchResult result = BannerLaunchResult.opened;
 
   @override
-  Future<ExternalLaunchResult> open(Uri url) async {
+  Future<BannerLaunchResult> open(Uri url) async {
     opened.add(url);
     return result;
   }
@@ -320,7 +320,7 @@ class HomeFakes {
   late final ApiBannerRepository banners;
   final ToastController toast = ToastController();
   final HomePreloadCache preloadCache = HomePreloadCache();
-  final FakeExternalLinkLauncher launcher = FakeExternalLinkLauncher();
+  final FakeBannerLinkLauncher launcher = FakeBannerLinkLauncher();
   final FakeBannerWebViewBuilder webView = FakeBannerWebViewBuilder();
 
   MainDependencies get dependencies => MainDependencies(

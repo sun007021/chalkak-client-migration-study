@@ -8,6 +8,7 @@ import '../features/boot/domain/auth_gate.dart';
 import '../features/boot/domain/home_preloader.dart';
 import '../features/boot/domain/pending_navigation.dart';
 import '../features/boot/domain/update_gate.dart';
+import '../features/navigation/main_dependencies.dart';
 import '../features/onboarding/domain/legal_document.dart';
 import '../features/onboarding/domain/sign_up_context.dart';
 import '../features/onboarding/domain/sign_up_use_case.dart';
@@ -15,7 +16,6 @@ import '../features/onboarding/presentation/legal_document_sheet.dart';
 import '../features/signature/domain/change_signature_use_case.dart';
 import '../features/signature/domain/signature_renderer.dart';
 import '../features/signature/domain/signature_repository.dart';
-import '../features/navigation/main_dependencies.dart';
 
 /// 앱이 쓰는 의존성 묶음. 테스트는 Fake로 채운 묶음을 통째로 넣는다.
 /// 이후 PR이 필드를 추가하므로 호출 쪽은 이름 있는 인자로만 만든다.

@@ -21,7 +21,7 @@ class _Rig {
   }
   final analytics = FakeAnalyticsTracker();
   final toast = RecordingToast();
-  final launcher = FakeExternalLinkLauncher();
+  final launcher = FakeBannerLinkLauncher();
   final builder = FakeBannerWebViewBuilder();
   int backs = 0;
   late final BannerWebViewModel vm;

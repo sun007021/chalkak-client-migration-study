@@ -1,7 +1,7 @@
 import 'package:chalkak/core/copy/ko.g.dart';
+import 'package:chalkak/features/banner/domain/banner_link_launcher.dart';
 import 'package:chalkak/features/banner/domain/banner_web_policy.dart';
 import 'package:chalkak/features/banner/domain/banner_web_view_model.dart';
-import 'package:chalkak/features/banner/domain/external_link_launcher.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/fake_analytics_tracker.dart';
@@ -18,7 +18,7 @@ class _Rig {
   }
   final analytics = FakeAnalyticsTracker();
   final toast = RecordingToast();
-  final launcher = FakeExternalLinkLauncher();
+  final launcher = FakeBannerLinkLauncher();
   late final BannerWebViewModel vm;
 }
 
@@ -96,7 +96,7 @@ void main() {
 
   test('TC-BANR-023 브라우저가 없으면 해당 토스트', () async {
     final r = _Rig();
-    r.launcher.result = ExternalLaunchResult.noBrowser;
+    r.launcher.result = BannerLaunchResult.noBrowser;
     r.vm.start();
     await r.vm.onNavigationRequest(_tap('https://other.test/a'));
     expect(r.toast.messages, [Copy.bannerWebNoBrowser]);
@@ -104,7 +104,7 @@ void main() {
 
   test('TC-BANR-023 브라우저 열기에 실패하면 해당 토스트', () async {
     final r = _Rig();
-    r.launcher.result = ExternalLaunchResult.failed;
+    r.launcher.result = BannerLaunchResult.failed;
     r.vm.start();
     await r.vm.onNavigationRequest(_tap('https://other.test/a'));
     expect(r.toast.messages, [Copy.bannerWebOpenFailed]);

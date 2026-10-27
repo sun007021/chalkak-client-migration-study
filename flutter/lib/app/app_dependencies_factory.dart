@@ -20,6 +20,7 @@ import '../features/boot/domain/auth_gate.dart';
 import '../features/boot/domain/home_preloader.dart';
 import '../features/boot/domain/pending_navigation.dart';
 import '../features/boot/domain/update_gate.dart';
+import '../features/navigation/main_dependencies_factory.dart';
 import '../features/onboarding/data/api_sign_up_repository.dart';
 import '../features/onboarding/data/url_launcher_external_link_launcher.dart';
 import '../features/onboarding/domain/sign_up_context.dart';
@@ -29,7 +30,6 @@ import '../features/signature/data/api_signature_repository.dart';
 import '../features/signature/data/api_signature_uploader.dart';
 import '../features/signature/data/ui_signature_renderer.dart';
 import '../features/signature/domain/change_signature_use_case.dart';
-import '../features/navigation/main_dependencies_factory.dart';
 import 'app_dependencies.dart';
 
 /// 실제 구현으로 [AppDependencies]를 조립한다. 아직 구현이 없는 기능(홈, 푸시)은

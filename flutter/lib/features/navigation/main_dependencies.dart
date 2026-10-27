@@ -1,6 +1,6 @@
 import '../../core/ui/toast/toast_controller.dart';
+import '../banner/domain/banner_link_launcher.dart';
 import '../banner/domain/banner_repository.dart';
-import '../banner/domain/external_link_launcher.dart';
 import '../banner/presentation/banner_web_view_builder.dart';
 import '../home/domain/home_preload.dart';
 import '../home/domain/home_repository.dart';
@@ -27,6 +27,6 @@ class MainDependencies {
   final HomePreloadCache preloadCache;
   final ToastController toast;
   final BannerWebViewBuilder bannerWebViewBuilder;
-  final ExternalLinkLauncher externalLinks;
+  final BannerLinkLauncher externalLinks;
   final HomeAiCardBuilder aiCardBuilder;
 }
