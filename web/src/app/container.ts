@@ -3,6 +3,7 @@ import type { RefreshLock } from '../core/auth/RefreshLock';
 import { IndexedDbSessionStore } from '../core/auth/IndexedDbSessionStore';
 import { CrossTabSessionSync } from '../core/auth/CrossTabSessionSync';
 import { SessionEvents } from '../core/auth/SessionEvents';
+import { createSessionChannel } from '../core/auth/SessionChannel';
 import type { SessionChannel } from '../core/auth/SessionChannel';
 import type { SessionStore } from '../core/auth/SessionStore';
 import { UserCaches } from '../core/auth/UserCaches';
@@ -116,8 +117,7 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
   const clock = options.clock ?? new SystemClock();
   const logger = options.logger ?? new ConsoleLogger();
   const ids = options.ids ?? new RandomIdGenerator();
-  // TODO(구현): 기본 채널을 createSessionChannel()로 바꾼다. store와 crossTabSync는 같은 채널 객체를 쓴다.
-  const sessionChannel: SessionChannel = options.sessionChannel ?? { post() {}, subscribe: () => () => {}, close() {} };
+  const sessionChannel: SessionChannel = options.sessionChannel ?? createSessionChannel(); // store와 crossTabSync가 같은 객체를 쓴다
   const store = options.store ?? new IndexedDbSessionStore({ indexedDB: options.indexedDB, channel: sessionChannel });
   const lock = options.lock ?? new WebLocksRefreshLock();
 

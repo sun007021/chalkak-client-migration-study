@@ -31,6 +31,53 @@ export interface BroadcastChannelHost {
 }
 
 /** BroadcastChannel(SESSION_CHANNEL_NAME)로 만든다. 지원하지 않거나 생성이 던지면 아무것도 안 하는 채널을 돌려준다. */
-export function createSessionChannel(_host: BroadcastChannelHost = globalThis as BroadcastChannelHost): SessionChannel {
-  throw new Error('not implemented');
+export function createSessionChannel(host: BroadcastChannelHost = globalThis as BroadcastChannelHost): SessionChannel {
+  const Ctor = host.BroadcastChannel;
+  if (typeof Ctor !== 'function') return NOOP_CHANNEL;
+  let raw: BroadcastChannelLike;
+  try {
+    raw = new Ctor(SESSION_CHANNEL_NAME);
+  } catch {
+    return NOOP_CHANNEL;
+  }
+  return {
+    post(signal) {
+      try {
+        raw.postMessage({ previousUserId: signal.previousUserId, userId: signal.userId });
+      } catch {
+        // 알림 실패가 저장소 쓰기를 막지 않는다.
+      }
+    },
+    subscribe(listener) {
+      const onMessage = (event: { data: unknown }) => {
+        const signal = parseSignal(event.data);
+        if (!signal) return;
+        try {
+          listener(signal);
+        } catch {
+          // 구독자 하나의 오류가 다른 구독자를 막지 않는다.
+        }
+      };
+      raw.addEventListener('message', onMessage);
+      return () => raw.removeEventListener('message', onMessage);
+    },
+    close() {
+      try {
+        raw.close();
+      } catch {
+        // 이미 닫힘
+      }
+    },
+  };
+}
+
+const NOOP_CHANNEL: SessionChannel = { post() {}, subscribe: () => () => {}, close() {} };
+
+const isIdOrNull = (v: unknown): v is string | null => v === null || typeof v === 'string';
+
+function parseSignal(data: unknown): SessionSignal | null {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return null;
+  const { previousUserId, userId } = data as Record<string, unknown>;
+  if (!isIdOrNull(previousUserId) || !isIdOrNull(userId)) return null;
+  return { previousUserId, userId };
 }

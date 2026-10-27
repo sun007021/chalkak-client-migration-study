@@ -9,10 +9,15 @@ import type { UserCaches } from './UserCaches';
  * previousUserId가 null인 신호(다른 탭의 새 로그인)는 무시한다. 서버 호출은 하지 않는다.
  */
 export class CrossTabSessionSync {
-  constructor(_deps: { channel: SessionChannel; userCaches: UserCaches; sessionEvents: SessionEvents }) {}
+  constructor(private readonly deps: { channel: SessionChannel; userCaches: UserCaches; sessionEvents: SessionEvents }) {}
 
   /** 구독을 시작하고 중지 함수를 돌려준다. */
   start(): () => void {
-    throw new Error('not implemented');
+    const { channel, userCaches, sessionEvents } = this.deps;
+    return channel.subscribe((signal) => {
+      if (signal.previousUserId === null || signal.previousUserId === signal.userId) return;
+      void userCaches.clearAll(); // 실패해도 clearAll이 던지지 않는다. 로그인으로 보내는 일을 막지 않는다.
+      sessionEvents.emit(signal.userId === null ? 'logout' : 'expired');
+    });
   }
 }
