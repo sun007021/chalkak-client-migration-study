@@ -25,16 +25,29 @@ abstract interface class PlayUpdateSource {
 /// 업데이트가 있고 우선순위가 1 이상(그리고 즉시 업데이트 허용)이면 필수(REQ-BOOT-008).
 /// 우선순위 0이면 통과, 조회 예외는 [UpdateStatus.unavailable].
 class PlayUpdateChecker implements UpdateChecker {
-  PlayUpdateChecker({required PlayUpdateSource source});
+  PlayUpdateChecker({required this._source});
+
+  final PlayUpdateSource _source;
 
   @override
-  Future<UpdateStatus> check() => throw UnimplementedError();
+  Future<UpdateStatus> check() async {
+    try {
+      final info = await _source.fetchInfo();
+      final required =
+          info.updateAvailable && info.priority >= 1 && info.immediateAllowed;
+      return required ? UpdateStatus.updateRequired : UpdateStatus.upToDate;
+    } on Object {
+      return UpdateStatus.unavailable;
+    }
+  }
 }
 
 /// 버튼이 누르면 Play 즉시 업데이트를 시작한다.
 class PlayUpdateLauncher implements UpdateLauncher {
-  PlayUpdateLauncher({required PlayUpdateSource source});
+  PlayUpdateLauncher({required this._source});
+
+  final PlayUpdateSource _source;
 
   @override
-  Future<void> launch() => throw UnimplementedError();
+  Future<void> launch() => _source.startImmediateUpdate();
 }

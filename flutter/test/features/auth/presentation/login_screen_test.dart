@@ -142,6 +142,20 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(
+      find.descendant(
+        of: byId(TestIds.loginErrorDialog),
+        matching: find.text(Copy.authLoginErrorTitle),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: byId(TestIds.loginErrorDialogConfirmButton),
+        matching: find.text(Copy.commonConfirm),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(byId(TestIds.loginErrorDialogConfirmButton));
     await settleUi(tester);
     expect(byId(TestIds.loginErrorDialog), findsNothing);

@@ -6,19 +6,35 @@ import 'update_gate.dart';
 /// - checking/forced면 마지막 요청 하나만 보류했다가 통과되는 순간 한 번 처리한다.
 /// - [clearAll](로그아웃·계정 전환)은 보류 중인 이동을 버린다.
 class PendingNavigation implements UserDataCleaner {
-  PendingNavigation({
-    required UpdateGate gate,
-    required void Function(String location) navigate,
-  });
+  PendingNavigation({required this._gate, required this._navigate}) {
+    _gate.addListener(_flushIfPassed);
+  }
 
-  bool get hasPending => throw UnimplementedError();
+  final UpdateGate _gate;
+  final void Function(String location) _navigate;
+  String? _pending;
 
-  void request(String location) => throw UnimplementedError();
+  bool get hasPending => _pending != null;
 
-  void discard() => throw UnimplementedError();
+  void request(String location) {
+    if (_gate.status == UpdateGateStatus.passed) {
+      _navigate(location);
+    } else {
+      _pending = location;
+    }
+  }
 
-  void dispose() => throw UnimplementedError();
+  void discard() => _pending = null;
+
+  void dispose() => _gate.removeListener(_flushIfPassed);
 
   @override
-  Future<void> clearAll() => throw UnimplementedError();
+  Future<void> clearAll() async => discard();
+
+  void _flushIfPassed() {
+    final location = _pending;
+    if (location == null || _gate.status != UpdateGateStatus.passed) return;
+    _pending = null;
+    _navigate(location);
+  }
 }

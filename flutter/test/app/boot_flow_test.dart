@@ -107,7 +107,7 @@ void main() {
       expect(
         find.descendant(
           of: byId(TestIds.updateGateDialog),
-          matching: find.byType(ButtonStyleButton),
+          matching: find.bySubtype<ButtonStyleButton>(),
         ),
         findsOneWidget,
       );

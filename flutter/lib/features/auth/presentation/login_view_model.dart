@@ -1,7 +1,11 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../../core/copy/ko.g.dart';
+
+import '../domain/login_failure.dart';
 import '../domain/login_use_case.dart';
 import '../domain/session_use_cases.dart';
 import '../domain/signup_credentials.dart';
@@ -42,20 +46,96 @@ final class NavigateToTerms extends LoginEvent {
 ///   취소는 오류 없이 isSubmitting=false.
 /// - [dispose]하면 진행 중 요청을 취소하고 이후 상태·이벤트를 내지 않는다.
 class LoginViewModel extends ChangeNotifier {
-  LoginViewModel({
-    required LoginUseCase loginUseCase,
-    required EnterGuestUseCase enterGuest,
-  });
+  LoginViewModel({required this._loginUseCase, required this._enterGuest});
 
-  LoginState get state => throw UnimplementedError();
-  Stream<LoginEvent> get events => throw UnimplementedError();
+  final LoginUseCase _loginUseCase;
+  final EnterGuestUseCase _enterGuest;
+  final StreamController<LoginEvent> _events =
+      StreamController<LoginEvent>.broadcast();
+  final CancelToken _cancelToken = CancelToken();
 
-  Future<void> onKakaoPressed() => throw UnimplementedError();
-  Future<void> onGuestPressed() => throw UnimplementedError();
+  LoginState _state = const LoginState();
+  int _errorSequence = 0;
+  bool _disposed = false;
+
+  LoginState get state => _state;
+  Stream<LoginEvent> get events => _events.stream;
+
+  Future<void> onKakaoPressed() async {
+    if (!_beginSubmission()) return;
+    final outcome = await _loginUseCase.loginWithKakao(
+      cancelToken: _cancelToken,
+    );
+    if (_disposed) return;
+    switch (outcome) {
+      case LoginSucceeded():
+        _emit(const NavigateToMain());
+      case LoginSignUpRequired(:final credentials):
+        _emit(NavigateToTerms(credentials));
+      case LoginCancelled():
+        _setState(const LoginState());
+      case LoginFailed(:final failure):
+        _fail(_messageOf(failure));
+    }
+  }
+
+  Future<void> onGuestPressed() async {
+    if (!_beginSubmission()) return;
+    final saved = await _enterGuest();
+    if (_disposed) return;
+    if (saved) {
+      _emit(const NavigateToMain());
+    } else {
+      _fail(Copy.authLoginErrorGuest);
+    }
+  }
 
   /// 오류 알림의 확인 버튼.
-  void dismissError() => throw UnimplementedError();
+  void dismissError() =>
+      _setState(LoginState(isSubmitting: _state.isSubmitting));
 
   /// 화면 전환이 끝난 뒤 다시 제출할 수 있게 한다.
-  void resetSubmission() => throw UnimplementedError();
+  void resetSubmission() => _setState(const LoginState());
+
+  bool _beginSubmission() {
+    if (_disposed || _state.isSubmitting) return false;
+    _setState(const LoginState(isSubmitting: true));
+    return true;
+  }
+
+  /// 성공·가입 필요는 화면 전환이 끝날 때까지 isSubmitting을 유지한다.
+  void _emit(LoginEvent event) => _events.add(event);
+
+  void _fail(String message) {
+    _setState(
+      LoginState(
+        error: LoginError(id: ++_errorSequence, message: message),
+      ),
+    );
+  }
+
+  static String _messageOf(LoginFailure failure) => switch (failure.kind) {
+    LoginFailureKind.config => Copy.authLoginErrorConfig,
+    LoginFailureKind.kakaoFailed => Copy.authLoginErrorKakaoFailed,
+    LoginFailureKind.kakaoAccount => Copy.authLoginErrorKakaoAccount,
+    LoginFailureKind.network => Copy.authLoginErrorNetwork,
+    LoginFailureKind.invalidResponse => Copy.authLoginErrorInvalidResponse,
+    LoginFailureKind.forbidden =>
+      failure.serverMessage ?? Copy.authLoginErrorGeneric,
+    LoginFailureKind.generic => Copy.authLoginErrorGeneric,
+  };
+
+  void _setState(LoginState next) {
+    if (_disposed) return;
+    _state = next;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _cancelToken.cancel();
+    _events.close();
+    super.dispose();
+  }
 }

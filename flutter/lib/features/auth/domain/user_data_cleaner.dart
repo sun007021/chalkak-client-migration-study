@@ -7,8 +7,19 @@ abstract interface class UserDataCleaner {
 
 /// 여러 [UserDataCleaner]를 순서대로 실행한다. 하나가 던져도 나머지를 계속 실행한다.
 class CompositeUserDataCleaner implements UserDataCleaner {
-  CompositeUserDataCleaner(List<UserDataCleaner> cleaners);
+  CompositeUserDataCleaner(List<UserDataCleaner> cleaners)
+    : _cleaners = List.unmodifiable(cleaners);
+
+  final List<UserDataCleaner> _cleaners;
 
   @override
-  Future<void> clearAll() => throw UnimplementedError();
+  Future<void> clearAll() async {
+    for (final cleaner in _cleaners) {
+      try {
+        await cleaner.clearAll();
+      } on Object {
+        // 하나가 실패해도 나머지 정리는 계속한다.
+      }
+    }
+  }
 }

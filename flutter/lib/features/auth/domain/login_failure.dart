@@ -27,8 +27,22 @@ class LoginFailure {
   const LoginFailure(this.kind, {this.serverMessage});
 
   /// social-login 응답 오류를 분류한다. cancelled는 호출자가 먼저 걸러야 한다.
-  factory LoginFailure.fromApiError(ApiError error) =>
-      throw UnimplementedError();
+  factory LoginFailure.fromApiError(ApiError error) {
+    if (error.isNetwork) return const LoginFailure(LoginFailureKind.network);
+    if (error.isInvalidResponse) {
+      return const LoginFailure(LoginFailureKind.invalidResponse);
+    }
+    if (error.status == 401) {
+      return const LoginFailure(LoginFailureKind.kakaoAccount);
+    }
+    if (error.status == 403) {
+      return LoginFailure(
+        LoginFailureKind.forbidden,
+        serverMessage: error.message,
+      );
+    }
+    return const LoginFailure(LoginFailureKind.generic);
+  }
 
   final LoginFailureKind kind;
   final String? serverMessage;

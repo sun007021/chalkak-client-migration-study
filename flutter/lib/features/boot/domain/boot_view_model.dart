@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../../auth/domain/push_registrar.dart';
 import 'auth_gate.dart';
 import 'home_preloader.dart';
@@ -37,15 +40,98 @@ final class BootReady extends BootState {
 /// - forced면 [BootForceUpdate]에서 멈추고, 게이트가 통과로 바뀌면 이어서 진행한다.
 class BootViewModel extends ChangeNotifier {
   BootViewModel({
-    required UpdateGate updateGate,
-    required AuthGate authGate,
-    required HomePreloader homePreloader,
-    required PushRegistrar pushRegistrar,
+    required this._updateGate,
+    required this._authGate,
+    required this._homePreloader,
+    required this._pushRegistrar,
     Duration? preloadMax,
-  });
+  }) : _preloadMax = preloadMax ?? AppConstants.splashPreloadMax;
 
-  BootState get state => throw UnimplementedError();
+  final UpdateGate _updateGate;
+  final AuthGate _authGate;
+  final HomePreloader _homePreloader;
+  final PushRegistrar _pushRegistrar;
+  final Duration _preloadMax;
+
+  BootState _state = const BootChecking();
+  Future<void>? _starting;
+  Timer? _preloadTimer;
+  bool _disposed = false;
+
+  BootState get state => _state;
 
   /// Ready가 되거나 강제 업데이트로 멈출 때 완료한다. 두 번 불러도 한 번만 진행한다.
-  Future<void> start() => throw UnimplementedError();
+  Future<void> start() => _starting ??= _start();
+
+  Future<void> _start() async {
+    _updateGate.addListener(_onGateChanged);
+    await _updateGate.check();
+    if (_updateGate.status == UpdateGateStatus.forced) {
+      _setState(const BootForceUpdate());
+      return;
+    }
+    await _proceed();
+  }
+
+  void _onGateChanged() {
+    if (_state is BootForceUpdate &&
+        _updateGate.status == UpdateGateStatus.passed) {
+      _setState(const BootChecking());
+      unawaited(_proceed());
+    }
+  }
+
+  Future<void> _proceed() async {
+    final auth = await _authGate.resolve();
+    switch (auth) {
+      case SignedOut():
+        _setState(const BootReady(BootDestination.login));
+      case GuestMode():
+        await _preloadHome(guest: true);
+      case Authenticated():
+        _registerPush();
+        await _preloadHome(guest: false);
+    }
+  }
+
+  void _registerPush() {
+    try {
+      _pushRegistrar.registerCurrentDevice().catchError((Object _) {});
+    } on Object {
+      // 푸시 등록 실패는 부팅에 영향을 주지 않는다.
+    }
+  }
+
+  Future<void> _preloadHome({required bool guest}) async {
+    final done = Completer<void>();
+    _preloadTimer = Timer(_preloadMax, () {
+      if (!done.isCompleted) done.complete();
+    });
+    unawaited(
+      _homePreloader
+          .preload(guest: guest)
+          .then<void>((_) {}, onError: (Object _) {})
+          .whenComplete(() {
+            if (!done.isCompleted) done.complete();
+          }),
+    );
+    await done.future;
+    _preloadTimer?.cancel();
+    _preloadTimer = null;
+    _setState(BootReady(BootDestination.home, isGuest: guest));
+  }
+
+  void _setState(BootState next) {
+    if (_disposed) return;
+    _state = next;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _preloadTimer?.cancel();
+    _updateGate.removeListener(_onGateChanged);
+    super.dispose();
+  }
 }

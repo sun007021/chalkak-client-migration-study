@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/auth/session.dart';
 import '../../../core/auth/session_manager.dart';
+import '../../../core/network/api_error.dart';
 import 'auth_repository.dart';
 import 'login_failure.dart';
 import 'nonce.dart';
@@ -44,14 +45,72 @@ final class LoginFailed extends LoginOutcome {
 /// 5. ApiError.cancelled는 [LoginCancelled], 나머지는 [LoginFailure.fromApiError].
 class LoginUseCase {
   LoginUseCase({
-    required SocialLoginClient socialLogin,
-    required NonceGenerator nonceGenerator,
-    required AuthRepository repository,
-    required SessionManager sessions,
-    required UserDataCleaner cleaner,
-    required PushRegistrar pushRegistrar,
+    required this._socialLogin,
+    required this._nonceGenerator,
+    required this._repository,
+    required this._sessions,
+    required this._cleaner,
+    required this._pushRegistrar,
   });
 
-  Future<LoginOutcome> loginWithKakao({CancelToken? cancelToken}) =>
-      throw UnimplementedError();
+  final SocialLoginClient _socialLogin;
+  final NonceGenerator _nonceGenerator;
+  final AuthRepository _repository;
+  final SessionManager _sessions;
+  final UserDataCleaner _cleaner;
+  final PushRegistrar _pushRegistrar;
+
+  Future<LoginOutcome> loginWithKakao({CancelToken? cancelToken}) async {
+    final rawNonce = _nonceGenerator.generate();
+    final String idToken;
+    try {
+      idToken = await _socialLogin.requestIdToken(
+        nonce: Nonce.sha256Hex(rawNonce),
+      );
+    } on SocialLoginCancelledException {
+      return const LoginCancelled();
+    } on SocialLoginMissingIdTokenException {
+      return const LoginFailed(LoginFailure(LoginFailureKind.config));
+    } on Object {
+      return const LoginFailed(LoginFailure(LoginFailureKind.kakaoFailed));
+    }
+
+    final SocialLoginResponse response;
+    try {
+      response = await _repository.socialLogin(
+        idToken: idToken,
+        rawNonce: rawNonce,
+        cancelToken: cancelToken,
+      );
+    } on ApiError catch (e) {
+      if (e.isCancelled) return const LoginCancelled();
+      return LoginFailed(LoginFailure.fromApiError(e));
+    }
+
+    switch (response) {
+      case SocialLoginSignUpRequired():
+        return LoginSignUpRequired(
+          SignUpCredentials(idToken: idToken, rawNonce: rawNonce),
+        );
+      case SocialLoginSucceeded(:final session):
+        if (cancelToken?.isCancelled ?? false) return const LoginCancelled();
+        final previous = await _sessions.read();
+        if (previous != null &&
+            !previous.isGuest &&
+            previous.userId != session.userId) {
+          await _cleaner.clearAll();
+        }
+        await _sessions.save(session);
+        _startPushRegistration();
+        return LoginSucceeded(session);
+    }
+  }
+
+  void _startPushRegistration() {
+    try {
+      _pushRegistrar.registerCurrentDevice().catchError((Object _) {});
+    } on Object {
+      // 푸시 등록 실패는 로그인 결과에 영향을 주지 않는다.
+    }
+  }
 }

@@ -9,7 +9,13 @@ class AppScope extends InheritedWidget {
   final AppDependencies dependencies;
 
   /// 조상에 [AppScope]가 없으면 FlutterError.
-  static AppDependencies of(BuildContext context) => throw UnimplementedError();
+  static AppDependencies of(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();
+    if (scope == null) {
+      throw FlutterError('AppScope가 위젯 트리 위에 없다. ChalkakApp 아래에서 사용해야 한다.');
+    }
+    return scope.dependencies;
+  }
 
   @override
   bool updateShouldNotify(AppScope oldWidget) =>

@@ -24,18 +24,7 @@ import 'fixtures.dart';
 import 'net_harness.dart' show apiHost, v1;
 
 /// 공용 fixture(`auth/…`, `common/…`)를 manifest의 상태 코드와 함께 응답으로 만든다.
-FakeResponse fixtureResponse(String name) {
-  final r = Fixture.response(name);
-  if (r.isFault) {
-    return FakeResponse.fault(
-      r.fault == 'timeout' ? FakeFault.timeout : FakeFault.disconnect,
-    );
-  }
-  return FakeResponse.fromFixture(
-    r.route.status!,
-    r.json.cast<String, Object?>(),
-  );
-}
+FakeResponse fixtureResponse(String name) => FakeResponse.fixture(name);
 
 /// `boot/session__*.json`(storage fixture)을 보안 저장소에 시드한다.
 /// - `{}`: 아무것도 쓰지 않음

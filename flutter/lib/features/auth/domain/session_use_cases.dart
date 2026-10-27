@@ -1,21 +1,34 @@
+import '../../../core/auth/session.dart';
 import '../../../core/auth/session_manager.dart';
+import '../../../core/network/api_error.dart';
 import 'auth_repository.dart';
 import 'user_data_cleaner.dart';
 
 /// 게스트 진입(REQ-AUTH-019~020). 서버를 부르지 않고 저장된 자격 증명을 지운 뒤
 /// 게스트 세션(`Session.guest()`)을 저장한다. 저장이 실패하면 false.
 class EnterGuestUseCase {
-  EnterGuestUseCase({required SessionManager sessions});
+  EnterGuestUseCase({required this._sessions});
 
-  Future<bool> call() => throw UnimplementedError();
+  final SessionManager _sessions;
+
+  Future<bool> call() async {
+    try {
+      await _sessions.save(Session.guest());
+      return true;
+    } on Object {
+      return false;
+    }
+  }
 }
 
 /// 설정의 게스트 "로그인" 버튼(D-05, TC-AUTH-033). 게스트 플래그를 지운다
 /// (`SessionManager.clear(userLogout)` -> cleared 이벤트로 로그인 화면 이동).
 class LeaveGuestUseCase {
-  LeaveGuestUseCase({required SessionManager sessions});
+  LeaveGuestUseCase({required this._sessions});
 
-  Future<void> call() => throw UnimplementedError();
+  final SessionManager _sessions;
+
+  Future<void> call() => _sessions.clear(SessionClearReason.userLogout);
 }
 
 /// 로그아웃(D-16, REQ-AUTH-033~036, 040).
@@ -24,12 +37,31 @@ class LeaveGuestUseCase {
 /// 진행 중에 다시 불리면 새 작업을 만들지 않는다.
 class LogoutUseCase {
   LogoutUseCase({
-    required SessionManager sessions,
-    required AuthRepository repository,
-    required UserDataCleaner cleaner,
+    required this._sessions,
+    required this._repository,
+    required this._cleaner,
   });
 
-  Future<void> call() => throw UnimplementedError();
+  final SessionManager _sessions;
+  final AuthRepository _repository;
+  final UserDataCleaner _cleaner;
+  Future<void>? _running;
+
+  Future<void> call() =>
+      _running ??= _run().whenComplete(() => _running = null);
+
+  Future<void> _run() async {
+    final session = await _sessions.read();
+    await _cleaner.clearAll();
+    await _sessions.clear(SessionClearReason.userLogout);
+    final refreshToken = session?.refreshToken ?? '';
+    if (session == null || session.isGuest || refreshToken.isEmpty) return;
+    try {
+      await _repository.logout(refreshToken: refreshToken);
+    } on Object {
+      // 서버 로그아웃 실패는 이미 끝난 로컬 로그아웃에 영향을 주지 않는다.
+    }
+  }
 }
 
 enum WithdrawResult { succeeded, failed, cancelled }
@@ -41,10 +73,29 @@ enum WithdrawResult { succeeded, failed, cancelled }
 /// 화면이 사라져도 요청은 취소하지 않으므로 204가 오면 정리는 끝까지 한다.
 class WithdrawUseCase {
   WithdrawUseCase({
-    required SessionManager sessions,
-    required AuthRepository repository,
-    required UserDataCleaner cleaner,
+    required this._sessions,
+    required this._repository,
+    required this._cleaner,
   });
 
-  Future<WithdrawResult> call() => throw UnimplementedError();
+  final SessionManager _sessions;
+  final AuthRepository _repository;
+  final UserDataCleaner _cleaner;
+  Future<WithdrawResult>? _running;
+
+  Future<WithdrawResult> call() =>
+      _running ??= _run().whenComplete(() => _running = null);
+
+  Future<WithdrawResult> _run() async {
+    try {
+      await _repository.deleteAccount();
+    } on ApiError catch (e) {
+      return e.isCancelled ? WithdrawResult.cancelled : WithdrawResult.failed;
+    } on Object {
+      return WithdrawResult.failed;
+    }
+    await _cleaner.clearAll();
+    await _sessions.clear(SessionClearReason.userLogout);
+    return WithdrawResult.succeeded;
+  }
 }

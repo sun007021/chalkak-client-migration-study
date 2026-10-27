@@ -21,18 +21,73 @@ enum UpdateGateStatus {
 /// - [recheckSignals]에 이벤트가 오면(앱 복귀, 온라인 전환) [check]를 다시 한다.
 class UpdateGate extends ChangeNotifier {
   UpdateGate({
-    required UpdateChecker checker,
-    required UpdateLauncher launcher,
-    required bool enabled,
+    required this._checker,
+    required this._launcher,
+    required this._enabled,
     Stream<void>? recheckSignals,
-  });
+  }) {
+    _signalSubscription = recheckSignals?.listen((_) => unawaited(check()));
+  }
 
-  UpdateGateStatus get status => throw UnimplementedError();
+  final UpdateChecker _checker;
+  final UpdateLauncher _launcher;
+  final bool _enabled;
+  StreamSubscription<void>? _signalSubscription;
+  UpdateGateStatus _status = UpdateGateStatus.checking;
+  Future<void>? _checking;
+  Future<void>? _opening;
+
+  UpdateGateStatus get status => _status;
 
   /// 동시에 여러 번 불려도 조회는 한 번에 하나만 진행한다.
-  Future<void> check() => throw UnimplementedError();
+  Future<void> check() =>
+      _checking ??= _check().whenComplete(() => _checking = null);
+
+  Future<void> _check() async {
+    if (!_enabled) {
+      _setStatus(UpdateGateStatus.passed);
+      return;
+    }
+    UpdateStatus result;
+    try {
+      result = await _checker.check();
+    } on Object {
+      result = UpdateStatus.unavailable;
+    }
+    switch (result) {
+      case UpdateStatus.updateRequired:
+        _setStatus(UpdateGateStatus.forced);
+      case UpdateStatus.upToDate:
+        _setStatus(UpdateGateStatus.passed);
+      case UpdateStatus.unavailable:
+        if (_status != UpdateGateStatus.forced) {
+          _setStatus(UpdateGateStatus.passed);
+        }
+    }
+  }
+
+  void _setStatus(UpdateGateStatus next) {
+    if (_status == next) return;
+    _status = next;
+    notifyListeners();
+  }
 
   /// "업데이트" 버튼. 진행 중이면 무시(연타해도 launcher 1회). 끝난 뒤에도
   /// 강제 상태가 남아 있으면 forced 유지(Android 취소·실패 포함, 앱을 종료하지 않는다).
-  Future<void> openStore() => throw UnimplementedError();
+  Future<void> openStore() =>
+      _opening ??= _open().whenComplete(() => _opening = null);
+
+  Future<void> _open() async {
+    try {
+      await _launcher.launch();
+    } on Object {
+      // 취소·실패해도 강제 상태는 그대로 둔다.
+    }
+  }
+
+  @override
+  void dispose() {
+    _signalSubscription?.cancel();
+    super.dispose();
+  }
 }
