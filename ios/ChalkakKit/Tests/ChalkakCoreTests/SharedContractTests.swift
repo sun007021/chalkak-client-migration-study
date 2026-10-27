@@ -70,6 +70,7 @@ struct SharedContractTests {
         #expect(Self.millis(AppConstants.uploadPutTimeout) == (try Self.int(c, "UPLOAD_PUT_TIMEOUT_MS")))
         #expect(AppConstants.retryBackoff.map(Self.millis) == (try #require(c["RETRY_BACKOFF_MS"] as? [Int])))
         #expect(AppConstants.retryMax == (try Self.int(c, "RETRY_MAX")))
+        #expect(Self.millis(AppConstants.retryAfterMax) == (try Self.int(c, "RETRY_AFTER_MAX_MS")))
         #expect(Self.millis(AppConstants.versionLookupTimeout) == (try Self.int(c, "VERSION_LOOKUP_TIMEOUT_MS")))
     }
 
@@ -95,7 +96,7 @@ struct SharedContractTests {
             "SIGNATURE_PNG_SIZE", "SIGNATURE_CONTENT_TYPE", "SIGNATURE_MAX_BYTES",
             "SIGNUP_PENDING_RETRY_INTERVAL_MS", "SIGNUP_PENDING_RETRY_MAX", "AI_REVIEW_POLL_INTERVAL_MS", "AI_REVIEW_POLL_WINDOW_MS",
             "PAGE_SIZE", "BANNER_PAGE_SIZE", "TOAST_DURATION_MS", "SPLASH_PRELOAD_MAX_MS",
-            "HTTP_CONNECT_TIMEOUT_MS", "HTTP_RESPONSE_TIMEOUT_MS", "UPLOAD_PUT_TIMEOUT_MS", "RETRY_BACKOFF_MS", "RETRY_MAX",
+            "HTTP_CONNECT_TIMEOUT_MS", "HTTP_RESPONSE_TIMEOUT_MS", "UPLOAD_PUT_TIMEOUT_MS", "RETRY_BACKOFF_MS", "RETRY_MAX", "RETRY_AFTER_MAX_MS",
             "VERSION_LOOKUP_TIMEOUT_MS", "TERMS_ALLOWED_HOSTS", "TERMS_URLS",
             "ANALYTICS_SCREEN_NAMES", "ANALYTICS_TAB_DESTINATIONS", "FIXTURE_NOW",
         ]

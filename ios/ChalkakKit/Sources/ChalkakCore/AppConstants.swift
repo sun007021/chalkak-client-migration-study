@@ -39,6 +39,8 @@ public enum AppConstants {
     public static let uploadPutTimeout = Duration.seconds(60)
     public static let retryBackoff: [Duration] = [.milliseconds(500), .milliseconds(1000)]
     public static let retryMax = 2
+    /// Retry-After가 이 값을 넘으면 기다리지 않고 재시도 없이 실패한다.
+    public static let retryAfterMax: Duration = .seconds(30)
     public static let versionLookupTimeout = Duration.seconds(3)
     public static let uploadIdClaimTTL = Duration.seconds(3600)
     public static let termsAllowedHosts: [String] = ["notion.com", "notion.so", "notion.site"]

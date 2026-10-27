@@ -5,7 +5,7 @@ public enum NetworkConstants {
     /// 재시도 최대 횟수(총 3시도).
     public static let maxRetries = AppConstants.retryMax
     /// Retry-After 상한. 이보다 길면 기다리지 않고 재시도 없이 실패한다(common-infra 임시 결정, 5개 플랫폼 공통).
-    public static let maxRetryAfter: Duration = .seconds(30)
+    public static let maxRetryAfter = AppConstants.retryAfterMax
 }
 
 public enum RetryPlan: Sendable, Equatable {
