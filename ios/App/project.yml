@@ -1,0 +1,75 @@
+# XcodeGen 설정. `cd ios/App && xcodegen generate`로 Chalkak.xcodeproj를 만든다(프로젝트 파일은 커밋하지 않는다).
+name: Chalkak
+options:
+  bundleIdPrefix: com.study.chalkak
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+configs:
+  Debug: debug
+  Release: release
+packages:
+  ChalkakKit:
+    path: ../ChalkakKit
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Chalkak:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+      - Resources
+    configFiles:
+      Debug: Config/App.xcconfig
+      Release: Config/App.xcconfig
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: 찰캌
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIUserInterfaceStyle: Light
+        API_BASE_URL: $(API_BASE_URL)
+        KAKAO_NATIVE_APP_KEY: $(KAKAO_NATIVE_APP_KEY)
+        UIAppFonts:
+          - Continuous-Regular.otf
+          - GriunXHangeulBanguri-Regular.ttf
+          - Pretendard-Bold.otf
+          - Pretendard-Regular.otf
+          - Pretendard-SemiBold.otf
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.study.chalkak.ios
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGNING_ALLOWED: NO
+    dependencies:
+      - package: ChalkakKit
+        product: ChalkakCore
+      - package: ChalkakKit
+        product: ChalkakNetwork
+      - package: ChalkakKit
+        product: ChalkakData
+      - package: ChalkakKit
+        product: ChalkakFeatures
+  ChalkakUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: Chalkak
+    settings:
+      base:
+        CODE_SIGNING_ALLOWED: NO
+schemes:
+  Chalkak:
+    build:
+      targets:
+        Chalkak: all
+        ChalkakUITests: [test]
+    test:
+      targets: [ChalkakUITests]

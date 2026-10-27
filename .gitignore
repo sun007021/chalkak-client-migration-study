@@ -1,6 +1,7 @@
 # 비밀값
 *.xcconfig
 !*.example.xcconfig
+!ios/App/Config/App.xcconfig
 local.properties
 GoogleService-Info.plist
 google-services.json
@@ -16,3 +17,5 @@ build/
 DerivedData/
 node_modules/
 .dart_tool/
+.build/
+ios/App/*.xcodeproj/
