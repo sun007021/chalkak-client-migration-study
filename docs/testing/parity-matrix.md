@@ -10,8 +10,8 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | BOOT | [boot-auth.md](catalog/boot-auth.md) | 39 | 2 | 2 | 0/39 | 27/39 | 34/39 | 33/39 | 0/39 |
 | AUTH | [boot-auth.md](catalog/boot-auth.md) | 65 | 5 | 5 | 1/65 | 52/65 | 56/65 | 53/65 | 0/65 |
-| ONB | [onboarding-signature.md](catalog/onboarding-signature.md) | 52 | 3 | 2 | 0/52 | 0/52 | 0/52 | 0/52 | 0/52 |
-| SIGN | [onboarding-signature.md](catalog/onboarding-signature.md) | 45 | 2 | 2 | 0/45 | 0/45 | 0/45 | 0/45 | 0/45 |
+| ONB | [onboarding-signature.md](catalog/onboarding-signature.md) | 52 | 3 | 2 | 0/52 | 0/52 | 46/52 | 0/52 | 0/52 |
+| SIGN | [onboarding-signature.md](catalog/onboarding-signature.md) | 45 | 2 | 2 | 0/45 | 0/45 | 42/45 | 0/45 | 0/45 |
 | NAV | [navigation.md](catalog/navigation.md) | 50 | 0 | 0 | 0/50 | 0/50 | 0/50 | 0/50 | 0/50 |
 | HOME | [home.md](catalog/home.md) | 60 | 2 | 2 | 0/60 | 0/60 | 0/60 | 0/60 | 0/60 |
 | BANR | [home.md](catalog/home.md) | 31 | 1 | 1 | 0/31 | 0/31 | 0/31 | 0/31 | 0/31 |
