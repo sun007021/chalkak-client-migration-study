@@ -48,3 +48,10 @@ test('extractLiterals does not treat object fields ending in Key as testIDs', ()
   ].join('\n');
   assert.deepEqual(extractLiterals(src).map((x) => x.literal), ['login.kakao-button', 'home.root']);
 });
+
+test('parseTestIds accepts camelCase placeholders such as {postId}', () => {
+  const md = '| home | 좋아요 | `home.ranking-like-button-{postId}` |  |\n';
+  const ids = parseTestIds(md);
+  assert.equal(ids.length, 1);
+  assert.deepEqual(findUnknown({ 'a.kt': 'Modifier.testTag("home.ranking-like-button-${postId}")' }, ids), []);
+});

@@ -241,28 +241,28 @@
 | home.topic.header | {M월 d일} · 오늘의 주제 | 오늘 주제 머리글(KST 날짜) |
 | home.topic.loading | 오늘의 주제를 불러오는 중 | 히어로·머리글 로딩 (D-06) |
 | home.topic.error | 오늘의 주제를 불러오지 못했어요 | 주제 조회 실패 |
-| home.topic.not_ready | 오늘의 주제가 아직 준비되지 않았어요 | 주제 404 |
-| home.hero.no_open_topic | 지금은 참여할 수 있는 주제가 없어요 | `/posts/today` 404 |
+| home.topic.not-ready | 오늘의 주제가 아직 준비되지 않았어요 | 주제 404 |
+| home.hero.no-open-topic | 지금은 참여할 수 있는 주제가 없어요 | `/posts/today` 404 |
 | home.hero.empty | "{주제}" 사진을 공유하지 않았어요 | Empty. 주제 제목이 비면 "오늘의 주제"로 대체 |
 | home.hero.processing | 사진을 처리하고 있어요 | VALIDATING |
-| home.hero.pending_badge | 검수 대기 | PENDING 히어로 배지 |
+| home.hero.pending-badge | 검수 대기 | PENDING 히어로 배지 |
 | home.hero.error | 사진 상태를 불러오지 못했어요 | 히어로 실패 |
 | home.hero.retry | 다시 시도 | 히어로·섹션 다시 시도 버튼 |
 | home.weekly.title | 이번 주 기록 | 섹션 제목 |
 | home.weekly.more | 보러가기 | 기록 탭으로 이동 |
 | home.weekly.pending | 대기 | PENDING 칸 라벨 |
 | home.weekly.error | 기록을 불러오지 못했어요 | 주간 기록 실패 |
-| home.ranking.yesterday_title | 어제 랭킹 | 섹션 제목 |
-| home.ranking.today_title | 오늘 인기있는 사진 | 섹션 제목 |
+| home.ranking.yesterday-title | 어제 랭킹 | 섹션 제목 |
+| home.ranking.today-title | 오늘 인기있는 사진 | 섹션 제목 |
 | home.ranking.empty | 아직 올라온 사진이 없어요 | 랭킹 빈 상태 |
 | home.ranking.error | {섹션 제목} 사진을 불러오지 못했어요 | 랭킹 실패 |
 | home.banner.title | ISSUE | 배너 섹션 제목, 웹뷰 화면 제목 |
 | home.banner.error | ISSUE를 불러오지 못했어요. 다시 시도 | 최초 배너 실패 |
-| banner.web.link_unavailable | 링크를 열 수 없어요 | 안전하지 않은 주소 |
-| banner.web.load_error | 페이지를 불러오지 못했어요 | 웹뷰 로드 실패 |
+| banner.web.link-unavailable | 링크를 열 수 없어요 | 안전하지 않은 주소 |
+| banner.web.load-error | 페이지를 불러오지 못했어요 | 웹뷰 로드 실패 |
 | banner.web.retry | 다시 시도 | 웹뷰 오류 버튼 |
-| banner.web.no_browser | 링크를 열 수 있는 브라우저가 없어요 | 외부 열기 불가 |
-| banner.web.open_failed | 브라우저에서 링크를 열지 못했어요 | 외부 열기 실패 |
+| banner.web.no-browser | 링크를 열 수 있는 브라우저가 없어요 | 외부 열기 불가 |
+| banner.web.open-failed | 브라우저에서 링크를 열지 못했어요 | 외부 열기 실패 |
 | home.guest.upload | 게시물을 추가하려면 로그인이 필요해요 | 게스트가 히어로 탭 (D-05) |
 | home.guest.feed | 게시물 피드를 보려면 로그인이 필요해요 | 게스트가 랭킹 사진 탭 (D-05) |
 | home.guest.like | 좋아요를 누르려면 로그인이 필요해요 | 게스트가 하트 탭 (D-05) |

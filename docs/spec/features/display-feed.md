@@ -240,8 +240,8 @@
 | display.sort.recent | 최신순 | 정렬 탭 |
 | display.sort.popular | 인기순 | 정렬 탭 |
 | display.sort.random | 랜덤순 | 정렬 탭 |
-| display.header.desc_latest | 같은 주제에서 다른 시선을 느껴보세요 | 오늘 날짜 머리글 |
-| display.header.desc_archive | 가장 사람들이 좋아했던 사진들이에요 | 지난 날짜 머리글 |
+| display.header.desc-latest | 같은 주제에서 다른 시선을 느껴보세요 | 오늘 날짜 머리글 |
+| display.header.desc-archive | 가장 사람들이 좋아했던 사진들이에요 | 지난 날짜 머리글 |
 | display.nav.previous | 이전 날짜 | 화살표 접근성 라벨 |
 | display.nav.next | 다음 날짜 | 화살표 접근성 라벨 |
 | display.picker.title | 날짜 선택 | 날짜 선택 시트 제목 |
@@ -249,15 +249,15 @@
 | display.picker.month | {n}월 | 휠 항목 |
 | display.picker.day | {n}일 | 휠 항목 |
 | display.empty | 이 날 올라온 사진이 없어요 | 빈 상태 |
-| display.date_missing | 해당 날짜의 전시가 없어요 | 이동하려는 날짜가 404 |
+| display.date-missing | 해당 날짜의 전시가 없어요 | 이동하려는 날짜가 404 |
 | display.error | 전시를 불러오지 못했어요 | 전시 로드 실패 |
 | display.retry | 다시 시도 | 오류 화면 버튼 |
 | common.error.network | 네트워크 연결을 확인해 주세요. | 연결 실패·타임아웃 |
-| feed.date_label | {M}월 {d}일의 주제 | 상세 날짜 라벨 |
-| feed.title_none | 무제 | 제목 없음 |
-| feed.photo_alt | 작품 이미지: {제목} | 접근성 설명 |
-| feed.photo_alt_none | 무제 작품 이미지 | 접근성 설명(제목 없음) |
-| feed.error.not_found | 게시물을 찾을 수 없어요 | 상세·수정·삭제 404 |
+| feed.date-label | {M}월 {d}일의 주제 | 상세 날짜 라벨 |
+| feed.title-none | 무제 | 제목 없음 |
+| feed.photo-alt | 작품 이미지: {제목} | 접근성 설명 |
+| feed.photo-alt-none | 무제 작품 이미지 | 접근성 설명(제목 없음) |
+| feed.error.not-found | 게시물을 찾을 수 없어요 | 상세·수정·삭제 404 |
 | feed.error.load | 게시물을 불러오지 못했어요 | 상세 로드 일반 실패 |
 | feed.error.invalid | 게시물 정보를 불러오지 못했어요 | 응답 계약 위반 |
 | feed.edit.title | 게시물 제목 수정 | 다이얼로그 제목 |
