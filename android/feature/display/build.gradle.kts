@@ -17,6 +17,6 @@ dependencies {
 }
 
 kotlin {
-    // Virtual-time helpers are used throughout the tests.
+    // Virtual-time helpers (runCurrent, advanceTimeBy, UnconfinedTestDispatcher) are used throughout the tests.
     compilerOptions { optIn.add("kotlinx.coroutines.ExperimentalCoroutinesApi") }
 }
