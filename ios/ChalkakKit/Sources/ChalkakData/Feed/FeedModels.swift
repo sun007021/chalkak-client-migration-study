@@ -67,6 +67,12 @@ public struct PostListQuery: Sendable, Equatable {
     public var page: Int
     public var pageSize: Int
 
+    /// 서버가 받는 시드 형식 `[A-Za-z0-9_-]{1,64}`. 목록 요청과 화면이 같은 기준을 쓴다.
+    public static func isValidRandomSeed(_ seed: String?) -> Bool {
+        guard let seed, (1...64).contains(seed.utf8.count) else { return false }
+        return seed.utf8.allSatisfy { ($0 >= 0x30 && $0 <= 0x39) || ($0 >= 0x41 && $0 <= 0x5A) || ($0 >= 0x61 && $0 <= 0x7A) || $0 == 0x5F || $0 == 0x2D }
+    }
+
     public init(topicDate: KSTDate, sort: PostSort = .recent, randomSeed: String? = nil, page: Int = 1, pageSize: Int = AppConstants.pageSize) {
         self.topicDate = topicDate
         self.sort = sort
