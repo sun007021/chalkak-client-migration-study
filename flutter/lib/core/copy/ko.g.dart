@@ -34,6 +34,9 @@ abstract final class Copy {
   /// `ai.error.network`
   static const aiErrorNetwork = '네트워크 연결을 확인해 주세요.';
 
+  /// `ai.error.not-found`
+  static const aiErrorNotFound = 'AI 피드백을 확인할 수 없는 게시물이에요.';
+
   /// `ai.error.not-viewable`
   static const aiErrorNotViewable = 'AI 피드백을 확인할 수 없는 게시물이에요.';
 
@@ -42,6 +45,9 @@ abstract final class Copy {
 
   /// `ai.failed.confirm`
   static const aiFailedConfirm = '확인';
+
+  /// `ai.failed.no-more`
+  static const aiFailedNoMore = '이 사진은 더 이상 AI 피드백을 요청할 수 없어요.';
 
   /// `ai.failed.past`
   static const aiFailedPast = 'AI 피드백은 오늘 올린 사진만 재요청할 수 있어요.';
@@ -79,11 +85,17 @@ abstract final class Copy {
   /// `ai.restart.title`
   static const aiRestartTitle = 'AI 피드백을 재요청할까요?';
 
+  /// `ai.result.criteria-dialog-title`
+  static const aiResultCriteriaDialogTitle = '찰칵AI는 어떤 기준으로 점수를 내나요?';
+
   /// `ai.result.criteria-help`
   static const aiResultCriteriaHelp = '찰칵AI는 어떤 기준으로 점수를 내나요?';
 
   /// `ai.result.distinctive`
   static const aiResultDistinctive = '작가님의 해석이 돋보이는 작품이에요';
+
+  /// `ai.result.perspective-badge`
+  static const aiResultPerspectiveBadge = '작가님의 해석이 돋보이는 작품이에요';
 
   /// `ai.result.score-a11y`
   static const aiResultScoreA11y = '전체 점수 10점 만점에 {X}점';
@@ -111,6 +123,9 @@ abstract final class Copy {
 
   /// `ai.start.title`
   static const aiStartTitle = 'AI 피드백을 시작할까요?';
+
+  /// `ai.start.title-retry`
+  static const aiStartTitleRetry = 'AI 피드백을 재요청할까요?';
 
   /// `app.name`
   static const appName = '찰칵';
@@ -154,6 +169,9 @@ abstract final class Copy {
   /// `auth.login.error.network`
   static const authLoginErrorNetwork = '네트워크 연결을 확인해 주세요.';
 
+  /// `auth.login.error.title`
+  static const authLoginErrorTitle = '로그인';
+
   /// `auth.login.guest`
   static const authLoginGuest = '로그인 없이 사진 둘러보기';
 
@@ -187,6 +205,18 @@ abstract final class Copy {
   /// `banner.open-failed`
   static const bannerOpenFailed = '브라우저에서 링크를 열지 못했어요';
 
+  /// `banner.web.link-unavailable`
+  static const bannerWebLinkUnavailable = '링크를 열 수 없어요';
+
+  /// `banner.web.load-error`
+  static const bannerWebLoadError = '페이지를 불러오지 못했어요';
+
+  /// `banner.web.no-browser`
+  static const bannerWebNoBrowser = '링크를 열 수 있는 브라우저가 없어요';
+
+  /// `banner.web.open-failed`
+  static const bannerWebOpenFailed = '브라우저에서 링크를 열지 못했어요';
+
   /// `banner.web.retry`
   static const bannerWebRetry = '다시 시도';
 
@@ -214,6 +244,9 @@ abstract final class Copy {
   /// `common.retry`
   static const commonRetry = '다시 시도';
 
+  /// `display.date-missing`
+  static const displayDateMissing = '해당 날짜의 전시가 없어요';
+
   /// `display.empty`
   static const displayEmpty = '이 날 올라온 사진이 없어요';
 
@@ -231,6 +264,12 @@ abstract final class Copy {
 
   /// `display.header.date-topic`
   static const displayHeaderDateTopic = '{M월 d일}의 주제';
+
+  /// `display.header.desc-archive`
+  static const displayHeaderDescArchive = '가장 사람들이 좋아했던 사진들이에요';
+
+  /// `display.header.desc-latest`
+  static const displayHeaderDescLatest = '같은 주제에서 다른 시선을 느껴보세요';
 
   /// `display.nav.next`
   static const displayNavNext = '다음 날짜';
@@ -264,6 +303,9 @@ abstract final class Copy {
 
   /// `edit.adjust.auto`
   static const editAdjustAuto = '자동';
+
+  /// `edit.adjust.black-point`
+  static const editAdjustBlackPoint = '블랙 포인트';
 
   /// `edit.adjust.contrast`
   static const editAdjustContrast = '대비';
@@ -312,6 +354,27 @@ abstract final class Copy {
 
   /// `edit.filter.warm`
   static const editFilterWarm = '따뜻하게';
+
+  /// `edit.ratio.1-1`
+  static const editRatio11 = '1:1';
+
+  /// `edit.ratio.16-9`
+  static const editRatio169 = '16:9';
+
+  /// `edit.ratio.3-4`
+  static const editRatio34 = '3:4';
+
+  /// `edit.ratio.4-3`
+  static const editRatio43 = '4:3';
+
+  /// `edit.ratio.4-5`
+  static const editRatio45 = '4:5';
+
+  /// `edit.ratio.5-4`
+  static const editRatio54 = '5:4';
+
+  /// `edit.ratio.9-16`
+  static const editRatio916 = '9:16';
 
   /// `edit.ratio.free`
   static const editRatioFree = '자유';
@@ -363,6 +426,9 @@ abstract final class Copy {
 
   /// `fdbk.title`
   static const fdbkTitle = '피드백';
+
+  /// `feed.date-label`
+  static const feedDateLabel = '{M}월 {d}일의 주제';
 
   /// `feed.delete.body`
   static const feedDeleteBody = '게시물을 삭제하시겠어요?';
@@ -436,8 +502,20 @@ abstract final class Copy {
   /// `feed.error.load`
   static const feedErrorLoad = '게시물을 불러오지 못했어요';
 
+  /// `feed.error.not-found`
+  static const feedErrorNotFound = '게시물을 찾을 수 없어요';
+
   /// `feed.not-found`
   static const feedNotFound = '게시물을 찾을 수 없어요';
+
+  /// `feed.photo-alt`
+  static const feedPhotoAlt = '작품 이미지: {제목}';
+
+  /// `feed.photo-alt-none`
+  static const feedPhotoAltNone = '무제 작품 이미지';
+
+  /// `feed.title-none`
+  static const feedTitleNone = '무제';
 
   /// `guest.detail-login-required`
   static const guestDetailLoginRequired = '상세를 보려면 로그인이 필요해요';
@@ -475,8 +553,14 @@ abstract final class Copy {
   /// `home.hero.error`
   static const homeHeroError = '사진 상태를 불러오지 못했어요';
 
+  /// `home.hero.no-open-topic`
+  static const homeHeroNoOpenTopic = '지금은 참여할 수 있는 주제가 없어요';
+
   /// `home.hero.no-topic`
   static const homeHeroNoTopic = '지금은 참여할 수 있는 주제가 없어요';
+
+  /// `home.hero.pending-badge`
+  static const homeHeroPendingBadge = '검수 대기';
 
   /// `home.hero.processing`
   static const homeHeroProcessing = '사진을 처리하고 있어요';
@@ -493,8 +577,14 @@ abstract final class Copy {
   /// `home.ranking.today`
   static const homeRankingToday = '오늘 인기있는 사진';
 
+  /// `home.ranking.today-title`
+  static const homeRankingTodayTitle = '오늘 인기있는 사진';
+
   /// `home.ranking.yesterday`
   static const homeRankingYesterday = '어제 랭킹';
+
+  /// `home.ranking.yesterday-title`
+  static const homeRankingYesterdayTitle = '어제 랭킹';
 
   /// `home.topic.error`
   static const homeTopicError = '오늘의 주제를 불러오지 못했어요';
@@ -727,6 +817,12 @@ abstract final class Copy {
   /// `record.pending.badge`
   static const recordPendingBadge = '사진 반영 중';
 
+  /// `record.pending.hint-close`
+  static const recordPendingHintClose = '자세한 안내 닫기';
+
+  /// `record.pending.hint-open`
+  static const recordPendingHintOpen = '자세한 안내 보기';
+
   /// `record.pending.tooltip`
   static const recordPendingTooltip = '사진을 반영하고 있어요.\n표시되기까지 조금 시간이 걸릴 수도 있어요!';
 
@@ -841,6 +937,9 @@ abstract final class Copy {
   /// `time.notification-format`
   static const timeNotificationFormat = 'M월 d일 HH:mm';
 
+  /// `upload.camera.save-failed`
+  static const uploadCameraSaveFailed = '사진을 갤러리에 저장하지 못했어요.';
+
   /// `upload.caption.placeholder`
   static const uploadCaptionPlaceholder = '작품 제목은 선택이에요.';
 
@@ -876,6 +975,12 @@ abstract final class Copy {
 
   /// `upload.gate.check-failed`
   static const uploadGateCheckFailed = '게시물 작성 여부를 확인하지 못했어요. 다시 시도해 주세요.';
+
+  /// `upload.gate.login-required`
+  static const uploadGateLoginRequired = '게시물을 추가하려면 로그인이 필요해요';
+
+  /// `upload.gate.no-open-topic`
+  static const uploadGateNoOpenTopic = '지금 참여할 수 있는 주제가 없어요.';
 
   /// `upload.gate.no-topic`
   static const uploadGateNoTopic = '지금 참여할 수 있는 주제가 없어요.';
@@ -919,6 +1024,9 @@ abstract final class Copy {
 
   /// `upload.title`
   static const uploadTitle = '전시하기';
+
+  /// `upload.topic.load-failed`
+  static const uploadTopicLoadFailed = '주제를 불러오지 못했어요. 다시 시도해 주세요.';
 
   /// `upload.topic.retry`
   static const uploadTopicRetry = '다시 시도';

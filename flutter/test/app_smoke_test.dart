@@ -1,9 +1,12 @@
-import 'package:chalkak/app/chalkak_app.dart';
+import 'package:chalkak/core/ui/test_ids.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/app_harness.dart';
+
 void main() {
-  testWidgets('앱이 뜬다', (tester) async {
-    await tester.pumpWidget(const ChalkakApp());
-    expect(find.text('찰캌'), findsOneWidget);
+  widgetTest('앱이 뜨면 스플래시를 먼저 그린다', (tester) async {
+    final h = AppHarness();
+    await tester.pumpWidget(h.app);
+    expect(byId(TestIds.splashLogo), findsOneWidget);
   });
 }

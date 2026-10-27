@@ -208,28 +208,28 @@
 | ai.pill.failed | AI 피드백 실패 | FAILED + 재요청 불가 |
 | ai.pill.recheck | AI 상태 다시 확인 | 첫 `GET` 실패 |
 | ai.start.title | AI 피드백을 시작할까요? | 시작 시트 |
-| ai.start.title_retry | AI 피드백을 재요청할까요? | 재요청 시트 |
+| ai.start.title-retry | AI 피드백을 재요청할까요? | 재요청 시트 |
 | ai.start.line1 | 결과가 나오기까지 몇 분 정도 소요될 수 있어요 | 시작 시트 안내 |
 | ai.start.line2 | 앱을 나가도 분석은 계속되니 걱정마세요 | 시작 시트 안내 |
 | ai.start.line3 | 분석이 끝나면 알림으로 알려드릴게요 | 시작 시트 안내 |
 | ai.start.confirm | 분석 시작하기 | 시작 시트 버튼 |
 | ai.failed.title | AI 피드백을 생성하지 못했어요 | 실패 시트 제목 |
-| ai.failed.no_more | 이 사진은 더 이상 AI 피드백을 요청할 수 없어요. | 실패 시트(`canRequestAgain=false`) |
+| ai.failed.no-more | 이 사진은 더 이상 AI 피드백을 요청할 수 없어요. | 실패 시트(`canRequestAgain=false`) |
 | ai.failed.past | AI 피드백은 오늘 올린 사진만 재요청할 수 있어요. | 실패 시트(지난 주제) |
 | ai.failed.confirm | 확인 | 실패 시트 버튼 |
-| ai.result.perspective_badge | 작가님의 해석이 돋보이는 작품이에요 | `distinctivePerspective=true` |
+| ai.result.perspective-badge | 작가님의 해석이 돋보이는 작품이에요 | `distinctivePerspective=true` |
 | ai.result.strength | 좋았던 점 | 결과 섹션 |
 | ai.result.weakness | 아쉬운 점 | 결과 섹션 |
 | ai.result.suggestion | 다음엔 이렇게 | 결과 섹션 |
-| ai.result.score_a11y | 전체 점수 10점 만점에 {X}점 | 접근성 설명 |
-| ai.result.criteria_dialog_title | 찰칵AI는 어떤 기준으로 점수를 내나요? | 기준 설명 다이얼로그 |
+| ai.result.score-a11y | 전체 점수 10점 만점에 {X}점 | 접근성 설명 |
+| ai.result.criteria-dialog-title | 찰칵AI는 어떤 기준으로 점수를 내나요? | 기준 설명 다이얼로그 |
 | ai.poll.timeout | 처리가 오래 걸리고 있어요. 나중에 다시 확인해 주세요. | 300초 창 종료 (D-03) |
 | ai.error.network | 네트워크 연결을 확인해 주세요. | 연결 오류 (D-20) |
 | ai.error.load | AI 피드백 정보를 불러오지 못했어요. | 계약 위반·기타 |
 | ai.error.login | 다시 로그인해 주세요. | 401 |
 | ai.error.banned | 이용이 제한되어 AI 피드백을 요청할 수 없어요. | 403 (D-08) |
-| ai.error.not_found | AI 피드백을 확인할 수 없는 게시물이에요. | 404 |
-| ai.error.server_message | (서버 `message` 그대로) | `POST` 400 |
+| ai.error.not-found | AI 피드백을 확인할 수 없는 게시물이에요. | 404 |
+| ai.error.server-message | (서버 `message` 그대로) | `POST` 400 |
 | ai.card.request | 이 사진, AI에게 피드백 받아보기 | 홈 카드 NONE |
 | ai.card.processing | AI 피드백이 진행중이에요 | 홈 카드 PROCESSING |
 | ai.card.completed | AI 피드백이 완료되었어요 | 홈 카드 COMPLETED |
