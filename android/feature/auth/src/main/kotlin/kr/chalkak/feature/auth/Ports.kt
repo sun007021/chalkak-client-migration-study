@@ -115,9 +115,6 @@ fun interface PushRegistrar {
     suspend fun registerCurrentDevice()
 }
 
-interface AnalyticsTracker {
-    fun screenView(screen: String)
-}
 
 enum class HomeMode { Member, Guest }
 
