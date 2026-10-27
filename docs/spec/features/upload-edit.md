@@ -369,12 +369,12 @@
 
 | 키 | 문구 | 상황 |
 | --- | --- | --- |
-| upload.gate.login_required | 게시물을 추가하려면 로그인이 필요해요 | 게스트가 업로드 버튼 탭 (D-05) |
-| upload.gate.already_posted | 이미 이 주제에 게시물을 작성했어요. | `isPosted=true` |
-| upload.gate.no_open_topic | 지금 참여할 수 있는 주제가 없어요. | `/posts/today` 404 |
+| upload.gate.login-required | 게시물을 추가하려면 로그인이 필요해요 | 게스트가 업로드 버튼 탭 (D-05) |
+| upload.gate.already-posted | 이미 이 주제에 게시물을 작성했어요. | `isPosted=true` |
+| upload.gate.no-open-topic | 지금 참여할 수 있는 주제가 없어요. | `/posts/today` 404 |
 | upload.gate.banned | 이용이 정지되어 게시물을 작성할 수 없어요. | 403 (D-08) |
-| upload.gate.check_failed | 게시물 작성 여부를 확인하지 못했어요. 다시 시도해 주세요. | 게이트 그 밖 실패 |
-| upload.topic.load_failed | 주제를 불러오지 못했어요. 다시 시도해 주세요. | 주제 조회 실패 |
+| upload.gate.check-failed | 게시물 작성 여부를 확인하지 못했어요. 다시 시도해 주세요. | 게이트 그 밖 실패 |
+| upload.topic.load-failed | 주제를 불러오지 못했어요. 다시 시도해 주세요. | 주제 조회 실패 |
 | upload.topic.retry | 다시 시도 | 주제 다시 시도 버튼 |
 | upload.title | 전시하기 | 상단 바 제목 |
 | upload.heading | 주제 ‘{주제}’에 맞는 한 장 | 사진 영역 안내 |
@@ -382,13 +382,13 @@
 | upload.caption.placeholder | 작품 제목은 선택이에요. | 제목 입력 |
 | upload.submit | 전시하기 | 제출 버튼 |
 | upload.submitting | 전시 중... | 제출 중 |
-| upload.camera.save_failed | 사진을 갤러리에 저장하지 못했어요. | 촬영본 저장 실패 (D-14) |
+| upload.camera.save-failed | 사진을 갤러리에 저장하지 못했어요. | 촬영본 저장 실패 (D-14) |
 | upload.error.network | 네트워크 연결을 확인해 주세요. | 연결 실패·타임아웃, 복구 확인 실패 |
 | upload.error.prepare | 사진을 준비하지 못했어요. 다시 시도해 주세요. | 정책 발급·인코딩·빈 사진 |
 | upload.error.upload | 사진을 업로드하지 못했어요. 다시 시도해 주세요. | `PUT` 거절 |
 | upload.error.create | 전시를 완료하지 못했어요. 다시 시도해 주세요. | 생성 거절·그 밖 |
 | upload.error.duplicate | 이미 이 주제에 전시한 사진이 있어요. | 400 판정 `isPosted=true` (D-02) |
-| upload.error.topic_changed | 주제가 변경되어 전시할 수 없어요. | 400 판정 404/주제 변경 (D-02) |
+| upload.error.topic-changed | 주제가 변경되어 전시할 수 없어요. | 400 판정 404/주제 변경 (D-02) |
 | upload.success.title | ‘{주제}’{을/를} 기록했어요. | 성공 화면 |
 | upload.success.pending | 검수를 기다리고 있어요. 피드 표시까지 시간이 조금 걸릴 수도 있어요! | `PENDING` |
 | upload.success.validating | 사진을 확인하고 있어요. 피드 표시까지 시간이 조금 걸릴 수도 있어요! | `VALIDATING` |
@@ -406,7 +406,7 @@
 | edit.adjust.contrast | 대비 | 조정 항목 |
 | edit.adjust.highlights | 하이라이트 | 조정 항목 |
 | edit.adjust.shadows | 그림자 | 조정 항목 |
-| edit.adjust.black_point | 블랙 포인트 | 조정 항목 |
+| edit.adjust.black-point | 블랙 포인트 | 조정 항목 |
 | edit.adjust.saturation | 채도 | 조정 항목 |
 | edit.adjust.warmth | 따뜻함 | 조정 항목 |
 | edit.filter.original | 원본 | 필터 |
@@ -417,13 +417,13 @@
 | edit.filter.vivid | 선명하게 | 필터 |
 | edit.ratio.original | 원본 | 자르기 비율 |
 | edit.ratio.free | 자유 | 자르기 비율 |
-| edit.ratio.1_1 | 1:1 | 자르기 비율 |
-| edit.ratio.4_5 | 4:5 | 자르기 비율 |
-| edit.ratio.5_4 | 5:4 | 자르기 비율 |
-| edit.ratio.3_4 | 3:4 | 자르기 비율 |
-| edit.ratio.4_3 | 4:3 | 자르기 비율 |
-| edit.ratio.9_16 | 9:16 | 자르기 비율 |
-| edit.ratio.16_9 | 16:9 | 자르기 비율 |
+| edit.ratio.1-1 | 1:1 | 자르기 비율 |
+| edit.ratio.4-5 | 4:5 | 자르기 비율 |
+| edit.ratio.5-4 | 5:4 | 자르기 비율 |
+| edit.ratio.3-4 | 3:4 | 자르기 비율 |
+| edit.ratio.4-3 | 4:3 | 자르기 비율 |
+| edit.ratio.9-16 | 9:16 | 자르기 비율 |
+| edit.ratio.16-9 | 16:9 | 자르기 비율 |
 | edit.error.render | 사진을 편집하지 못했어요. 다시 시도해 주세요. | 편집 렌더링 실패 (iOS) |
 
 고른 기준:

@@ -22,7 +22,8 @@ export function parseTestIds(markdown) {
   const ids = [];
   for (const cells of tableRows(section)) {
     const m = (cells[2] ?? '').match(/^`([^`]+)`$/);
-    if (!m || !ID_SHAPE.test(m[1])) continue;
+    // Placeholders may be camelCase ({postId}); only the fixed parts must follow the id shape.
+    if (!m || !ID_SHAPE.test(m[1].replace(/\{[^}]*\}/g, '{}'))) continue;
     const regex = new RegExp(`^${escapeRe(m[1]).replace(/\{[^}]*\}/g, WILDCARD)}$`);
     ids.push({ id: m[1], regex });
   }
