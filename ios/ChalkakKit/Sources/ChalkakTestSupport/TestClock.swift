@@ -26,6 +26,7 @@ public final class TestClock: AppClock {
         var uptime: Duration
         var nextID = 0
         var sleepers: [Int: Sleeper] = [:]
+        var sleeperWaiters: [(target: Int, continuation: CheckedContinuation<Void, Never>)] = []
         var sleepMode: SleepMode
         var recordedSleeps: [Duration] = []
     }
@@ -66,12 +67,16 @@ public final class TestClock: AppClock {
         }
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-                let alreadyCancelled = state.withLock { s -> Bool in
-                    if Task.isCancelled { return true }
+                let (alreadyCancelled, ready) = state.withLock { s -> (Bool, [CheckedContinuation<Void, Never>]) in
+                    if Task.isCancelled { return (true, []) }
                     s.sleepers[id] = Sleeper(deadline: s.uptime + duration, continuation: continuation)
-                    return false
+                    let count = s.sleepers.count
+                    let ready = s.sleeperWaiters.filter { $0.target <= count }.map(\.continuation)
+                    s.sleeperWaiters.removeAll { $0.target <= count }
+                    return (false, ready)
                 }
                 if alreadyCancelled { continuation.resume(throwing: CancellationError()) }
+                ready.forEach { $0.resume() }
             }
         } onCancel: {
             let sleeper = state.withLock { $0.sleepers.removeValue(forKey: id) }
@@ -96,9 +101,16 @@ public final class TestClock: AppClock {
         state.withLock { $0.now = date }
     }
 
-    /// sleeper가 `count`개 이상 등록될 때까지 실시간 대기 없이 양보(`Task.yield`)하며 기다린다.
+    /// sleeper가 `count`개 이상 등록될 때까지 기다린다. sleep이 등록될 때 깨우므로 실시간·양보 횟수에 기대지 않는다.
     public func waitUntilSleeperCount(atLeast count: Int) async {
-        while sleeperCount < count { await Task.yield() }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let satisfied = state.withLock { s -> Bool in
+                if s.sleepers.count >= count { return true }
+                s.sleeperWaiters.append((count, continuation))
+                return false
+            }
+            if satisfied { continuation.resume() }
+        }
     }
 
     private static func seconds(_ duration: Duration) -> TimeInterval {
