@@ -66,7 +66,7 @@ describe('401 갱신', () => {
     expect(expired.count).toBe(0);
   });
 
-  it('TC-NET-014 만료된 access token은 Authorization 없이 보내고 서버 401을 받아 갱신 경로로 간다', async () => {
+  it('TC-NET-014 TC-AUTH-054 만료된 access token은 Authorization 없이 보내고 서버 401을 받아 갱신 경로로 간다', async () => {
     const { ff, client, clock } = makeApiEnv(memberSession({ accessTokenExpiresAt: NOW - 1_000 }));
     ff.route('GET /notifications', byToken({ 'fixture-access-token-2': jsonResponse(200, body) }));
     ff.route('POST /auth/refresh', () => jsonResponse(200, refreshSuccessBody));
@@ -181,7 +181,7 @@ describe('401 갱신', () => {
     expect(expired.count).toBe(1);
   });
 
-  it('TC-NET-021 refresh 요청 자체가 REAUTHENTICATION_REQUIRED면 세션을 지우고 요청은 REAUTH ApiError로 실패한다', async () => {
+  it('TC-NET-021 TC-AUTH-051 refresh 요청 자체가 REAUTHENTICATION_REQUIRED면 세션을 지우고 요청은 REAUTH ApiError로 실패한다', async () => {
     const { ff, client, clock, store, expired } = makeApiEnv(memberSession());
     ff.route('GET /notifications', () => jsonResponse(401, errorBodies.unauthorized));
     ff.route('POST /auth/refresh', () => jsonResponse(401, errorBodies.reauth));

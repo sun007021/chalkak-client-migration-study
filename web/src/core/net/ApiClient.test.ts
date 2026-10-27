@@ -78,7 +78,7 @@ describe('요청 구성', () => {
     expect(ff.calls.map((x) => x.url.startsWith('https://mock.local:4010/api/v1/'))).toEqual([true, true]);
   });
 
-  it('TC-NET-051 REQ-NET-002 loopback 외 http·경로가 붙은 기준 주소는 파싱 단계에서 ConfigError이고 요청도 Authorization도 나가지 않는다', () => {
+  it('TC-NET-051 TC-AUTH-055 REQ-NET-002 loopback 외 http·경로가 붙은 기준 주소는 파싱 단계에서 ConfigError이고 요청도 Authorization도 나가지 않는다', () => {
     const { ff } = makeApiEnv(memberSession());
     for (const baseUrl of ['http://mock.local', 'https://mock.local/api/v1/', 'ftp://mock.local']) {
       expect(() => parseApiBaseUrl(baseUrl)).toThrow(ConfigError);

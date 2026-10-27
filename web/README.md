@@ -62,7 +62,8 @@ src/
 | 강제 업데이트 | 게이트 없음 | D-15, REQ-BOOT-013 |
 | 푸시 | 수신·기기 등록 없음. 알림함은 제공 | Q-04, REQ-PUSH-017 |
 | 토큰 보관 | access는 메모리, refresh·userId·만료 시각은 IndexedDB(임시안). XSS 시 refresh token 탈취 위험이 있다 | Q-03, REQ-AUTH-024 |
-| 카카오 로그인 | 서버가 카카오 ID 토큰 aud를 앱 키 하나와만 비교해 웹 키 토큰이 거절될 수 있다. 로그인 코드는 `SocialLoginClient` 뒤에 두고 Fake로 검증 | Q-02 |
+| 카카오 로그인 | 서버가 카카오 ID 토큰 aud를 앱 키 하나와만 비교해 웹 키 토큰이 거절될 수 있다. 로그인 코드는 `SocialLoginClient` 뒤에 두고 Fake로 검증한다. 실제 구현 `KakaoWebLoginClient`는 OIDC 인가 리다이렉트(nonce=SHA-256(rawNonce) hex, state)이고 rawNonce·state는 리다이렉트 사이 `sessionStorage`에 두었다가 콜백에서 1회 쓰고 지운다. **개발 서버 E2E는 카카오 로그인 대신 아래 개발용 세션 주입을 쓴다** | Q-02 |
+| 개발용 세션 주입 | 개발 빌드(`import.meta.env.DEV`) 또는 `VITE_ENABLE_DEV_SESSION=true`에서만 `/dev/session` 라우트와 로그인 화면의 우회 버튼이 있다. 개발 서버에서 얻은 refresh token과 userId를 붙여 넣으면 `POST /auth/refresh`로 토큰을 받아 저장하고 홈으로 간다. 프로덕션 빌드에는 라우트가 없다 | Q-02 |
 | 약관 문서 | 새 탭 | D-25 |
 | 네트워크 타임아웃 | fetch는 연결/응답 분리 불가 → 응답 15초(헤더+본문 수신 포함) 하나로 적용. `HTTP_CONNECT_TIMEOUT_MS`는 shared 값과 대조용으로만 둔다 | D-21 |
 | refresh 동시성 | 탭이 여러 개라 메모리 single-flight로는 부족 → Web Locks(`chalkak-auth-refresh`) 안에서 재읽기→refresh→비교 후 쓰기. 미지원이면 탭 안 뮤텍스 | D-17 |
