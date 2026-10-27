@@ -10,6 +10,7 @@
 
 - 배경: 두 앱 모두 grapheme(사용자 인지 문자) 기준으로 10자를 자른다(iOS §5.1-2, AN §5.2-6). 서버는 `strip()` 후 **code point** 기준 10자(API §1.3, H1~H5). 규칙 POST-005는 "앞뒤 공백 제거 안 함"이라 적혀 있지만 서버 코드는 제거한다(API §8.1 D2).
 - 결정: **입력값의 앞뒤 공백을 제거한 뒤 code point 수로 센다.** 10 초과면 입력을 막는다(잘라내지 않고 더 이상 입력되지 않게, 붙여넣기는 10 code point까지만 받는다). 공백만 있거나 비면 제목 없음(`null`)으로 보낸다. 표시에서 제목이 없으면 "무제".
+- 공백 제거는 각 플랫폼 기본 trim(유니코드 공백, NBSP·U+3000 포함)을 쓴다. 서버 Java `strip()`은 NBSP를 지우지 않지만 클라이언트가 제거한 값을 보내므로 길이 판정은 어긋나지 않는다.
 - 테스트: 이모지 10개 허용, 결합 이모지(👨‍👩‍👧, code point 5개) 2개+1자는 11 → 차단, 앞뒤 공백 포함 12자이고 strip 후 10자면 허용.
 
 ## D-02 서버 오류 분기는 errorCode + HTTP 상태 + 호출 API로만
@@ -190,7 +191,7 @@
 ## D-21 네트워크 타임아웃
 
 - 배경: iOS·Android 모두 기본값(iOS 60초, OkHttp 10초).
-- 결정: 일반 API 연결 10초·응답 15초, presigned PUT은 60초. 멱등 요청(GET, PUT, DELETE, PATCH, 업로드 정책 발급)만 네트워크 오류·5xx에 지수 백오프(0.5초, 1초) 최대 2회 재시도한다. `POST /posts`, `POST /auth/refresh`, `POST /feedbacks`, `POST .../ai-review`, `POST /auth/social-*`는 자동 재시도하지 않는다. 429·503의 `Retry-After`가 있으면 그만큼 기다린다.
+- 결정: 일반 API 연결 10초·응답 15초, presigned PUT은 60초. 멱등 요청(GET, PUT, DELETE, PATCH, 업로드 정책 발급)만 네트워크 오류·5xx에 지수 백오프(0.5초, 1초) 최대 2회 재시도한다. `POST /posts`, `POST /auth/refresh`, `POST /feedbacks`, `POST .../ai-review`, `POST /auth/social-*`는 자동 재시도하지 않는다. 429·503의 `Retry-After`가 있으면 그만큼 기다린다. 단 `RETRY_AFTER_MAX_MS`(30초, 임시 상한)를 넘으면 기다리지 않고 그 응답으로 실패 처리한다(2026-10-27 Web 스레드 제안, 다섯 플랫폼 공통).
 
 ## D-22 분석 이벤트
 

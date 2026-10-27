@@ -1,5 +1,5 @@
 /// 이벤트 이름·파라미터 키·허용 screen_name(D-22).
-// TODO(shared): shared/constants.json이 생기면 철자 대조 테스트(TC-ANL-002, TC-ANL-023)를 추가한다.
+/// 철자는 shared/constants.json과 test/core/constants/shared_constants_test.dart가 대조한다.
 abstract final class AnalyticsNames {
   static const screenViewEvent = 'screen_view';
   static const bottomNavigationSelectedEvent = 'bottom_navigation_selected';

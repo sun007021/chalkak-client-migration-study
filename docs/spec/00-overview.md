@@ -108,6 +108,7 @@ chalkak-client-migration-study/
 | `SIGNUP_PENDING_RETRY` | 1초 간격 최대 10회 | 기존 두 앱 |
 | `AI_REVIEW_POLL_INTERVAL` | 3초(홈 포함, D-03) | AI 리뷰 안내 |
 | `AI_REVIEW_POLL_WINDOW` | 300초 | AI 리뷰 안내 |
+| `RETRY_AFTER_MAX_MS` | 30,000 (`Retry-After`가 이보다 길면 기다리지 않고 실패, 임시) | D-21 |
 | `PAGE_SIZE` | 20(배너 10) | 기존 두 앱 |
 | `TOAST_DURATION` | 2.5초 | iOS |
 | `SPLASH_PRELOAD_MAX` | 700ms | Android |

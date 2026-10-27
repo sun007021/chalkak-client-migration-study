@@ -38,3 +38,13 @@ test('findUnknown flags ids missing from the table, accepts templated literals',
   const unknown = findUnknown(files, ids);
   assert.deepEqual(unknown.map((u) => [u.file, u.literal, u.line]), [['a.tsx', 'login.nope', 1]]);
 });
+
+test('extractLiterals does not treat object fields ending in Key as testIDs', () => {
+  const src = [
+    "const a = { copyKey: 'common.error-network' };",
+    "final k = Key('login.kakao-button');",
+    "final v = ValueKey('home.root');",
+    "val apiKey = \"home.root\"",
+  ].join('\n');
+  assert.deepEqual(extractLiterals(src).map((x) => x.literal), ['login.kakao-button', 'home.root']);
+});
