@@ -23,6 +23,19 @@ export function buildUrl(
   return `${base}/${lowerPath}${pairs.length > 0 ? `?${pairs.join('&')}` : ''}`;
 }
 
+/** 경로 한 조각을 인코딩한다(UUID는 소문자). `/`, `?`, `#`, 공백 등이 경로 구조를 깨지 않게 한다. */
+export function pathSegment(value: string | number): string {
+  return encodeURIComponent(lowerIfUuid(String(value)));
+}
+
+/** 태그 함수: apiPath`/posts/${id}/likes`. 보간 값은 pathSegment로 인코딩하고 고정 부분은 그대로 둔다. */
+export function apiPath(strings: TemplateStringsArray, ...values: (string | number)[]): string {
+  return strings.reduce(
+    (acc, part, i) => acc + part + (i < values.length ? pathSegment(values[i]) : ''),
+    '',
+  );
+}
+
 /** JSON 바디 안의 UUID 형태 문자열을 소문자 정규형으로 바꾼 복사본을 돌려준다. */
 export function normalizeBodyUuids<T>(body: T): T {
   return normalize(body) as T;

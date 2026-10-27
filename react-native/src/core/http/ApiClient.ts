@@ -1,6 +1,7 @@
 import {
   HTTP_CONNECT_TIMEOUT_MS,
   HTTP_RESPONSE_TIMEOUT_MS,
+  RETRY_AFTER_MAX_MS,
   RETRY_MAX,
   UPLOAD_PUT_TIMEOUT_MS,
 } from '../../shared/constants';
@@ -14,14 +15,10 @@ import {
   ReauthenticationRequiredError,
   parseErrorBody,
 } from './ApiError';
+import { isAllowedTransportUrl } from '../config/transportSecurity';
 import { abortable, throwIfAborted } from './abort';
 import { authorizationHeaderFor } from './AuthHeaderPolicy';
-import {
-  MAX_RETRY_AFTER_MS,
-  authLevelFor,
-  isRefreshableRequest,
-  isRetryable,
-} from './RequestPolicy';
+import { authLevelFor, isRefreshableRequest, isRetryable } from './RequestPolicy';
 import { backoffMs, parseRetryAfterMs } from './RetryAfter';
 import { toApiError } from './transportErrors';
 import { buildUrl, normalizeBodyUuids, stripQuery } from './UrlBuilder';
@@ -116,6 +113,10 @@ export class ApiClient {
 
   /** presigned PUT: 인증·공통 헤더 없이 Content-Type만, 60초 타임아웃. 갱신 없음. */
   async uploadToPresignedUrl(request: PresignedPutRequest): Promise<void> {
+    if (!isAllowedTransportUrl(request.url)) {
+      // https(또는 loopback http)가 아니면 보내기 전에 거부한다. 서버가 준 URL이라도 평문으로 올리지 않는다.
+      throw new NetworkError('insecure upload url');
+    }
     await this.sendWithRetry({
       method: 'PUT',
       url: request.url,
@@ -186,9 +187,16 @@ export class ApiClient {
     if (sent.kind !== 'authenticated') throw error;
     const code = error.errorCode;
     if (code !== 'UNAUTHORIZED' && code !== 'REAUTHENTICATION_REQUIRED') throw error;
-    if (code === 'UNAUTHORIZED' && sent.refreshExpired) throw error;
+    if (code === 'UNAUTHORIZED' && sent.refreshExpired) {
+      throw new AuthenticationRequiredError('refresh token expired');
+    }
 
-    const current = await this.deps.sessionStore.load();
+    const { state: current, discarded } = await this.deps.sessionStore.loadChecked();
+    if (discarded) {
+      // 보안 저장소 읽기 실패로 세션을 버렸다: 무음으로 끝내지 않고 로그인으로 보낸다.
+      this.deps.tokenRefresher.notifySessionLost();
+      throw new ReauthenticationRequiredError('session lost');
+    }
     if (current.kind !== 'authenticated' || current.credentials.userId !== sent.userId) {
       throw new CancelledError('session changed');
     }
@@ -245,10 +253,11 @@ export class ApiClient {
     const logUrl = stripQuery(attempt.url);
     for (let index = 0; ; index += 1) {
       throwIfAborted(attempt.signal);
-      let failure: ApiError;
+      let failure: ApiError | undefined;
       let retryAfterHeader: string | undefined;
+      let response: HttpResponse | undefined;
       try {
-        const response = await transport.send(
+        response = await transport.send(
           {
             method: attempt.method,
             url: attempt.url,
@@ -261,6 +270,13 @@ export class ApiClient {
             responseTimeoutMs: attempt.timeoutMs.response,
           },
         );
+      } catch (error) {
+        // 알 수 없는 예외는 toApiError가 그대로 다시 던진다.
+        const mapped = toApiError(error, attempt.signal);
+        if (!(mapped instanceof NetworkError)) throw mapped;
+        failure = mapped;
+      }
+      if (response) {
         throwIfAborted(attempt.signal);
         logger.log({
           level: 'debug',
@@ -273,12 +289,9 @@ export class ApiClient {
         if (response.status >= 200 && response.status < 300) return response;
         retryAfterHeader = response.headers['retry-after'];
         failure = parseErrorBody(response.status, response.bodyText);
-      } catch (error) {
-        if (error instanceof ApiError && !(error instanceof NetworkError)) throw error;
-        failure = toApiError(error, attempt.signal);
-        if (failure instanceof CancelledError) throw failure;
       }
 
+      if (!failure) throw new Error('unreachable: no response and no failure');
       const delay =
         attempt.retryable && index < RETRY_MAX
           ? this.retryDelay(failure, retryAfterHeader, index, clock.now())
@@ -304,7 +317,7 @@ export class ApiClient {
     if (!(failure instanceof HttpError)) return null;
     if (failure.status === 429 || failure.status === 503) {
       const waitMs = parseRetryAfterMs(retryAfter, now);
-      if (waitMs !== null) return waitMs > MAX_RETRY_AFTER_MS ? null : waitMs;
+      if (waitMs !== null) return waitMs > RETRY_AFTER_MAX_MS ? null : waitMs;
       return failure.status === 503 ? backoffMs(index) : null;
     }
     return failure.status >= 500 ? backoffMs(index) : null;

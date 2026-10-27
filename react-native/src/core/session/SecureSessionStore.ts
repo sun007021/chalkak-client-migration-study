@@ -97,6 +97,10 @@ export class SecureSessionStore implements SessionStore {
   ) {}
 
   load(): Promise<SessionState> {
+    return this.serialize(async () => (await this.read()).state);
+  }
+
+  loadChecked(): Promise<{ state: SessionState; discarded: boolean }> {
     return this.serialize(() => this.read());
   }
 
@@ -110,7 +114,7 @@ export class SecureSessionStore implements SessionStore {
 
   replaceTokensIfCurrent(expected: string, tokens: RefreshedTokens): Promise<boolean> {
     return this.serialize(async () => {
-      const state = await this.read();
+      const { state } = await this.read();
       if (state.kind !== 'authenticated' || state.credentials.refreshToken !== expected) {
         return false;
       }
@@ -128,7 +132,7 @@ export class SecureSessionStore implements SessionStore {
 
   clearIfCurrent(expected: string): Promise<boolean> {
     return this.serialize(async () => {
-      const state = await this.read();
+      const { state } = await this.read();
       if (state.kind !== 'authenticated' || state.credentials.refreshToken !== expected) {
         return false;
       }
@@ -143,18 +147,19 @@ export class SecureSessionStore implements SessionStore {
     return run;
   }
 
-  private async read(): Promise<SessionState> {
+  private async read(): Promise<{ state: SessionState; discarded: boolean }> {
     let text: string | null;
     try {
       text = await this.storage.getItem(SESSION_STORAGE_KEY);
     } catch {
       await this.discard();
-      return NONE;
+      return { state: NONE, discarded: true };
     }
-    if (text === null) return NONE;
+    if (text === null) return { state: NONE, discarded: false };
     const state = decode(text);
-    if (state.kind === 'none') await this.discard();
-    return state;
+    if (state.kind !== 'none') return { state, discarded: false };
+    await this.discard();
+    return { state: NONE, discarded: true };
   }
 
   private async discard(): Promise<void> {

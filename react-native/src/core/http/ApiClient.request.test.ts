@@ -1,4 +1,4 @@
-import { CancelledError, HttpError, InvalidResponseError } from './ApiError';
+import { CancelledError, NetworkError, HttpError, InvalidResponseError } from './ApiError';
 import {
   BASE_URL,
   createNetHarness,
@@ -6,7 +6,7 @@ import {
   unauthorized,
   type NetHarness,
 } from './__testing__/createNetHarness';
-import { fixtureResponse } from './__testing__/loadFixture';
+import { fixtureBody, fixtureResponse } from './__testing__/loadFixture';
 import { deferred, json, noContent, raw } from './__testing__/FakeTransport';
 import type { HttpResponse } from './HttpTransport';
 
@@ -163,6 +163,32 @@ describe('ApiClient 요청 구성', () => {
       await flush();
       controller.abort();
       expect(await call).toBeInstanceOf(CancelledError);
+    });
+  });
+
+  describe('presigned URL 검사', () => {
+    it('TC-NET-044 REQ-NET-001 https가 아닌(loopback 아닌 http) 업로드 URL은 보내지 않고 거부한다', async () => {
+      const { uploadUrl } = fixtureBody<{ uploadUrl: string }>(
+        'upload/posts-uploads__insecure-upload-url',
+      );
+      await expect(
+        h.api.uploadToPresignedUrl({
+          url: uploadUrl,
+          contentType: 'image/webp',
+          body: new Uint8Array([1]),
+        }),
+      ).rejects.toBeInstanceOf(NetworkError);
+      expect(h.transport.requests).toHaveLength(0);
+    });
+
+    it('TC-NET-044 loopback http(mock 서버) 업로드 URL은 허용한다', async () => {
+      h.transport.script(fixtureResponse('common/presigned-put__ok'));
+      await h.api.uploadToPresignedUrl({
+        url: 'http://localhost:4010/__upload/x?X-Amz-Expires=300',
+        contentType: 'image/webp',
+        body: new Uint8Array([1]),
+      });
+      expect(h.transport.requests).toHaveLength(1);
     });
   });
 

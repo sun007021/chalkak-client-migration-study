@@ -111,10 +111,11 @@ describe('ApiClient 인증 헤더와 401 갱신', () => {
       expect(h.transport.requestsTo('POST', '/auth/refresh')).toHaveLength(0);
     });
 
-    it('REQ-NET-018 refresh token이 이미 만료된 세션은 갱신 대상이 아니다', async () => {
+    it('REQ-NET-018 refresh token이 이미 만료된 세션은 갱신하지 않고 AuthenticationRequiredError다(세션 유지)', async () => {
       await h.signIn({ refreshTokenExpiresAt: new Date(h.clock.now().getTime() - 1) });
       h.transport.script(unauthorized());
-      await expect(getNotifications()).rejects.toBeInstanceOf(HttpError);
+      await expect(getNotifications()).rejects.toBeInstanceOf(AuthenticationRequiredError);
+      expect((await h.sessionStore.load()).kind).toBe('authenticated');
       expect(h.transport.requestsTo('POST', '/auth/refresh')).toHaveLength(0);
     });
 
@@ -305,15 +306,17 @@ describe('ApiClient 인증 헤더와 401 갱신', () => {
       expect(h.transport.requests).toHaveLength(0);
     });
 
-    it('REQ-AUTH-023 보안 저장소 읽기가 예외를 던지면 세션 없음으로 보고 갱신·재시도 없이 401 오류로 끝난다', async () => {
+    it('REQ-AUTH-023 인증 상태였는데 보안 저장소 읽기가 예외를 던지면 세션을 버리고 ReauthenticationRequiredError + session-expired 1회, 갱신·재시도는 없다', async () => {
       await h.signIn();
       h.transport.respond(() => {
         h.storage.failNextRead = true; // 401 처리의 세션 재확인 읽기가 실패
         return unauthorized();
       });
-      await expect(getNotifications()).rejects.toBeInstanceOf(CancelledError);
+      await expect(getNotifications()).rejects.toBeInstanceOf(ReauthenticationRequiredError);
       expect(h.transport.requestsTo('POST', '/auth/refresh')).toHaveLength(0);
       expect(h.transport.requests).toHaveLength(1);
+      expect(h.emitted).toEqual([{ type: 'session-expired' }]);
+      expect((await h.sessionStore.load()).kind).toBe('none');
     });
   });
 
@@ -354,6 +357,17 @@ describe('ApiClient 인증 헤더와 401 갱신', () => {
       expect(h.transport.requests).toHaveLength(1);
       expect((await h.sessionStore.load()).kind).toBe('none');
       expect(h.emitted).toEqual([{ type: 'session-expired' }]);
+    });
+
+    it('TC-NET-020 일반 API 여러 개가 동시에 직접 REAUTH 401을 받아도 이벤트는 한 번이고 모두 ReauthenticationRequiredError다', async () => {
+      await h.signIn();
+      h.transport.respond(() => reauth());
+      const results = await Promise.all(
+        [getNotifications(), getNotifications(), getNotifications()].map((p) => p.catch((e) => e)),
+      );
+      results.forEach((r) => expect(r).toBeInstanceOf(ReauthenticationRequiredError));
+      expect(h.emitted).toHaveLength(1);
+      expect(h.transport.requestsTo('POST', '/auth/refresh')).toHaveLength(0);
     });
 
     it('TC-NET-021 refresh 요청 자체가 REAUTHENTICATION_REQUIRED면 세션을 지우고 로그인 이벤트를 낸다', async () => {
@@ -403,6 +417,15 @@ describe('ApiClient 인증 헤더와 401 갱신', () => {
         expect(h.emitted).toEqual([]);
       },
     );
+
+    it('TC-NET-023 refresh 응답이 REAUTH 아닌 401이면 AuthenticationRequiredError이고 세션은 유지한다', async () => {
+      await h.signIn();
+      h.transport.respond(() => unauthorized());
+      await expect(getNotifications()).rejects.toBeInstanceOf(AuthenticationRequiredError);
+      expect(h.transport.requestsTo('POST', '/auth/refresh')).toHaveLength(1);
+      expect((await h.sessionStore.load()).kind).toBe('authenticated');
+      expect(h.emitted).toEqual([]);
+    });
 
     it('TC-NET-024 refresh가 5xx면 일시 실패로 보고 세션을 유지하며 재시도하지 않는다', async () => {
       // fixture: auth/refresh__internal-error.json

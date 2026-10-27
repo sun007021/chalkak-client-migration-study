@@ -1,7 +1,7 @@
 import type { Clock } from '../time/Clock';
 import type { SessionCredentials, SessionStore } from '../session/SessionStore';
 import { refreshedTokensFromResponse } from '../session/SessionCredentials';
-import { HttpError, ReauthenticationRequiredError } from './ApiError';
+import { AuthenticationRequiredError, HttpError, ReauthenticationRequiredError } from './ApiError';
 import type { AuthSessionEvents } from './AuthSessionEvents';
 import type { NetworkLogger } from './NetworkLogger';
 
@@ -43,6 +43,7 @@ export type ExpireOutcome = 'expired' | 'session-changed';
  */
 export class TokenRefresher {
   private readonly inflight = new Map<string, Promise<RefreshOutcome>>();
+  private readonly expiring = new Map<string, Promise<ExpireOutcome>>();
 
   constructor(private readonly deps: TokenRefresherDeps) {}
 
@@ -50,13 +51,34 @@ export class TokenRefresher {
   refresh(refreshToken: string, userId: string): Promise<RefreshOutcome> {
     const existing = this.inflight.get(refreshToken);
     if (existing) return existing;
-    const flight = this.run(refreshToken, userId).finally(() => this.inflight.delete(refreshToken));
+    const flight: Promise<RefreshOutcome> = this.run(refreshToken, userId).finally(() => {
+      if (this.inflight.get(refreshToken) === flight) this.inflight.delete(refreshToken);
+    });
     this.inflight.set(refreshToken, flight);
     return flight;
   }
 
-  /** 세션이 아직 그 refresh token이면 지우고 로그인 이벤트를 낸다. 이미 바뀌었으면 아무것도 하지 않는다. */
-  async expire(refreshToken: string): Promise<ExpireOutcome> {
+  /**
+   * 세션이 아직 그 refresh token이면 지우고 로그인 이벤트를 낸다. 같은 token의 동시 호출은 한 작업을 공유해
+   * 모두 같은 결과('expired')를 받고 이벤트는 한 번만 나간다. 이미 바뀌었으면 'session-changed'.
+   */
+  expire(refreshToken: string): Promise<ExpireOutcome> {
+    const existing = this.expiring.get(refreshToken);
+    if (existing) return existing;
+    const flight: Promise<ExpireOutcome> = this.doExpire(refreshToken).finally(() => {
+      if (this.expiring.get(refreshToken) === flight) this.expiring.delete(refreshToken);
+    });
+    this.expiring.set(refreshToken, flight);
+    return flight;
+  }
+
+  /** 보안 저장소 읽기 실패로 세션을 버렸을 때: 로그인 이벤트를 낸다. 인증 상태였던 요청이 한 번씩 호출한다. */
+  notifySessionLost(): void {
+    this.deps.logger.log({ level: 'error', event: 'auth.session-lost' });
+    this.deps.events.emit({ type: 'session-expired' });
+  }
+
+  private async doExpire(refreshToken: string): Promise<ExpireOutcome> {
     const cleared = await this.deps.sessionStore.clearIfCurrent(refreshToken);
     if (!cleared) return 'session-changed';
     this.deps.logger.log({ level: 'warn', event: 'auth.session-expired' });
@@ -90,6 +112,7 @@ export class TokenRefresher {
         }
         throw new ReauthenticationRequiredError('reauthentication required');
       }
+      const unauthorized = error instanceof HttpError && error.status === 401;
       logger.log({
         level: 'error',
         event: 'auth.refresh.failed',
@@ -97,6 +120,8 @@ export class TokenRefresher {
         errorCode: error instanceof HttpError ? (error.errorCode ?? undefined) : undefined,
         detail: error instanceof Error ? error.name : undefined,
       });
+      // refresh 응답이 REAUTH 아닌 401이면 세션은 유지하고 "인증 필요"로 통일한다(REQ-NET-023과 같은 처리).
+      if (unauthorized) throw new AuthenticationRequiredError('refresh unauthorized');
       throw error;
     }
 

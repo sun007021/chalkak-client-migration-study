@@ -1,4 +1,4 @@
-import { buildUrl, normalizeBodyUuids, stripQuery } from './UrlBuilder';
+import { apiPath, buildUrl, pathSegment, normalizeBodyUuids, stripQuery } from './UrlBuilder';
 
 const BASE = 'https://api.test/api/v1/';
 const UPPER = '3F1C2A52-AAAA-4BBB-8CCC-DDDDEEEEFFFF';
@@ -63,5 +63,15 @@ describe('stripQuery', () => {
   });
   it('쿼리가 없으면 그대로', () => {
     expect(stripQuery('https://s3.test/key')).toBe('https://s3.test/key');
+  });
+});
+
+describe('pathSegment / apiPath', () => {
+  it('경로 구조를 깨는 문자를 인코딩하고 UUID는 소문자로 만든다', () => {
+    expect(pathSegment('a/b?c#d e')).toBe('a%2Fb%3Fc%23d%20e');
+    expect(pathSegment(UPPER)).toBe(UPPER.toLowerCase());
+    expect(apiPath`/posts/${UPPER}/likes`).toBe(`/posts/${UPPER.toLowerCase()}/likes`);
+    expect(apiPath`/users/${'x/../y'}`).toBe('/users/x%2F..%2Fy');
+    expect(apiPath`/pages/${3}`).toBe('/pages/3');
   });
 });

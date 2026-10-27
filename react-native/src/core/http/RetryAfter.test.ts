@@ -1,4 +1,4 @@
-import { MAX_RETRY_AFTER_MS } from './RequestPolicy';
+import { RETRY_AFTER_MAX_MS } from '../../shared/constants';
 import { backoffMs, parseRetryAfterMs } from './RetryAfter';
 
 const NOW = new Date('2026-10-27T00:00:00.000Z');
@@ -40,6 +40,6 @@ describe('parseRetryAfterMs', () => {
   it('TC-NET-041 매우 큰 값은 자르지 않고 그대로 돌려준다(상한 판단은 ApiClient가 한다)', () => {
     expect(parseRetryAfterMs('86400', NOW)).toBe(86_400_000);
     expect(parseRetryAfterMs('Wed, 28 Oct 2026 00:00:00 GMT', NOW)).toBe(86_400_000);
-    expect(86_400_000).toBeGreaterThan(MAX_RETRY_AFTER_MS);
+    expect(86_400_000).toBeGreaterThan(RETRY_AFTER_MAX_MS);
   });
 });

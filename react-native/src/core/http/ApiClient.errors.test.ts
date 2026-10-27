@@ -145,6 +145,14 @@ describe('ApiClient 응답·오류 해석', () => {
     });
   });
 
+  describe('알 수 없는 예외', () => {
+    it('transport가 알 수 없는 예외(버그)를 던지면 NetworkError로 바꾸지 않고 그대로 던진다', async () => {
+      h.transport.script(new RangeError('bug'));
+      await expect(getTopics()).rejects.toBeInstanceOf(RangeError);
+      expect(h.transport.requests).toHaveLength(1);
+    });
+  });
+
   describe('연결 계열 오류 통일', () => {
     it.each([
       ['fetch TypeError', () => new TypeError('Network request failed')],

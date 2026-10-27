@@ -7,7 +7,7 @@ import {
 } from './__testing__/createNetHarness';
 import { json, networkFailure, timeoutFailure } from './__testing__/FakeTransport';
 import { fixtureResponse } from './__testing__/loadFixture';
-import { MAX_RETRY_AFTER_MS } from './RequestPolicy';
+import { RETRY_AFTER_MAX_MS } from '../../shared/constants';
 
 const identity = (raw: unknown) => raw;
 const ok = () => json(200, { ok: true });
@@ -166,8 +166,11 @@ describe('ApiClient 재시도', () => {
       },
     );
 
-    it('TC-NET-041 상한(MAX_RETRY_AFTER_MS)보다 긴 Retry-After는 자르지 않고 재시도를 포기해 실패로 돌려준다', async () => {
-      h.transport.script(json(503, INTERNAL_BODY, { 'retry-after': '86400' }), ok());
+    it('TC-NET-041 상한(RETRY_AFTER_MAX_MS)보다 긴 Retry-After는 자르지 않고 재시도를 포기해 실패로 돌려준다', async () => {
+      h.transport.script(
+        json(503, INTERNAL_BODY, { 'retry-after': String(RETRY_AFTER_MAX_MS / 1000 + 1) }),
+        ok(),
+      );
       await expect(get()).rejects.toMatchObject({ status: 503 });
       expect(h.transport.requests).toHaveLength(1);
       expect(h.sleeper.calls).toEqual([]);
@@ -175,11 +178,11 @@ describe('ApiClient 재시도', () => {
 
     it('TC-NET-041 상한과 같은 Retry-After는 기다린다', async () => {
       h.transport.script(
-        json(503, INTERNAL_BODY, { 'retry-after': String(MAX_RETRY_AFTER_MS / 1000) }),
+        json(503, INTERNAL_BODY, { 'retry-after': String(RETRY_AFTER_MAX_MS / 1000) }),
         ok(),
       );
       await get();
-      expect(h.sleeper.calls).toEqual([MAX_RETRY_AFTER_MS]);
+      expect(h.sleeper.calls).toEqual([RETRY_AFTER_MAX_MS]);
     });
 
     it('TC-NET-042 Retry-After 없는 429는 멱등 요청이라도 재시도하지 않는다', async () => {

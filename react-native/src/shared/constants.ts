@@ -50,6 +50,8 @@ export const HTTP_RESPONSE_TIMEOUT_MS: number = json.HTTP_RESPONSE_TIMEOUT_MS;
 export const UPLOAD_PUT_TIMEOUT_MS: number = json.UPLOAD_PUT_TIMEOUT_MS;
 export const RETRY_BACKOFF_MS: readonly number[] = json.RETRY_BACKOFF_MS;
 export const RETRY_MAX: number = json.RETRY_MAX;
+/** Retry-After가 이보다 길면 기다리지 않고 실패로 돌려준다(자르지 않음, D-21). */
+export const RETRY_AFTER_MAX_MS: number = json.RETRY_AFTER_MAX_MS;
 export const VERSION_LOOKUP_TIMEOUT_MS: number = json.VERSION_LOOKUP_TIMEOUT_MS;
 
 export const TERMS_ALLOWED_HOSTS: readonly string[] = json.TERMS_ALLOWED_HOSTS;

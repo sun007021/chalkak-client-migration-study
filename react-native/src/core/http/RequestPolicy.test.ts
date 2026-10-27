@@ -77,6 +77,17 @@ describe('RequestPolicy', () => {
     });
   });
 
+  describe('경로 규약 assert', () => {
+    it.each(['/posts?page=1', '/posts/', 'posts', '/posts#x'])(
+      '잘못된 경로 %j는 바로 던진다',
+      (bad) => {
+        expect(() => authLevelFor('GET', bad)).toThrow();
+        expect(() => isRetryable('GET', bad)).toThrow();
+        expect(() => isRefreshableRequest('GET', bad)).toThrow();
+      },
+    );
+  });
+
   describe('isRefreshableRequest', () => {
     it.each<[HttpMethod, string, boolean]>([
       ['GET', '/notifications', true],

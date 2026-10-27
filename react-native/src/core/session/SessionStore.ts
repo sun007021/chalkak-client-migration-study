@@ -14,6 +14,11 @@ export type RefreshedTokens = Omit<SessionCredentials, 'userId'>;
 
 export interface SessionStore {
   load(): Promise<SessionState>;
+  /**
+   * load와 같되, 읽기 예외·손상 값 때문에 저장된 세션을 버렸는지 함께 알려준다(`discarded`).
+   * 버린 경우 state는 none이다. 사용자가 로그아웃한 none과 구분하려는 용도다.
+   */
+  loadChecked(): Promise<{ state: SessionState; discarded: boolean }>;
   /** 인증 세션을 저장하고 게스트 플래그를 지운다. 한 번의 쓰기로 원자적이다. */
   saveAuthenticated(credentials: SessionCredentials): Promise<void>;
   /** 인증 자격을 지우고 게스트 플래그를 저장한다. */
