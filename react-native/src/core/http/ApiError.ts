@@ -1,3 +1,14 @@
+const KNOWN_ERROR_CODES: readonly string[] = [
+  'BUSINESS_ERROR',
+  'UNAUTHORIZED',
+  'REAUTHENTICATION_REQUIRED',
+  'FORBIDDEN',
+  'INTERNAL_ERROR',
+  'SIGNATURE_PROCESSING_PENDING',
+  'SIGNATURE_REUPLOAD_REQUIRED',
+  'SIGNATURE_REGISTRATION_REQUIRED',
+];
+
 /** 서버가 내려주는 errorCode 중 클라이언트가 구분하는 값. 알 수 없는 코드는 BUSINESS_ERROR로 정규화한다(D-02). */
 export type KnownErrorCode =
   | 'BUSINESS_ERROR'
@@ -47,15 +58,24 @@ export class AuthenticationRequiredError extends ApiError {}
 /** 401 REAUTHENTICATION_REQUIRED. 세션은 이미 지워졌고 로그인 이벤트가 나갔다. */
 export class ReauthenticationRequiredError extends ApiError {}
 
-/** API_BASE_URL 설정 오류(ApiError가 아니라 요청 전에 나는 설정 오류). */
-export class ConfigError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ConfigError';
-  }
-}
-
 /** 오류 응답 본문을 HttpError로 변환한다. 빈 본문·비 JSON·errorCode 없음이면 status만 가진 오류. */
-export function parseErrorBody(_status: number, _bodyText: string): HttpError {
-  throw new Error('not implemented');
+export function parseErrorBody(status: number, bodyText: string): HttpError {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(bodyText);
+  } catch {
+    return new HttpError(status, null, null);
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return new HttpError(status, null, null);
+  }
+  const { errorCode, message } = parsed as { errorCode?: unknown; message?: unknown };
+  if (typeof errorCode !== 'string' || errorCode === '') return new HttpError(status, null, null);
+  const known = KNOWN_ERROR_CODES.includes(errorCode as KnownErrorCode);
+  return new HttpError(
+    status,
+    known ? (errorCode as KnownErrorCode) : 'BUSINESS_ERROR',
+    typeof message === 'string' && message !== '' ? message : null,
+    errorCode,
+  );
 }

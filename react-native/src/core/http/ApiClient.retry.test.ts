@@ -6,6 +6,7 @@ import {
   type NetHarness,
 } from './__testing__/createNetHarness';
 import { json, networkFailure, timeoutFailure } from './__testing__/FakeTransport';
+import { fixtureResponse } from './__testing__/loadFixture';
 import { MAX_RETRY_AFTER_MS } from './RequestPolicy';
 
 const identity = (raw: unknown) => raw;
@@ -107,7 +108,7 @@ describe('ApiClient 재시도', () => {
 
     it('TC-NET-042 비멱등 POST가 429여도 재시도 없이 실패한다', async () => {
       // fixture: common/error__rate-limited-429.json
-      h.transport.script(json(429, BUSINESS_BODY, { 'retry-after': '2' }));
+      h.transport.script(fixtureResponse('common/error__rate-limited-429'));
       await expect(
         h.api.requestVoid({ method: 'POST', path: '/posts', body: {} }),
       ).rejects.toMatchObject({ status: 429 });
@@ -131,8 +132,11 @@ describe('ApiClient 재시도', () => {
     ])(
       'TC-NET-040 %s + Retry-After 2초면 백오프 대신 2초 기다린 뒤 재시도한다',
       async (_n, status) => {
-        // fixture: common/error__service-unavailable-503.json, common/error__rate-limited-429.json
-        h.transport.script(json(status, INTERNAL_BODY, { 'retry-after': '2' }), ok());
+        const name =
+          status === 503
+            ? 'common/error__service-unavailable-503'
+            : 'common/error__rate-limited-429';
+        h.transport.script(fixtureResponse(name), ok());
         await expect(get()).resolves.toEqual({ ok: true });
         expect(h.sleeper.calls).toEqual([2000]);
       },
@@ -162,10 +166,26 @@ describe('ApiClient 재시도', () => {
       },
     );
 
-    it('TC-NET-041 매우 큰 Retry-After는 상한을 넘지 않는다', async () => {
+    it('TC-NET-041 상한(MAX_RETRY_AFTER_MS)보다 긴 Retry-After는 자르지 않고 재시도를 포기해 실패로 돌려준다', async () => {
       h.transport.script(json(503, INTERNAL_BODY, { 'retry-after': '86400' }), ok());
+      await expect(get()).rejects.toMatchObject({ status: 503 });
+      expect(h.transport.requests).toHaveLength(1);
+      expect(h.sleeper.calls).toEqual([]);
+    });
+
+    it('TC-NET-041 상한과 같은 Retry-After는 기다린다', async () => {
+      h.transport.script(
+        json(503, INTERNAL_BODY, { 'retry-after': String(MAX_RETRY_AFTER_MS / 1000) }),
+        ok(),
+      );
       await get();
       expect(h.sleeper.calls).toEqual([MAX_RETRY_AFTER_MS]);
+    });
+
+    it('TC-NET-042 Retry-After 없는 429는 멱등 요청이라도 재시도하지 않는다', async () => {
+      h.transport.script(fixtureResponse('common/error__rate-limited-429', { 'Retry-After': '' }));
+      await expect(get()).rejects.toMatchObject({ status: 429 });
+      expect(h.transport.requests).toHaveLength(1);
     });
   });
 

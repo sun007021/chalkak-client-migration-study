@@ -37,8 +37,9 @@ describe('parseRetryAfterMs', () => {
     expect(parseRetryAfterMs(undefined, NOW)).toBeNull();
   });
 
-  it('TC-NET-041 매우 큰 값은 상한(MAX_RETRY_AFTER_MS)으로 자른다', () => {
-    expect(parseRetryAfterMs('86400', NOW)).toBe(MAX_RETRY_AFTER_MS);
-    expect(parseRetryAfterMs('Wed, 28 Oct 2026 00:00:00 GMT', NOW)).toBe(MAX_RETRY_AFTER_MS);
+  it('TC-NET-041 매우 큰 값은 자르지 않고 그대로 돌려준다(상한 판단은 ApiClient가 한다)', () => {
+    expect(parseRetryAfterMs('86400', NOW)).toBe(86_400_000);
+    expect(parseRetryAfterMs('Wed, 28 Oct 2026 00:00:00 GMT', NOW)).toBe(86_400_000);
+    expect(86_400_000).toBeGreaterThan(MAX_RETRY_AFTER_MS);
   });
 });

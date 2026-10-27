@@ -1,14 +1,8 @@
 import Constants from 'expo-constants';
+import { LOOPBACK_HOSTS } from './transportSecurity';
 
 /** 모든 API 경로의 공통 접두(REQ-NET-003). `API_BASE_URL`은 서버 origin이고 앱이 이 접두를 붙인다. */
 export const API_PATH_PREFIX = '/api/v1';
-
-/**
- * https가 아닌 http를 허용하는 loopback 호스트(팀장 결정).
- * E2E mock 서버가 개발 머신의 localhost(iOS 시뮬레이터)나 10.0.2.2(Android 에뮬레이터 -> 호스트)에서
- * 평문 http로 떠 있기 때문이다. 외부로 나가지 않는 주소만 허용하므로 TLS 요구(REQ-NET-001)의 취지를 해치지 않는다.
- */
-const LOOPBACK_HOSTS: readonly string[] = ['localhost', '127.0.0.1', '10.0.2.2'];
 
 /** `apiBaseUrl`은 항상 `https://host[:port]/api/v1/` 형태(끝 슬래시 포함)다. */
 export type AppConfig = { readonly apiBaseUrl: string };

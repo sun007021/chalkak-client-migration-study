@@ -5,12 +5,27 @@ export type GuardedResult<T> = { status: 'applied'; value: T } | { status: 'stal
  * 이전 요청이 나중에 끝나도 stale로 돌려준다. 취소로 인한 reject는 stale로 삼킨다.
  */
 export class LatestRequestGuard {
-  run<T>(_task: (signal: AbortSignal) => Promise<T>): Promise<GuardedResult<T>> {
-    throw new Error('not implemented');
+  private generation = 0;
+  private controller: AbortController | null = null;
+
+  async run<T>(task: (signal: AbortSignal) => Promise<T>): Promise<GuardedResult<T>> {
+    this.controller?.abort();
+    const controller = new AbortController();
+    this.controller = controller;
+    const mine = ++this.generation;
+    try {
+      const value = await task(controller.signal);
+      return mine === this.generation ? { status: 'applied', value } : { status: 'stale' };
+    } catch (error) {
+      if (mine !== this.generation) return { status: 'stale' };
+      throw error;
+    }
   }
 
   /** 진행 중 요청을 모두 무효화한다(화면 이탈, 계정 전환). */
   invalidate(): void {
-    throw new Error('not implemented');
+    this.generation += 1;
+    this.controller?.abort();
+    this.controller = null;
   }
 }

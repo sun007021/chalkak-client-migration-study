@@ -171,4 +171,39 @@ describe('SecureSessionStore', () => {
       expect(await store.load()).toEqual({ kind: 'none' });
     });
   });
+
+  describe('읽기 예외', () => {
+    it('REQ-AUTH-023 보안 저장소 읽기가 예외를 던져도 크래시 없이 none으로 읽고 항목을 지운다', async () => {
+      await store.saveAuthenticated(credentials());
+      storage.failNextRead = true;
+      expect(await store.load()).toEqual({ kind: 'none' });
+      expect(storage.data.size).toBe(0);
+      expect(await store.load()).toEqual({ kind: 'none' });
+    });
+
+    it('REQ-AUTH-023 읽기 예외는 replaceTokensIfCurrent·clearIfCurrent에서도 false로 끝난다', async () => {
+      await store.saveAuthenticated(credentials());
+      storage.failNextRead = true;
+      expect(await store.replaceTokensIfCurrent('refresh-1', tokens('a', 'r'))).toBe(false);
+      await store.saveAuthenticated(credentials());
+      storage.failNextRead = true;
+      expect(await store.clearIfCurrent('refresh-1')).toBe(false);
+    });
+  });
+
+  describe('값 크기 경고', () => {
+    it('2KB를 넘는 세션은 저장은 하되 경고를 남긴다', async () => {
+      const warn = jest.fn();
+      const big = new SecureSessionStore(storage, warn);
+      await big.saveAuthenticated(credentials({ accessToken: 'x'.repeat(3000) }));
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect((await big.load()).kind).toBe('authenticated');
+    });
+
+    it('일반 크기 세션은 경고하지 않는다', async () => {
+      const warn = jest.fn();
+      await new SecureSessionStore(storage, warn).saveAuthenticated(credentials());
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
 });

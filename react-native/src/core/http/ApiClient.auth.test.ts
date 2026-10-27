@@ -255,6 +255,68 @@ describe('ApiClient 인증 헤더와 401 갱신', () => {
     });
   });
 
+  describe('읽는 사이 갱신이 끝나는 경합 (wiki: 옛 refresh token 재전송)', () => {
+    const rotated = () => ({
+      accessToken: 'access-2',
+      accessTokenExpiresAt: new Date(h.clock.now().getTime() + 900_000),
+      refreshToken: 'refresh-2',
+      refreshTokenExpiresAt: new Date(h.clock.now().getTime() + 2_592_000_000),
+    });
+
+    it('TC-NET-016 401 처리 중 저장소 읽기가 지연되는 사이 다른 요청의 갱신이 끝나도 옛 refresh token을 다시 보내지 않고 새 토큰으로 재전송한다', async () => {
+      const original = await h.signIn();
+      let release: () => void = () => undefined;
+      h.transport.respond((req) => {
+        if (bearer(req) === 'Bearer access-2') return json(200, OK_BODY);
+        // 401을 돌려주는 순간 다음 저장소 읽기(401 처리의 세션 재확인)를 붙잡는다.
+        release = h.storage.holdNextRead();
+        return unauthorized();
+      });
+      const call = getNotifications();
+      await flush();
+      // 붙잡힌 읽기 뒤에 다른 요청의 갱신 결과 저장이 줄을 선다.
+      const saved = h.sessionStore.replaceTokensIfCurrent(original.refreshToken, rotated());
+      await flush();
+      release();
+      await saved;
+      await expect(call).resolves.toEqual(OK_BODY);
+      expect(h.transport.requestsTo('POST', '/auth/refresh')).toHaveLength(0);
+      expect(h.transport.requests).toHaveLength(2);
+    });
+
+    it('TC-NET-016 single-flight가 비어 있어도 refresh 직전 재확인으로 옛 토큰 refresh를 막는다(TokenRefresher 단독)', async () => {
+      const original = await h.signIn();
+      await h.sessionStore.replaceTokensIfCurrent(original.refreshToken, rotated());
+      const outcome = await h.tokenRefresher.refresh(original.refreshToken, original.userId);
+      expect(outcome.kind === 'refreshed' && outcome.credentials.refreshToken).toBe('refresh-2');
+      expect(h.transport.requests).toHaveLength(0);
+    });
+
+    it('TC-NET-016 재확인 때 다른 계정이거나 세션이 없으면 session-changed다(네트워크 없음)', async () => {
+      const original = await h.signIn();
+      await h.signIn({ userId: 'user-b', refreshToken: 'refresh-b' });
+      expect(await h.tokenRefresher.refresh(original.refreshToken, original.userId)).toEqual({
+        kind: 'session-changed',
+      });
+      await h.sessionStore.clear();
+      expect(await h.tokenRefresher.refresh('refresh-b', 'user-b')).toEqual({
+        kind: 'session-changed',
+      });
+      expect(h.transport.requests).toHaveLength(0);
+    });
+
+    it('REQ-AUTH-023 보안 저장소 읽기가 예외를 던지면 세션 없음으로 보고 갱신·재시도 없이 401 오류로 끝난다', async () => {
+      await h.signIn();
+      h.transport.respond(() => {
+        h.storage.failNextRead = true; // 401 처리의 세션 재확인 읽기가 실패
+        return unauthorized();
+      });
+      await expect(getNotifications()).rejects.toBeInstanceOf(CancelledError);
+      expect(h.transport.requestsTo('POST', '/auth/refresh')).toHaveLength(0);
+      expect(h.transport.requests).toHaveLength(1);
+    });
+  });
+
   describe('REAUTHENTICATION_REQUIRED', () => {
     it('TC-NET-018 재전송한 요청이 REAUTHENTICATION_REQUIRED면 세션을 지우고 로그인 이벤트를 낸다', async () => {
       await h.signIn();

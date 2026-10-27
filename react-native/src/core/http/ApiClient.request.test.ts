@@ -6,6 +6,7 @@ import {
   unauthorized,
   type NetHarness,
 } from './__testing__/createNetHarness';
+import { fixtureResponse } from './__testing__/loadFixture';
 import { deferred, json, noContent, raw } from './__testing__/FakeTransport';
 import type { HttpResponse } from './HttpTransport';
 
@@ -123,7 +124,7 @@ describe('ApiClient 요청 구성', () => {
     it('TC-NET-044 Authorization·Accept 없이 정책의 Content-Type만 보내고 타임아웃은 60초다', async () => {
       // fixture: common/presigned-put__ok.json
       await h.signIn();
-      h.transport.script(raw(200, ''));
+      h.transport.script(fixtureResponse('common/presigned-put__ok'));
       await upload();
       const request = h.transport.requests[0];
       expect(request.method).toBe('PUT');

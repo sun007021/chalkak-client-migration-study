@@ -1,13 +1,11 @@
 import type { HttpMethod } from './HttpTransport';
 import {
-  CONNECT_TIMEOUT_MS,
-  MAX_RETRIES,
-  PRESIGNED_PUT_TIMEOUT_MS,
-  RESPONSE_TIMEOUT_MS,
-  authLevelFor,
-  isRefreshableRequest,
-  isRetryable,
-} from './RequestPolicy';
+  HTTP_CONNECT_TIMEOUT_MS as CONNECT_TIMEOUT_MS,
+  HTTP_RESPONSE_TIMEOUT_MS as RESPONSE_TIMEOUT_MS,
+  RETRY_MAX as MAX_RETRIES,
+  UPLOAD_PUT_TIMEOUT_MS as PRESIGNED_PUT_TIMEOUT_MS,
+} from '../../shared/constants';
+import { authLevelFor, isRefreshableRequest, isRetryable } from './RequestPolicy';
 
 const ID = '3f1c2a52-1111-4222-8333-444455556666';
 
