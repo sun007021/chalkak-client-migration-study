@@ -13,8 +13,8 @@
 | ONB | [onboarding-signature.md](catalog/onboarding-signature.md) | 52 | 3 | 2 | 0/52 | 43/52 | 46/52 | 0/52 | 0/52 |
 | SIGN | [onboarding-signature.md](catalog/onboarding-signature.md) | 45 | 2 | 2 | 0/45 | 41/45 | 42/45 | 0/45 | 0/45 |
 | NAV | [navigation.md](catalog/navigation.md) | 50 | 0 | 0 | 0/50 | 0/50 | 0/50 | 0/50 | 0/50 |
-| HOME | [home.md](catalog/home.md) | 60 | 2 | 2 | 0/60 | 0/60 | 0/60 | 0/60 | 0/60 |
-| BANR | [home.md](catalog/home.md) | 31 | 1 | 1 | 0/31 | 0/31 | 0/31 | 0/31 | 0/31 |
+| HOME | [home.md](catalog/home.md) | 60 | 2 | 2 | 0/60 | 54/60 | 0/60 | 0/60 | 0/60 |
+| BANR | [home.md](catalog/home.md) | 31 | 1 | 1 | 0/31 | 25/31 | 0/31 | 0/31 | 0/31 |
 | DISP | [display-feed.md](catalog/display-feed.md) | 62 | 1 | 1 | 23/62 | 0/62 | 0/62 | 0/62 | 0/62 |
 | FEED | [display-feed.md](catalog/display-feed.md) | 58 | 2 | 2 | 31/58 | 3/58 | 7/58 | 0/58 | 0/58 |
 | LIKE | [display-feed.md](catalog/display-feed.md) | 35 | 1 | 1 | 31/35 | 0/35 | 0/35 | 0/35 | 0/35 |
