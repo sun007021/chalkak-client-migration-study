@@ -4,6 +4,8 @@ plugins {
 
 dependencies {
     api(project(":core:data"))
+    // HomeMode / HomePreloader live in feature/auth Ports.kt (reused, not moved).
+    api(project(":feature:auth"))
 
     testImplementation(testFixtures(project(":core:common")))
     testImplementation(testFixtures(project(":core:data")))
@@ -13,10 +15,9 @@ dependencies {
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.kotlin.test.junit5)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.okhttp.mockwebserver)
 }
 
 kotlin {
-    // Virtual-time helpers are used throughout the tests.
+    // Virtual-time helpers (runCurrent, advanceTimeBy, UnconfinedTestDispatcher) are used throughout the tests.
     compilerOptions { optIn.add("kotlinx.coroutines.ExperimentalCoroutinesApi") }
 }
