@@ -14,11 +14,13 @@ let package = Package(
     ],
     targets: [
         .target(name: "ChalkakCore"),
+        // 테스트 전용 공용 Fake(TestClock 등). 앱 타깃·product에는 포함하지 않는다.
+        .target(name: "ChalkakTestSupport", dependencies: ["ChalkakCore"]),
         .target(name: "ChalkakNetwork", dependencies: ["ChalkakCore"]),
         .target(name: "ChalkakData", dependencies: ["ChalkakCore", "ChalkakNetwork"]),
         .target(name: "ChalkakFeatures", dependencies: ["ChalkakCore", "ChalkakNetwork", "ChalkakData"]),
-        .testTarget(name: "ChalkakCoreTests", dependencies: ["ChalkakCore"]),
-        .testTarget(name: "ChalkakNetworkTests", dependencies: ["ChalkakNetwork"]),
+        .testTarget(name: "ChalkakCoreTests", dependencies: ["ChalkakCore", "ChalkakTestSupport"]),
+        .testTarget(name: "ChalkakNetworkTests", dependencies: ["ChalkakCore", "ChalkakNetwork", "ChalkakTestSupport"]),
         .testTarget(name: "ChalkakDataTests", dependencies: ["ChalkakData"]),
         .testTarget(name: "ChalkakFeaturesTests", dependencies: ["ChalkakFeatures"]),
     ]
