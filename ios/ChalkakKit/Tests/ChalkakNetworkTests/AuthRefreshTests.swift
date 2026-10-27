@@ -169,6 +169,15 @@ struct AuthRefreshTests {
         await sut.expectNoRefreshTokenReuse()
     }
 
+    @Test("TC-NET-021 REAUTHENTICATION_REQUIRED 코드라도 401이 아니면 세션을 지우지 않는다")
+    func reauthCodeWithNon401KeepsSession() async throws {
+        let odd = HTTPResponse.error(400, "REAUTHENTICATION_REQUIRED", "x")
+        let sut = try SUT(script: [.response(unauthorized), .response(odd)])
+        await #expect(throws: APIError.self) { try await sut.client.send(get("/notifications")) }
+        #expect(await sut.store.currentSession() != nil)
+        #expect(await sut.events.count == 0)
+    }
+
     @Test("TC-NET-022 refresh 성공 시 두 토큰을 함께 저장하고 만료 시각을 응답 초 값으로 계산하며, 저장 뒤에 재전송한다")
     func savesBothTokens() async throws {
         let clock = makeTestClock()
