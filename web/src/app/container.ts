@@ -1,7 +1,10 @@
 import { WebLocksRefreshLock } from '../core/auth/RefreshLock';
 import type { RefreshLock } from '../core/auth/RefreshLock';
 import { IndexedDbSessionStore } from '../core/auth/IndexedDbSessionStore';
+import { CrossTabSessionSync } from '../core/auth/CrossTabSessionSync';
 import { SessionEvents } from '../core/auth/SessionEvents';
+import { createSessionChannel } from '../core/auth/SessionChannel';
+import type { SessionChannel } from '../core/auth/SessionChannel';
 import type { SessionStore } from '../core/auth/SessionStore';
 import { UserCaches } from '../core/auth/UserCaches';
 import { AnalyticsReporter } from '../core/analytics/AnalyticsReporter';
@@ -26,6 +29,11 @@ import { SignupDraft } from '../features/auth/SignupDraft';
 import { createKakaoWebLoginClient } from '../features/auth/createKakaoLogin';
 import { LoginViewModel } from '../features/auth/LoginViewModel';
 import type { ResumeKakaoRedirect, SocialLoginClient } from '../features/auth/SocialLoginClient';
+import { GuestGate } from '../features/shell/GuestGate';
+import { MainShellViewModel } from '../features/shell/MainShellViewModel';
+import { NoopUploadEntry } from '../features/shell/UploadEntry';
+import type { UploadEntry } from '../features/shell/UploadEntry';
+import type { SessionMode } from '../features/boot/authGate';
 import { BootViewModel } from '../features/boot/BootViewModel';
 import { NoopHomePreloader } from '../features/boot/HomePreloader';
 import type { HomePreloader } from '../features/boot/HomePreloader';
@@ -56,6 +64,10 @@ export interface AppContainerOptions {
   preloader?: HomePreloader;
   /** 기본 store가 IndexedDbSessionStore일 때 쓸 IDBFactory. */
   indexedDB?: IDBFactory;
+  /** 탭 간 세션 신호 채널. 이 탭의 store와 CrossTabSessionSync가 같은 객체를 쓴다. 기본: createSessionChannel()(BroadcastChannel 'chalkak-session'). */
+  sessionChannel?: SessionChannel;
+  /** 업로드 버튼(회원)이 부르는 진입. 기본 NoopUploadEntry. */
+  uploadEntry?: UploadEntry;
 }
 
 export interface AppContainer {
@@ -77,11 +89,17 @@ export interface AppContainer {
   preloader: HomePreloader;
   accountService: AccountService;
   devSessionEnabled: boolean;
+  guestGate: GuestGate;
+  uploadEntry: UploadEntry;
+  /** 다른 탭의 로그아웃·계정 전환을 받는다. 라우트 루트가 마운트될 때 start()한다. */
+  crossTabSync: CrossTabSessionSync;
   /** 개발용 세션 주입 화면(동적 import)이 서비스를 만들 재료. devSessionEnabled가 false면 null. */
   devSessionDeps: { refresher: TokenRefresher; store: SessionStore; userCaches: UserCaches } | null;
   /** 화면이 마운트될 때마다 새 ViewModel을 만든다. 현재 컨테이너 값(this)을 읽는다. */
   createLoginViewModel(): LoginViewModel;
   createBootViewModel(): BootViewModel;
+  /** 메인 셸이 마운트될 때마다 새 ViewModel을 만든다. */
+  createMainShellViewModel(mode: SessionMode): MainShellViewModel;
 }
 
 /**
@@ -98,7 +116,18 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
   const clock = options.clock ?? new SystemClock();
   const logger = options.logger ?? new ConsoleLogger();
   const ids = options.ids ?? new RandomIdGenerator();
-  const store = options.store ?? new IndexedDbSessionStore({ indexedDB: options.indexedDB });
+  const holder: { sync?: CrossTabSessionSync } = {};
+  const rawChannel = options.sessionChannel ?? createSessionChannel();
+  // store와 crossTabSync가 같은 객체를 쓴다. 이 탭이 보내는 신호는 crossTabSync가 "이 탭이 아는 userId"를 갱신하는 데도 쓴다.
+  const sessionChannel: SessionChannel = {
+    post: (signal) => {
+      holder.sync?.noteLocalUser(signal.userId);
+      rawChannel.post(signal);
+    },
+    subscribe: (listener) => rawChannel.subscribe(listener),
+    close: () => rawChannel.close(),
+  };
+  const store = options.store ?? new IndexedDbSessionStore({ indexedDB: options.indexedDB, channel: sessionChannel });
   const lock = options.lock ?? new WebLocksRefreshLock();
 
   const sessionEvents = new SessionEvents();
@@ -139,6 +168,15 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
   const devSessionEnabled = options.devSessionEnabled ?? DEV_SESSION_ENABLED;
   const signupDraft = new SignupDraft();
   sessionEvents.subscribe(() => signupDraft.clear()); // 로그아웃·만료 뒤에는 가입 중이던 자격 증명을 남기지 않는다
+  const crossTabSync = new CrossTabSessionSync({
+    channel: sessionChannel,
+    store,
+    userCaches,
+    sessionEvents,
+    document: globalThis.document,
+    window: globalThis.window,
+  });
+  holder.sync = crossTabSync;
   const container: AppContainer = {
     clock,
     logger,
@@ -157,6 +195,9 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     preloader: options.preloader ?? new NoopHomePreloader(),
     accountService: new AccountService({ authApi, store, userCaches, toast, sessionEvents, logger }),
     devSessionEnabled,
+    guestGate: new GuestGate({ toast }),
+    uploadEntry: options.uploadEntry ?? new NoopUploadEntry(),
+    crossTabSync,
     devSessionDeps: devSessionEnabled ? { refresher, store, userCaches } : null,
     createLoginViewModel() {
       return new LoginViewModel({
@@ -169,6 +210,9 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
         ids: this.ids,
         logger: this.logger,
       });
+    },
+    createMainShellViewModel(mode) {
+      return new MainShellViewModel({ mode, guestGate: this.guestGate, analytics: this.analytics, uploadEntry: this.uploadEntry });
     },
     createBootViewModel() {
       return new BootViewModel({ store: this.store, clock: this.clock, preloader: this.preloader, logger: this.logger });
