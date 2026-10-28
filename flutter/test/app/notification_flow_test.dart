@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_harness.dart';
-import '../support/display_fakes.dart';
 import '../support/net_harness.dart';
 import '../support/notification_fakes.dart';
 
