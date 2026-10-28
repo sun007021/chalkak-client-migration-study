@@ -3,6 +3,7 @@ import type { RouteValue } from './fixtureRouter';
 import { FixtureRouter } from './fixtureRouter';
 import { makeApiEnv } from './apiEnv';
 import { flushAsync } from './FakeClock';
+import type { FakeClock } from './FakeClock';
 import { FakeExternalLinkOpener } from './FakeExternalLinkOpener';
 import { FakeHomeNavigator } from './FakeHomeNavigator';
 import { FakeUploadEntry } from './FakeUploadEntry';
@@ -91,4 +92,23 @@ export const requestedPaths = (h: Pick<HomeHarness, 'ff'>, from = 0): string[] =
 /** 대기 중인 Promise 체인을 비운다(가짜 타이머 없이 응답 반영 확인). */
 export async function settle(): Promise<void> {
   for (let i = 0; i < 3; i += 1) await flushAsync();
+}
+
+/**
+ * 가짜 시계 위에서 약속이 끝날 때까지 기다린다: 마이크로태스크를 비우고, 아직 안 끝났으면 재시도 백오프(0.5초, 1초)가 지나도록 시계를 0.5초씩 전진한다.
+ * 성공 경로(재시도 없음)에서는 시계를 움직이지 않으므로 KST 23:59:59 같은 시각 테스트에도 쓸 수 있다.
+ */
+export async function finish<T>(h: { clock: FakeClock }, promise: Promise<T>): Promise<T> {
+  let done = false;
+  const wrapped = promise.finally(() => {
+    done = true;
+  });
+  wrapped.catch(() => undefined);
+  for (let i = 0; ; i += 1) {
+    await settle();
+    if (done) break;
+    if (i > 40) throw new Error('약속이 끝나지 않았다');
+    await h.clock.advance(500);
+  }
+  return wrapped;
 }
