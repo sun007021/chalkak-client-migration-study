@@ -71,7 +71,7 @@ function SignaturePreviewView({ vm, mode, png }: { vm: SignaturePreviewViewModel
         <button type="button" data-testid="signature-preview.redraw-button" disabled={state.busy} style={{ minHeight: 48 }} onClick={() => go(vm.redraw())}>
           {t('onb.sign.preview.redraw')}
         </button>
-        <button type="button" data-testid="signature-preview.confirm-button" disabled={state.busy} style={{ minHeight: 48 }} onClick={() => void vm.confirm().then(go)}>
+        <button type="button" data-testid="signature-preview.confirm-button" disabled={state.busy} style={{ minHeight: 48 }} onClick={() => void vm.confirm().then(go, () => undefined)}>
           {mode === 'onboarding' ? t('onb.sign.preview.start') : t('sign.change.confirm')}
         </button>
       </div>

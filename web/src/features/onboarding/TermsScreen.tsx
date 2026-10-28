@@ -1,5 +1,5 @@
-import { useCallback } from 'react';
-import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
+import { useCallback, useState } from 'react';
+import type { CSSProperties, FocusEvent, KeyboardEvent, ReactNode } from 'react';
 import { Navigate, useNavigate } from 'react-router';
 import { useContainer } from '../../app/AppContext';
 import { ROUTES } from '../../app/paths';
@@ -38,13 +38,27 @@ function CheckMark({ checked }: { checked: boolean }): ReactNode {
 
 /** div role=checkbox: 네이티브 button과 달리 Space가 click을 따로 만들지 않아 키 처리를 한 곳에서 한다. */
 function Checkbox({ testId, checked, label, onToggle }: { testId: string; checked: boolean; label: string; onToggle: () => void }): ReactNode {
+  // 키보드로 포커스가 왔을 때만 윤곽선을 보인다(마우스 클릭 포커스는 제외).
+  const [focusVisible, setFocusVisible] = useState(false);
+  const onFocus = (event: FocusEvent<HTMLDivElement>) => {
+    try {
+      setFocusVisible(event.currentTarget.matches(':focus-visible'));
+    } catch {
+      setFocusVisible(true);
+    }
+  };
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key !== ' ' && event.key !== 'Enter') return;
+    if (event.key !== ' ') return;
     event.preventDefault();
     onToggle();
   };
   return (
-    <div role="checkbox" aria-checked={checked} tabIndex={0} data-testid={testId} style={checkboxStyle} onClick={onToggle} onKeyDown={onKeyDown}>
+    <div role="checkbox" aria-checked={checked} tabIndex={0} data-testid={testId} style={focusVisible ? { ...checkboxStyle, outline: '3px solid #1a73e8', outlineOffset: 2, borderRadius: 4 } : checkboxStyle}
+      onClick={onToggle}
+      onKeyDown={onKeyDown}
+      onFocus={onFocus}
+      onBlur={() => setFocusVisible(false)}
+    >
       <CheckMark checked={checked} />
       <span>{label}</span>
     </div>

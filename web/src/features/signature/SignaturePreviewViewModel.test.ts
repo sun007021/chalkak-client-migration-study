@@ -169,3 +169,13 @@ describe('SignaturePreviewViewModel 변경 실패', () => {
     expect(submitter.calls).toBe(2);
   });
 });
+
+describe('SignaturePreviewViewModel 예외', () => {
+  it('submitter가 던져도 일반 실패 토스트를 보이고 busy를 풀며 미리보기에 머문다', async () => {
+    const { vm, submitter, toast } = setup('change');
+    submitter.submit = () => Promise.reject(new Error('boom'));
+    expect(await vm.confirm()).toEqual({ kind: 'stay' });
+    expect(message(toast)).toBe(t('sign.change.error.generic'));
+    expect(vm.state.busy).toBe(false);
+  });
+});

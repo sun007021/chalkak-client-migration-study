@@ -9,6 +9,7 @@ import type { Clock } from '../../core/time/Clock';
 import type { AuthApi } from '../auth/AuthApi';
 import type { SignupDraft } from '../auth/SignupDraft';
 import type { KakaoCredential } from '../auth/SocialLoginClient';
+import { classifyConfirmRejection } from '../signature/confirmFailure';
 import type { SignatureFailure, SignatureSubmitter, SubmitOutcome } from '../signature/SignatureSubmitter';
 import type { SignupRepository, SignupSession, SignupUploadTicket } from './SignupRepository';
 
@@ -116,10 +117,8 @@ export class SignupService implements SignatureSubmitter {
           this.deps.signupDraft.clear();
           return failed({ kind: 'expired' });
         }
-        if (stage === 'signup') {
-          if (error.status === 404) return failed({ kind: 'reupload' });
-          if (error.status === 400 && error.errorCode === 'BUSINESS_ERROR') return failed({ kind: 'invalid' });
-        }
+        const rejection = stage === 'signup' ? classifyConfirmRejection(error, 'reupload') : null;
+        if (rejection) return failed(rejection);
       }
     }
     this.deps.logger?.log('warn', 'signup failed', { stage, error });

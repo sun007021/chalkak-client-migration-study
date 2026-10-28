@@ -3,7 +3,7 @@ import { ViewModel } from '../../core/state/ViewModel';
 import { signatureFailureMessage } from './signatureFailureMessages';
 import type { ToastController } from '../../core/ui/ToastController';
 import type { SignatureMode } from './SignatureMode';
-import type { SignatureSubmitter } from './SignatureSubmitter';
+import type { SignatureSubmitter, SubmitOutcome } from './SignatureSubmitter';
 
 export interface SignaturePreviewState {
   /** 요청 중(PENDING 재시도 대기 포함). 확정·다시 그리기 버튼 비활성, 진행 표시. 성공 뒤에는 true로 둔다(이동 중 연타 방지). */
@@ -56,7 +56,14 @@ export class SignaturePreviewViewModel extends ViewModel<SignaturePreviewState> 
     if (this.state.busy) return { kind: 'stay' };
     const { mode, png, submitter, toast } = this._deps;
     this.setState({ busy: true });
-    const outcome = await submitter.submit(png, this.abort.signal);
+    let outcome: SubmitOutcome;
+    try {
+      outcome = await submitter.submit(png, this.abort.signal);
+    } catch {
+      // submitter는 던지지 않는 계약이지만, 예외가 나도 busy가 영원히 남지 않게 일반 실패로 처리한다.
+      if (this.closed) return { kind: 'cancelled' };
+      outcome = { kind: 'failed', failure: { kind: 'generic' } };
+    }
     if (this.closed) return { kind: 'cancelled' };
     if (outcome.kind === 'cancelled') {
       this.setState({ busy: false });

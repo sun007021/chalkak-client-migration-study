@@ -87,6 +87,13 @@ describe('약관 동의 상호작용', () => {
     fireEvent.keyUp(service, { key: ' ' });
     await waitFor(() => expect(checked(service)).toBe('true'));
   });
+
+  it('Enter로는 체크박스가 토글되지 않는다(Space만)', async () => {
+    await readyTerms();
+    const service = box('service');
+    fireEvent.keyDown(service, { key: 'Enter' });
+    expect(checked(service)).toBe('false');
+  });
 });
 
 describe('약관 문서 보기 (새 탭, D-25)', () => {

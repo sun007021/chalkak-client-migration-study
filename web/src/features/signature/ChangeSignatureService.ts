@@ -3,6 +3,7 @@ import type { SessionStore } from '../../core/auth/SessionStore';
 import { ApiError, NetworkError, SessionChangedError, isCancellation } from '../../core/net/errors';
 import type { PresignedUploader } from '../../core/net/PresignedUploader';
 import type { Logger } from '../../core/net/Logger';
+import { classifyConfirmRejection } from './confirmFailure';
 import type { SignatureRepository } from './SignatureRepository';
 import type { SignatureFailure, SignatureSubmitter, SubmitOutcome } from './SignatureSubmitter';
 
@@ -32,10 +33,11 @@ export class ChangeSignatureService implements SignatureSubmitter {
   async submit(png: Blob, signal: AbortSignal): Promise<SubmitOutcome> {
     const { repository, uploader, store } = this.deps;
     if (signal.aborted) return CANCELLED;
-    const startedAs = (await store.read()).userId;
     let stage: Stage = 'uploads';
     let outcome: SubmitOutcome;
+    let startedAs: string | null = null;
     try {
+      startedAs = (await store.read()).userId;
       const ticket = await repository.requestUpload(signal);
       stage = 'put';
       await uploader.put({ url: ticket.uploadUrl, body: png, contentType: SIGNATURE_CONTENT_TYPE, signal });
@@ -48,7 +50,11 @@ export class ChangeSignatureService implements SignatureSubmitter {
     if (outcome.kind === 'failed' && outcome.failure.kind === 'expired') return outcome;
     if (outcome.kind === 'cancelled' || signal.aborted) return CANCELLED;
     // 로그아웃·계정 전환으로 사용자가 바뀌었으면 결과를 버린다(TC-SIGN-038).
-    if ((await store.read()).userId !== startedAs) return CANCELLED;
+    try {
+      if ((await store.read()).userId !== startedAs) return CANCELLED;
+    } catch {
+      return failed({ kind: 'generic' });
+    }
     return outcome;
   }
 
@@ -58,11 +64,8 @@ export class ChangeSignatureService implements SignatureSubmitter {
     if (error instanceof ApiError && stage !== 'put') {
       if (error.status === 401) return failed({ kind: 'expired' });
       if (error.status === 403) return failed({ kind: 'forbidden' });
-      if (stage === 'confirm') {
-        if (error.status === 400 && error.errorCode === 'SIGNATURE_REUPLOAD_REQUIRED') return failed({ kind: 'reupload' });
-        if (error.status === 400) return failed({ kind: 'invalid' });
-        if (error.status === 404) return failed({ kind: 'not_found' });
-      }
+      const rejection = stage === 'confirm' ? classifyConfirmRejection(error, 'not_found') : null;
+      if (rejection) return failed(rejection);
     }
     this.deps.logger?.log('warn', 'signature change failed', { stage, error });
     return failed({ kind: 'generic' });

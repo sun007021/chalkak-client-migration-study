@@ -96,7 +96,7 @@ function SignatureDrawView({ vm, mode }: { vm: SignatureDrawViewModel; mode: Sig
   const submit = () =>
     void vm.submit().then((outcome) => {
       if (outcome.kind === 'preview') navigate(mode === 'onboarding' ? ROUTES.signupSignaturePreview : ROUTES.changeSignaturePreview, { state: below ? SETTINGS_BELOW_STATE : undefined });
-    });
+    }, () => undefined);
   const back = () => {
     const plan = planDrawBack(mode, below);
     if (plan.kind === 'back') navigate(-plan.steps);
