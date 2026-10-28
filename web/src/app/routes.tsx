@@ -101,8 +101,8 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
         { path: ROUTES.signupSignature, element: <SignatureDrawScreen mode="onboarding" /> },
         { path: ROUTES.signupSignaturePreview, element: <SignaturePreviewScreen mode="onboarding" /> },
         {
-          // 사인 변경: 회원만, 탭 셸(하단 바) 밖. 게스트는 설정으로 보낸다(구현 단계).
-          element: <RequireSession container={container}>{() => <Outlet />}</RequireSession>,
+          // 사인 변경: 회원만, 탭 셸(하단 바) 밖. 게스트는 설정으로 보낸다.
+          element: <RequireSession container={container}>{(mode) => (mode === 'guest' ? <Navigate to={ROUTES.settings} replace /> : <Outlet />)}</RequireSession>,
           children: [
             { path: ROUTES.changeSignature, element: <SignatureDrawScreen mode="change" /> },
             { path: ROUTES.changeSignaturePreview, element: <SignaturePreviewScreen mode="change" /> },
