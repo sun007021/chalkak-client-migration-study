@@ -56,6 +56,8 @@ export type ApiClientDeps = {
   sleeper: Sleeper;
   clock: Clock;
   logger: NetworkLogger;
+  /** 멱등 요청의 최대 재시도 횟수. 기본은 RETRY_MAX(테스트는 0으로 끌 수 있다). */
+  maxRetries?: number;
 };
 
 type Attempt = {
@@ -337,7 +339,7 @@ export class ApiClient {
 
       if (!failure) throw new Error('unreachable: no response and no failure');
       const delay =
-        attempt.retryable && index < RETRY_MAX
+        attempt.retryable && index < (this.deps.maxRetries ?? RETRY_MAX)
           ? this.retryDelay(failure, retryAfterHeader, index, clock.now())
           : null;
       logger.log({

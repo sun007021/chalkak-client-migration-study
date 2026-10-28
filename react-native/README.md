@@ -230,3 +230,34 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
   - `fireEvent`는 이미 `act`로 감싸져 있어 그 바깥을 또 `act`로 감싸면 "overlapping act" 경고가 난다.
   - `FakeCalendarImageSaver`처럼 즉시 끝나는 가짜로는 `await fireEvent.press` 두 번이 "연타"가 아니다(첫 저장이 이미 끝난다). 연타 검증은 저장을 붙잡아 둔다.
   - 기록 흐름 테스트의 기준 시각(10-27)보다 미래인 10-31 사진으로 전시를 열면 전시가 오늘로 맞춰 열린다(전시는 날짜를 오늘 이하로 자른다).
+
+## 알림·푸시 (`src/features/notification`, `src/features/push`, `src/core/push`, `src/data/notification`)
+
+- **구성**: 알림함(`NotificationInboxViewModel`, 마운트 = `onShown`, 언마운트 = `onHidden`)과 상세(`NotificationDetailViewModel`)는 순수 TS ViewModel이다. 알림함 행 탭과 푸시 탭은 같은 `planNotificationTap`(D-11 목적지 표)과 `NotificationTapProcessor`를 지난다(읽음 처리 -> 홈 `onPushReceived` -> 이동). 읽음 API 실패는 네트워크면 안내 토스트 후 이동, 그 밖(404 등)은 `noti.gone` 토스트 + 알림함 새로고침이다. 401은 `AuthErrorPolicy`(키 `notification-read`).
+- **푸시 포트**: `core/push`의 인터페이스(`PushPermissionGateway`, `PushTokenProvider`, `NotificationResponseSource`, `PushMessageSource`, `PushNotificationPresenter`, `PushPromptFlagStore`)를 ViewModel/조정자가 쓰고, 실제 어댑터는 `core/push/expo/`(expo-notifications)에 얇게 둔다(매핑 함수만 테스트). `AppContainer.startPush()`가 `App.tsx`의 `useEffect`에서 불려 등록기·권한 조정자·포그라운드 핸들러·탭 라우터를 시작하고 정리 함수를 돌려준다(StrictMode 안전).
+- **기기 등록**: `DevicePushRegistrar`가 `PUT /push-devices/current {fcmToken}`을 보낸다. 토큰은 JWT에 세션 ID가 있어야 보내고(없으면 한 번 갱신), 같은 (사용자, 토큰)은 다시 보내지 않으며, 세션 세대가 바뀌었으면 성공을 기록하지 않는다. 실패는 reject하지 않고 로그만 남긴다.
+- **탭 처리**: `PushTapRouter`가 부팅 단계로 정한다. 스플래시·업데이트 필요 -> 보류(`PendingPushStore`에 저장), 로그인 -> 폐기, 가입 -> 인증 상태면 보류, 메인 회원 -> 처리(업로드·피드백 화면에서는 `PushTapBlocker`가 막음), 메인 게스트 -> 폐기. 계정이 바뀌면 보류분을 버린다.
+- **확인 필요(백엔드·기획)**
+  1. **iOS 푸시 토큰(미해결, 후속 필요)**: iOS는 지금 **기기 등록을 하지 않는다**. `getDevicePushTokenAsync`는 iOS에서 APNs 토큰을 주는데 서버는 FCM 토큰(`fcmToken`)만 받으므로 APNs 토큰은 보내지 않는다(`PushTokenProvider`가 iOS에서 null). 네이티브 iOS도 `PlaceholderFCMTokenProvider`로 같은 상태다. 후속: 기존 `PushTokenProvider` 이음새 뒤에 `@react-native-firebase/messaging`으로 FCM 토큰을 얻는 구현을 꽂는다(iOS에 `GoogleService-Info.plist`와 APNs 키 필요). `docs/spec`은 고치지 않았다.
+  2. **스펙 충돌 2(권한 대화상자)**: 스펙은 OS 대화상자만 말하는 곳과 iOS 앱 내 사전 안내(`push-permission.*` testid, `noti.perm.title/body`)를 말하는 곳이 있다. OS 대화상자만 구현했고 사전 안내 testid는 쓰지 않았다.
+  3. **스펙 충돌 3(포그라운드 AI 푸시)**: 포그라운드에서 받은 원격 푸시는 OS 배너를 끄고(`setNotificationHandler`) 앱이 직접 로컬 알림으로 보여 주며 AI 푸시도 억제하지 않는다.
+  4. **프롬프트 플래그 저장**: `PushPromptFlagStore`/`PendingPushStore`는 AsyncStorage라 앱 삭제 후 재설치하면 초기화된다(키체인이 아님).
+  5. **포그라운드 로컬 알림 탭**: 앱이 보여 준 로컬 알림에도 `data`를 실어 탭하면 같은 경로로 이동한다.
+  6. **Android 채널**: `moderation_push`(기본 채널, `app.config.ts` 플러그인 `defaultChannel`). 채널 이름/중요도 확정 필요.
+  7. **Firebase 설정**: `GOOGLE_SERVICES_JSON` 환경 변수가 있으면 `android.googleServicesFile`로 쓴다. 실기기 푸시 E2E에는 이 파일(과 iOS APNs 키)이 필요하다.
+  8. **Android 데이터 전용 푸시(실기기 확인 필요)**: 포그라운드에서 `notification` 블록 없이 `data`만 오는 푸시가 `addNotificationReceivedListener`로 오는지, 앱이 직접 표시할 제목·본문이 있는지는 기기에서 확인한다.
+- **내비게이션**: React Navigation 7의 `navigate`는 기본으로 쌓으므로 `openHome`·`openInbox`는 `{ pop: true }`로 스택에 이미 있는 화면까지 되돌아간다(`NavigationNotificationNavigator.integration.test.tsx`가 실제 RootNavigator로 확인). 내비게이션이 준비되기 전의 푸시 탭은 `NavigationPushTapBlocker`가 막아 두었다가 `NavigationContainer`의 `onReady`(`AppContainer.onNavigationReady`)에서 다시 처리한다. 작성 중 화면 목록은 `routes.ts`의 `PUSH_TAP_BLOCKING_ROUTES`이고 피드백 화면은 아직 없어 SET·FDBK PR에서 추가한다(TODO).
+- **시작·정지**: `PushFeature`가 컨테이너당 하나이고 참조 수로 센다(StrictMode의 start -> stop -> start 안전). 콜드 스타트 탭은 컨테이너 수명 동안 한 번만 소비하고, 같은 탭이 응답 리스너로도 오면 알림 요청 식별자로 거른다. 라우터는 세션 첫 `load()` 뒤에 세대를 읽는다(부팅의 첫 load가 세대를 올리므로).
+- **테스트 함정**: 알림 하네스는 `createNetHarness({ maxRetries: 0 })`(`ApiClientDeps.maxRetries`, 기본 `RETRY_MAX`)라 "실패 후 성공" 스크립트가 한 단계씩이다. 재시도 자체는 `ApiClient.retry.test.ts`가 검증한다. `FixtureRouter.set`은 호출 기록을 새로 시작한다. 헤더는 대소문자를 구분하지 않고 `authorizationOf`로 읽는다.
+
+## AI 피드백 (`src/features/ai-review`, `src/data/ai-review`)
+
+- **구성**: `AiReviewRepository`(GET/POST `/posts/{id}/ai-review`, 디코더가 점수 0~10·status와 result 일치·feedback 비어 있지 않음을 검사해 `InvalidResponseError`) -> `DefaultAiReviewPoller`(앱에 하나, `AppContainer.aiReview`/`aiReviewSession`; 상태 확인·폴링·POST·오류 처리; 화면은 `owner`를 넘겨 자기 폴링만 멈춘다) -> `AiReviewViewModel`(게시물 하나의 알약/카드/시트 표시 상태, 순수 TS) -> `AiReviewSection`(상세 알약)·`AiReviewCard`(홈 카드)·`AiReviewSheets`. `AiReviewHosts`(app)가 ViewModel을 만들고 dispose하며 `FeedScreen.renderAiReview`, `HomeScreen.renderAiCard`로 꽂는다(화면 컴포넌트는 컨테이너를 모른다). 기존 `AiReviewPoller`(start/stop) 계약은 홈이 그대로 쓴다. 폴러는 `UserDataCacheRegistry`에 올라 로그아웃·계정 전환 때 `clearAll`된다.
+- **폴링(D-03)**: 첫 GET은 바로, 이후 3초 간격(`AI_REVIEW_POLL_INTERVAL_MS`), 창 300초(`AI_REVIEW_POLL_WINDOW_MS`). 대기 뒤 `창 경과 >= 300초`면 GET 없이 `stalled`로 멈춘다(그래서 GET은 3~297초 99회). 창 시작은 `start`/`refresh`를 부른 시각 또는 POST를 **보낸** 시각(REQ-AIR-026)이며 서버 `requestedAt`은 쓰지 않는다. 시계는 `Clock`, 대기는 주입한 `Sleeper`이고 취소는 AbortSignal이다. 상태가 실제로 달라질 때만 구독자에게 알린다. 같은 게시물로 이미 루프가 도는 중에 `start`를 또 부르면(홈 ViewModel과 카드) 다시 시작하지 않는다.
+- **취소**: `stop`, 게시물 변경, `dispose`, `clearAll`, `SessionStore.generation()` 변경이면 대기 중 sleep과 요청을 취소하고 늦게 온 응답은 반영하지 않는다. 화면 가시성은 `AiReviewViewModel`이 `AppVisibility`로 본다(백그라운드 = `stop`, 복귀 = GET부터 새 창).
+- **오류**: 401은 `AuthErrorPolicy`(키 = postId). 폴링 GET의 연결 실패·5xx·검증 실패는 PROCESSING인 동안 계속하고 토스트는 한 번. 처음부터 실패하면 `check-failed`("AI 상태 다시 확인"). GET 404는 메시지 없이 `hidden`, POST 404는 `ai.error.not-found` 토스트 + `hidden`. POST 400은 서버 `message` 그대로, 403은 `ai.error.banned`, 연결 오류·5xx·검증 실패는 문구를 보이고 POST를 다시 보내지 않은 채 GET으로 동기화한다(POST는 `RequestPolicy`상 자동 재시도 대상이 아니다).
+- **`start`와 `refresh`**: `start`는 같은 게시물의 COMPLETED면 재조회하지 않고(홈 복귀, REQ-AIR-051) 나머지는 결과를 유지한 채 GET한다. `refresh`는 항상 GET(상세 재진입, "다시 확인"). 홈 표면은 `start`, 상세 표면은 `refresh`를 쓴다. 폴러가 앱에 하나라서 상세가 열려 있는 동안은 상세가 맡은 게시물이 폴러의 대상이고, 상세를 닫으면 `stop`이라 홈이 다시 보일 때 홈이 `start`한다.
+- **푸시 진입**: `AiReviewViewModel`의 `entry: 'push'`는 최신 GET이 확인된 첫 순간에 COMPLETED면 결과 시트, FAILED면 실패 시트를 한 번만 연다(PROCESSING·NONE이면 열지 않고 소비). `PostDetail.openAiSheet` 라우트 파라미터는 아직 main에 없어 연결하지 않았다. 푸시 PR이 `FeedAiReview`에 `entry`를 넘기면 된다.
+- **스펙 해석(합의된 것)**: GET 404는 메시지 없이 숨김(TC-AIR-017의 문구는 POST 404에서만). 창 종료 뒤 "AI 상태 다시 확인"은 알약("AI 분석중", 비활성)과 별개로 안내 아래에 둔다(`feed.ai-recheck-button`, TC-AIR-037). **TC-AIR-022는 창 시작을 POST "응답" 시각으로 적었지만 REQ-AIR-026·D-03에 따라 POST를 "보낸" 시각으로 구현했다**(응답이 늦으면 그만큼 창이 짧아진다).
+- **확인 필요(스펙 미결 그대로)**: 기준 설명 다이얼로그 본문은 소스에서 확인하지 못해 제목과 닫기 버튼만 있다. POST가 곧바로 COMPLETED를 줘도 결과 시트를 자동으로 열지 않는다[추정]. 홈 카드 실패 재요청(시트 없음)과 상세(재요청 시트)가 다른 것은 REQ-AIR-036 그대로이며 통일 여부는 결정 없음. 점수는 소수 첫째 자리 고정(`toFixed(1)`)[추정]. 포그라운드 푸시 표시 억제는 푸시 영역. 실패 시트를 푸시로 열었는데 재요청 가능이면 사유 없이 재요청 버튼을 보인다(`ai-failed-sheet.retry-button` 규칙).
+- **테스트**: `__testing__/VirtualTimeSleeper`는 `FakeClock`과 한 몸으로 도는 Sleeper(`advance(ms)`가 깨울 순서대로 푼다), `createAiReviewHarness`는 저장소·폴러·fixture 라우터를 조립한다. 경계(299.999/300.000초)는 `intervalMs` 주입으로 검증한다. `testID`는 `feed.ai-*`, `home.ai-*`, `ai-start-sheet.*`, `ai-result-sheet.*`, `ai-failed-sheet.*`(`criteria-close-button`은 RN 추가). 미구현 TC: 021(동의 UI 없음은 W), 046(E2E), 055·056(애니메이션·스크린샷), 059(알림함), 060·061(A).
