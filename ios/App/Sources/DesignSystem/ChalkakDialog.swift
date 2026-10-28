@@ -4,7 +4,7 @@ import SwiftUI
 /// `actions`가 하나뿐이면 그 버튼만으로 닫는다(닫기 제스처·바깥 탭 없음).
 struct ChalkakDialog<Actions: View>: View {
     let identifier: String
-    let title: String
+    let title: String?
     let message: String
     let titleIdentifier: String?
     let messageIdentifier: String?
@@ -12,7 +12,7 @@ struct ChalkakDialog<Actions: View>: View {
 
     init(
         identifier: String,
-        title: String,
+        title: String?,
         message: String,
         titleIdentifier: String? = nil,
         messageIdentifier: String? = nil,
@@ -30,10 +30,12 @@ struct ChalkakDialog<Actions: View>: View {
         ZStack {
             ChalkakColor.scrim.ignoresSafeArea()
             VStack(spacing: ChalkakSpacing.lg) {
-                Text(title)
-                    .font(ChalkakFont.headline)
-                    .foregroundStyle(ChalkakColor.textPrimary)
-                    .accessibilityIdentifier(titleIdentifier ?? "\(identifier).title")
+                if let title {
+                    Text(title)
+                        .font(ChalkakFont.headline)
+                        .foregroundStyle(ChalkakColor.textPrimary)
+                        .accessibilityIdentifier(titleIdentifier ?? "\(identifier).title")
+                }
                 Text(message)
                     .font(ChalkakFont.callout)
                     .foregroundStyle(ChalkakColor.textSecondary)
