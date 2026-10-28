@@ -1,4 +1,7 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
+
+import '../../../core/ui/selectable_test_id.dart';
+import '../../../core/ui/test_id.dart';
 
 /// 하트 버튼과 좋아요 수. 전시 그리드·피드·홈 랭킹이 같이 쓴다.
 ///
@@ -24,5 +27,24 @@ class LikeButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => throw UnimplementedError();
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SelectableTestId(
+          buttonId,
+          selected: isLiked,
+          child: IconButton(
+            visualDensity: VisualDensity.compact,
+            isSelected: isLiked,
+            icon: const Icon(Icons.favorite_border),
+            selectedIcon: Icon(Icons.favorite, color: colors.error),
+            onPressed: enabled ? onPressed : null,
+          ),
+        ),
+        TestId(countId, child: Text('$likeCount')),
+      ],
+    );
+  }
 }

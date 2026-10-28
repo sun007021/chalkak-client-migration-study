@@ -62,6 +62,7 @@ class PostCard {
     bool clearTitle = false,
     int? likeCount,
     bool? isLiked,
+    bool? isMine,
   }) => PostCard(
     id: id,
     authorId: authorId,
@@ -72,7 +73,7 @@ class PostCard {
     title: clearTitle ? null : (title ?? this.title),
     likeCount: likeCount ?? this.likeCount,
     isLiked: isLiked ?? this.isLiked,
-    isMine: isMine,
+    isMine: isMine ?? this.isMine,
   );
 }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 /// 게시물 변경을 화면 밖으로 알리는 공용 버스(전시·기록·홈·피드가 같이 쓴다).
 sealed class PostEvent {
   const PostEvent(this.postId);
@@ -20,16 +22,24 @@ final class PostTitleChanged extends PostEvent {
 class PostEventBus {
   PostEventBus();
 
-  Stream<PostEvent> get events => throw UnimplementedError();
+  final StreamController<PostEvent> _controller =
+      StreamController<PostEvent>.broadcast();
+  final Set<String> _removed = {};
+
+  Stream<PostEvent> get events => _controller.stream;
 
   /// 삭제·404로 [publishRemoved]된 적이 있는 id인가.
-  bool isRemoved(String postId) => throw UnimplementedError();
+  bool isRemoved(String postId) => _removed.contains(postId);
 
-  void publishRemoved(String postId) => throw UnimplementedError();
+  void publishRemoved(String postId) {
+    _removed.add(postId);
+    _controller.add(PostRemoved(postId));
+  }
 
-  void publishTitleChanged(String postId, String? title) =>
-      throw UnimplementedError();
+  void publishTitleChanged(String postId, String? title) {
+    _controller.add(PostTitleChanged(postId, title));
+  }
 
   /// 계정 전환: 기억한 삭제 id를 비운다(TC-FEED-057).
-  void reset() => throw UnimplementedError();
+  void reset() => _removed.clear();
 }

@@ -1,5 +1,10 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../../core/copy/ko.g.dart';
+import '../../../core/network/api_error.dart';
 import '../../feed/domain/post_event_bus.dart';
 import 'like_repository.dart';
 import 'toast_message.dart';
@@ -24,6 +29,32 @@ class LikeState {
   String toString() => 'LikeState(isLiked: $isLiked, likeCount: $likeCount)';
 }
 
+/// 게시물 하나의 좋아요 진행 상황. 저장소 안에서만 쓴다.
+class _Entry {
+  _Entry(LikeState value)
+    : shown = value,
+      confirmed = value,
+      intent = value.isLiked;
+
+  /// 화면에 보이는 값(낙관 반영 포함).
+  LikeState shown;
+
+  /// 서버가 마지막으로 확정한 값.
+  LikeState confirmed;
+
+  /// 사용자가 마지막으로 원한 좋아요 여부.
+  bool intent;
+
+  /// 탭 횟수. 요청이 도는 동안 사용자가 더 눌렀는지 알아내는 데 쓴다.
+  int taps = 0;
+
+  /// 이 게시물에 마지막으로 좋아요 변경(낙관 반영·확정·롤백)이 있었던 저장소 version.
+  int touchedAt = 0;
+
+  /// 요청 줄을 처리 중이면 그 Future.
+  Future<void>? worker;
+}
+
 /// 전시·피드·홈이 함께 쓰는 좋아요 저장소(D-04). 화면은 값을 직접 갖지 않고
 /// [stateOf]를 읽으며, 바뀔 때마다 [notifyListeners]로 알린다.
 ///
@@ -39,23 +70,38 @@ class LikeState {
 ///   이동은 앱이 세션 해제로 처리). 403(등록)은 `Copy.likeErrorBanned`, 재요청 없음.
 ///   404는 롤백 + `Copy.likeErrorGeneric` + [PostEventBus.publishRemoved].
 /// - 실패한 요청 뒤에 사용자가 더 누른 의도가 있으면 롤백이 그 의도를 되돌리지 않고
-///   남은 의도를 한 번 더 보낸다(TC-LIKE-022).
+///   남은 의도를 한 번 더 보낸다(TC-LIKE-022). 이렇게 밀려난 실패는 토스트를 내지 않는다.
 /// - [toasts]는 broadcast다. 화면이 보이는 동안만 구독하면 보이지 않을 때의 토스트는 버려진다.
 class LikeStore extends ChangeNotifier {
   LikeStore({
-    required LikeRepository repository,
-    required PostEventBus events,
-    required bool Function() isGuest,
+    required this._repository,
+    required this._events,
+    required this._isGuest,
   });
 
-  Stream<ToastMessage> get toasts => throw UnimplementedError();
+  final LikeRepository _repository;
+  final PostEventBus _events;
+  final bool Function() _isGuest;
+
+  final Map<String, _Entry> _entries = {};
+  final StreamController<ToastMessage> _toasts =
+      StreamController<ToastMessage>.broadcast();
+
+  /// 계정 전환([reset]) 때마다 새로 만든다. 이전 세대의 응답은 버린다.
+  CancelToken _cancelToken = CancelToken();
+  int _generation = 0;
+  int _version = 0;
+  int _toastSequence = 0;
+  bool _disposed = false;
+
+  Stream<ToastMessage> get toasts => _toasts.stream;
 
   /// 어떤 게시물이든 값이 바뀔 때마다 1씩 오른다. 목록 재검증 요청을 보내기 전에 읽어 두었다가
   /// [reconcile]의 `since`로 넘긴다.
-  int get version => throw UnimplementedError();
+  int get version => _version;
 
   /// 아직 본 적 없는 게시물이면 null.
-  LikeState? stateOf(String postId) => throw UnimplementedError();
+  LikeState? stateOf(String postId) => _entries[postId]?.shown;
 
   /// 서버 응답(목록·상세)의 좋아요 값을 반영하고 화면에 쓸 값을 돌려준다.
   /// `since` 이후 이 게시물에 좋아요 변경(낙관 반영·확정·롤백)이 있었거나 요청이 진행 중이면
@@ -65,11 +111,165 @@ class LikeStore extends ChangeNotifier {
     required bool isLiked,
     required int likeCount,
     required int since,
-  }) => throw UnimplementedError();
+  }) {
+    final value = LikeState(isLiked: isLiked, likeCount: likeCount);
+    final entry = _entries[postId];
+    if (entry == null) {
+      _entries[postId] = _Entry(value);
+      _changed();
+      return value;
+    }
+    if (entry.worker != null || entry.touchedAt > since) return entry.shown;
+    final differs = entry.shown != value || entry.confirmed != value;
+    entry
+      ..shown = value
+      ..confirmed = value
+      ..intent = isLiked;
+    if (differs) _changed();
+    return value;
+  }
 
   /// 이 게시물의 요청 줄이 모두 끝나면 완료한다. [reconcile]로 값을 본 적 없는 게시물이면 무시한다.
-  Future<void> toggle(String postId) => throw UnimplementedError();
+  Future<void> toggle(String postId) {
+    if (_disposed) return Future<void>.value();
+    if (_isGuest()) {
+      _emitToast(Copy.guestLike);
+      return Future<void>.value();
+    }
+    final entry = _entries[postId];
+    if (entry == null) return Future<void>.value();
+
+    entry
+      ..intent = !entry.intent
+      ..taps += 1
+      ..shown = _applied(entry.shown, liked: entry.intent);
+    _touch(entry);
+    return entry.worker ??= _drain(postId, entry);
+  }
 
   /// 계정 전환·로그아웃: 값을 모두 비우고 진행 중 요청의 결과를 무시한다(TC-LIKE-031).
-  void reset() => throw UnimplementedError();
+  void reset() {
+    _generation++;
+    _cancelToken.cancel();
+    _cancelToken = CancelToken();
+    _entries.clear();
+    _changed();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _generation++;
+    _cancelToken.cancel();
+    unawaited(_toasts.close());
+    super.dispose();
+  }
+
+  /// 확정 값과 의도가 같아질 때까지 한 번에 하나씩 요청한다.
+  Future<void> _drain(String postId, _Entry entry) async {
+    final generation = _generation;
+    try {
+      while (entry.confirmed.isLiked != entry.intent) {
+        final wanted = entry.intent;
+        final tapsAtStart = entry.taps;
+        try {
+          final result = await _send(postId, liked: wanted);
+          if (_isStale(generation)) return;
+          _onSuccess(entry, result);
+        } on Object catch (error) {
+          if (_isStale(generation)) return;
+          _onFailure(
+            postId,
+            entry,
+            error,
+            superseded: tapsAtStart != entry.taps,
+          );
+          if (entry.confirmed.isLiked == entry.intent) break;
+          if (_isTerminal(error)) break;
+        }
+      }
+    } finally {
+      if (!_isStale(generation) && identical(_entries[postId], entry)) {
+        entry.worker = null;
+      }
+    }
+  }
+
+  Future<LikeResult> _send(String postId, {required bool liked}) => liked
+      ? _repository.like(postId, cancelToken: _cancelToken)
+      : _repository.unlike(postId, cancelToken: _cancelToken);
+
+  void _onSuccess(_Entry entry, LikeResult result) {
+    final confirmed = LikeState(
+      isLiked: result.isLiked,
+      likeCount: result.likeCount,
+    );
+    entry
+      ..confirmed = confirmed
+      ..shown = result.isLiked == entry.intent
+          ? confirmed
+          // 응답 뒤 사용자가 더 눌렀다면 남은 의도를 확정 값 위에 다시 낙관 반영한다.
+          : _applied(confirmed, liked: entry.intent);
+    _touch(entry);
+  }
+
+  void _onFailure(
+    String postId,
+    _Entry entry,
+    Object error, {
+    required bool superseded,
+  }) {
+    final apiError = error is ApiError ? error : null;
+    if (apiError != null && apiError.isCancelled) return;
+
+    final status = apiError?.status;
+    final terminal = _isTerminal(error);
+    // 요청이 도는 동안 사용자가 의도를 바꿨으면 이 실패는 밀려난 것이다: 롤백하지 않고 남은 의도를 다시 보낸다.
+    final keepsIntent =
+        !terminal && superseded && entry.intent != entry.confirmed.isLiked;
+    if (keepsIntent) return;
+
+    entry
+      ..intent = entry.confirmed.isLiked
+      ..shown = entry.confirmed;
+    _touch(entry);
+
+    if (status == 401) return;
+    if (status == 403) {
+      _emitToast(Copy.likeErrorBanned);
+      return;
+    }
+    if (status == 404) _events.publishRemoved(postId);
+    _emitToast(Copy.likeErrorGeneric);
+  }
+
+  /// 다시 보내도 소용없는 실패(인증·정지·삭제).
+  bool _isTerminal(Object error) =>
+      error is ApiError &&
+      (error.status == 401 || error.status == 403 || error.status == 404);
+
+  LikeState _applied(LikeState from, {required bool liked}) {
+    if (from.isLiked == liked) return from;
+    final delta = liked ? 1 : -1;
+    final count = from.likeCount + delta;
+    return LikeState(isLiked: liked, likeCount: count < 0 ? 0 : count);
+  }
+
+  bool _isStale(int generation) => _disposed || generation != _generation;
+
+  void _touch(_Entry entry) {
+    _version++;
+    entry.touchedAt = _version;
+    notifyListeners();
+  }
+
+  void _changed() {
+    _version++;
+    notifyListeners();
+  }
+
+  void _emitToast(String text) {
+    if (_disposed) return;
+    _toasts.add(ToastMessage(id: ++_toastSequence, text: text));
+  }
 }

@@ -305,24 +305,27 @@ void main() {
       expect(s.rig.likeRepo.putCount, 1);
     });
 
-    widgetTest('TC-LIKE-030 좋아요 실패 토스트가 같은 문구로 연달아 전달돼도 둘 다 전달된다', (
-      tester,
-    ) async {
-      final s = await _open(tester, manualLikes: true);
-      final second = postIdOf(4);
-      s.rig.likeRepo.seedServer(second, likeCount: 36);
-      await tester.tap(byId(DisplayTestIds.likeButton(_first)));
-      await tester.tap(byId(DisplayTestIds.likeButton(second)));
-      await settleUi(tester);
-      s.rig.likeRepo.calls[0].fail(networkError());
-      s.rig.likeRepo.calls[1].fail(networkError());
-      await settleUi(tester);
-      expect(
-        [for (final t in s.toasts) t.text],
-        [Copy.likeErrorGeneric, Copy.likeErrorGeneric],
-      );
-      expect(s.toasts[0].id, isNot(s.toasts[1].id));
-    });
+    widgetTest(
+      'TC-LIKE-030 좋아요 실패 토스트가 같은 문구로 연달아 나가도 둘 다 나간다(LikeStore.toasts)',
+      (tester) async {
+        final s = await _open(tester, manualLikes: true);
+        final second = postIdOf(4);
+        s.rig.likeRepo.seedServer(second, likeCount: 36);
+        await tester.tap(byId(DisplayTestIds.likeButton(_first)));
+        await tester.tap(byId(DisplayTestIds.likeButton(second)));
+        await settleUi(tester);
+        s.rig.likeRepo.calls[0].fail(networkError());
+        s.rig.likeRepo.calls[1].fail(networkError());
+        await settleUi(tester);
+        // 좋아요 토스트는 화면이 아니라 LikeStore.toasts로 나간다(DisplayScreen 문서 참고).
+        expect(s.toasts, isEmpty);
+        expect(
+          [for (final t in s.rig.likeToasts) t.text],
+          [Copy.likeErrorGeneric, Copy.likeErrorGeneric],
+        );
+        expect(s.rig.likeToasts[0].id, isNot(s.rig.likeToasts[1].id));
+      },
+    );
 
     widgetTest('TC-LIKE-014 게스트가 하트를 누르면 토스트만 전달되고 요청이 없다', (tester) async {
       final s = await _open(tester, guest: true, manualLikes: true);

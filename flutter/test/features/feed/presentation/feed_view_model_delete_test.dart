@@ -106,13 +106,20 @@ void main() {
       });
     }
 
-    fakeTest('TC-FEED-041 404이면 "게시물을 찾을 수 없어요" 토스트와 함께 목록·캐시에서 뺀다', (async) {
+    fakeTest('TC-FEED-041 404이면 이미 삭제된 게시물이라 오류 토스트 없이 목록·캐시에서 빼고 상세를 닫는다', (
+      async,
+    ) {
       final r = _open(async, [Reply.fail(errorFx(delete404Fx))]);
       r.vm.confirmDelete();
       settle(async);
-      expect(r.toastTexts, [Copy.feedErrorNotFound]);
+      expect(r.toastTexts, isEmpty);
       expect(r.removedIds, [myPostId]);
+      expect(r.bus.isRemoved(myPostId), isTrue);
+      expect(r.closeCount, 1);
       expect(r.state.isDeleting, isFalse);
+      r.vm.confirmDelete();
+      settle(async);
+      expect(r.repo.deleteCalls, hasLength(1), reason: '이미 없는 게시물에 다시 보내지 않는다');
     });
   });
 
