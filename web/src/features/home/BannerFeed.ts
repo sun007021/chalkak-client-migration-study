@@ -20,6 +20,11 @@ export type BannerFeedState = { status: 'loading' } | { status: 'error' } | Bann
 /** 새로고침 실패 결과. 취소·성공이면 null. */
 export type BannerRefreshFailure = { network: boolean } | null;
 
+/** 추가 페이지를 읽게 하는 센티넬을 놓을 카드 인덱스: 끝에서 두 번째(REQ-BANR-007). 2장 이하면 처음. */
+export function bannerSentinelIndex(count: number): number {
+  return Math.max(0, count - 2);
+}
+
 const isAbort = (error: unknown): boolean => error instanceof Error && error.name === 'AbortError';
 
 /** 같은 id는 먼저 온 것만 남긴다(REQ-BANR-009). */

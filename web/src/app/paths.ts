@@ -44,3 +44,9 @@ export const SETTINGS_BELOW_STATE = { settingsBelow: true } as const;
 export function isSettingsBelow(location: { key: string; state: unknown }): boolean {
   return location.key !== 'default' && (location.state as { settingsBelow?: unknown } | null)?.settingsBelow === true;
 }
+
+/**
+ * 홈에서 전시·기록 탭을 push할 때 넣는 location state. 하단 바의 홈 → 다른 탭과 같은 뜻("홈이 바로 아래에 쌓여 있다")이라
+ * 탭 전환 정책(planTabNavigation)이 뒤로 가기(POP)로 홈에 돌아온다.
+ */
+export const HOME_BELOW_STATE = { homeBelow: true } as const;

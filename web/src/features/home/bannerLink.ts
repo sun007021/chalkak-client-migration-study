@@ -5,7 +5,7 @@
  */
 export function isOpenableBannerUrl(url: string): boolean {
   // URL 파서는 탭·줄바꿈을 조용히 지우므로 파싱 전에 거른다.
-  if (/[\s\u0000-\u001f\u007f]/.test(url)) return false;
+  if (/\s/.test(url) || [...url].some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f)) return false;
   // `https:///path`는 파서가 호스트를 path의 첫 조각으로 읽는다. 권한 부분이 비어 있으면 호스트 없음이다.
   if (!/^https:\/\/[^/?#]/i.test(url)) return false;
   try {

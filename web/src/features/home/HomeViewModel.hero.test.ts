@@ -424,15 +424,14 @@ describe('HomeViewModel 게스트 (D-05)', () => {
     expect(h.ff.calls.some((c) => /^\/posts\/[0-9a-f-]{36}$/.test(c.path))).toBe(false);
   });
 
-  it('TC-BANR-009 TC-BANR-027 게스트도 배너를 보고 누르면 로그인 요구 없이 새 탭으로 연다. 랭킹이 실패해도 배너는 독립적이다', async () => {
+  it('TC-BANR-009 TC-BANR-027 게스트도 배너를 보고 링크(새 탭)로 열 수 있어 로그인 요구가 없다. 랭킹이 실패해도 배너는 독립적이다', async () => {
     const h = createHomeHarness({ mode: 'guest' });
     h.router.set(POPULAR_TODAY, 'home/posts-list__500-server-error');
     await finish(h, h.viewModel.onShown());
     expect(h.viewModel.state.popular).toEqual({ status: 'error' });
     expect(h.banners.state.status).toBe('ready');
 
-    h.viewModel.onBannerPress('44444444-4444-4444-8444-444444444402');
-    expect(h.opener.opened).toEqual(['https://web.example.test/issues/2']);
+    expect(h.viewModel.bannerLinkFor('44444444-4444-4444-8444-444444444402')).toEqual({ kind: 'link', href: 'https://web.example.test/issues/2' });
     expect(h.toasts.messages).toEqual([]);
   });
 });

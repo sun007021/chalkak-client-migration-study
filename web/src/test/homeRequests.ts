@@ -9,3 +9,17 @@ export const isHomeLoadRequest = (call: Pick<RecordedRequest, 'method' | 'path'>
 
 /** 홈이 스스로 보낸 읽기 요청을 뺀 호출 기록. */
 export const outsideHome = (ff: Pick<FakeFetch, 'calls'>): RecordedRequest[] => ff.calls.filter((call) => !isHomeLoadRequest(call));
+
+/** 게스트에게 금지된 회원 전용 읽기 API(D-05, REQ-HOME-012). */
+const MEMBER_ONLY_PATHS = new Set(['/posts/today', '/posts/calendar', '/notifications/unread-status']);
+const isMemberOnly = (call: Pick<RecordedRequest, 'path'>): boolean => MEMBER_ONLY_PATHS.has(call.path) || AI_REVIEW_GET.test(call.path) || call.path.endsWith('/ai-review');
+
+/**
+ * 게스트 화면의 요청 단언: 회원 전용 API(/posts/today, /posts/calendar, 미읽음, ai-review)는 0건, 어떤 요청에도 Authorization이 없고,
+ * 홈이 보내는 공개 읽기(주제·랭킹·배너) 말고는 요청이 없다(로그인·갱신 등 인증 API 0건).
+ */
+export function expectGuestRequestsOnlyPublic(ff: Pick<FakeFetch, 'calls'>): void {
+  expect(ff.calls.filter(isMemberOnly)).toEqual([]);
+  expect(ff.calls.filter((call) => call.headers['authorization'] !== undefined)).toEqual([]);
+  expect(outsideHome(ff)).toEqual([]);
+}

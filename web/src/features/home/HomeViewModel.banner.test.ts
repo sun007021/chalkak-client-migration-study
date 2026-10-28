@@ -6,36 +6,22 @@ import type { Banner } from './homeModels';
 const FIRST = '44444444-4444-4444-8444-444444444401';
 const SECOND = '44444444-4444-4444-8444-444444444402';
 
-describe('HomeViewModel ISSUE 배너 (Web: 현재 탭 유지, 새 탭으로 열기)', () => {
-  it('TC-BANR-012 TC-BANR-019 REQ-BANR-004 배너 카드는 https 주소를 ExternalLinkOpener(새 탭)로 열고 홈 화면은 유지한다', async () => {
+describe('HomeViewModel ISSUE 배너 (Web: 카드는 새 탭 링크 <a target=_blank>, 열기는 브라우저가 한다)', () => {
+  it('TC-BANR-012 TC-BANR-019 REQ-BANR-004 https 배너는 링크(href)로 판정되고 홈 화면은 유지된다', async () => {
     const h = createHomeHarness();
     await finish(h, h.viewModel.onShown());
     expect(h.banners.state.status).toBe('ready');
 
-    h.viewModel.onBannerPress(FIRST);
-    h.viewModel.onBannerPress(SECOND);
-    expect(h.opener.opened).toEqual(['https://web.example.test/issues/1', 'https://web.example.test/issues/2']);
-    expect(h.navigator.calls).toEqual([]); // 이 탭은 이동하지 않는다
+    expect(h.viewModel.bannerLinkFor(FIRST)).toEqual({ kind: 'link', href: 'https://web.example.test/issues/1' });
+    expect(h.viewModel.bannerLinkFor(SECOND)).toEqual({ kind: 'link', href: 'https://web.example.test/issues/2' });
+    expect(h.navigator.calls).toEqual([]);
     expect(h.toasts.messages).toEqual([]);
   });
 
-  it('목록에 없는 id는 아무 일도 없다', async () => {
+  it('목록에 없는 id는 링크도 아니고 차단도 아니다(null)', async () => {
     const h = createHomeHarness();
     await finish(h, h.viewModel.onShown());
-    h.viewModel.onBannerPress('44444444-4444-4444-8444-4444444444ff');
-    expect(h.opener.opened).toEqual([]);
-    expect(h.toasts.messages).toEqual([]);
-  });
-
-  it('TC-BANR-023 REQ-BANR-020 새 탭을 열지 못하면(팝업 차단 등) "브라우저에서 링크를 열지 못했어요" 토스트를 띄운다', async () => {
-    const h = createHomeHarness();
-    await finish(h, h.viewModel.onShown());
-    h.opener.result = false;
-    h.viewModel.onBannerPress(FIRST);
-    expect(h.toasts.messages).toEqual([t('banner.web.open-failed')]);
-    h.opener.result = 'throw';
-    h.viewModel.onBannerPress(FIRST);
-    expect(h.toasts.messages).toEqual([t('banner.web.open-failed'), t('banner.web.open-failed')]); // 같은 문구도 다시 뜬다(D-20)
+    expect(h.viewModel.bannerLinkFor('44444444-4444-4444-8444-4444444444ff')).toBeNull();
   });
 
   it('TC-BANR-017 REQ-BANR-013 https가 아닌 주소가 목록에 들어와도 열지 않고 "링크를 열 수 없어요"를 보인다(방어)', async () => {
@@ -48,8 +34,8 @@ describe('HomeViewModel ISSUE 배너 (Web: 현재 탭 유지, 새 탭으로 열�
     }
     const h = createHomeHarness({ bannerFeed: (repository) => new InsecureFeed({ repository }) });
     await finish(h, h.viewModel.onShown());
-    h.viewModel.onBannerPress(FIRST);
-    expect(h.opener.opened).toEqual([]);
+    expect(h.viewModel.bannerLinkFor(FIRST)).toEqual({ kind: 'blocked' });
+    h.viewModel.onBlockedBannerPress();
     expect(h.toasts.messages).toEqual([t('banner.web.link-unavailable')]);
   });
 

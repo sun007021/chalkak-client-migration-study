@@ -8,7 +8,7 @@ import { loadStorageFixture } from '../test/sessionFixtures';
 import { d } from '../core/net/decode';
 import { EMPTY_SESSION } from '../core/auth/SessionStore';
 import { t } from '../copy/ko';
-import { outsideHome } from '../test/homeRequests';
+import { expectGuestRequestsOnlyPublic } from '../test/homeRequests';
 
 const decodeId = d.object({ id: d.string() });
 
@@ -41,7 +41,7 @@ describe('부팅 흐름 (스플래시 → 인증 게이트)', () => {
     const h = makeHarness({ session: loadStorageFixture('session__guest').session });
     renderApp(h.container);
     expect(await screen.findByTestId('home.root')).toHaveAttribute('data-mode', 'guest');
-    expect(outsideHome(h.ff)).toHaveLength(0);
+    expectGuestRequestsOnlyPublic(h.ff);
     expect(h.preloader.calls).toEqual(['guest']);
   });
 

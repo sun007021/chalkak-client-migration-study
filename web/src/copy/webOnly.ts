@@ -4,8 +4,17 @@
  */
 export const webOnlyCopy = {
   'home.refresh': '새로고침',
-  /** 어제 랭킹·오늘 인기 섹션의 전시 이동 링크(shared의 home.weekly.more는 "보러가기"로 이번 주 기록 전용). */
-  'home.ranking.more': '더 보기',
+  /** 홈 새로고침 중 표시(home.refresh-indicator)의 텍스트. */
+  'home.refresh-indicator': '새로고침 중',
+  /** 어제 랭킹·오늘 인기 섹션의 전시 이동 링크. 접근성 이름은 "섹션 제목 더보기". */
+  'home.ranking.more': '더보기',
+  /** 제목이 없는 랭킹 사진의 대체 텍스트(제목이 있으면 이미지는 장식). */
+  'home.ranking.photo-alt': '사진',
+  /** 주간 칸의 접근성 이름: "10월 27일 화요일". 요일 글자는 record.weekday에서 온다. */
+  'home.week.weekday-suffix': '요일',
+  /** 배너를 더 불러오는 중(목록 끝)과 추가 페이지 실패 안내. */
+  'home.banner.loading-more': '불러오는 중',
+  'home.banner.more-error': '더 불러오지 못했어요',
 } as const;
 
 export type WebOnlyCopyKey = keyof typeof webOnlyCopy;

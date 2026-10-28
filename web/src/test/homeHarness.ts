@@ -4,7 +4,6 @@ import { FixtureRouter } from './fixtureRouter';
 import { makeApiEnv } from './apiEnv';
 import { flushAsync } from './FakeClock';
 import type { FakeClock } from './FakeClock';
-import { FakeExternalLinkOpener } from './FakeExternalLinkOpener';
 import { FakeHomeNavigator } from './FakeHomeNavigator';
 import { FakeUploadEntry } from './FakeUploadEntry';
 import { guestSession, memberSession } from './fixtures';
@@ -69,7 +68,6 @@ export function createHomeHarness(options: HomeHarnessOptions = {}) {
   const toast = new ToastController({ clock: env.clock, ids: new SequentialIdGenerator() });
   const toasts = recordToasts(toast);
   const navigator = new FakeHomeNavigator();
-  const opener = new FakeExternalLinkOpener();
   const upload = new FakeUploadEntry();
   const bannerRepository = new BannerRepository({ api });
   const banners = options.bannerFeed ? options.bannerFeed(bannerRepository) : new BannerFeed({ repository: bannerRepository });
@@ -82,9 +80,8 @@ export function createHomeHarness(options: HomeHarnessOptions = {}) {
     guestGate: new GuestGate({ toast }),
     uploadEntry: upload,
     navigator,
-    externalLinkOpener: opener,
   });
-  return { ...env, router, toast, toasts, navigator, opener, upload, banners, viewModel };
+  return { ...env, router, toast, toasts, navigator, upload, banners, viewModel };
 }
 
 export type HomeHarness = ReturnType<typeof createHomeHarness>;

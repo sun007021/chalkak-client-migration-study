@@ -8,6 +8,10 @@ import { loadFixture, guestSession, memberSession } from '../../test/fixtures';
 import { makeHarness, renderApp } from '../../test/appHarness';
 import type { Harness } from '../../test/appHarness';
 import { screenViews } from '../../test/screenViews';
+import { FakeVisibilityObserver } from '../../test/FakeVisibilityObserver';
+import type { VisibilityObserverFactory } from '../../core/ui/VisibilityObserver';
+import { render } from '@testing-library/react';
+import { VisibilitySentinel } from './HomeScreen';
 import {
   BANNERS_P1,
   CALENDAR_OCT,
@@ -32,11 +36,12 @@ interface OpenOptions {
   routes?: Record<string, RouteValue>;
   strict?: boolean;
   path?: string;
+  visibilityObserver?: VisibilityObserverFactory | null;
 }
 
 async function openHome(options: OpenOptions = {}) {
   const mode = options.mode ?? 'member';
-  const h = makeHarness({ session: mode === 'member' ? memberSession() : guestSession });
+  const h = makeHarness({ session: mode === 'member' ? memberSession() : guestSession, visibilityObserver: options.visibilityObserver });
   const fixtures = new FixtureRouter(h.ff, { ...(mode === 'member' ? MEMBER_ROUTES : GUEST_ROUTES), ...options.routes });
   const view = renderApp(h.container, options.path ?? '/home', { strict: options.strict });
   await screen.findByTestId('home.root');
@@ -462,19 +467,17 @@ describe('홈 ISSUE 배너 (BANR)', () => {
     expect(screen.queryByTestId('home.issue-error')).not.toBeInTheDocument();
   });
 
-  it('TC-BANR-012 REQ-BANR-012 배너를 누르면 https 주소를 새 탭(ExternalLinkOpener)으로 열고 홈은 그대로이며 issue screen_view는 없다', async () => {
+  it('TC-BANR-012 REQ-BANR-012 배너 카드는 https 주소의 새 탭 링크(<a target=_blank rel=noopener noreferrer>)이고, 눌러도 홈은 그대로이며 issue screen_view는 없다', async () => {
     const { h, path } = await openHome();
-    fireEvent.click(await screen.findByTestId('home.issue-item-44444444-4444-4444-8444-444444444402'));
-    expect(h.opener.opened).toEqual(['https://web.example.test/issues/2']);
+    const card = await screen.findByTestId('home.issue-item-44444444-4444-4444-8444-444444444402');
+    expect(card.tagName).toBe('A');
+    expect(card).toHaveAttribute('href', 'https://web.example.test/issues/2');
+    expect(card).toHaveAttribute('target', '_blank');
+    expect(card.getAttribute('rel')?.split(' ').sort()).toEqual(['noopener', 'noreferrer']);
+    fireEvent.click(card);
     expect(path()).toBe('/home');
     expect(screenViews(h.tracker)).toEqual(['home']); // Web은 앱 안 웹뷰 화면이 없다(허용 차이)
-  });
-
-  it('TC-BANR-023 새 탭을 열지 못하면 "브라우저에서 링크를 열지 못했어요" 토스트가 뜬다', async () => {
-    const { h } = await openHome();
-    h.opener.result = false;
-    fireEvent.click(await screen.findByTestId('home.issue-item-44444444-4444-4444-8444-444444444401'));
-    expect(toastText()).toBe(t('banner.web.open-failed'));
+    expect(screen.queryByTestId('toast.message')).not.toBeInTheDocument(); // 새 탭 열기 성공 여부는 noopener라 알 수 없어 실패 토스트가 없다
   });
 
   it('TC-BANR-010 REQ-BANR-005 빈 응답이면 ISSUE 섹션도 오류도 보이지 않는다', async () => {
@@ -512,10 +515,11 @@ describe('홈 ISSUE 배너 (BANR)', () => {
     expect(screen.getByTestId('home.issue-item-44444444-4444-4444-8444-444444444401').querySelector('img')).not.toBeNull();
   });
 
-  it('TC-BANR-009 TC-BANR-027 게스트도 배너를 보고 누르면 로그인 요구 없이 새 탭이 열린다', async () => {
-    const { h } = await openHome({ mode: 'guest' });
-    fireEvent.click(await screen.findByTestId('home.issue-item-44444444-4444-4444-8444-444444444401'));
-    expect(h.opener.opened).toEqual(['https://web.example.test/issues/1']);
+  it('TC-BANR-009 TC-BANR-027 게스트도 배너를 보고, 카드는 로그인 요구 없는 새 탭 링크다', async () => {
+    await openHome({ mode: 'guest' });
+    const card = await screen.findByTestId('home.issue-item-44444444-4444-4444-8444-444444444401');
+    expect(card).toHaveAttribute('href', 'https://web.example.test/issues/1');
+    fireEvent.click(card);
     expect(screen.queryByTestId('toast.message')).not.toBeInTheDocument();
   });
 });
@@ -707,5 +711,147 @@ describe('홈 testID 존재 (TC-HOME-057)', () => {
     ]) {
       expect(screen.getByTestId(testId), testId).toBeInTheDocument();
     }
+  });
+});
+
+describe('홈 ISSUE 배너 세로 목록·센티넬 (REQ-BANR-007~009)', () => {
+  const P2 = 'GET /banners?page=2&pageSize=10';
+
+  it('TC-BANR-012 센티넬은 끝에서 두 번째 카드 앞에 있고, 마운트 직후 이미 보이면 바로 page=2를 받아 이어 붙인다', async () => {
+    const observer = new FakeVisibilityObserver({ immediate: true });
+    const { fixtures } = await openHome({ visibilityObserver: observer.factory });
+    await waitFor(() => expect(screen.getAllByTestId(/^home\.issue-item-/)).toHaveLength(13));
+    expect(fixtures.calls(P2)).toHaveLength(1);
+    expect(screen.getByTestId('home.issue-section').querySelector('ul')).toHaveStyle({ flexDirection: 'column' }); // 세로 목록(명세)
+    const first = observer.targets[0]!;
+    expect(first.closest('li')?.nextElementSibling).not.toBeNull(); // 첫 센티넬은 마지막 카드가 아니라 그 앞 카드와 함께 있었다
+  });
+
+  it('TC-BANR-012 보이지 않는 동안은 요청하지 않고, 보이는 순간 한 번만 요청한다. 관찰 수단이 없으면(null) 자동 요청이 없다', async () => {
+    const observer = new FakeVisibilityObserver();
+    const { fixtures } = await openHome({ visibilityObserver: observer.factory });
+    await screen.findByTestId('home.issue-section');
+    expect(fixtures.calls(P2)).toHaveLength(0);
+    await act(async () => observer.show());
+    await waitFor(() => expect(fixtures.calls(P2)).toHaveLength(1));
+
+    const none = await openHome({ visibilityObserver: null });
+    await screen.findAllByTestId('home.issue-section');
+    expect(none.fixtures.calls(P2)).toHaveLength(0);
+  });
+
+  it('TC-BANR-013 추가 페이지가 실패하면 목록 끝에 다시 시도 버튼이 나오고, 누르면 같은 page=2를 다시 받는다(스크롤 없이)', async () => {
+    const observer = new FakeVisibilityObserver({ immediate: true });
+    const { h } = await openHome({ visibilityObserver: observer.factory, routes: { [P2]: 'banner/banners__500-server-error' } });
+    await advance(h, 5_000);
+    const retry = await screen.findByRole('button', { name: t('common.retry') });
+    expect(screen.getAllByTestId(/^home\.issue-item-/)).toHaveLength(10);
+    const router = new FixtureRouter(h.ff);
+    router.set(P2, 'banner/banners__page2-last');
+    fireEvent.click(retry);
+    await waitFor(() => expect(screen.getAllByTestId(/^home\.issue-item-/)).toHaveLength(13));
+    expect(router.calls(P2)).toHaveLength(1);
+  });
+});
+
+describe('VisibilitySentinel', () => {
+  it('보이는 순간 onVisible, 언마운트하면 관찰을 끊는다', () => {
+    const observer = new FakeVisibilityObserver();
+    const onVisible = vi.fn();
+    const view = render(<VisibilitySentinel observe={observer.factory} onVisible={onVisible} />);
+    expect(observer.targets).toHaveLength(1);
+    observer.show();
+    expect(onVisible).toHaveBeenCalledTimes(1);
+    view.unmount();
+    expect(observer.disconnects).toBe(1);
+  });
+
+  it('관찰 수단이 없으면(null) 아무 일도 하지 않는다', () => {
+    const onVisible = vi.fn();
+    render(<VisibilitySentinel observe={null} onVisible={onVisible} />);
+    expect(onVisible).not.toHaveBeenCalled();
+  });
+});
+
+describe('홈 유지·계정 전환 (REQ-HOME-040)', () => {
+  it('REQ-HOME-040 TC-HOME-039 다른 탭에 갔다 뒤로 와도 화면을 비우지 않고(loading 없음) 조용히 다시 불러와 교체한다', async () => {
+    const { fixtures, router } = await openHome();
+    await screen.findByTestId('home.hero-photo');
+    fireEvent.click(await screen.findByTestId('home.ranking-more-link'));
+    await screen.findByTestId('display.root');
+    const gate = deferred<void>();
+    fixtures.set(TODAY_POST, async () => {
+      await gate.promise;
+      return loadFixture('home/posts-today__posted-pending.json').toResponse();
+    });
+    fixtures.set(CALENDAR_OCT, 'home/posts-calendar__2026-10-week-pending');
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await screen.findByTestId('home.root');
+    expect(screen.getByTestId('home.hero-photo')).toBeInTheDocument(); // 응답 전에도 이전 내용이 그대로
+    expect(screen.queryByTestId('home.hero-loading')).not.toBeInTheDocument();
+    expect(screen.getByTestId(`home.popular-item-${id('202')}`)).toBeInTheDocument();
+    expect(screen.queryByTestId('home.refresh-indicator')).not.toBeInTheDocument(); // 조용한 갱신
+    await act(async () => gate.resolve());
+    await waitFor(() => expect(screen.getByTestId('home.hero-pending-badge')).toBeInTheDocument());
+  });
+
+  it('REQ-HOME-040 컨테이너는 모드별로 홈 ViewModel을 하나만 보관하고, 모드가 바뀌면 이전 것을 dispose한다', () => {
+    const h = makeHarness({ session: memberSession() });
+    const first = h.container.homeSession('member');
+    expect(h.container.homeSession('member').viewModel).toBe(first.viewModel);
+    const guest = h.container.homeSession('guest');
+    expect(guest.viewModel).not.toBe(first.viewModel);
+  });
+
+  it('TC-HOME-044 계정 전환(UserCaches 정리) 때 보이는 홈은 곧바로 다시 불러온다', async () => {
+    const { h, fixtures } = await openHome();
+    await screen.findByTestId('home.hero-photo');
+    expect(fixtures.calls(TOPICS_TODAY)).toHaveLength(1);
+    await act(async () => {
+      await h.container.userCaches.clearAll();
+    });
+    await waitFor(() => expect(fixtures.calls(TOPICS_TODAY)).toHaveLength(2));
+    expect(await screen.findByTestId('home.hero-photo')).toBeInTheDocument();
+  });
+});
+
+describe('홈 접근성 이름', () => {
+  it('주간 칸은 "10월 27일 화요일", PENDING은 "대기"가 붙는다', async () => {
+    await openHome({ routes: { [CALENDAR_OCT]: 'home/posts-calendar__2026-10-week-pending' } });
+    await screen.findByTestId('home.week-section');
+    expect(screen.getByTestId('home.week-day-2026-10-26')).toHaveAccessibleName('10월 26일 월요일');
+    expect(screen.getByTestId('home.week-day-2026-10-27')).toHaveAccessibleName(`10월 27일 화요일 ${t('home.weekly.pending')}`);
+  });
+
+  it('더보기는 섹션 이름이 들어간 링크(href)다', async () => {
+    await openHome();
+    const yesterday = await screen.findByTestId('home.ranking-more-link');
+    expect(yesterday).toHaveAccessibleName('어제 랭킹 더보기');
+    expect(yesterday).toHaveAttribute('href', '/display?date=2026-10-26&sort=popular');
+    expect(screen.getByTestId('home.popular-more-link')).toHaveAccessibleName('오늘 인기있는 사진 더보기');
+    expect(screen.getByRole('button', { name: `${t('home.weekly.title')} ${t('home.weekly.more')}` })).toBeInTheDocument();
+  });
+
+  it('랭킹 사진은 제목이 있으면 장식(alt 비움)이라 이름이 중복되지 않는다', async () => {
+    await openHome();
+    const item = await screen.findByTestId(`home.popular-item-${id('202')}`);
+    expect(item.querySelector('img')).toHaveAttribute('alt', '');
+    expect(item).toHaveAccessibleName('은행잎');
+  });
+
+  it('새로고침 표시에는 텍스트가 있다', async () => {
+    const gate = deferred<void>();
+    const { h } = await openHome();
+    await screen.findByTestId('home.hero-photo');
+    new FixtureRouter(h.ff).set(TODAY_POST, async () => {
+      await gate.promise;
+      return loadFixture('home/posts-today__posted-approved.json').toResponse();
+    });
+    fireEvent.click(screen.getByRole('button', { name: REFRESH_BUTTON_NAME }));
+    expect(await screen.findByTestId('home.refresh-indicator')).toHaveTextContent('새로고침 중');
+    await act(async () => gate.resolve());
   });
 });
