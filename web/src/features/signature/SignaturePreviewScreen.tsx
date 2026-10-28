@@ -4,6 +4,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router';
 import { useContainer } from '../../app/AppContext';
 import { ROUTES, isSettingsBelow } from '../../app/paths';
 import { t } from '../../copy/ko';
+import { useSignupGate } from '../onboarding/useSignupGate';
 import { useScreenView } from '../../core/analytics/useScreenView';
 import { useOwnedViewModel } from '../../core/state/useOwnedViewModel';
 import { useViewModel } from '../../core/state/useViewModel';
@@ -23,16 +24,15 @@ const drawPath = (mode: SignatureMode): string => (mode === 'onboarding' ? ROUTE
 
 export function SignaturePreviewScreen({ mode }: { mode: SignatureMode }): ReactNode {
   const container = useContainer();
-  // 마운트 시 한 번만 판정한다. 가입 컨텍스트가 없으면 로그인, 내보낼 PNG가 없으면 그리기로(새로고침 등).
-  const [entry] = useState<{ to: string } | { png: Blob }>(() => {
-    if (mode === 'onboarding' && container.signupDraft.get() === null) return { to: ROUTES.login };
-    const png = container.signatureDraft.get();
-    return png ? { png } : { to: drawPath(mode) };
-  });
-  const png = 'png' in entry ? entry.png : null;
-  const create = useCallback(() => (png ? container.createSignaturePreviewViewModel(mode, png) : null), [container, mode, png]);
+  const gate = useSignupGate(mode === 'onboarding');
+  // 내보낼 PNG는 마운트 시 한 번만 잡는다. 없으면(새로고침 등) 그리기로 보낸다.
+  const [png] = useState(() => container.signatureDraft.get());
+  const ok = gate.kind === 'ok';
+  const create = useCallback(() => (ok && png ? container.createSignaturePreviewViewModel(mode, png) : null), [container, mode, png, ok]);
   const vm = useOwnedViewModel(create);
-  if (!png) return <Navigate to={(entry as { to: string }).to} replace />;
+  if (gate.kind === 'redirect') return <Navigate to={gate.to} replace />;
+  if (gate.kind === 'checking') return null;
+  if (!png) return <Navigate to={drawPath(mode)} replace />;
   return vm ? <SignaturePreviewView vm={vm} mode={mode} png={png} /> : null;
 }
 

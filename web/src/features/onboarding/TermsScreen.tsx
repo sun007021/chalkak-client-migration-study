@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { Navigate, useNavigate } from 'react-router';
 import { useContainer } from '../../app/AppContext';
@@ -6,6 +6,7 @@ import { ROUTES } from '../../app/paths';
 import { t } from '../../copy/ko';
 import { useOwnedViewModel } from '../../core/state/useOwnedViewModel';
 import { useViewModel } from '../../core/state/useViewModel';
+import { useSignupGate } from './useSignupGate';
 import type { LegalDocumentKind } from './LegalDocument';
 import type { TermsOutcome, TermsViewModel } from './TermsViewModel';
 
@@ -16,11 +17,11 @@ import type { TermsOutcome, TermsViewModel } from './TermsViewModel';
  */
 export function TermsScreen(): ReactNode {
   const container = useContainer();
-  // 가입 컨텍스트는 마운트 시 한 번만 본다(뒤로 가기로 폐기한 뒤 다시 평가해 화면이 깜빡이지 않도록).
-  const [hasContext] = useState(() => container.signupDraft.get() !== null);
-  const create = useCallback(() => (hasContext ? container.createTermsViewModel() : null), [container, hasContext]);
+  const gate = useSignupGate(true);
+  const ok = gate.kind === 'ok';
+  const create = useCallback(() => (ok ? container.createTermsViewModel() : null), [container, ok]);
   const vm = useOwnedViewModel(create);
-  if (!hasContext) return <Navigate to={ROUTES.login} replace />;
+  if (gate.kind === 'redirect') return <Navigate to={gate.to} replace />;
   return vm ? <TermsView vm={vm} /> : null;
 }
 

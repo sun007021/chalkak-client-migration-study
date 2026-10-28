@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { makeHarness, renderApp } from '../test/appHarness';
-import { ME, loadFixture } from '../test/fixtures';
+import { ME, loadFixture, memberSession } from '../test/fixtures';
 import { screenViews } from '../test/screenViews';
 import { SIGNUP_CONFIRM, SIGNUP_PUT, SIGNUP_UPLOADS, routeSignup, sequence } from '../test/signatureRoutes';
 import { drawStroke, stubCanvasRect } from '../test/signatureDrawing';
@@ -112,8 +112,25 @@ describe('가입 흐름의 뒤로 가기와 재진입', () => {
     for (let i = 0; i < 4; i++) {
       await act(async () => router.navigate(-1));
       await waitFor(() => expect(document.querySelector('[data-testid]')).not.toBeNull());
-      for (const id of ['terms.root', 'signature.root', 'signature-preview.root']) expect(screen.queryByTestId(id), id).not.toBeInTheDocument();
+      for (const id of ['terms.root', 'signature.root', 'signature-preview.root', 'login.root']) expect(screen.queryByTestId(id), id).not.toBeInTheDocument();
     }
+    expect(await screen.findByTestId('home.root')).toBeInTheDocument();
+  });
+
+  it('회원 세션이 있으면 로그인 화면에 들어와도 홈으로 replace한다', async () => {
+    const h = makeHarness({ session: memberSession() });
+    const { path } = renderApp(h.container, '/login');
+    expect(await screen.findByTestId('home.root')).toBeInTheDocument();
+    expect(path()).toBe('/home');
+    expect(screen.queryByTestId('login.root')).not.toBeInTheDocument();
+  });
+
+  it('로그인 화면에 들어오면 가입 중이던 idToken·rawNonce를 폐기한다', async () => {
+    const h = makeHarness();
+    h.container.signupDraft.set({ idToken: 't', rawNonce: 'n' });
+    renderApp(h.container, '/login');
+    await screen.findByTestId('login.root');
+    expect(h.container.signupDraft.get()).toBeNull();
   });
 
   it('TC-ONB-045 가입을 끝내기 전에 앱을 다시 시작하면(세션 없음) 로그인 화면이 열린다', async () => {

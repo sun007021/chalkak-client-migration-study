@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { CSSProperties, PointerEvent, ReactNode } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router';
 import { useContainer } from '../../app/AppContext';
 import { ROUTES, SETTINGS_BELOW_STATE, isSettingsBelow } from '../../app/paths';
 import { SIGNATURE_PNG_SIZE } from '../../constants';
 import { t } from '../../copy/ko';
+import { useSignupGate } from '../onboarding/useSignupGate';
 import { useScreenView } from '../../core/analytics/useScreenView';
 import { useOwnedViewModel } from '../../core/state/useOwnedViewModel';
 import { useViewModel } from '../../core/state/useViewModel';
@@ -23,15 +24,15 @@ import { planDrawBack } from './signatureNavigation';
  */
 export function SignatureDrawScreen({ mode }: { mode: SignatureMode }): ReactNode {
   const container = useContainer();
-  // 가입 컨텍스트는 마운트 시 한 번만 본다. 없으면(새로고침 등) 그리지 않고 로그인으로 보낸다.
-  const [allowed] = useState(() => mode === 'change' || container.signupDraft.get() !== null);
+  const gate = useSignupGate(mode === 'onboarding');
+  const allowed = gate.kind === 'ok';
   const create = useCallback(() => {
     if (!allowed) return null;
     container.signatureDraft.clear(); // 빈 패드로 시작하므로 이전 PNG도 남기지 않는다.
     return container.createSignatureDrawViewModel(mode);
   }, [container, mode, allowed]);
   const vm = useOwnedViewModel(create);
-  if (!allowed) return <Navigate to={ROUTES.login} replace />;
+  if (gate.kind === 'redirect') return <Navigate to={gate.to} replace />;
   return vm ? <SignatureDrawView vm={vm} mode={mode} /> : null;
 }
 
