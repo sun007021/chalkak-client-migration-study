@@ -124,13 +124,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     switch (event) {
       case ScrollToTop(:final destination):
         if (destination == BottomDestination.home && _homeScroll.hasClients) {
-          unawaited(
-            _homeScroll.animateTo(
-              0,
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOut,
-            ),
-          );
+          _homeScroll.jumpTo(0);
         }
       case NavigateToUpload(:final topicDate):
         unawaited(
@@ -253,11 +247,16 @@ class _BottomBar extends StatelessWidget {
                 ),
                 Expanded(
                   child: Center(
-                    child: TestId.button(
-                      NavigationTestIds.uploadButton,
+                    child: Semantics(
+                      key: const Key(NavigationTestIds.uploadButton),
+                      identifier: NavigationTestIds.uploadButton,
+                      container: true,
+                      button: true,
+                      label: Copy.navTabUploadA11y,
+                      onTap: onUpload,
+                      excludeSemantics: true,
                       child: IconButton.filled(
                         icon: const Icon(Icons.add),
-                        tooltip: Copy.navTabUploadA11y,
                         onPressed: onUpload,
                       ),
                     ),

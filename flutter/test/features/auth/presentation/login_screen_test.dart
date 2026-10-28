@@ -116,7 +116,14 @@ void main() {
     await tester.tap(byId(TestIds.loginGuestButton));
     await settleUi(tester);
     expect(byId(TestIds.homeRoot), findsOneWidget);
-    expect(h.http.adapter.requests, isEmpty);
+    // 게스트 링크 자체는 인증 서버를 부르지 않는다. 홈이 열리며 부르는 공개 조회(주제·랭킹·배너)는
+    // 인증 헤더 없이 가야 한다(REQ-HOME-012).
+    final requests = h.http.adapter.requests;
+    expect(requests.where((r) => r.uri.path.contains('/auth/')), isEmpty);
+    expect(
+      requests.where((r) => r.headers.containsKey('Authorization')),
+      isEmpty,
+    );
     expect(h.http.store.current!.isGuest, isTrue);
   });
 

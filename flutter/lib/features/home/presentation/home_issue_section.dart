@@ -94,8 +94,14 @@ class _HomeIssueCardState extends State<HomeIssueCard> {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: TestId.button(
-        HomeTestIds.issueItem(item.id),
+      child: Semantics(
+        key: Key(HomeTestIds.issueItem(item.id)),
+        identifier: HomeTestIds.issueItem(item.id),
+        container: true,
+        button: true,
+        label: '${item.title}\n${item.subtitle}',
+        onTap: widget.onPressed,
+        excludeSemantics: true,
         child: Card(
           clipBehavior: Clip.antiAlias,
           margin: EdgeInsets.zero,
