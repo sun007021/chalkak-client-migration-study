@@ -16,6 +16,7 @@ struct RootView: View {
             }
             ToastOverlay(center: container.toast)
         }
+        .task { await container.pushHub.attachToEntryPoint() }
         .task { await launch.start() }
         .onChange(of: scenePhase) { _, phase in
             // 앱이 보이지 않을 때의 토스트 요청은 버린다(D-20).

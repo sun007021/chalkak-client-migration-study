@@ -68,3 +68,14 @@ describe('RootNavigator 상세 화면', () => {
     await waitFor(() => expect(screen.getByTestId('feed.title')).toHaveTextContent('은행잎'));
   });
 });
+
+describe('RootNavigator 업로드 라우트', () => {
+  it('REQ-UPL-008 topicDate를 읽을 수 없으면 오늘로 대신하지 않고 화면을 닫는다', async () => {
+    const container = await renderNavigator();
+    await act(async () =>
+      container.navigationHandle.navigate('Upload', { topicDate: 'not-a-date' }),
+    );
+    await waitFor(() => expect(container.navigationHandle.getCurrentRoute()?.name).toBe('Home'));
+    expect(screen.queryByTestId('upload.submit-button')).not.toBeOnTheScreen();
+  });
+});

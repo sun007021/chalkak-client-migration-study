@@ -1,7 +1,10 @@
 import SwiftUI
+import UIKit
 
 @main
 struct ChalkakApp: App {
+    /// 알림 센터 델리게이트 등록과 APNs 토큰 수신(푸시 탭은 `PushEntryPoint` → `PushEventHub`로 이어진다).
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     private let bootstrap = AppBootstrap.load()
 
     var body: some Scene {

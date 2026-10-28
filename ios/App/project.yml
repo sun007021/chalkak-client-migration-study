@@ -58,6 +58,11 @@ targets:
           - Pretendard-Bold.otf
           - Pretendard-Regular.otf
           - Pretendard-SemiBold.otf
+    # 푸시 알림(APNs) 권한. 배포 서명 시 Xcode가 production으로 바꾼다. Firebase는 의존성에 없다(FCM 토큰은 자리표시자).
+    entitlements:
+      path: Sources/Chalkak.entitlements
+      properties:
+        aps-environment: development
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.study.chalkak.ios
