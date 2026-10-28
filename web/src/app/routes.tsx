@@ -125,6 +125,14 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
             { path: ROUTES.settings, handle: settingsHandle, element: <TabPlaceholder tab="settings" testId="settings.root" /> },
           ],
         },
+        // 알림함·게시물 상세는 다음 PR의 화면이 대체하는 자리표시(홈 이동 계약 검증용). 탭 셸 밖이라 하단 바가 없다.
+        {
+          element: <RequireSession container={container}>{() => <Outlet />}</RequireSession>,
+          children: [
+            { path: ROUTES.notifications, element: <div data-testid="notifications.root" /> },
+            { path: `${ROUTES.feed}/:postId`, element: <div data-testid="feed.root" /> },
+          ],
+        },
         ...devSessionRoutes(container),
         { path: '*', element: <Navigate to={ROUTES.boot} replace /> },
       ],

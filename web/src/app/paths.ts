@@ -13,7 +13,26 @@ export const ROUTES = {
   /** 설정에서 들어오는 사인 변경 화면(탭 셸 밖, 하단 바 없음). */
   changeSignature: '/settings/signature',
   changeSignaturePreview: '/settings/signature/preview',
+  /** 알림함(홈 벨). 화면은 알림 PR. 지금은 자리표시. */
+  notifications: '/notifications',
+  /** 게시물 상세(피드) 접두. 실제 경로는 `${ROUTES.feed}/:postId`(feedPath). 화면은 전시·피드 PR. 지금은 자리표시. */
+  feed: '/feed',
 } as const;
+
+/** 전시 탭을 해당 날짜의 인기순으로: `/display?date=2026-10-26&sort=popular`. */
+export function displayPath(_date: string, _sort: 'popular' | 'recent'): string {
+  throw new Error('not implemented');
+}
+
+/** 기록 탭. 날짜가 있으면 `/record?date=2026-10-26`, null이면 `/record`. */
+export function recordPath(_date: string | null): string {
+  throw new Error('not implemented');
+}
+
+/** 게시물 상세: `/feed/{postId}`(postId는 소문자 UUID 그대로). */
+export function feedPath(_postId: string): string {
+  throw new Error('not implemented');
+}
 
 /**
  * 설정에서 변경 흐름으로 push할 때 넣는 location state. "설정이 바로 아래에 쌓여 있다"는 뜻이라
