@@ -65,6 +65,7 @@ import { ROUTES } from './paths';
 export interface AppEnv {
   VITE_API_BASE_URL?: string;
   VITE_KAKAO_CLIENT_ID?: string;
+  VITE_UPLOAD_PROXY?: string;
 }
 
 /** env 외는 모두 테스트·특수 환경용 덮어쓰기다. 없으면 실제 구현(SystemClock, fetch, IndexedDbSessionStore, WebLocksRefreshLock, ConsoleLogger, KakaoWebLoginClient 등)을 만든다. */
