@@ -36,7 +36,7 @@ export class PresignedUploader {
     assertAllowedAbsoluteUrl(request.url);
     const response = await this.transport.send({
       method: 'PUT',
-      url: request.url,
+      url: this.deps.urlRewriter ? this.deps.urlRewriter.rewrite(request.url) : request.url,
       headers: { 'content-type': request.contentType },
       body: request.body,
       timeoutMs: UPLOAD_PUT_TIMEOUT_MS,

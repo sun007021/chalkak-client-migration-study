@@ -6,10 +6,10 @@ export interface BlobUrlFactory {
 
 /** 실제 구현: URL.createObjectURL / URL.revokeObjectURL. */
 export class ObjectUrlFactory implements BlobUrlFactory {
-  create(_blob: Blob): string {
-    throw new Error('not implemented');
+  create(blob: Blob): string {
+    return URL.createObjectURL(blob);
   }
-  revoke(_url: string): void {
-    throw new Error('not implemented');
+  revoke(url: string): void {
+    URL.revokeObjectURL(url);
   }
 }

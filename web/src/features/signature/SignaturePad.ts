@@ -1,4 +1,5 @@
 import { ViewModel } from '../../core/state/ViewModel';
+import { hasSignature } from './signatureGeometry';
 
 export interface PadPoint {
   x: number;
@@ -35,35 +36,56 @@ export class SignaturePad extends ViewModel<SignaturePadState> {
   }
 
   /** 새 획을 시작하고 첫 점을 넣는다. 점 하나만 찍고 끝내도 획으로 인정한다(REQ-SIGN-005). 그리는 중이면 이전 획을 끝낸다. */
-  beginStroke(_point: PadPoint): void {
-    throw new Error('not implemented');
+  beginStroke(point: PadPoint): void {
+    const p = this.fit(point);
+    if (!p) return;
+    this.commit([...this.state.strokes, [p]], true);
   }
 
   /** 그리는 중인 획에 점을 더한다. 그리는 중이 아니면 무시. */
-  extendStroke(_point: PadPoint): void {
-    throw new Error('not implemented');
+  extendStroke(point: PadPoint): void {
+    if (!this.state.drawing) return;
+    const p = this.fit(point);
+    if (!p) return;
+    const strokes = this.state.strokes;
+    const last = strokes[strokes.length - 1];
+    if (!last) return;
+    this.commit([...strokes.slice(0, -1), [...last, p]], true);
   }
 
   endStroke(): void {
-    throw new Error('not implemented');
+    if (!this.state.drawing) return;
+    this.commit(this.state.strokes, false);
   }
 
   /** 완성된 획을 한 번에 넣는다(점이 없으면 무시). 테스트·복원용. */
-  addStroke(_points: readonly PadPoint[]): void {
-    throw new Error('not implemented');
+  addStroke(points: readonly PadPoint[]): void {
+    const fitted = points.map((p) => this.fit(p)).filter((p): p is PadPoint => p !== null);
+    if (fitted.length === 0) return;
+    this.commit([...this.state.strokes, fitted], false);
   }
 
   /** 마지막 획 하나를 지운다. 그리는 중이면 그 획을 끝내고 지운다. */
   undo(): void {
-    throw new Error('not implemented');
+    this.commit(this.state.strokes.slice(0, -1), false);
   }
 
   clear(): void {
-    throw new Error('not implemented');
+    this.commit([], false);
   }
 
   /** 지금 상태의 복사본. 이후 변경이 반영되지 않는다. */
   snapshot(): SignatureDrawing {
-    throw new Error('not implemented');
+    return { width: this.size.width, height: this.size.height, strokes: this.state.strokes.map((stroke) => stroke.map((p) => ({ x: p.x, y: p.y }))) };
+  }
+
+  private commit(strokes: readonly PadStroke[], drawing: boolean): void {
+    this.setState({ strokes, hasSignature: hasSignature(strokes), canUndo: strokes.length > 0, drawing });
+  }
+
+  /** 유한하지 않으면 null, 아니면 영역 안으로 보정한 점. */
+  private fit(point: PadPoint): PadPoint | null {
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
+    return { x: Math.min(Math.max(point.x, 0), this.size.width), y: Math.min(Math.max(point.y, 0), this.size.height) };
   }
 }

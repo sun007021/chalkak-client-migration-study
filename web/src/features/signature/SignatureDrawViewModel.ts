@@ -1,3 +1,5 @@
+import { SIGNATURE_MAX_BYTES } from '../../constants';
+import { t } from '../../copy/ko';
 import { ViewModel } from '../../core/state/ViewModel';
 import type { Logger } from '../../core/net/Logger';
 import type { SignatureDraft } from './SignatureDraft';
@@ -39,19 +41,53 @@ export interface SignatureDrawViewModelDeps {
  * rasterizer가 던지면 모드별 generic 문구(onb.signup.error.generic / sign.change.error.generic). dispose 뒤에 끝난 결과는 버린다.
  */
 export class SignatureDrawViewModel extends ViewModel<SignatureDrawState> {
+  private closed = false;
+  private readonly unsubscribePad: () => void;
+
   constructor(private readonly _deps: SignatureDrawViewModelDeps) {
     super({ busy: false, error: null });
+    // 다시 그리거나 되돌리거나 지우면(패드가 바뀌면) 오류를 거둔다.
+    this.unsubscribePad = _deps.pad.subscribe(() => this.dismissError());
   }
 
   get pad(): SignaturePad {
     return this._deps.pad;
   }
 
-  submit(): Promise<SignatureDrawOutcome> {
-    throw new Error('not implemented');
+  async submit(): Promise<SignatureDrawOutcome> {
+    const { pad, rasterizer, draft } = this._deps;
+    if (!pad.state.hasSignature || this.state.busy) return { kind: 'stay' };
+    this.setState({ busy: true, error: null });
+    let png: Blob;
+    try {
+      png = await rasterizer.rasterize(pad.snapshot());
+    } catch (error) {
+      this._deps.logger?.log('warn', 'signature rasterize failed', { error });
+      if (this.closed) return { kind: 'stay' };
+      this.fail(t(this._deps.mode === 'onboarding' ? 'onb.signup.error.generic' : 'sign.change.error.generic'));
+      return { kind: 'stay' };
+    }
+    if (this.closed) return { kind: 'stay' };
+    if (png.size > SIGNATURE_MAX_BYTES) {
+      this.fail(t('sign.error.too-large'));
+      return { kind: 'stay' };
+    }
+    draft.set(png);
+    this.setState({ busy: false });
+    return { kind: 'preview' };
   }
 
   dismissError(): void {
-    throw new Error('not implemented');
+    this.setState({ error: null });
+  }
+
+  override dispose(): void {
+    this.closed = true;
+    this.unsubscribePad();
+    super.dispose();
+  }
+
+  private fail(message: string): void {
+    this.setState({ busy: false, error: { id: this._deps.nextId(), message } });
   }
 }

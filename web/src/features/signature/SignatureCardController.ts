@@ -1,3 +1,7 @@
+import { t } from '../../copy/ko';
+import { ApiError } from '../../core/net/errors';
+import { StaleGuard } from '../../core/state/StaleGuard';
+import type { Ticket } from '../../core/state/StaleGuard';
 import { ViewModel } from '../../core/state/ViewModel';
 import type { UserCache } from '../../core/auth/UserCaches';
 import type { ToastController } from '../../core/ui/ToastController';
@@ -17,16 +21,49 @@ export interface SignatureCardState {
  * 401(갱신 후에도 실패)은 어느 쪽이든 토스트 없음. refresh는 던지지 않는다. 계정이 바뀌어 clear된 뒤 늦게 온 응답은 반영하지 않는다(TC-SIGN-038).
  */
 export class SignatureCardController extends ViewModel<SignatureCardState> implements UserCache {
-  constructor(_deps: { repository: SignatureRepository; toast: ToastController }) {
+  private readonly guard = new StaleGuard();
+  private inflight: Promise<void> | null = null;
+
+  constructor(private readonly deps: { repository: SignatureRepository; toast: ToastController }) {
     super({ status: 'idle', imageUrl: null });
   }
 
   refresh(): Promise<void> {
-    throw new Error('not implemented');
+    if (this.inflight) return this.inflight;
+    const ticket = this.guard.begin();
+    this.setState({ status: 'loading' });
+    const run = this.load(ticket).finally(() => {
+      if (this.inflight === run) this.inflight = null;
+    });
+    this.inflight = run;
+    return run;
   }
 
   /** idle로 되돌리고 진행 중 응답을 무효화한다. */
   clear(): void {
-    throw new Error('not implemented');
+    this.guard.invalidate();
+    this.inflight = null;
+    this.setState({ status: 'idle', imageUrl: null });
+  }
+
+  private async load(ticket: Ticket): Promise<void> {
+    try {
+      const current = await this.deps.repository.fetchCurrent();
+      if (!ticket.isCurrent()) return;
+      this.setState({ status: 'content', imageUrl: current.displayUrl });
+    } catch (error) {
+      if (!ticket.isCurrent()) return;
+      if (error instanceof ApiError && error.status === 400 && error.errorCode === 'SIGNATURE_REGISTRATION_REQUIRED') {
+        this.setState({ status: 'registration_required', imageUrl: null });
+        return;
+      }
+      const silent = error instanceof ApiError && error.status === 401;
+      if (this.state.imageUrl !== null) {
+        this.setState({ status: 'content' });
+        if (!silent) this.deps.toast.show(t('sign.load.error'));
+      } else {
+        this.setState({ status: 'error' });
+      }
+    }
   }
 }

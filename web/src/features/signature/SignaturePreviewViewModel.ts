@@ -1,4 +1,6 @@
+import { t } from '../../copy/ko';
 import { ViewModel } from '../../core/state/ViewModel';
+import { signatureFailureMessage } from './signatureFailureMessages';
 import type { ToastController } from '../../core/ui/ToastController';
 import type { SignatureMode } from './SignatureMode';
 import type { SignatureSubmitter } from './SignatureSubmitter';
@@ -39,6 +41,9 @@ export interface SignaturePreviewViewModelDeps {
  * dispose: 진행 중 요청을 abort하고 이후 토스트·결과를 내지 않는다.
  */
 export class SignaturePreviewViewModel extends ViewModel<SignaturePreviewState> {
+  private readonly abort = new AbortController();
+  private closed = false;
+
   constructor(private readonly _deps: SignaturePreviewViewModelDeps) {
     super({ busy: false });
   }
@@ -47,11 +52,43 @@ export class SignaturePreviewViewModel extends ViewModel<SignaturePreviewState> 
     return this._deps.mode;
   }
 
-  confirm(): Promise<SignaturePreviewOutcome> {
-    throw new Error('not implemented');
+  async confirm(): Promise<SignaturePreviewOutcome> {
+    if (this.state.busy) return { kind: 'stay' };
+    const { mode, png, submitter, toast } = this._deps;
+    this.setState({ busy: true });
+    const outcome = await submitter.submit(png, this.abort.signal);
+    if (this.closed) return { kind: 'cancelled' };
+    if (outcome.kind === 'cancelled') {
+      this.setState({ busy: false });
+      return { kind: 'cancelled' };
+    }
+    if (outcome.kind === 'succeeded') {
+      if (mode === 'onboarding') return { kind: 'home' };
+      toast.show(t('sign.change.done'));
+      void this._deps.refreshSignatureCard?.().catch(() => undefined);
+      return { kind: 'settings' };
+    }
+    toast.show(signatureFailureMessage(mode, outcome.failure));
+    this.setState({ busy: false });
+    switch (outcome.failure.kind) {
+      case 'invalid':
+        return { kind: 'draw' };
+      case 'expired':
+        return { kind: 'login' };
+      case 'forbidden':
+        return mode === 'onboarding' ? { kind: 'login' } : { kind: 'stay' };
+      default:
+        return { kind: 'stay' };
+    }
   }
 
   redraw(): SignaturePreviewOutcome {
-    throw new Error('not implemented');
+    return this.state.busy ? { kind: 'stay' } : { kind: 'draw' };
+  }
+
+  override dispose(): void {
+    this.closed = true;
+    this.abort.abort();
+    super.dispose();
   }
 }

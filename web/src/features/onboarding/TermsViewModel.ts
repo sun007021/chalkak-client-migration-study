@@ -29,35 +29,43 @@ export interface TermsViewModelDeps {
  * 약관 화면 상태(REQ-ONB-002~007, 010). 동의는 메모리에만 있고 저장·전송하지 않는다(D-25). 화면이 마운트될 때마다 새로 만들어 모두 해제로 시작한다.
  */
 export class TermsViewModel extends ViewModel<TermsState> {
-  constructor(_deps: TermsViewModelDeps) {
+  constructor(private readonly deps: TermsViewModelDeps) {
     super({ serviceAgreed: false, privacyAgreed: false, allAgreed: false, canProceed: false, openFailed: false });
   }
 
   /** 전체 동의가 꺼져 있으면 두 항목을 모두 켜고, 켜져 있으면 모두 끈다. */
   toggleAll(): void {
-    throw new Error('not implemented');
+    this.apply(!this.state.allAgreed, !this.state.allAgreed);
   }
 
   toggleService(): void {
-    throw new Error('not implemented');
+    this.apply(!this.state.serviceAgreed, this.state.privacyAgreed);
   }
 
   togglePrivacy(): void {
-    throw new Error('not implemented');
+    this.apply(this.state.serviceAgreed, !this.state.privacyAgreed);
   }
 
   /** 문서를 새 탭으로 연다. 체크 상태는 건드리지 않는다. 열지 못하면 openFailed. */
-  openDocument(_kind: LegalDocumentKind): LegalOpenResult {
-    throw new Error('not implemented');
+  openDocument(kind: LegalDocumentKind): LegalOpenResult {
+    const result = this.deps.launcher.open(kind);
+    this.setState({ openFailed: result !== 'opened' });
+    return result;
   }
 
   /** canProceed이면 signature, 아니면 stay. */
   next(): TermsOutcome {
-    throw new Error('not implemented');
+    return this.state.canProceed ? { kind: 'signature' } : { kind: 'stay' };
   }
 
   /** 가입 컨텍스트를 폐기하고 login(REQ-ONB-027). */
   back(): TermsOutcome {
-    throw new Error('not implemented');
+    this.deps.signupDraft.clear();
+    return { kind: 'login' };
+  }
+
+  private apply(serviceAgreed: boolean, privacyAgreed: boolean): void {
+    const allAgreed = serviceAgreed && privacyAgreed;
+    this.setState({ serviceAgreed, privacyAgreed, allAgreed, canProceed: allAgreed });
   }
 }

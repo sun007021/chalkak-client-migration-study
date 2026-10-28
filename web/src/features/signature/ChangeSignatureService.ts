@@ -1,8 +1,10 @@
+import { SIGNATURE_CONTENT_TYPE } from '../../constants';
 import type { SessionStore } from '../../core/auth/SessionStore';
+import { ApiError, NetworkError, SessionChangedError, isCancellation } from '../../core/net/errors';
 import type { PresignedUploader } from '../../core/net/PresignedUploader';
 import type { Logger } from '../../core/net/Logger';
 import type { SignatureRepository } from './SignatureRepository';
-import type { SignatureSubmitter, SubmitOutcome } from './SignatureSubmitter';
+import type { SignatureFailure, SignatureSubmitter, SubmitOutcome } from './SignatureSubmitter';
 
 export interface ChangeSignatureServiceDeps {
   repository: SignatureRepository;
@@ -19,10 +21,50 @@ export interface ChangeSignatureServiceDeps {
  * 확정 404 → not_found, 네트워크·타임아웃 → network, 그 밖 → generic. PUT(S3) 단계: 네트워크 → network, 그 밖(403 포함) → generic. 취소 → cancelled.
  * 시작할 때의 userId와 끝났을 때의 userId가 다르면(로그아웃·계정 전환) 결과를 버린다(cancelled, TC-SIGN-038). 단 expired는 세션이 지워진 것이 원인이라 그대로 돌려준다.
  */
-export class ChangeSignatureService implements SignatureSubmitter {
-  constructor(_deps: ChangeSignatureServiceDeps) {}
+type Stage = 'uploads' | 'put' | 'confirm';
 
-  submit(_png: Blob, _signal: AbortSignal): Promise<SubmitOutcome> {
-    throw new Error('not implemented');
+const failed = (failure: SignatureFailure): SubmitOutcome => ({ kind: 'failed', failure });
+const CANCELLED: SubmitOutcome = { kind: 'cancelled' };
+
+export class ChangeSignatureService implements SignatureSubmitter {
+  constructor(private readonly deps: ChangeSignatureServiceDeps) {}
+
+  async submit(png: Blob, signal: AbortSignal): Promise<SubmitOutcome> {
+    const { repository, uploader, store } = this.deps;
+    if (signal.aborted) return CANCELLED;
+    const startedAs = (await store.read()).userId;
+    let stage: Stage = 'uploads';
+    let outcome: SubmitOutcome;
+    try {
+      const ticket = await repository.requestUpload(signal);
+      stage = 'put';
+      await uploader.put({ url: ticket.uploadUrl, body: png, contentType: SIGNATURE_CONTENT_TYPE, signal });
+      stage = 'confirm';
+      await repository.confirm(ticket.uploadId, signal);
+      outcome = { kind: 'succeeded' };
+    } catch (error) {
+      outcome = this.classify(error, stage);
+    }
+    if (outcome.kind === 'failed' && outcome.failure.kind === 'expired') return outcome;
+    if (outcome.kind === 'cancelled' || signal.aborted) return CANCELLED;
+    // 로그아웃·계정 전환으로 사용자가 바뀌었으면 결과를 버린다(TC-SIGN-038).
+    if ((await store.read()).userId !== startedAs) return CANCELLED;
+    return outcome;
+  }
+
+  private classify(error: unknown, stage: Stage): SubmitOutcome {
+    if (isCancellation(error) || error instanceof SessionChangedError) return CANCELLED;
+    if (error instanceof NetworkError) return failed({ kind: 'network' });
+    if (error instanceof ApiError && stage !== 'put') {
+      if (error.status === 401) return failed({ kind: 'expired' });
+      if (error.status === 403) return failed({ kind: 'forbidden' });
+      if (stage === 'confirm') {
+        if (error.status === 400 && error.errorCode === 'SIGNATURE_REUPLOAD_REQUIRED') return failed({ kind: 'reupload' });
+        if (error.status === 400) return failed({ kind: 'invalid' });
+        if (error.status === 404) return failed({ kind: 'not_found' });
+      }
+    }
+    this.deps.logger?.log('warn', 'signature change failed', { stage, error });
+    return failed({ kind: 'generic' });
   }
 }
