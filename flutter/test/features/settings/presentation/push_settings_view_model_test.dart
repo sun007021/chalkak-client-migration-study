@@ -1,6 +1,6 @@
 import 'package:chalkak/core/copy/ko.g.dart';
 import 'package:chalkak/core/network/api_error.dart';
-import 'package:chalkak/features/settings/domain/notification_permission.dart';
+import 'package:chalkak/core/push/notification_permission.dart';
 import 'package:chalkak/features/settings/domain/notification_settings.dart';
 import 'package:chalkak/features/settings/presentation/push_settings_view_model.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -411,7 +411,7 @@ void main() {
     test('TC-SET-038 권한이 거부면 켜려 할 때 시스템 알림 설정을 한 번 열고 값은 바꾸지 않는다', () async {
       final r = _Rig();
       await r.ready(topicOff);
-      r.permission.current = NotificationPermission.denied;
+      r.permission.current = OsPermissionStatus.denied;
       await r.vm.toggle(PushSetting.topic, true);
       expect(r.permission.openSettingsCalls, 1);
       expect(r.repo.updateCalls, isEmpty);
@@ -431,7 +431,7 @@ void main() {
     test('REQ-SET-016 권한이 거부여도 끄는 것은 정상 저장 흐름을 따른다', () async {
       final r = _Rig();
       await r.ready();
-      r.permission.current = NotificationPermission.denied;
+      r.permission.current = OsPermissionStatus.denied;
       await r.vm.toggle(PushSetting.topic, false);
       expect(r.permission.openSettingsCalls, 0);
       expect(r.repo.updateCalls.single.enabled, isFalse);
@@ -441,7 +441,7 @@ void main() {
     test('REQ-SET-018 권한 미결정에서 켜면 요청을 띄우고 허용되면 저장한다', () async {
       final r = _Rig();
       await r.ready(aiOff);
-      r.permission.current = NotificationPermission.notDetermined;
+      r.permission.current = OsPermissionStatus.notDetermined;
       await r.vm.toggle(PushSetting.aiReview, true);
       expect(r.permission.requestCalls, 1);
       expect(r.permission.openSettingsCalls, 0);
@@ -452,7 +452,7 @@ void main() {
     test('REQ-SET-018 권한 요청이 거부되면 값도 서버도 바꾸지 않는다', () async {
       final r = _Rig();
       await r.ready(aiOff);
-      r.permission.current = NotificationPermission.notDetermined;
+      r.permission.current = OsPermissionStatus.notDetermined;
       r.permission.requestResult = false;
       await r.vm.toggle(PushSetting.aiReview, true);
       expect(r.permission.requestCalls, 1);
@@ -463,9 +463,9 @@ void main() {
     test('REQ-SET-017 권한 상태는 탭할 때마다 다시 읽고 서버 값은 그대로 둔다', () async {
       final r = _Rig();
       await r.ready(topicOff);
-      r.permission.current = NotificationPermission.denied;
+      r.permission.current = OsPermissionStatus.denied;
       await r.vm.toggle(PushSetting.topic, true);
-      r.permission.current = NotificationPermission.granted;
+      r.permission.current = OsPermissionStatus.granted;
       await r.vm.toggle(PushSetting.topic, true);
       expect(r.permission.openSettingsCalls, 1);
       expect(r.repo.updateCalls, hasLength(1));

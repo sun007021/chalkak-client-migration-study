@@ -438,6 +438,13 @@ class FakeNotificationPermission implements NotificationPermission {
     if (e != null) throw e;
     return current = OsPermissionStatus.granted;
   }
+
+  int openSettingsCalls = 0;
+
+  @override
+  Future<void> openSystemSettings() async {
+    openSettingsCalls++;
+  }
 }
 
 class FakePermissionFlag implements PermissionPromptFlag {

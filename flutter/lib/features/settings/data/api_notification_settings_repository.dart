@@ -32,11 +32,7 @@ class ApiNotificationSettingsRepository
   }) {
     // 본문은 바꾼 항목 하나뿐이다(나머지 생략). 204 본문은 읽지 않는다.
     return _client.requestNoContent(
-      ApiRequest(
-        HttpMethod.patch,
-        _path,
-        body: {setting.wireKey: enabled},
-      ),
+      ApiRequest(HttpMethod.patch, _path, body: {setting.wireKey: enabled}),
       cancelToken: cancelToken,
     );
   }

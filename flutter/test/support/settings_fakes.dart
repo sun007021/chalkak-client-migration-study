@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:chalkak/core/auth/session.dart';
 import 'package:chalkak/core/network/api_error.dart';
+import 'package:chalkak/core/push/notification_permission.dart';
 import 'package:chalkak/features/auth/domain/session_use_cases.dart';
 import 'package:chalkak/features/auth/domain/user_data_cleaner.dart';
 import 'package:chalkak/features/navigation/domain/guest_guard.dart';
 import 'package:chalkak/features/onboarding/domain/legal_document.dart';
 import 'package:chalkak/features/onboarding/presentation/legal_document_view_model.dart';
 import 'package:chalkak/features/settings/data/api_notification_settings_repository.dart';
-import 'package:chalkak/features/settings/domain/notification_permission.dart';
 import 'package:chalkak/features/settings/domain/notification_settings.dart';
 import 'package:chalkak/features/settings/domain/notification_settings_repository.dart';
 import 'package:chalkak/features/settings/presentation/push_settings_view_model.dart';
@@ -50,11 +50,11 @@ const aiOff = NotificationSettings(
 /// 상태 코드만 가진 서버 오류.
 ApiError serverError(int status) => ApiError.fromErrorResponse(status, null);
 
-/// 기기 알림 권한 Fake. 호출 횟수를 센다.
-class FakePushPermission implements NotificationPermissionGateway {
-  NotificationPermission current = NotificationPermission.granted;
+/// 기기 알림 권한 Fake(앱 전체가 쓰는 [NotificationPermission]). 호출 횟수를 센다.
+class FakePushPermission implements NotificationPermission {
+  OsPermissionStatus current = OsPermissionStatus.granted;
 
-  /// [request]가 돌려줄 값(허용 여부).
+  /// [request]가 허용으로 끝나는지. 허용이면 [current]도 granted가 된다.
   bool requestResult = true;
 
   int statusCalls = 0;
@@ -62,15 +62,17 @@ class FakePushPermission implements NotificationPermissionGateway {
   int openSettingsCalls = 0;
 
   @override
-  Future<NotificationPermission> status() async {
+  Future<OsPermissionStatus> status() async {
     statusCalls++;
     return current;
   }
 
   @override
-  Future<bool> request() async {
+  Future<OsPermissionStatus> request() async {
     requestCalls++;
-    return requestResult;
+    return current = requestResult
+        ? OsPermissionStatus.granted
+        : OsPermissionStatus.denied;
   }
 
   @override

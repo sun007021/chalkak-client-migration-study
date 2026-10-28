@@ -65,10 +65,14 @@ class SignatureCardViewModel extends ChangeNotifier {
   bool _loading = false;
   bool _disposed = false;
 
+  /// 사인 변경·계정 전환마다 올린다. 이전 세대에 시작된 조회의 결과는 버린다.
+  int _epoch = 0;
+
   SignatureCardState get state => _state;
 
   Future<void> load() async {
     if (_isGuest || _loading || _disposed) return;
+    final epoch = _epoch;
     _loading = true;
     _setState(
       SignatureCardState(
@@ -80,11 +84,18 @@ class SignatureCardViewModel extends ChangeNotifier {
       final signature = await _repository.fetchCurrent(
         cancelToken: _cancelToken,
       );
+      if (epoch != _epoch) return;
       _settle(SignatureCardStatus.content, imageUrl: signature.displayUrl);
     } on ApiError catch (e) {
+      if (epoch != _epoch) return;
       _onFailure(e);
+    } on Object {
+      // 예상 밖의 실패도 조회 실패와 같게 다룬다(화면이 멈추지 않게).
+      if (epoch != _epoch) return;
+      _onFailure(ApiError.invalidResponse());
     } finally {
-      _loading = false;
+      // 새 세대가 시작한 조회의 진행 표시를 이전 세대가 지우지 않는다.
+      if (epoch == _epoch) _loading = false;
     }
   }
 
@@ -94,11 +105,22 @@ class SignatureCardViewModel extends ChangeNotifier {
   /// 변경 전에 시작된 조회는 진행 중이어도 결과를 버리고, 새로 `GET`을 보내 그 썸네일(null이면 원본)로
   /// 바꾼다. 변경 요청의 응답 URL은 쓰지 않는다. 변경이 실패한 경우에는 부르지 않으며 진행 중이던
   /// 조회는 그대로 반영된다(TC-SET-010).
-  Future<void> onSignatureChanged() => throw UnimplementedError();
+  Future<void> onSignatureChanged() {
+    if (_isGuest || _disposed) return Future<void>.value();
+    _epoch++;
+    _loading = false;
+    return load();
+  }
 
   /// 계정 전환·로그아웃 때 보이던 사인과 진행 중 조회를 비운다(idle로). 늦게 도착한 이전 계정의
   /// 응답은 반영하지 않는다(TC-SET-037).
-  void reset() => throw UnimplementedError();
+  void reset() {
+    if (_disposed) return;
+    _epoch++;
+    _loading = false;
+    _settledStatus = SignatureCardStatus.idle;
+    _setState(const SignatureCardState());
+  }
 
   void _onFailure(ApiError error) {
     if (error.errorCode == ApiErrorCode.signatureRegistrationRequired) {
@@ -111,6 +133,8 @@ class SignatureCardViewModel extends ChangeNotifier {
         _settledStatus,
         imageUrl: _state.imageUrl,
         toast: SignatureMessage(id: ++_toastSequence, text: Copy.signLoadError),
+        // 보여 줄 사인이 없을 때만 카드가 인라인 오류를 보인다(보이던 사인은 유지).
+        loadFailed: _state.imageUrl == null,
       );
     }
   }
@@ -119,10 +143,16 @@ class SignatureCardViewModel extends ChangeNotifier {
     SignatureCardStatus status, {
     String? imageUrl,
     SignatureMessage? toast,
+    bool loadFailed = false,
   }) {
     _settledStatus = status;
     _setState(
-      SignatureCardState(status: status, imageUrl: imageUrl, toast: toast),
+      SignatureCardState(
+        status: status,
+        imageUrl: imageUrl,
+        toast: toast,
+        loadFailed: loadFailed,
+      ),
     );
   }
 

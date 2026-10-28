@@ -21,8 +21,9 @@ class ApiFeedbackRepository implements FeedbackRepository {
         final id = json['feedbackId'];
         final created = json['createdAt'];
         final createdAt = created is String ? DateTime.tryParse(created) : null;
-        if (id is! String || createdAt == null)
+        if (id is! String || createdAt == null) {
           throw ApiError.invalidResponse();
+        }
         return FeedbackReceipt(feedbackId: id, createdAt: createdAt.toUtc());
       },
       cancelToken: cancelToken,

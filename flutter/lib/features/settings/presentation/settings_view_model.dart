@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/analytics/analytics_constants.dart';
 import '../../../core/analytics/analytics_tracker.dart';
+import '../../../core/copy/ko.g.dart';
 import '../../../core/ui/toast/toast_controller.dart';
 import '../../auth/domain/session_use_cases.dart';
 import '../../auth/domain/user_data_cleaner.dart';
@@ -91,53 +93,151 @@ class SettingsViewModel extends ChangeNotifier implements UserDataCleaner {
   final SignatureCardViewModel signature;
   final PushSettingsViewModel push;
 
-  // ignore: unused_field
   final LogoutUseCase _logout;
-  // ignore: unused_field
   final WithdrawUseCase _withdraw;
-  // ignore: unused_field
   final LeaveGuestUseCase _leaveGuest;
-  // ignore: unused_field
   final GuestGuard _guestGuard;
-  // ignore: unused_field
   final ToastSink _toast;
-  // ignore: unused_field
   final AnalyticsTracker _analytics;
-  // ignore: unused_field
   final bool _isGuest;
-  // ignore: unused_field
   final String _appVersion;
 
-  SettingsState get state => throw UnimplementedError();
+  final StreamController<SettingsEvent> _events =
+      StreamController<SettingsEvent>.broadcast();
 
-  Stream<SettingsEvent> get events => throw UnimplementedError();
+  SettingsDialog? _dialog;
+  bool _accountBusy = false;
+  bool _disposed = false;
+  Future<void>? _tabLoad;
 
-  Future<void> onTabShown() => throw UnimplementedError();
+  SettingsState get state => SettingsState(
+    isGuest: _isGuest,
+    appVersion: _appVersion,
+    dialog: _dialog,
+    accountBusy: _accountBusy,
+  );
 
-  void onFeedbackPressed() => throw UnimplementedError();
+  Stream<SettingsEvent> get events => _events.stream;
 
-  void onPrivacyPressed() => throw UnimplementedError();
+  Future<void> onTabShown() {
+    if (_disposed) return Future<void>.value();
+    _analytics.logEvent(AnalyticsEvent.screenView(ScreenNames.settings));
+    if (_isGuest) return Future<void>.value();
+    // 이전 진입의 조회가 아직 끝나지 않았다면 새로 시작하지 않고 그 결과를 함께 기다린다.
+    final running = _tabLoad;
+    if (running != null) return running;
+    final load = _tabLoad = _loadTab();
+    unawaited(
+      load.then<void>((_) {}, onError: (Object _) {}).whenComplete(() {
+        // 계정이 바뀐 뒤 시작한 새 조회를 지우지 않도록 같은 조회일 때만 비운다.
+        if (identical(_tabLoad, load)) _tabLoad = null;
+      }),
+    );
+    return load;
+  }
 
-  void onTermsPressed() => throw UnimplementedError();
+  /// 사인 카드와 푸시 설정은 서로 기다리지 않는다. 한쪽이 실패해도 다른 쪽은 그대로다.
+  Future<void> _loadTab() =>
+      Future.wait([signature.onSettingsTabShown(), push.onSettingsTabShown()]);
 
-  void onChangeSignaturePressed() => throw UnimplementedError();
+  void onFeedbackPressed() {
+    if (_guestGuard.blocks(GuestRestriction.feedback)) return;
+    _emit(const OpenFeedback());
+  }
 
-  Future<void> onSignatureChangeFinished({required bool succeeded}) =>
-      throw UnimplementedError();
+  void onPrivacyPressed() =>
+      _emit(const OpenLegalDocument(LegalDocument.privacy));
 
-  void onLogoutRowPressed() => throw UnimplementedError();
+  void onTermsPressed() =>
+      _emit(const OpenLegalDocument(LegalDocument.service));
 
-  void onWithdrawRowPressed() => throw UnimplementedError();
+  void onChangeSignaturePressed() => _emit(const OpenChangeSignature());
 
-  /// 열린 확인 대화상자의 "취소".
-  void onDialogCancelled() => throw UnimplementedError();
+  Future<void> onSignatureChangeFinished({required bool succeeded}) async {
+    if (!succeeded) return;
+    await signature.onSignatureChanged();
+  }
 
-  Future<void> onLogoutConfirmed() => throw UnimplementedError();
+  void onLogoutRowPressed() => _openDialog(SettingsDialog.logout);
 
-  Future<void> onWithdrawConfirmed() => throw UnimplementedError();
+  void onWithdrawRowPressed() => _openDialog(SettingsDialog.withdraw);
 
-  Future<void> onLoginPressed() => throw UnimplementedError();
+  void _openDialog(SettingsDialog dialog) {
+    if (_disposed || _isGuest || _accountBusy) return;
+    _dialog = dialog;
+    notifyListeners();
+  }
+
+  /// 열린 확인 대화상자의 "취소". 처리 중에는 닫지 않는다.
+  void onDialogCancelled() {
+    if (_disposed || _accountBusy || _dialog == null) return;
+    _dialog = null;
+    notifyListeners();
+  }
+
+  Future<void> onLogoutConfirmed() async {
+    if (_disposed || _accountBusy || _dialog != SettingsDialog.logout) return;
+    _accountBusy = true;
+    notifyListeners();
+    try {
+      // 로컬 정리와 세션 삭제까지가 끝이고, 로그인 화면 이동은 앱이 세션 삭제를 보고 한다.
+      await _logout();
+    } on Object {
+      // 로그아웃 유스케이스는 실패를 삼키도록 만들어져 있다. 예상 밖의 오류도 화면을 멈추지 않는다.
+    } finally {
+      _finishAccountAction();
+    }
+  }
+
+  Future<void> onWithdrawConfirmed() async {
+    if (_disposed || _accountBusy || _dialog != SettingsDialog.withdraw) return;
+    _accountBusy = true;
+    notifyListeners();
+    var result = WithdrawResult.failed;
+    try {
+      result = await _withdraw();
+    } on Object {
+      result = WithdrawResult.failed;
+    }
+    // 화면이 사라진 뒤의 실패는 알릴 곳이 없다. 성공은 유스케이스가 정리·세션 삭제를 끝냈다.
+    if (_disposed) return;
+    _finishAccountAction();
+    if (result == WithdrawResult.failed) _toast.show(Copy.authWithdrawError);
+  }
+
+  void _finishAccountAction() {
+    if (_disposed) return;
+    _accountBusy = false;
+    _dialog = null;
+    notifyListeners();
+  }
+
+  Future<void> onLoginPressed() async {
+    if (_disposed) return;
+    try {
+      await _leaveGuest();
+    } on Object {
+      // 저장소 오류. 다시 누를 수 있게 그대로 둔다.
+    }
+  }
 
   @override
-  Future<void> clearAll() => throw UnimplementedError();
+  Future<void> clearAll() async {
+    _tabLoad = null;
+    await push.clearAll();
+    signature.reset();
+  }
+
+  void _emit(SettingsEvent event) {
+    if (_disposed) return;
+    _events.add(event);
+  }
+
+  @override
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    unawaited(_events.close());
+    super.dispose();
+  }
 }

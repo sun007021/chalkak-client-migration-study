@@ -156,8 +156,9 @@ class FeedbackViewModel extends ChangeNotifier {
 
     // 보내는 사이 로그아웃·계정 전환이 있었으면 이전 계정의 결과는 버린다.
     if (await _currentUserId() != sentAs || _disposed) {
-      if (!_disposed)
+      if (!_disposed) {
         _set(_with(sending: false, canSend: _canSend(_state.text)));
+      }
       return;
     }
     if (succeeded) {
