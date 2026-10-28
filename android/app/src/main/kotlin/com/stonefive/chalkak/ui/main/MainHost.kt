@@ -37,6 +37,7 @@ import kotlinx.coroutines.CoroutineScope
 import kr.chalkak.core.data.post.LikeController
 import kr.chalkak.core.data.post.PostChanges
 import kr.chalkak.core.data.post.PostSort
+import kr.chalkak.feature.aireview.AiReviewStateHolder
 import kr.chalkak.feature.auth.HomeMode
 import kr.chalkak.feature.display.DisplayStateHolder
 import kr.chalkak.feature.display.FeedEntry
@@ -104,6 +105,8 @@ class MainDependencies(
     val newDisplayHolder: (scope: CoroutineScope, date: LocalDate?, sort: PostSort?) -> DisplayStateHolder,
     /** Post detail holder for one feed entry. */
     val newFeedHolder: (scope: CoroutineScope, entry: FeedEntry) -> FeedStateHolder,
+    /** AI feedback holder for one feed entry (one per stacked feed, finished with it); null = no AI area. */
+    val newAiReviewHolder: ((scope: CoroutineScope) -> AiReviewStateHolder)? = null,
     val image: RemoteImage = { _, _ -> },
     /** Photo slot of display and feed (width given, height from the image's ratio); same type as [image]. */
     val photo: RemoteImage = image,

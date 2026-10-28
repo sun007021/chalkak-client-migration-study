@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import com.stonefive.chalkak.ui.common.RemoteImage
 import com.stonefive.chalkak.ui.components.ScreenGoneEffect
 import kr.chalkak.feature.display.FeedEffect
+import kr.chalkak.feature.aireview.AiReviewStateHolder
 import kr.chalkak.feature.display.FeedStateHolder
 
 /**
@@ -31,6 +32,11 @@ fun FeedRoute(
     onLoginRequired: () -> Unit,
     modifier: Modifier = Modifier,
     finishOnLeave: Boolean = true,
+    /**
+     * AI feedback holder of this post (null = no AI area). The target is `AiReviewTarget(postId, topicDate)` only for my post
+     * whose detail is confirmed; otherwise null. Its lifecycle follows this route ([finishOnLeave] as for [holder]).
+     */
+    aiReview: AiReviewStateHolder? = null,
 ) {
     val state by holder.state.collectAsState()
     val back by rememberUpdatedState(onBack)
