@@ -1,7 +1,7 @@
 # XcodeGen 설정. `cd ios/App && xcodegen generate`로 Chalkak.xcodeproj를 만든다(프로젝트 파일은 커밋하지 않는다).
 name: Chalkak
 options:
-  bundleIdPrefix: com.study.chalkak
+  bundleIdPrefix: com.stonefive
   deploymentTarget:
     iOS: "18.0"
   createIntermediateGroups: true
@@ -65,7 +65,8 @@ targets:
         aps-environment: development
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.study.chalkak.ios
+        # 카카오 콘솔에 등록된 원본 앱 번들 ID(Q-15). Flutter 앱과 같으니 시뮬레이터를 플랫폼별로 나눠 쓴다.
+        PRODUCT_BUNDLE_IDENTIFIER: com.stonefive.chalkak
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGNING_ALLOWED: NO
