@@ -131,6 +131,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       }
     } else {
       setState(() {});
+      // 이미 전시 탭에 있을 때의 이동(업로드 직후)도 목표를 적용한다.
+      if (selected == BottomDestination.display) _applyDisplayTarget();
     }
   }
 
@@ -177,10 +179,13 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     final target = widget.shell.takeDisplayTarget();
     if (target == null) return;
     unawaited(() async {
+      final sameDate = display.selectedDate == target.date;
       await display.selectDate(target.date);
       await display.selectSort(
         target.popular ? DisplaySort.popular : DisplaySort.recent,
       );
+      // 같은 날짜를 이미 보고 있으면 옮겨도 다시 불러오지 않으므로 직접 재검증한다.
+      if (target.revalidate && sameDate) await display.onReturnedFromFeed();
     }());
   }
 
