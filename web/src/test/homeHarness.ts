@@ -55,6 +55,8 @@ export interface HomeHarnessOptions {
   /** ISO 시각. 기본 FIXTURE_NOW(KST 2026-10-27 12:00). */
   now?: string;
   session?: StoredSession;
+  /** BannerFeed를 바꿔 끼운다(예: 방어 분기 검증용 하위 클래스). */
+  bannerFeed?: (repository: BannerRepository) => BannerFeed;
 }
 
 /** ViewModel 단위 테스트용: 실제 HomeRepository·BannerRepository·ApiClient를 FakeFetch(FixtureRouter) 위에 엮는다. */
@@ -69,7 +71,8 @@ export function createHomeHarness(options: HomeHarnessOptions = {}) {
   const navigator = new FakeHomeNavigator();
   const opener = new FakeExternalLinkOpener();
   const upload = new FakeUploadEntry();
-  const banners = new BannerFeed({ repository: new BannerRepository({ api }) });
+  const bannerRepository = new BannerRepository({ api });
+  const banners = options.bannerFeed ? options.bannerFeed(bannerRepository) : new BannerFeed({ repository: bannerRepository });
   const viewModel = new HomeViewModel({
     mode,
     clock: env.clock,
