@@ -16,7 +16,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberUpdatedState
@@ -32,6 +31,7 @@ import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.ui.components.ChalkakAlert
 import com.stonefive.chalkak.ui.components.ChalkakOutlinedButton
 import com.stonefive.chalkak.ui.components.Loading
+import com.stonefive.chalkak.ui.components.ScreenGoneEffect
 import com.stonefive.chalkak.ui.theme.ChalkakTheme
 import kr.chalkak.feature.auth.HomeMode
 import kr.chalkak.feature.auth.LoginEffect
@@ -142,7 +142,7 @@ fun LoginRoute(
             }
         }
     }
-    DisposableEffect(holder) { onDispose { holder.onScreenGone() } }
+    ScreenGoneEffect(holder) { holder.onScreenGone() }
     LoginScreen(
         state = state,
         onKakaoClick = holder::onKakaoClicked,

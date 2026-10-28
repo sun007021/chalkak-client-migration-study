@@ -161,7 +161,12 @@ private fun RoutedScreens(boot: BootState, deps: RootDependencies, session: Root
 
     LaunchedEffect(nav) {
         deps.authEvents.collect { event ->
-            if (event == AuthEvent.GoToLogin && nav.top != Route.Login) nav.onSessionEnded()
+            if (event == AuthEvent.GoToLogin && nav.top != Route.Login) {
+                // The session is gone: a half-finished signup (idToken/rawNonce, drawing) must not survive into the next account.
+                deps.signupContext.discard()
+                session.endSignupFlow()
+                nav.onSessionEnded()
+            }
         }
     }
     BackHandler { if (nav.onSystemBack() == NavOutcome.ExitApp) deps.onExitApp() }
@@ -248,8 +253,12 @@ private fun SignaturePreviewHost(nav: NavigationController, deps: RootDependenci
     SignupPreviewRoute(
         holder = holder,
         png = png,
-        onGoHome = { nav.onAuthenticated() },
+        onGoHome = {
+            session.endSignupFlow()
+            nav.onAuthenticated()
+        },
         onBackToLogin = { copyKey ->
+            session.endSignupFlow()
             nav.onSessionEnded()
             session.showToast(copy[copyKey])
         },

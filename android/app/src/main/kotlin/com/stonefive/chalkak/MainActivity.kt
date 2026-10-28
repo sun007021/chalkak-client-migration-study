@@ -42,6 +42,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         platform.currentActivity.clear(this)
+        platform.updateFlowBridge.detach(updateFlow)
         super.onDestroy()
     }
 }

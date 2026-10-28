@@ -42,6 +42,11 @@ class UpdateFlowBridge {
     @Volatile
     private var pending: CompletableDeferred<Int>? = null
 
+    /** Drops [registered] when the Activity that owns it is destroyed: the launcher references that Activity's result registry. */
+    fun detach(registered: ActivityResultLauncher<IntentSenderRequest>) {
+        if (launcher === registered) launcher = null
+    }
+
     internal fun begin(): CompletableDeferred<Int> = CompletableDeferred<Int>().also { pending = it }
 
     fun onResult(resultCode: Int) {

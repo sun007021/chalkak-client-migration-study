@@ -44,8 +44,8 @@ class PlatformAdapters(
             val bridge = UpdateFlowBridge()
             val playManager = AppUpdateManagerFactory.create(app)
             val socialLogin: SocialLoginClient = when {
-                // Debug builds only: BuildConfig.FAKE_SOCIAL_LOGIN is hard false in release (build.gradle.kts).
-                BuildConfig.FAKE_SOCIAL_LOGIN -> FakeSocialLoginClient()
+                // Debug builds only: BuildConfig.FAKE_SOCIAL_LOGIN is hard false in release (build.gradle.kts); DEBUG is a second lock.
+                BuildConfig.FAKE_SOCIAL_LOGIN && BuildConfig.DEBUG -> FakeSocialLoginClient()
                 else -> KakaoSocialLoginClient(KakaoSdkFactory.create(app, BuildConfig.KAKAO_NATIVE_APP_KEY, activity))
             }
             return PlatformAdapters(

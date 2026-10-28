@@ -14,9 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kr.chalkak.core.common.Clock
 import kr.chalkak.core.common.SystemClock
 import kr.chalkak.core.data.auth.SecureNonceGenerator
@@ -24,6 +22,7 @@ import kr.chalkak.core.data.onboarding.DefaultSignupRepository
 import kr.chalkak.core.data.onboarding.PresignedSignatureUploader
 import kr.chalkak.core.data.onboarding.SignatureUploader
 import kr.chalkak.core.data.onboarding.SignupRepository
+import kr.chalkak.feature.auth.AuthEventRelay
 import kr.chalkak.feature.auth.BootGate
 import kr.chalkak.feature.auth.LoginStateHolder
 import kr.chalkak.feature.navigation.NavigationController
@@ -82,12 +81,15 @@ class AppContainer(
     val sessionStore: SessionStore get() = persistentSessionStore
     val guestFlagStore: GuestFlagStore get() = persistentSessionStore
 
-    // A Channel, not a SharedFlow: an event emitted before the navigation shell starts collecting (cold start refresh
-    // failure) must be buffered, not dropped. Single consumer.
-    private val authEvents = Channel<AuthEvent>(Channel.BUFFERED)
+    // A SharedFlow, not a Channel: BootGate and the navigation shell both collect, and every collector must see every event
+    // (a Channel hands each event to one collector only). BootGate subscribes in start() before any API call can fail.
+    private val authEventRelay = AuthEventRelay()
 
-    /** `AuthEvent.GoToLogin` etc.; the navigation shell collects this (one collector). */
-    val authEventFlow: Flow<AuthEvent> = authEvents.receiveAsFlow()
+    /** `AuthEvent.GoToLogin` etc.; hot, no replay. Collected by [bootGate] and by the navigation shell. */
+    val authEventFlow: Flow<AuthEvent> get() = authEventRelay.events
+
+    /** Where the network layer reports auth events; tests use it to emit one. */
+    internal val authEventSink: AuthEventSink get() = authEventRelay
 
     /** Screens register what must be dropped on account change (caches, unread state, ...). Run in registration order. */
     private val resetters = CopyOnWriteArrayList<UserDataResetter>()
@@ -114,7 +116,7 @@ class AppContainer(
     private val authFreeOkHttp: OkHttpClient by lazy { OkHttpFactory.apiClient(base = okHttpBase) }
 
     val apiClient: ApiClient by lazy {
-        val sink = AuthEventSink { authEvents.trySend(it) }
+        val sink = authEventSink
         val refresher = TokenRefresher(sessionStore, HttpRefreshApi(apiBaseUrl, authFreeOkHttp), clock, applicationScope, sink)
         ApiClient(apiBaseUrl, apiOkHttp, sessionStore, refresher, clock, sink)
     }

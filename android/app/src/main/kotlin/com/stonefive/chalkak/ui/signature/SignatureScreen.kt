@@ -24,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -55,6 +54,7 @@ import com.stonefive.chalkak.ui.components.ChalkakAlert
 import com.stonefive.chalkak.ui.components.ChalkakButton
 import com.stonefive.chalkak.ui.components.ChalkakOutlinedButton
 import com.stonefive.chalkak.ui.components.Loading
+import com.stonefive.chalkak.ui.components.ScreenGoneEffect
 import com.stonefive.chalkak.ui.theme.ChalkakTheme
 import kr.chalkak.feature.onboarding.CanvasSize
 import kr.chalkak.feature.onboarding.FlowError
@@ -364,7 +364,7 @@ fun SignupPreviewRoute(
             }
         }
     }
-    DisposableEffect(holder) { onDispose { holder.onScreenGone() } }
+    ScreenGoneEffect(holder) { holder.onScreenGone() }
     SignaturePreviewScreen(
         mode = SignatureMode.Signup,
         png = png,
@@ -401,7 +401,7 @@ fun ChangeSignaturePreviewRoute(
             }
         }
     }
-    DisposableEffect(holder) { onDispose { holder.onScreenGone() } }
+    ScreenGoneEffect(holder) { holder.onScreenGone() }
     SignaturePreviewScreen(
         mode = SignatureMode.Change,
         png = png,

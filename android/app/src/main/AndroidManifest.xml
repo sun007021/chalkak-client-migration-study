@@ -28,9 +28,10 @@
         </activity>
 
         <!-- Kakao login redirect target (scheme kakao<native app key>, key from -PkakaoNativeAppKey). The class exists only in builds
-             with the Kakao SDK; without it the entry is inert because nothing can start it. -->
+             with the Kakao SDK; without it the entry is disabled (placeholder kakaoAuthEnabled=false) so the missing class can never be started. -->
         <activity
             android:name="com.kakao.sdk.auth.AuthCodeHandlerActivity"
+            android:enabled="${kakaoAuthEnabled}"
             android:exported="true"
             tools:ignore="MissingClass">
             <intent-filter>

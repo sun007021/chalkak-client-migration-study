@@ -54,6 +54,11 @@ class RootSession {
         signaturePng = null
     }
 
+    /** Signup ended (account created, or back to login): the drawing PNG must not outlive it. */
+    fun endSignupFlow() {
+        signaturePng = null
+    }
+
     fun showToast(text: String) {
         toast = ToastUi(++toastCounter, text)
     }

@@ -21,6 +21,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -176,4 +177,17 @@ fun ChalkakAlert(
 @Composable
 fun TopBar(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Box(modifier = modifier.fillMaxWidth().statusBarsPadding().padding(start = 8.dp, top = 4.dp)) { content() }
+}
+
+/**
+ * Runs [onGone] when this composition part leaves, except while the Activity is only being recreated (rotation, theme, locale):
+ * the holder survives that and its in-flight work must go on. Use it for `holder.onScreenGone()`.
+ */
+@Composable
+fun ScreenGoneEffect(key: Any, onGone: () -> Unit) {
+    val activity = androidx.activity.compose.LocalActivity.current
+    val latest by androidx.compose.runtime.rememberUpdatedState(onGone)
+    androidx.compose.runtime.DisposableEffect(key) {
+        onDispose { if (activity?.isChangingConfigurations != true) latest() }
+    }
 }

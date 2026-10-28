@@ -71,6 +71,8 @@ android {
         buildConfigField("boolean", "FORCE_UPDATE_CHECK_ENABLED", forceUpdateCheck.toString())
         // Kakao's AuthCodeHandlerActivity needs the scheme `kakao<native app key>`; the placeholder value is harmless without a key.
         manifestPlaceholders["kakaoNativeAppKey"] = kakaoNativeAppKey.ifEmpty { "not-configured" }
+        // Without the SDK the AuthCodeHandlerActivity class does not exist: keep its exported manifest entry disabled.
+        manifestPlaceholders["kakaoAuthEnabled"] = kakaoSdkEnabled.toString()
     }
 
     buildTypes {
