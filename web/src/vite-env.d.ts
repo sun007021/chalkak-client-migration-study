@@ -11,3 +11,6 @@ interface ImportMetaEnv {
 
 /** vite.config.ts의 define이 빌드 시점에 true/false로 치환한다. src/app/devSession.ts 한 곳에서만 읽는다. */
 declare const __DEV_SESSION_ENABLED__: boolean;
+
+/** vite.config.ts의 define이 치환한다(`mode !== 'production' || VITE_UPLOAD_PROXY === 'true'`). src/app/bootstrap.tsx 한 곳에서만 읽는다. */
+declare const __UPLOAD_PROXY_ENABLED__: boolean;

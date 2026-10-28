@@ -22,3 +22,11 @@
 - TC-SIGN-039, TC-SIGN-040, TC-SIGN-041 화면(W) 부분 — 설정 화면의 사인 카드 UI가 필요하다. `SignatureRepository`, `SignatureCardController`(상태·재조회)는 이번에 단위로 닫음 — 설정 화면 PR.
 - TC-SIGN-026 W — 설정 화면 카드 노출 — 설정 화면 PR.
 - 설정 화면의 사인 변경 진입점(`/settings/signature`로 이동하는 버튼) — 설정 화면 PR.
+
+## 알려진 한계·확인 필요 (코드리뷰 정리)
+
+- 뒤로 버튼 "←"의 접근성 라벨 copy 키가 `shared/copy/ko.json`에 없다(글리프만 렌더) — shared에 키 추가 요청 필요.
+- `WindowExternalLinkOpener`는 `noopener`로 열기 때문에 `window.open`이 null을 돌려줘도 팝업 차단과 구분할 수 없다. 던지지 않으면 열린 것으로 본다 — 한계로 수용.
+- 가입 confirm 400이 "이미 사용된 토큰"일 때도 D-02에 따라 `invalid`(다시 그리기)로 가서, 같은 토큰 재사용이 원인이면 그리기 루프가 가능하다 — 백엔드 확인 필요.
+- 업로드 프록시는 loopback https를 지원하지 않는다(loopback은 http, 허용 포트만).
+- 딥링크로 변경 그리기가 첫 항목이면 끝난 뒤 `[그리기, 설정]`이 되어 뒤로 가기에 그리기가 다시 나온다(`settingsBelow` 없는 경우의 replace 규칙).

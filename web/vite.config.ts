@@ -18,7 +18,11 @@ export default defineConfig(({ mode }) => {
   // 개발용 세션 주입(Q-02) 존재 조건. 정적으로 치환되어 꺼진 빌드에서는 관련 코드(동적 import 포함)가 번들에서 빠진다.
   const devSessionEnabled = mode !== 'production' || env.VITE_ENABLE_DEV_SESSION === 'true';
   return {
-    define: { __DEV_SESSION_ENABLED__: JSON.stringify(devSessionEnabled) },
+    define: {
+      __DEV_SESSION_ENABLED__: JSON.stringify(devSessionEnabled),
+      // presigned PUT 개발 프록시 경유 여부. 꺼진 빌드(기본 배포 빌드)에서는 DevProxyUploadUrlRewriter와 /__upload-proxy 접두가 번들에서 빠진다.
+      __UPLOAD_PROXY_ENABLED__: JSON.stringify(mode !== 'production' || env.VITE_UPLOAD_PROXY === 'true'),
+    },
     // presigned PUT은 S3로 직접 가면 버킷 CORS에 막힐 수 있다. 개발·preview 서버만 /__upload-proxy/<호스트>/... 를 그 호스트로 중계한다(배포 빌드 산출물에는 영향 없음).
     plugins: [react(), uploadProxyPlugin({ extraHosts: uploadExtraHosts, loopbackPorts: uploadLoopbackPorts, previewEnabled: env.VITE_UPLOAD_PROXY === 'true' })],
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
