@@ -48,7 +48,10 @@ export class FixtureRouter {
     for (const [key, value] of Object.entries(table)) this.set(key, value);
   }
 
-  /** 라우트를 추가하거나 교체한다(호출 기록도 새로 시작). */
+  /**
+   * 라우트를 추가하거나 교체한다. **같은 키의 호출 기록(calls)도 비운다**: 테스트 중간에 `set`으로 응답을 바꾸면
+   * 그 전의 호출은 `calls`에 남지 않는다. 전체 요청 수가 필요하면 `transport.requestsTo`를 쓴다.
+   */
   set(key: string, value: RouteValue): this {
     this.routes.set(key, { ...parseKey(key), value, calls: [] });
     return this;

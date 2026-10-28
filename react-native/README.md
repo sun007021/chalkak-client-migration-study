@@ -246,7 +246,7 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
   6. **Android 채널**: `moderation_push`(기본 채널, `app.config.ts` 플러그인 `defaultChannel`). 채널 이름/중요도 확정 필요.
   7. **Firebase 설정**: `GOOGLE_SERVICES_JSON` 환경 변수가 있으면 `android.googleServicesFile`로 쓴다. 실기기 푸시 E2E에는 이 파일(과 iOS APNs 키)이 필요하다.
   8. **Android 데이터 전용 푸시(실기기 확인 필요)**: 포그라운드에서 `notification` 블록 없이 `data`만 오는 푸시가 `addNotificationReceivedListener`로 오는지, 앱이 직접 표시할 제목·본문이 있는지는 기기에서 확인한다.
-- **내비게이션**: React Navigation 7의 `navigate`는 기본으로 쌓으므로 `openHome`·`openInbox`는 `{ pop: true }`로 스택에 이미 있는 화면까지 되돌아간다(`NavigationNotificationNavigator.integration.test.tsx`가 실제 RootNavigator로 확인). 내비게이션이 준비되기 전의 푸시 탭은 `NavigationPushTapBlocker`가 막아 두었다가 `NavigationContainer`의 `onReady`(`AppContainer.onNavigationReady`)에서 다시 처리한다. 작성 중 화면 목록은 `routes.ts`의 `PUSH_TAP_BLOCKING_ROUTES`이고 피드백 화면은 아직 없어 SET·FDBK PR에서 추가한다(TODO).
+- **내비게이션**: React Navigation 7의 `navigate`는 기본으로 쌓으므로 `openHome`·`openInbox`는 `{ pop: true }`로 스택에 이미 있는 화면까지 되돌아간다(`NavigationNotificationNavigator.integration.test.tsx`가 실제 RootNavigator로 확인). 내비게이션이 준비되기 전의 푸시 탭은 `NavigationPushTapBlocker`가 막아 두었다가 `NavigationContainer`의 `onReady`(`AppContainer.onNavigationReady`)에서 다시 처리한다. 작성 중 화면 목록은 `routes.ts`의 `PUSH_TAP_BLOCKING_ROUTES`(`Upload`, `Feedback`)이다.
 - **시작·정지**: `PushFeature`가 컨테이너당 하나이고 참조 수로 센다(StrictMode의 start -> stop -> start 안전). 콜드 스타트 탭은 컨테이너 수명 동안 한 번만 소비하고, 같은 탭이 응답 리스너로도 오면 알림 요청 식별자로 거른다. 라우터는 세션 첫 `load()` 뒤에 세대를 읽는다(부팅의 첫 load가 세대를 올리므로).
 - **테스트 함정**: 알림 하네스는 `createNetHarness({ maxRetries: 0 })`(`ApiClientDeps.maxRetries`, 기본 `RETRY_MAX`)라 "실패 후 성공" 스크립트가 한 단계씩이다. 재시도 자체는 `ApiClient.retry.test.ts`가 검증한다. `FixtureRouter.set`은 호출 기록을 새로 시작한다. 헤더는 대소문자를 구분하지 않고 `authorizationOf`로 읽는다.
 
@@ -261,3 +261,19 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
 - **스펙 해석(합의된 것)**: GET 404는 메시지 없이 숨김(TC-AIR-017의 문구는 POST 404에서만). 창 종료 뒤 "AI 상태 다시 확인"은 알약("AI 분석중", 비활성)과 별개로 안내 아래에 둔다(`feed.ai-recheck-button`, TC-AIR-037). **TC-AIR-022는 창 시작을 POST "응답" 시각으로 적었지만 REQ-AIR-026·D-03에 따라 POST를 "보낸" 시각으로 구현했다**(응답이 늦으면 그만큼 창이 짧아진다).
 - **확인 필요(스펙 미결 그대로)**: 기준 설명 다이얼로그 본문은 소스에서 확인하지 못해 제목과 닫기 버튼만 있다. POST가 곧바로 COMPLETED를 줘도 결과 시트를 자동으로 열지 않는다[추정]. 홈 카드 실패 재요청(시트 없음)과 상세(재요청 시트)가 다른 것은 REQ-AIR-036 그대로이며 통일 여부는 결정 없음. 점수는 소수 첫째 자리 고정(`toFixed(1)`)[추정]. 포그라운드 푸시 표시 억제는 푸시 영역. 실패 시트를 푸시로 열었는데 재요청 가능이면 사유 없이 재요청 버튼을 보인다(`ai-failed-sheet.retry-button` 규칙).
 - **테스트**: `__testing__/VirtualTimeSleeper`는 `FakeClock`과 한 몸으로 도는 Sleeper(`advance(ms)`가 깨울 순서대로 푼다), `createAiReviewHarness`는 저장소·폴러·fixture 라우터를 조립한다. 경계(299.999/300.000초)는 `intervalMs` 주입으로 검증한다. `testID`는 `feed.ai-*`, `home.ai-*`, `ai-start-sheet.*`, `ai-result-sheet.*`, `ai-failed-sheet.*`(`criteria-close-button`은 RN 추가). 미구현 TC: 021(동의 UI 없음은 W), 046(E2E), 055·056(애니메이션·스크린샷), 059(알림함), 060·061(A).
+
+## 설정·피드백·분석 (`src/features/settings`, `src/features/feedback`, `src/data/settings`, `src/data/feedback`, `src/core/analytics`)
+
+- **구성**: `SettingsViewModel`(순수 TS, `SettingsViewModelOwner`가 `MainPhaseViewModelOwner`로 메인 단계 동안 하나)이 푸시 설정 3종·기기 권한·로그아웃/탈퇴 확인·법률 문서 시트를 맡고, 사인 카드는 `SignatureCardViewModel`(`refresh`/`onSignatureChanged`/`clearAll`, 세대 기반으로 늦은 응답 폐기)이 맡는다. 피드백은 `FeedbackViewModel` + `FeedbackScreen`(라우트 `Feedback`), 사인 변경은 `SignatureChange` 라우트이며 성공하면 `onSignatureChanged()`로 GET을 다시 한다(D-18). 이동은 `NavigationSettingsNavigator`. 피드백 ViewModel은 `cacheRegistry`에 올라 로그아웃 때 비워지고 화면이 닫히면 해제된다.
+- **푸시 설정 컨트롤러**: 조회·토글·권한 확인·이탈 시 되돌림은 `PushSettingsController`(순수 TS)가 맡고 `SettingsViewModel`이 합성한다. 요청 번호는 카운터 하나에서 나와 `AuthErrorPolicy` 키가 겹치지 않고, 재조회·화면 이탈·초기화는 진행 중 토글(권한 창이 열린 것 포함)을 모두 취소해 스위치가 잠기지 않는다. 이탈 시 되돌리는 이유는 응답을 보지 못해 서버 반영 여부를 모르기 때문이고, 다음 진입의 조회가 서버 값으로 바로잡는다.
+- **푸시 권한**: 새 포트를 만들지 않고 `PushPermissionGateway`에 `openSystemSettings()`를 더했다(Android는 앱 알림 설정 화면 인텐트, 실패하면 `Linking.openSettings()`; iOS는 `openSettings()`). 켤 때 이미 `denied`였던 경우에만 시스템 설정을 열고, 미결정에서 요청 창을 거부한 직후에는 열지 않고 꺼진 채로 둔다. 권한 확인 자체가 실패하면 막지 않고 저장을 진행한다(fail-open). 포그라운드 복귀 시 권한 재확인(REQ-SET-017)은 화면에 보일 상태가 없어 두지 않았고 토글 시점에 확인한다. 푸시 설정 PATCH는 항목 하나씩 보낸다(PATCH 재시도 정책 적용).
+- **분석(D-22)**: 컨테이너의 `AnalyticsTracker` 하나만 쓴다. `AnalyticsBackend`가 주입되면 `BackendAnalyticsTracker`가 같은 트래커를 감싸 화면 이름·하단 탭 목적지·이벤트별 파라미터를 허용 목록으로 걸러 보내고, 알 수 없는 이벤트는 버리며 백엔드 오류는 삼킨다(`reportError`). 백엔드가 없으면 로그 출력 트래커를 쓴다. **운영 백엔드는 아직 연결하지 않았다**(Firebase Analytics는 google-services 설정이 필요한 후속). `analytics`와 `analyticsBackend`를 함께 주면 `AppContainer.create`가 던진다. 허용 목록이 거른 이벤트는 개발 중에만 `console.warn`으로 알린다.
+- **탈퇴 401**: `AccountActionsViewModel`은 탈퇴가 401 후 `REAUTHENTICATION_REQUIRED`(또는 취소)면 실패 토스트를 띄우지 않는다. 인증 흐름(`AuthErrorPolicy`)이 로그인으로 보낸다.
+- **확인 필요(백엔드·기획)**
+  1. **알림 권한 거부 시 동작(모호점 1)**: 기기 권한이 꺼져 있으면 토글을 켜려 할 때 시스템 설정을 여는 쪽으로 구현했다. 거부 상태에서 서버 설정 값을 어떻게 보일지(켜진 채로 둘지) 기획 확인이 필요하다.
+  2. **피드백 오류 표시(모호점 3)**: 전송 오류는 토스트가 아니라 화면 안(`feedback.error-message`)에 보인다. 검증 실패는 고정 문구 `fdbk.error.invalid`이고, 서버가 400 `message`를 주어도 고정 문구를 쓴다(서버 문구 노출 여부 확인 필요).
+  3. **확인 다이얼로그(모호점 4)**: 로그아웃·탈퇴 요청 중에는 다이얼로그가 열린 채 확인 버튼이 비활성이다. 탈퇴가 `REAUTHENTICATION_REQUIRED`이면 토스트 없이 조용히 닫힌다.
+  4. **사인 카드 오류(모호점 6)**: 사인이 없는 최초 조회 실패는 카드 안의 오류 상태와 "다시 시도" 버튼(`settings.signature-retry-button`)만 보이고 토스트는 없다(TC-SET-006). 보이던 사인을 두고 재조회가 실패하면 사인을 유지하고 `sign.load.error` 토스트만 띄운다(TC-SET-005). 이 구분이 기획 의도인지 확인 필요.
+  5. **피드백 전송 중 이탈**: 전송 중 화면을 닫으면 요청을 abort하고 결과를 버린다(서버에는 이미 반영됐을 수 있다). 이탈 시 중단할지, 끝까지 보내고 조용히 처리할지 기획 확인이 필요하다.
+  6. **피드백 공백 제거**: 스펙은 "앞뒤 공백 제거"만 정한다. JS `trim()`(줄바꿈 포함 공백)을 그대로 쓴다.
+- **StrictMode와 screen_view**: 설정 화면의 `screen_view`는 탭 마운트마다 한 번 보낸다. 개발 모드의 이중 effect는 한 번 더 보낼 수 있고(홈·전시·기록의 `useFocusEffect`와 같음) 운영에는 영향이 없다. 피드백은 소유자가 `start()`로 한 번 보낸다.

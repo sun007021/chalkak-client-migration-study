@@ -24,11 +24,11 @@
 | REC | [record.md](catalog/record.md) | 45 | 2 | 2 | 38/45 | 42/45 | 41/45 | 41/45 | 0/45 |
 | NOTI | [notification-push.md](catalog/notification-push.md) | 57 | 2 | 2 | 44/57 | 48/57 | 50/57 | 45/57 | 0/57 |
 | PUSH | [notification-push.md](catalog/notification-push.md) | 77 | 4 | 6 | 64/77 | 67/77 | 67/77 | 63/77 | 0/77 |
-| SET | [settings-feedback.md](catalog/settings-feedback.md) | 56 | 3 | 3 | 33/56 | 47/56 | 51/56 | 0/56 | 0/56 |
-| FDBK | [settings-feedback.md](catalog/settings-feedback.md) | 37 | 2 | 2 | 29/37 | 31/37 | 34/37 | 0/37 | 0/37 |
+| SET | [settings-feedback.md](catalog/settings-feedback.md) | 56 | 3 | 3 | 33/56 | 47/56 | 51/56 | 50/56 | 0/56 |
+| FDBK | [settings-feedback.md](catalog/settings-feedback.md) | 37 | 2 | 2 | 29/37 | 31/37 | 34/37 | 32/37 | 0/37 |
 | NET | [common-infra.md](catalog/common-infra.md) | 62 | 2 | 2 | 55/62 | 55/62 | 56/62 | 56/62 | 59/62 |
 | TIME | [common-infra.md](catalog/common-infra.md) | 30 | 0 | 0 | 17/30 | 23/30 | 21/30 | 16/30 | 22/30 |
-| ANL | [common-infra.md](catalog/common-infra.md) | 25 | 0 | 0 | 11/25 | 23/25 | 8/25 | 0/25 | 16/25 |
+| ANL | [common-infra.md](catalog/common-infra.md) | 25 | 0 | 0 | 11/25 | 23/25 | 8/25 | 19/25 | 16/25 |
 
 ## 허용된 차이
 
