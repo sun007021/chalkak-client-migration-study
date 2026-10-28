@@ -8,6 +8,7 @@ import '../core/ui/toast/toast_host.dart';
 import '../features/banner/domain/banner_models.dart';
 import '../features/banner/domain/banner_web_view_model.dart';
 import '../features/banner/presentation/banner_web_screen.dart';
+import '../features/boot/domain/update_gate.dart';
 import '../features/feed/domain/feed_target.dart';
 import '../features/home/domain/home_models.dart';
 import '../features/like/domain/toast_message.dart' as like;
@@ -17,6 +18,7 @@ import '../features/navigation/presentation/main_shell_navigator.dart';
 import 'app_dependencies.dart';
 import 'app_routes.dart';
 import 'feed_route.dart';
+import 'notification_routes.dart';
 import 'upload_route.dart';
 
 /// `/main`: 세션이 게스트인지 읽은 뒤 [MainShell]을 만든다.
@@ -35,15 +37,34 @@ class _MainRouteHostState extends State<MainRouteHost> {
   late final _RouterNavigator _navigator = _RouterNavigator(
     context,
     widget.dependencies,
+    notifications: () => _notificationNavigator,
     onUploaded: _onUploaded,
   );
+  late final RouterNotificationNavigator _notificationNavigator =
+      RouterNotificationNavigator(
+        context: context,
+        dependencies: widget.dependencies,
+        parts: () => _parts,
+        feedRouteBuilder: _navigator.buildFeedRoute,
+      );
   StreamSubscription<like.ToastMessage>? _likeToasts;
   bool _disposed = false;
 
   @override
   void initState() {
     super.initState();
+    // 업데이트 게이트(D-15)가 통과돼야 메인이 준비된 것이다.
+    widget.dependencies.updateGate.addListener(_syncMainReady);
     unawaited(_init());
+  }
+
+  /// 푸시 탭 처리는 메인이 화면에 있고 업데이트 게이트가 통과된 뒤에만 시작한다.
+  void _syncMainReady() {
+    final ready =
+        !_disposed &&
+        _parts != null &&
+        widget.dependencies.updateGate.status == UpdateGateStatus.passed;
+    widget.dependencies.notification.coordinator.setMainReady(ready);
   }
 
   Future<void> _init() async {
@@ -68,6 +89,14 @@ class _MainRouteHostState extends State<MainRouteHost> {
         isGuest: guest,
       ),
     );
+    final notification = widget.dependencies.notification;
+    final home = _parts!.home;
+    notification.navigator.attach(this, _notificationNavigator);
+    notification.unread.attach(this, home.refreshUnread);
+    _syncMainReady();
+    // 인증 사용자의 첫 메인 진입이면 OS 알림 권한을 한 번 묻는다(이미 물었으면 등록기가 아무것도 하지 않는다).
+    unawaited(notification.onMainEntered(isGuest: guest));
+    notification.registerDevice();
   }
 
   /// 업로드 성공 뒤: 전시 탭의 해당 날짜로 가고, 홈은 오늘 사진 상태를, 기록은 달력을 다시 불러온다
@@ -83,6 +112,11 @@ class _MainRouteHostState extends State<MainRouteHost> {
   @override
   void dispose() {
     _disposed = true;
+    widget.dependencies.updateGate.removeListener(_syncMainReady);
+    final notification = widget.dependencies.notification;
+    notification.coordinator.setMainReady(false);
+    notification.navigator.detach(this);
+    notification.unread.detach(this);
     unawaited(_likeToasts?.cancel());
     _parts?.dispose();
     super.dispose();
@@ -109,21 +143,25 @@ class _MainRouteHostState extends State<MainRouteHost> {
 
 /// 셸의 이동 요청을 라우터/네비게이터로 보낸다. 알림함은 해당 PR이 추가하기 전까지
 /// 이동하지 않고 바로 끝난다.
+const Object _uploadBlocker = 'upload';
+
 class _RouterNavigator implements MainShellNavigator {
   _RouterNavigator(
     this._context,
     this._dependencies, {
+    required this._notifications,
     required this.onUploaded,
   });
 
   final BuildContext _context;
   final AppDependencies _dependencies;
+  final RouterNotificationNavigator Function() _notifications;
 
   /// 업로드를 마치고 "확인했어요."를 누르면 전시 탭 이동과 재검증을 맡는다.
   final void Function(KstDate date) onUploaded;
 
   @override
-  Future<void> openNotifications() => Future<void>.value();
+  Future<void> openNotifications() => _notifications().openInboxAndWait();
 
   @override
   Future<void> openFeed(PostSummary seed) => openFeedTarget(
@@ -137,7 +175,17 @@ class _RouterNavigator implements MainShellNavigator {
 
   @override
   Future<void> openFeedTarget(FeedTarget target) async {
-    if (!_context.mounted) return;
+    final route = await buildFeedRoute(target, openAiFeedback: false);
+    if (route == null || !_context.mounted) return;
+    await Navigator.of(_context).push<void>(route);
+  }
+
+  /// 게시물 상세 라우트. 게스트·세션 없음이면 userId 없이 만든다.
+  Future<PageRoute<void>?> buildFeedRoute(
+    FeedTarget target, {
+    required bool openAiFeedback,
+  }) async {
+    if (!_context.mounted) return null;
     String? userId;
     try {
       final session = await _dependencies.sessions.read();
@@ -147,14 +195,15 @@ class _RouterNavigator implements MainShellNavigator {
     } on Object {
       userId = null;
     }
-    if (!_context.mounted) return;
-    await Navigator.of(_context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (context) => FeedRoute(
-          dependencies: _dependencies,
-          target: target,
-          userId: userId,
-        ),
+    return MaterialPageRoute<void>(
+      settings: RouteSettings(
+        name: RouterNotificationNavigator.feedName(target.postId),
+      ),
+      builder: (context) => FeedRoute(
+        dependencies: _dependencies,
+        target: target,
+        userId: userId,
+        openAiFeedback: openAiFeedback,
       ),
     );
   }
@@ -163,23 +212,30 @@ class _RouterNavigator implements MainShellNavigator {
   Future<void> openUpload(KstDate topicDate) async {
     if (!_context.mounted) return;
     UploadExit? exit;
-    await Navigator.of(_context).push<void>(
-      MaterialPageRoute<void>(
-        fullscreenDialog: true,
-        builder: (context) => UploadRoute(
-          dependencies: _dependencies,
-          topicDate: topicDate,
-          onExit: (value) => exit = value,
+    // 업로드·사진 편집·성공 화면은 모두 이 라우트 안에 있다. 끝날 때까지 푸시 이동을 보류한다(TC-PUSH-061).
+    final coordinator = _dependencies.notification.coordinator;
+    coordinator.setBlocked(_uploadBlocker, blocked: true);
+    try {
+      await Navigator.of(_context).push<void>(
+        MaterialPageRoute<void>(
+          fullscreenDialog: true,
+          builder: (context) => UploadRoute(
+            dependencies: _dependencies,
+            topicDate: topicDate,
+            onExit: (value) => exit = value,
+          ),
         ),
-      ),
-    );
-    switch (exit) {
-      case UploadExitToDisplay(:final date):
-        onUploaded(date);
-      case UploadExitToLogin():
-        goToLogin();
-      case null:
-        break;
+      );
+      switch (exit) {
+        case UploadExitToDisplay(:final date):
+          onUploaded(date);
+        case UploadExitToLogin():
+          goToLogin();
+        case null:
+          break;
+      }
+    } finally {
+      coordinator.setBlocked(_uploadBlocker, blocked: false);
     }
   }
 
