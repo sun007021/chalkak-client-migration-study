@@ -128,3 +128,9 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
 - 가입이 서버에서 받아들여진 뒤 세션 저장 구간(`committing`)에는 뒤로가기를 막는다. 그 전의 진행 중 요청은 뒤로가기로 취소된다.
 - 웹뷰는 `react-native-webview`(Expo 번들 버전 고정). `jest.setup.ts`가 네이티브 모듈이 없을 때 던지는 import를 mock으로 막는다.
 - 화면 테스트는 `toHaveTextContent('문자열')`이 **전체 일치**라서, 여러 줄 제목·안내(`\n`)는 첫 줄만 testID 요소에 두고 나머지는 다음 요소에 둔다.
+
+## Android OkHttp 자동 재시도 끄기 (`plugins/withOkHttpNoRetry.js`, D-21)
+
+- 이유: Android의 RN `fetch`는 OkHttp를 거치고, OkHttp 기본값 `retryOnConnectionFailure(true)`는 연결 실패 때 `POST` 같은 비멱등 요청도 조용히 다시 보낸다. D-21은 재시도를 `ApiClient` 한 곳에서 멱등 요청만 최대 2회로 제한하므로 prebuild 때 `MainApplication.kt`의 `onCreate`(`super.onCreate()` 직후, `loadReactNative` 전)에 `OkHttpClientProvider.setOkHttpClientFactory { createClientBuilder().retryOnConnectionFailure(false).build() }`를 넣는다. `createClientBuilder()`라서 RN 기본 쿠키 저장소(`ReactCookieJarContainer`)와 타임아웃 0은 유지된다.
+- 마커 주석(`@generated begin chalkak-okhttp-no-retry`)으로 멱등이다. 삽입 위치를 못 찾으면(템플릿 변경) prebuild가 오류로 멈춘다. Java `MainApplication`은 지원하지 않고 오류를 낸다.
+- **E2E 확인 항목(Android)**: 응답을 받기 전에 연결을 끊는 서버로 `POST`(예: `POST /posts`)를 보냈을 때 서버에 요청이 **한 번만** 도착하는지 본다(재전송 없음). 멱등 요청(GET)은 `ApiClient`의 재시도(최대 2회)만 일어나는지도 확인한다.
