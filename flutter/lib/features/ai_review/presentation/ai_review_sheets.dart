@@ -8,31 +8,44 @@ import 'ai_review_test_ids.dart';
 
 /// 하단 시트 한 장의 내용. 세션의 [AiReviewState.sheet]에 따라 시작·결과·실패 시트를 그린다.
 /// 시트를 닫는 동작은 모두 세션에 맡기고(`onSheetDismissed`), 실제 닫기는 호스트가 한다.
-class AiReviewSheetContent extends StatelessWidget {
+class AiReviewSheetContent extends StatefulWidget {
   const AiReviewSheetContent({super.key, required this.session});
 
   final AiReviewSession session;
 
   @override
+  State<AiReviewSheetContent> createState() => _AiReviewSheetContentState();
+}
+
+class _AiReviewSheetContentState extends State<AiReviewSheetContent> {
+  /// 시트가 닫히는 동안(상태는 이미 null)에도 마지막 내용을 그려 높이가 줄지 않게 한다.
+  AiSheet? _last;
+
+  @override
   Widget build(BuildContext context) {
+    final session = widget.session;
     return ListenableBuilder(
       listenable: session,
-      builder: (context, _) => switch (session.state.sheet) {
-        AiStartSheet(:final retry) => _StartSheet(
-          retry: retry,
-          onStart: session.onStartConfirmed,
-          onClose: session.onSheetDismissed,
-        ),
-        AiResultSheet(:final content) => _ResultSheet(
-          content: content,
-          onCriteriaHelp: session.onCriteriaHelpPressed,
-          onClose: session.onSheetDismissed,
-        ),
-        AiFailedSheet(:final reason) => _FailedSheet(
-          reason: reason,
-          onConfirm: session.onSheetDismissed,
-        ),
-        null => const SizedBox.shrink(),
+      builder: (context, _) {
+        final current = session.state.sheet;
+        if (current != null) _last = current;
+        return switch (current ?? _last) {
+          AiStartSheet(:final retry) => _StartSheet(
+            retry: retry,
+            onStart: session.onStartConfirmed,
+            onClose: session.onSheetDismissed,
+          ),
+          AiResultSheet(:final content) => _ResultSheet(
+            content: content,
+            onCriteriaHelp: session.onCriteriaHelpPressed,
+            onClose: session.onSheetDismissed,
+          ),
+          AiFailedSheet(:final reason) => _FailedSheet(
+            reason: reason,
+            onConfirm: session.onSheetDismissed,
+          ),
+          null => const SizedBox.shrink(),
+        };
       },
     );
   }

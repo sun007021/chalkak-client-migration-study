@@ -1,15 +1,14 @@
 import 'dart:async';
 
-import 'package:clock/clock.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../../core/constants/app_constants.dart';
 import '../../../core/copy/ko.g.dart';
 import '../../../core/network/api_error.dart';
 import '../../../core/time/kst_clock.dart';
 import '../../../core/ui/toast/toast_controller.dart';
 import '../../auth/domain/user_data_cleaner.dart';
+import 'ai_poller.dart';
 import 'ai_review_models.dart';
 import 'ai_review_repository.dart';
 import 'ai_review_state.dart';
@@ -38,6 +37,8 @@ import 'ai_review_target.dart';
 ///   유지, 403 `Copy.aiErrorBanned`, 404 `Copy.aiErrorNotFound` + 숨김, 401 `Copy.aiErrorLogin`
 ///   (갱신/로그인 이동은 ApiClient·D-17), 연결 오류 `Copy.aiErrorNetwork`·5xx·검증 실패
 ///   `Copy.aiErrorLoad` 뒤 `GET`으로 한 번 동기화한다. 어떤 경우도 `POST`를 다시 보내지 않는다.
+/// - 자정(KST)이 지나도 알약은 스스로 다시 그려지지 않는다(타이머 없음). 다음 rebuild나 탭에서
+///   `topicDate`를 다시 판정해 숨기고 요청을 막는다.
 /// - 폴링은 PROCESSING일 때만, 직전 응답 뒤 [AppConstants.aiReviewPollInterval](3초) 간격으로
 ///   `GET`하고(동시에 둘 이상 없음), 창은 [AppConstants.aiReviewPollWindow](300초)이며 시작 시각은
 ///   `POST`를 보낸 시각 또는 폴링을 시작한 시각이다(서버 `requestedAt`은 쓰지 않는다). 시간은
@@ -101,10 +102,15 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
   /// 진입·수동 갱신으로 보낸 `GET`이 아직 안 끝났다(같은 순간의 중복 호출을 합친다).
   bool _entryFetchInFlight = false;
 
-  Timer? _pollTimer;
+  /// 폴링 창과 예약. 창 시작은 `POST`를 보낸 시각 또는 폴링을 시작한 시각이다.
+  late final AiPoller _poller = AiPoller(
+    onTick: _onPollTick,
+    onTimeout: _onPollTimeout,
+  );
 
-  /// 폴링 창 시작 시각(`POST`를 보낸 시각 또는 폴링을 시작한 시각). 폴링 중이 아니면 null.
-  DateTime? _windowStart;
+  /// `POST`가 아직 안 끝났다. 세대와 무관하게 응답(또는 오류)이 올 때만 꺼진다. 숨김·재진입을
+  /// 거쳐도 두 번째 `POST`를 막는다(REQ-AIR-020).
+  bool _postInFlight = false;
 
   /// 현재 폴링 연속 구간에서 오류 토스트를 이미 띄웠다.
   bool _pollErrorToasted = false;
@@ -151,8 +157,7 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
     _getToken?.cancel();
     _getToken = null;
     _entryFetchInFlight = false;
-    _pollTimer?.cancel();
-    _pollTimer = null;
+    _poller.pause();
   }
 
   void _resetForTarget() {
@@ -164,7 +169,7 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
     _sheet = null;
     _criteriaOpen = false;
     _notice = null;
-    _windowStart = null;
+    _poller.stop();
     _pollErrorToasted = false;
   }
 
@@ -201,11 +206,13 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
   }
 
   /// 화면이 보이지 않게 됐다(백그라운드·덮임·다른 탭). 폴링 중단, 진행 중 응답 폐기.
-  void onHidden() {
+  ///
+  /// [notify]가 false면 상태가 바뀌어도 리스너에 알리지 않는다(위젯 해제 경로).
+  void onHidden({bool notify = true}) {
     if (_disposed) return;
     _visible = false;
     _invalidate();
-    _windowStart = null;
+    _poller.stop();
     _pollErrorToasted = false;
     final changed = _requesting || _checking;
     _requesting = false;
@@ -213,7 +220,7 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
       _checking = false;
       _recheck = _review == null;
     }
-    if (changed) _notify();
+    if (changed && notify) _notify();
   }
 
   /// 알약·카드 탭.
@@ -306,6 +313,7 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
     if (_disposed) return;
     _disposed = true;
     _invalidate();
+    _poller.stop();
     super.dispose();
   }
 
@@ -318,7 +326,7 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
     _notFound = false;
     _recheck = false;
     _checking = _review == null;
-    _windowStart ??= clock.now();
+    _poller.open();
     _entryFetchInFlight = true;
     _notify();
     _sendGet(poll: false);
@@ -330,8 +338,12 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
     final generation = _generation;
     final token = _getToken = CancelToken();
     try {
-      final review = await _repository.get(target.postId, cancelToken: token);
+      var review = await _repository.get(target.postId, cancelToken: token);
       if (_stale(generation)) return;
+      // 진행 중인 `POST`가 있는데 아직 NONE이면 서버가 처리 전일 뿐이다: 분석중으로 본다.
+      if (_postInFlight && review.status == AiReviewStatus.none) {
+        review = const AiReview(status: AiReviewStatus.processing);
+      }
       _entryFetchInFlight = false;
       _checking = false;
       _pollErrorToasted = false;
@@ -360,7 +372,7 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
     final unauthorized = api?.status == 401;
     if (poll) {
       if (unauthorized) {
-        _stopPolling();
+        _poller.stop();
         _toast.show(Copy.aiErrorLogin);
         _notify();
         return;
@@ -369,15 +381,15 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
         _pollErrorToasted = true;
         _toast.show(_errorMessage(api));
       }
-      _schedulePoll();
+      _poller.schedule();
       _notify();
       return;
     }
     if (_review == null) _recheck = true;
     if (_review?.status == AiReviewStatus.processing) {
-      _schedulePoll();
+      _poller.schedule();
     } else {
-      _stopPolling();
+      _poller.stop();
     }
     _toast.show(unauthorized ? Copy.aiErrorLogin : _errorMessage(api));
     _notify();
@@ -389,7 +401,7 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
     _review = null;
     _sheet = null;
     _criteriaOpen = false;
-    _stopPolling();
+    _poller.stop();
     _notify();
   }
 
@@ -411,10 +423,10 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
       _criteriaOpen = false;
     }
     if (review.status == AiReviewStatus.processing) {
-      _windowStart ??= clock.now();
-      _schedulePoll();
+      _poller.open();
+      _poller.schedule();
     } else {
-      _stopPolling();
+      _poller.stop();
     }
     _notify();
   }
@@ -435,44 +447,12 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
 
   // ---- 폴링 ----
 
-  void _stopPolling() {
-    _pollTimer?.cancel();
-    _pollTimer = null;
-    _windowStart = null;
-  }
-
-  /// 직전 응답 3초 뒤에 다음 `GET`을 예약한다. 창이 끝나면 `GET` 없이 안내만 남기고 멈춘다.
-  void _schedulePoll() {
-    _pollTimer?.cancel();
-    _pollTimer = null;
-    final start = _windowStart;
-    if (start == null) return;
-    final remaining =
-        AppConstants.aiReviewPollWindow - clock.now().difference(start);
-    if (remaining <= Duration.zero) {
-      _timeout();
-      return;
-    }
-    final delay = remaining < AppConstants.aiReviewPollInterval
-        ? remaining
-        : AppConstants.aiReviewPollInterval;
-    _pollTimer = Timer(delay, _onPollTimer);
-  }
-
-  void _onPollTimer() {
-    _pollTimer = null;
+  void _onPollTick() {
     if (_disposed || _target == null) return;
-    final start = _windowStart;
-    if (start == null) return;
-    if (clock.now().difference(start) >= AppConstants.aiReviewPollWindow) {
-      _timeout();
-      return;
-    }
     _sendGet(poll: true);
   }
 
-  void _timeout() {
-    _stopPolling();
+  void _onPollTimeout() {
     _notice = Copy.aiPollTimeout;
     _notify();
   }
@@ -481,7 +461,13 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
 
   Future<void> _startPost() async {
     final target = _target;
-    if (target == null || _requesting) return;
+    if (target == null || _requesting || _postInFlight) {
+      if (_sheet is AiStartSheet) {
+        _sheet = null;
+        _notify();
+      }
+      return;
+    }
     if (!_isToday) {
       // 자정이 지났다: 시트를 닫고 요청하지 않는다(REQ-AIR-003).
       _sheet = null;
@@ -495,17 +481,20 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
     _checking = false;
     _requesting = true;
     _pollErrorToasted = false;
-    _windowStart = clock.now();
+    _poller.open(restart: true);
+    _postInFlight = true;
     _notify();
     try {
       final review = await _repository.request(target.postId);
+      _postInFlight = false;
       if (_stale(generation)) return;
       _requesting = false;
       _applyReview(review);
     } on Object catch (error) {
+      _postInFlight = false;
       if (_stale(generation)) return;
       _requesting = false;
-      _windowStart = null;
+      _poller.stop();
       _onPostError(error);
     }
   }
@@ -548,7 +537,7 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
     final target = _target;
     if (target == null) return;
     _invalidate();
-    _windowStart ??= clock.now();
+    _poller.open();
     _entryFetchInFlight = true;
     _sendGet(poll: false, silent: true);
   }

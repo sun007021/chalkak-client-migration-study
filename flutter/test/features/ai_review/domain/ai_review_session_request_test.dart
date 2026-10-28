@@ -1,3 +1,4 @@
+import 'package:chalkak/core/constants/app_constants.dart';
 import 'package:chalkak/core/copy/ko.g.dart';
 import 'package:chalkak/features/ai_review/domain/ai_review_state.dart';
 import 'package:chalkak/features/ai_review/domain/ai_review_target.dart';
@@ -99,6 +100,29 @@ void main() {
       expect(r.api.postCalls(), 1);
       expect(r.state.pill, AiPill.processing);
     });
+
+    fakeTest(
+      'TC-AIR-023 REQ-AIR-020 POST 응답을 기다리다 숨겼다 다시 보여도 두 번째 POST는 없고 분석중이다',
+      (async) {
+        final r = _noneRig();
+        r.api.post([
+          fx(aiPost('202-processing'), delay: const Duration(seconds: 5)),
+        ]);
+        r.show(async);
+        r.session.onPillPressed();
+        r.session.onStartConfirmed();
+        r.pass(async, const Duration(seconds: 1));
+        r.session.onHidden();
+        r.session.onShown();
+        r.pass(async, const Duration(seconds: 1));
+        // 서버가 아직 NONE으로 답해도 진행 중인 POST가 있으니 분석중이다.
+        expect(r.state.pill, AiPill.processing);
+        r.session.onPillPressed();
+        r.session.onStartConfirmed();
+        r.pass(async, const Duration(seconds: 10));
+        expect(r.api.postCalls(), 1);
+      },
+    );
 
     fakeTest('TC-AIR-024 이미 완료된 리뷰의 200 COMPLETED는 그대로 보이고 폴링·자동 시트가 없다', (
       async,
@@ -232,7 +256,11 @@ void main() {
         r.show(async);
         r.api.get([fx(aiGet('processing'))]);
         final getsBefore = r.api.getCalls();
-        r.request(async, wait: const Duration(seconds: 11));
+        // 연결 타임아웃(10초)에 POST가 실패하고 동기화 GET이 나간다. 3초 뒤 폴링 GET 전까지만 본다.
+        r.request(
+          async,
+          wait: AppConstants.httpConnectTimeout + const Duration(seconds: 1),
+        );
         expect(r.toast.messages, [Copy.aiErrorNetwork]);
         expect(r.api.getCalls(), getsBefore + 1);
         expect(r.state.pill, AiPill.processing);

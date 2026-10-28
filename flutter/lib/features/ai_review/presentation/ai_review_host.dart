@@ -62,7 +62,7 @@ class _AiReviewHostState extends State<AiReviewHost>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.session.removeListener(_onSession);
-    if (_shown) widget.session.onHidden();
+    if (_shown) widget.session.onHidden(notify: false);
     _closeLeftovers();
     super.dispose();
   }
