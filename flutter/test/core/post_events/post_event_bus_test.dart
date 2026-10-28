@@ -1,9 +1,9 @@
-import 'package:chalkak/features/feed/domain/post_event_bus.dart';
+import 'package:chalkak/core/post_events/post_event_bus.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../support/display_fakes.dart';
-import '../../../support/fake_async_helpers.dart';
-import '../../../support/net_harness.dart' show settle;
+import '../../support/display_fakes.dart';
+import '../../support/fake_async_helpers.dart';
+import '../../support/net_harness.dart' show settle;
 
 void main() {
   fakeTest('TC-FEED-036 삭제 이벤트를 모든 구독자(전시·기록·홈)가 받는다', (async) {

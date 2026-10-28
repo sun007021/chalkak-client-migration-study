@@ -252,9 +252,6 @@ class _Content extends StatelessWidget {
     final signatureUrl = content.signatureImageUrl;
     // 상세 응답이 확정되기 전에는 수정·삭제를 누를 수 없다(REQ-FEED-009, TC-FEED-012).
     final actionable = state.isConfirmed && !state.isDeleting;
-    final photoLabel = content.title == null || content.title!.trim().isEmpty
-        ? Copy.feedPhotoAltNone
-        : Copy.fill(Copy.feedPhotoAlt, {'제목': content.title!});
     return Stack(
       children: [
         Column(
@@ -270,7 +267,7 @@ class _Content extends StatelessWidget {
                       NetworkPhoto(
                         content.originalImageUrl,
                         fit: BoxFit.contain,
-                        semanticLabel: photoLabel,
+                        semanticLabel: state.photoLabel,
                       ),
                       if (signatureUrl != null)
                         Positioned(

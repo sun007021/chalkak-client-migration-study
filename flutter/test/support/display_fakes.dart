@@ -3,13 +3,13 @@ import 'dart:convert';
 import 'dart:ui' show Tristate;
 
 import 'package:chalkak/core/network/api_error.dart';
+import 'package:chalkak/core/post_events/post_event_bus.dart';
 import 'package:chalkak/core/time/kst_date.dart';
 import 'package:chalkak/features/display/domain/display_models.dart';
 import 'package:chalkak/features/display/domain/display_repository.dart';
 import 'package:chalkak/features/display/presentation/display_view_model.dart';
 import 'package:chalkak/features/feed/domain/feed_target.dart';
 import 'package:chalkak/features/feed/domain/post_detail.dart';
-import 'package:chalkak/features/feed/domain/post_event_bus.dart';
 import 'package:chalkak/features/feed/domain/post_repository.dart';
 import 'package:chalkak/features/feed/presentation/feed_view_model.dart';
 import 'package:chalkak/features/like/domain/like_repository.dart';
@@ -522,7 +522,7 @@ class DisplayRig {
       repository: repo,
       likes: likes,
       postEvents: bus,
-      isGuest: guest,
+      isGuest: () => guest,
       initialDate: initialDate,
       initialSort: initialSort,
     );

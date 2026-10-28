@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/copy/ko.g.dart';
 import '../../../core/network/api_error.dart';
-import '../../feed/domain/post_event_bus.dart';
+import '../../../core/post_events/post_event_bus.dart';
 import 'like_repository.dart';
 import 'toast_message.dart';
 
@@ -178,14 +178,14 @@ class LikeStore extends ChangeNotifier {
           _onSuccess(entry, result);
         } on Object catch (error) {
           if (_isStale(generation)) return;
-          _onFailure(
+          final resend = _onFailure(
             postId,
             entry,
             error,
+            wanted: wanted,
             superseded: tapsAtStart != entry.taps,
           );
-          if (entry.confirmed.isLiked == entry.intent) break;
-          if (_isTerminal(error)) break;
+          if (!resend) break;
         }
       }
     } finally {
@@ -213,34 +213,42 @@ class LikeStore extends ChangeNotifier {
     _touch(entry);
   }
 
-  void _onFailure(
+  /// 실패를 반영하고, 남은 의도를 다시 보내야 하면 true를 돌려준다.
+  /// 취소와 인증·정지·삭제 실패는 다시 보내지 않는다.
+  bool _onFailure(
     String postId,
     _Entry entry,
     Object error, {
+    required bool wanted,
     required bool superseded,
   }) {
     final apiError = error is ApiError ? error : null;
-    if (apiError != null && apiError.isCancelled) return;
-
-    final status = apiError?.status;
     final terminal = _isTerminal(error);
+    final cancelled = apiError != null && apiError.isCancelled;
     // 요청이 도는 동안 사용자가 의도를 바꿨으면 이 실패는 밀려난 것이다: 롤백하지 않고 남은 의도를 다시 보낸다.
-    final keepsIntent =
-        !terminal && superseded && entry.intent != entry.confirmed.isLiked;
-    if (keepsIntent) return;
+    if (!terminal &&
+        !cancelled &&
+        superseded &&
+        entry.intent != entry.confirmed.isLiked) {
+      return true;
+    }
 
     entry
       ..intent = entry.confirmed.isLiked
       ..shown = entry.confirmed;
     _touch(entry);
+    if (cancelled) return false;
 
-    if (status == 401) return;
-    if (status == 403) {
+    final status = apiError?.status;
+    if (status == 401) return false;
+    // 정지 안내는 등록(PUT)에만 해당한다. 취소(DELETE)의 403은 일반 실패다.
+    if (status == 403 && wanted) {
       _emitToast(Copy.likeErrorBanned);
-      return;
+      return false;
     }
     if (status == 404) _events.publishRemoved(postId);
     _emitToast(Copy.likeErrorGeneric);
+    return false;
   }
 
   /// 다시 보내도 소용없는 실패(인증·정지·삭제).

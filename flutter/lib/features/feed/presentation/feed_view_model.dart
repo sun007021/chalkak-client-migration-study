@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/copy/ko.g.dart';
 import '../../../core/network/api_error.dart';
+import '../../../core/post_events/post_event_bus.dart';
 import '../../../core/text/code_points.dart';
 import '../../../core/time/kst_clock.dart';
 import '../../../core/time/kst_date.dart';
@@ -13,7 +14,6 @@ import '../../like/domain/like_store.dart';
 import '../../like/domain/toast_message.dart';
 import '../domain/feed_target.dart';
 import '../domain/post_detail.dart';
-import '../domain/post_event_bus.dart';
 import '../domain/post_repository.dart';
 
 enum FeedStatus { loading, content, notFound, error }
@@ -59,10 +59,14 @@ class FeedState {
     this.titleError,
     this.isDeleting = false,
     this.loadingImageUrl,
+    this.photoLabel = '',
   });
 
   final FeedStatus status;
   final FeedContent? content;
+
+  /// 사진의 접근성 라벨: 제목이 있으면 "{제목} 사진" 형태, 없으면 `Copy.feedPhotoAltNone`.
+  final String photoLabel;
 
   /// 상세 응답을 받아 확정되었는가. 확정 전에는 좋아요·수정·삭제가 막힌다.
   final bool isConfirmed;
@@ -163,7 +167,6 @@ class FeedViewModel extends ChangeNotifier {
     final seed = _target.seed;
     if (seed != null) {
       _view = _View.fromSeed(seed);
-      _provisionalMine = _target.isMine;
       // 저장소가 이 게시물을 아직 모르면 시드 값으로 채운다(이미 알면 그 값이 더 최신이다).
       if (_likes.stateOf(_target.postId) == null) {
         _likes.reconcile(
@@ -173,8 +176,6 @@ class FeedViewModel extends ChangeNotifier {
           since: _likes.version,
         );
       }
-    } else {
-      _provisionalMine = _target.isMine;
     }
     _likes.addListener(_publish);
     _state = _buildState();
@@ -192,7 +193,6 @@ class FeedViewModel extends ChangeNotifier {
   final CancelToken _cancelToken = CancelToken();
 
   late FeedState _state;
-  late final bool _provisionalMine;
   _View? _view;
   KstDate _today;
   FeedStatus? _terminal;
@@ -322,7 +322,7 @@ class FeedViewModel extends ChangeNotifier {
   bool get _isMine {
     if (_userId == null) return false;
     final authorId = _view?.authorId;
-    return authorId == null ? _provisionalMine : authorId == _userId;
+    return authorId == null ? _target.isMine : authorId == _userId;
   }
 
   bool get _isTopicToday => _view?.topicDate == _today;
@@ -456,6 +456,11 @@ class FeedViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  static String _photoLabel(String? title) =>
+      title == null || title.trim().isEmpty
+      ? Copy.feedPhotoAltNone
+      : Copy.fill(Copy.feedPhotoAlt, {'제목': title});
+
   FeedState _buildState() {
     final view = _view;
     final like = _likes.stateOf(_target.postId);
@@ -488,6 +493,7 @@ class FeedViewModel extends ChangeNotifier {
       titleError: _titleError,
       isDeleting: _deleting,
       loadingImageUrl: view == null ? _target.thumbnailUrl : null,
+      photoLabel: _photoLabel(view?.title),
     );
   }
 }

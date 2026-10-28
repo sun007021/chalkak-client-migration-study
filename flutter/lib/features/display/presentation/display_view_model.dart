@@ -5,10 +5,10 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/copy/ko.g.dart';
 import '../../../core/network/api_error.dart';
+import '../../../core/post_events/post_event_bus.dart';
 import '../../../core/time/kst_clock.dart';
 import '../../../core/time/kst_date.dart';
 import '../../feed/domain/feed_target.dart';
-import '../../feed/domain/post_event_bus.dart';
 import '../../like/domain/like_store.dart';
 import '../../like/domain/toast_message.dart';
 import '../domain/display_models.dart';
@@ -90,7 +90,7 @@ class DisplayViewModel extends ChangeNotifier {
   final DisplayRepository _repository;
   final LikeStore _likes;
   final PostEventBus _postEvents;
-  final bool _isGuest;
+  final bool Function() _isGuest;
   final KstClock _clock;
   final KstDate? _initialDate;
   final DisplaySort _initialSort;
@@ -226,7 +226,7 @@ class DisplayViewModel extends ChangeNotifier {
   /// 사진 탭. 게스트는 토스트, 아니면 [DisplayOpenFeed]를 낸다(목록의 id·URL·좋아요·`isMine`·날짜가 시드).
   void onPostTapped(String postId) {
     if (_disposed) return;
-    if (_isGuest) {
+    if (_isGuest()) {
       _toast(Copy.guestFeed);
       return;
     }
@@ -522,7 +522,7 @@ class DisplayViewModel extends ChangeNotifier {
     try {
       for (final post in posts) {
         if (_postEvents.isRemoved(post.id)) continue;
-        final card = _isGuest
+        final card = _isGuest()
             ? post.copyWith(isLiked: false, isMine: false)
             : post;
         _likes.reconcile(
