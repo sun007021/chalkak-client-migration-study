@@ -12,6 +12,11 @@ import '../home/data/api_home_repository.dart';
 import '../home/domain/home_preload.dart';
 import '../like/data/api_like_repository.dart';
 import '../like/domain/like_store.dart';
+import '../record/data/api_record_repository.dart';
+import '../record/data/gallery_calendar_image_saver.dart';
+import '../record/data/png_calendar_image_renderer.dart';
+import '../record/data/post_bus_record_events.dart';
+import '../record/domain/record_data_cleaner.dart';
 import 'domain/guest_flag.dart';
 import 'main_dependencies.dart';
 
@@ -39,5 +44,10 @@ MainDependencies buildMainDependencies(ApiClient client) {
     ),
     postEvents: postEvents,
     guestFlag: guestFlag,
+    recordRepository: ApiRecordRepository(client: client),
+    recordImageRenderer: const PngCalendarImageRenderer(),
+    recordImageSaver: const GalleryCalendarImageSaver(),
+    recordPostEvents: PostBusRecordEvents(postEvents),
+    recordCleaner: RecordDataCleaner(),
   );
 }

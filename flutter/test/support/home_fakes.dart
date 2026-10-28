@@ -25,6 +25,9 @@ import 'package:chalkak/features/navigation/domain/main_shell_view_model.dart';
 import 'package:chalkak/features/navigation/domain/upload_entry_gate.dart';
 import 'package:chalkak/features/navigation/main_dependencies.dart';
 import 'package:chalkak/features/navigation/presentation/main_shell_navigator.dart';
+import 'package:chalkak/features/record/data/api_record_repository.dart';
+import 'package:chalkak/features/record/data/post_bus_record_events.dart';
+import 'package:chalkak/features/record/domain/record_data_cleaner.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart' show test;
@@ -34,6 +37,8 @@ import 'display_fakes.dart';
 import 'fake_adapter.dart';
 import 'fake_analytics_tracker.dart';
 import 'net_harness.dart' show advance, sessionAt, sessionGuest, settle, t0, v1;
+import 'record_fakes.dart'
+    show FakeCalendarImageRenderer, FakeCalendarImageSaver;
 
 /// `shared/fixtures/<name>`을 manifest의 상태와 함께 응답으로 만든다(지연 선택).
 FakeResponse fx(String name, {Duration delay = Duration.zero}) =>
@@ -368,7 +373,17 @@ class HomeFakes {
     likeStore: likeStore,
     postEvents: postEvents,
     guestFlag: guestFlag,
+    recordRepository: ApiRecordRepository(client: http.client),
+    recordImageRenderer: recordRenderer,
+    recordImageSaver: recordSaver,
+    recordPostEvents: PostBusRecordEvents(postEvents),
+    recordCleaner: recordCleaner,
   );
+
+  /// 기록 탭은 홈과 같은 FakeAdapter 위의 `/posts/calendar`를 쓴다(홈 `api.calendar`로 스크립트).
+  final FakeCalendarImageRenderer recordRenderer = FakeCalendarImageRenderer();
+  final FakeCalendarImageSaver recordSaver = FakeCalendarImageSaver();
+  final RecordDataCleaner recordCleaner = RecordDataCleaner();
 }
 
 /// 시작 시각을 정해 가상 시간에서 실행하는 테스트(KST 자정·주 경계 시나리오용).
