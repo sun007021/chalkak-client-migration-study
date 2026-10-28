@@ -21,8 +21,10 @@ import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
 import kr.chalkak.feature.upload.UploadGateEffect
 import kr.chalkak.feature.upload.UploadSuccessText
+import kr.chalkak.core.common.DateFormats
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -121,7 +123,9 @@ class MainHostUploadTest {
         tap("upload-success.confirm-button")
         rule.awaitTag("display.root")
         assertEquals(Route.TabRoot(Tab.Display), rig.nav.top)
-        assertEquals(UPLOAD_ENTRY_DATE, rig.nav.state.value.displayDateRequest)
+        // The display route took the request over (consumed) and opened the uploaded day.
+        assertNull(rig.nav.state.value.displayDateRequest)
+        node("display.date-label").assertTextEquals(DateFormats.monthDay(UPLOAD_ENTRY_DATE))
         assertFalse(rule.hasNode("upload-success.root"))
         assertFalse(rule.hasNode("upload.root"))
         node("bottom-bar.root").assertIsDisplayed()

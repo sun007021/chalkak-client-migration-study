@@ -110,9 +110,13 @@ class AndroidPhotoCodec(private val bitmaps: OrientedBitmaps) : PhotoCodec {
     override suspend fun readBounds(photo: PickedPhoto): ImageSize? = withContext(Dispatchers.IO) { bitmaps.bounds(photo) }
 
     override suspend fun decode(photo: PickedPhoto, sampleSize: Int): DecodedImage =
-        withContext(Dispatchers.IO) { AndroidDecodedImage(bitmaps.decode(photo, sampleSize)) }
+        withContext(Dispatchers.IO) { AndroidDecodedImage(oomAsFailure { bitmaps.decode(photo, sampleSize) }) }
 
     override suspend fun render(source: DecodedImage, edit: PhotoEdit): DecodedImage = withContext(Dispatchers.Default) {
+        oomAsFailure { renderNow(source, edit) }
+    }
+
+    private suspend fun renderNow(source: DecodedImage, edit: PhotoEdit): DecodedImage {
         val input = (source as AndroidDecodedImage).bitmap
         val shaped = BitmapGeometry.rotateAndCrop(input, edit.quarterTurns, edit.crop)
         // The pixel stage writes in place: it needs a copy of the source itself, never the source (the caller still owns it).
@@ -122,11 +126,18 @@ class AndroidPhotoCodec(private val bitmaps: OrientedBitmaps) : PhotoCodec {
             shaped.copy(Bitmap.Config.ARGB_8888, true).also { if (shaped !== input) shaped.recycle() }
         }
         PixelPipeline.applyInPlace(target, edit.adjustments.toValues(), edit.filter)
-        AndroidDecodedImage(target)
+        return AndroidDecodedImage(target)
     }
 
     override suspend fun scale(source: DecodedImage, target: ImageSize): DecodedImage = withContext(Dispatchers.Default) {
-        AndroidDecodedImage(Bitmap.createScaledBitmap((source as AndroidDecodedImage).bitmap, target.width, target.height, true))
+        AndroidDecodedImage(oomAsFailure { Bitmap.createScaledBitmap((source as AndroidDecodedImage).bitmap, target.width, target.height, true) })
+    }
+
+    /** A bitmap that does not fit in memory is "this photo cannot be prepared" (REQ-UPL-018), not a crash: the encoder only catches Exceptions. */
+    private inline fun <T> oomAsFailure(block: () -> T): T = try {
+        block()
+    } catch (e: OutOfMemoryError) {
+        throw IllegalStateException("out of memory while preparing the photo", e)
     }
 }
 
