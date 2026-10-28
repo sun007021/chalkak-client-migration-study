@@ -1,14 +1,24 @@
-import { ROUTES } from '../../app/paths';
 import type { PostSeed } from '../post/postModels';
-export function feedLocationState(seed: PostSeed): { seed: PostSeed } { return { seed }; }
-export function readFeedSeed(state: unknown, postId: string): PostSeed | null {
-  if (typeof state !== 'object' || state === null) return null;
-  const seed = (state as { seed?: unknown }).seed as Record<string, unknown> | undefined;
-  if (typeof seed !== 'object' || seed === null) return null;
-  if (typeof seed.id !== 'string' || seed.id.toLowerCase() !== postId.toLowerCase()) return null;
-  if (typeof seed.authorId !== 'string' || typeof seed.originalImageUrl !== 'string') return null;
-  if (typeof seed.likeCount !== 'number' || seed.likeCount < 0 || typeof seed.isLiked !== 'boolean' || typeof seed.isMine !== 'boolean') return null;
-  return seed as unknown as PostSeed;
+
+/** 상세를 push할 때 넣는 location state. 새로고침하면 브라우저가 history.state를 유지하므로 시드도 남는다. */
+export function feedLocationState(_seed: PostSeed): { seed: PostSeed } {
+  throw new Error('not implemented');
 }
+
+/**
+ * location.state에서 시드를 꺼낸다. 객체가 아니거나 필수 필드(id, authorId, originalImageUrl, likeCount(음수 아님), isLiked, isMine) 모양이 틀리거나
+ * seed.id가 postId와 다르면(대소문자 무시) null — 믿을 수 있는 시드만 쓴다.
+ */
+export function readFeedSeed(_state: unknown, _postId: string): PostSeed | null {
+  throw new Error('not implemented');
+}
+
 export type FeedClosePlan = { kind: 'back' } | { kind: 'replace'; to: string };
-export function planFeedClose(l: { key: string }): FeedClosePlan { return l.key === 'default' ? { kind: 'replace', to: ROUTES.home } : { kind: 'back' }; }
+
+/**
+ * 닫기 버튼의 이동 계획. 앱 안에서 push한 항목(location.key !== 'default')이면 뒤로(이전 화면·스크롤 복원),
+ * 새로고침·딥링크로 첫 항목이 된 경우(key === 'default')에는 홈으로 replace(임시: 어디서 왔는지 알 수 없다).
+ */
+export function planFeedClose(_location: { key: string }): FeedClosePlan {
+  throw new Error('not implemented');
+}

@@ -1,19 +1,26 @@
 import type { ApiClient } from '../../core/net/ApiClient';
-import { d } from '../../core/net/decode';
-import { InvalidResponseError } from '../../core/net/errors';
-import { path } from '../../core/net/url';
-export interface LikeResult { postId: string; likeCount: number; isLiked: boolean }
-const decode = d.object({ postId: d.string(), likeCount: d.number(), isLiked: d.boolean() });
+
+/** 좋아요 PUT/DELETE의 성공 응답(API §1.3). */
+export interface LikeResult {
+  postId: string;
+  likeCount: number;
+  isLiked: boolean;
+}
+
+/**
+ * 좋아요 API. 본문 없는 PUT/DELETE `/posts/{postId}/likes`이고 멱등이라 D-21 자동 재시도를 거친다.
+ * 던지는 것은 ApiClient와 같다(ApiError, NetworkError, InvalidResponseError, 취소는 AbortError).
+ */
 export class LikeRepository {
   constructor(protected readonly deps: { api: ApiClient }) {}
-  async like(id: string, signal?: AbortSignal): Promise<LikeResult> {
-    const r = await this.deps.api.request({ method: 'PUT', path: path`/posts/${id}/likes`, signal }, decode);
-    if (r.postId.toLowerCase() !== id.toLowerCase() || !r.isLiked) throw new InvalidResponseError('like mismatch');
-    return r;
+
+  /** PUT /posts/{postId}/likes. 응답 postId가 요청과 다르거나 isLiked=false(모순)면 InvalidResponseError. */
+  like(_postId: string, _signal?: AbortSignal): Promise<LikeResult> {
+    throw new Error('not implemented');
   }
-  async unlike(id: string, signal?: AbortSignal): Promise<LikeResult> {
-    const r = await this.deps.api.request({ method: 'DELETE', path: path`/posts/${id}/likes`, signal }, decode);
-    if (r.postId.toLowerCase() !== id.toLowerCase() || r.isLiked) throw new InvalidResponseError('unlike mismatch');
-    return r;
+
+  /** DELETE /posts/{postId}/likes. 응답 postId가 요청과 다르거나 isLiked=true(모순)면 InvalidResponseError. */
+  unlike(_postId: string, _signal?: AbortSignal): Promise<LikeResult> {
+    throw new Error('not implemented');
   }
 }
