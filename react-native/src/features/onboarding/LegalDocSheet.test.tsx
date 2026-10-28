@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { FakeAnalyticsTracker } from '../../core/analytics/__testing__/FakeAnalyticsTracker';
-import { FakeExternalLinkOpener } from '../../core/link/__testing__/FakeExternalLinkOpener';
+import { FakeExternalLinkOpener } from '../../core/linking/__testing__/FakeExternalLinkOpener';
 import { TERMS_URLS } from '../../shared/constants';
 import { t } from '../../shared/copy';
 import { LegalDocSheet, type WebViewComponentProps } from './LegalDocSheet';
@@ -26,7 +26,7 @@ async function setup(url: string = TERMS_URLS.service) {
     kind: 'service',
     url,
     analytics: new FakeAnalyticsTracker(),
-    externalLinkOpener: new FakeExternalLinkOpener(),
+    linkOpener: new FakeExternalLinkOpener(),
   });
   await vm.start();
   const onClose = jest.fn();

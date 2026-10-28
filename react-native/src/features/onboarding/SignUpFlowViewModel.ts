@@ -1,5 +1,5 @@
 import type { AnalyticsTracker } from '../../core/analytics/AnalyticsTracker';
-import type { ExternalLinkOpener } from '../../core/link/ExternalLinkOpener';
+import type { ExternalLinkOpener } from '../../core/linking/ExternalLinkOpener';
 import type { PushRegistrar } from '../../core/push/PushRegistrar';
 import { Observable } from '../../core/state/Observable';
 import { TERMS_URLS } from '../../shared/constants';
@@ -21,7 +21,7 @@ export type SignUpFlowDeps = {
   analytics: AnalyticsTracker;
   authNavigator: AuthFlowNavigator;
   pushRegistrar: PushRegistrar;
-  externalLinkOpener: ExternalLinkOpener;
+  linkOpener: ExternalLinkOpener;
   /** 사인 흐름(onboarding 모드)을 만든다. 콜백은 이 클래스가 넘긴다. */
   createSignatureFlow: (host: {
     onCompleted: () => void;
@@ -99,7 +99,7 @@ export class SignUpFlowViewModel extends Observable<SignUpFlowState> {
       kind,
       url: TERMS_URLS[kind],
       analytics: this.deps.analytics,
-      externalLinkOpener: this.deps.externalLinkOpener,
+      linkOpener: this.deps.linkOpener,
     });
     this.documentViewModel = document;
     this.setState({ ...this.getSnapshot(), openDocument: kind });

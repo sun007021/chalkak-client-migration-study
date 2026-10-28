@@ -1,5 +1,5 @@
 import type { AnalyticsTracker } from '../../core/analytics/AnalyticsTracker';
-import type { ExternalLinkOpener } from '../../core/link/ExternalLinkOpener';
+import type { ExternalLinkOpener } from '../../core/linking/ExternalLinkOpener';
 import { Observable } from '../../core/state/Observable';
 import { decideDocumentTarget, normalizeDocumentUrl } from './TermsDocumentPolicy';
 import type { TermsKind } from './TermsViewModel';
@@ -17,7 +17,7 @@ export type TermsDocumentDeps = {
   kind: TermsKind;
   url: string;
   analytics: AnalyticsTracker;
-  externalLinkOpener: ExternalLinkOpener;
+  linkOpener: ExternalLinkOpener;
 };
 
 /** 약관 문서 시트. 설정에서도 같은 클래스를 쓴다. 웹뷰 컴포넌트는 플랫폼 부분이라 화면이 주입받는다. */
@@ -36,7 +36,7 @@ export class TermsDocumentViewModel extends Observable<TermsDocumentState> {
    * 외부 브라우저로 열렸으면 status는 loaded이고 inAppUrl은 null이다(소유자가 시트를 닫는다).
    */
   async start(): Promise<void> {
-    const { kind, analytics, externalLinkOpener } = this.deps;
+    const { kind, analytics, linkOpener } = this.deps;
     // 판정한 값과 실제로 여는 값이 같도록 한 번만 정규화한다.
     const url = normalizeDocumentUrl(this.deps.url);
     analytics.screenView(kind === 'service' ? 'terms_of_service' : 'privacy_policy');
@@ -45,7 +45,7 @@ export class TermsDocumentViewModel extends Observable<TermsDocumentState> {
       this.setState({ ...this.getSnapshot(), status: 'loading', inAppUrl: url });
       return;
     }
-    const opened = target === 'external' && (await openSafely(externalLinkOpener, url));
+    const opened = target === 'external' && (await openSafely(linkOpener, url));
     this.setState({ ...this.getSnapshot(), status: opened ? 'loaded' : 'cannot-open' });
   }
 
@@ -53,7 +53,7 @@ export class TermsDocumentViewModel extends Observable<TermsDocumentState> {
   async openExternal(url: string): Promise<void> {
     const value = normalizeDocumentUrl(url);
     if (decideDocumentTarget(value) !== 'external') return;
-    await openSafely(this.deps.externalLinkOpener, value);
+    await openSafely(this.deps.linkOpener, value);
   }
 
   onWebViewLoaded(): void {
@@ -76,7 +76,7 @@ export class TermsDocumentViewModel extends Observable<TermsDocumentState> {
 
 async function openSafely(opener: ExternalLinkOpener, url: string): Promise<boolean> {
   try {
-    return await opener.open(url);
+    return (await opener.open(url)) === 'opened';
   } catch {
     return false;
   }

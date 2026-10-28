@@ -1,6 +1,6 @@
 import { FakeAnalyticsTracker } from '../../../core/analytics/__testing__/FakeAnalyticsTracker';
 import { FakeSleeper } from '../../../core/http/__testing__/FakeSleeper';
-import { FakeExternalLinkOpener } from '../../../core/link/__testing__/FakeExternalLinkOpener';
+import { FakeExternalLinkOpener } from '../../../core/linking/__testing__/FakeExternalLinkOpener';
 import { FakeToastPresenter } from '../../../core/toast/__testing__/FakeToastPresenter';
 import type { PendingSignUp } from '../../../data/auth/AuthRepository';
 import { createAuthHarness } from '../../../data/auth/__testing__/createAuthHarness';
@@ -36,7 +36,7 @@ export function createSignUpHarness(
     analytics,
     authNavigator: navigator,
     pushRegistrar: auth.push,
-    externalLinkOpener: linkOpener,
+    linkOpener,
     createSignatureFlow: (host) =>
       new SignatureFlowViewModel({
         mode: 'onboarding',

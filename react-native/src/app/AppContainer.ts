@@ -21,8 +21,6 @@ import type { UserDataCache } from '../core/push/UserDataCache';
 import { UserDataCacheRegistry } from '../core/push/UserDataCacheRegistry';
 import { ToastCenter } from '../core/toast/ToastCenter';
 import type { ToastPresenter } from '../core/toast/ToastPresenter';
-import { LinkingExternalLinkOpener as LegalLinkOpener } from '../core/link/LinkingExternalLinkOpener';
-import type { ExternalLinkOpener as LegalExternalLinkOpener } from '../core/link/ExternalLinkOpener';
 import { AuthRepository, type PendingSignUp } from '../data/auth/AuthRepository';
 import { SignUpRepository } from '../data/auth/SignUpRepository';
 import { SignatureRepository } from '../data/signature/SignatureRepository';
@@ -98,7 +96,6 @@ export interface Dependencies {
   readonly visibility: AppVisibility;
   readonly linkOpener: ExternalLinkOpener;
   readonly sleeper: Sleeper;
-  readonly externalLinkOpener: LegalExternalLinkOpener;
   /** 사인 PNG를 만드는 래스터라이저. 기본은 순수 TS 구현(다섯 플랫폼이 같은 알고리즘). */
   readonly signatureRasterizer: SignatureRasterizer;
   /** 기본은 화면 위에 그리는 ToastCenter(`container.toastCenter`). 테스트는 Fake를 넣는다. */
@@ -138,7 +135,7 @@ export class AppContainer {
   readonly signUpFlowOwner: SignUpFlowOwner;
   readonly signatureRepository: SignatureRepository;
   private readonly signUpRepository: SignUpRepository;
-  private readonly externalLinkOpener: LegalExternalLinkOpener;
+  private readonly linkOpener: ExternalLinkOpener;
   private readonly sleeper: Sleeper;
   private readonly signatureRasterizer: SignatureRasterizer;
   private readonly socialLoginClient: SocialLoginClient;
@@ -152,7 +149,7 @@ export class AppContainer {
     this.dependencies = dependencies;
     this.toast = dependencies.toast;
     this.toastCenter = toastCenter;
-    this.externalLinkOpener = dependencies.externalLinkOpener;
+    this.linkOpener = dependencies.linkOpener;
     this.sleeper = dependencies.sleeper;
     this.signatureRasterizer = dependencies.signatureRasterizer;
     this.config = dependencies.config;
@@ -210,7 +207,7 @@ export class AppContainer {
       analytics: this.analytics,
       authNavigator: this.bootViewModel,
       pushRegistrar: this.pushRegistrar,
-      externalLinkOpener: this.externalLinkOpener,
+      linkOpener: this.linkOpener,
       createSignatureFlow: (host) =>
         new SignatureFlowViewModel({
           mode: 'onboarding',
@@ -279,7 +276,7 @@ export class AppContainer {
       url,
       analytics: this.analytics,
       toast: this.toast,
-      linkOpener: this.dependencies.linkOpener,
+      linkOpener: this.linkOpener,
     });
   }
 
@@ -355,7 +352,6 @@ export class AppContainer {
         linkOpener: overrides.linkOpener ?? new LinkingExternalLinkOpener(),
         toast: overrides.toast ?? toastCenter!,
         sleeper,
-        externalLinkOpener: overrides.externalLinkOpener ?? new LegalLinkOpener(),
         signatureRasterizer: overrides.signatureRasterizer ?? new SoftwareSignatureRasterizer(),
         likes: overrides.likes ?? new NoopLikeController(),
         aiReview: overrides.aiReview ?? new NoopAiReviewPoller(),

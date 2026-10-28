@@ -1,5 +1,5 @@
 import { FakeAnalyticsTracker } from '../../core/analytics/__testing__/FakeAnalyticsTracker';
-import { FakeExternalLinkOpener } from '../../core/link/__testing__/FakeExternalLinkOpener';
+import { FakeExternalLinkOpener } from '../../core/linking/__testing__/FakeExternalLinkOpener';
 import { TERMS_URLS } from '../../shared/constants';
 import { TermsDocumentViewModel } from './TermsDocumentViewModel';
 import type { TermsKind } from './TermsViewModel';
@@ -10,7 +10,7 @@ function setup(
 ) {
   const analytics = new FakeAnalyticsTracker();
   const opener = new FakeExternalLinkOpener();
-  const vm = new TermsDocumentViewModel({ kind, url, analytics, externalLinkOpener: opener });
+  const vm = new TermsDocumentViewModel({ kind, url, analytics, linkOpener: opener });
   return { vm, analytics, opener };
 }
 
@@ -40,7 +40,7 @@ describe('TermsDocumentViewModel', () => {
 
   it('TC-ONB-013 외부 브라우저로도 열 수 없으면 cannot-open("문서를 열 수 없어요")', async () => {
     const { vm, opener } = setup('service', 'https://evil.example/terms');
-    opener.setResult(false);
+    opener.result = 'failed';
     await vm.start();
     expect(vm.getSnapshot().status).toBe('cannot-open');
   });
