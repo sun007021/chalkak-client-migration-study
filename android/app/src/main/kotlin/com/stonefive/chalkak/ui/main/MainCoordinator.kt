@@ -7,12 +7,14 @@ import kotlinx.coroutines.launch
 import kr.chalkak.core.data.home.HomePost
 import kr.chalkak.core.data.post.PostSort
 import kr.chalkak.core.data.post.PostSummary
+import kr.chalkak.feature.display.FeedEntry
 import kr.chalkak.feature.home.HomeEffect
 import kr.chalkak.feature.navigation.FeedSource
 import kr.chalkak.feature.navigation.NavOutcome
 import kr.chalkak.feature.navigation.NavigationController
 import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
+import java.time.LocalDate
 import kr.chalkak.feature.upload.UploadCopyKeys
 import kr.chalkak.feature.upload.SuccessInfo
 import kr.chalkak.feature.upload.UploadGateEffect
@@ -98,7 +100,12 @@ class MainCoordinator(
                 session.displayEntry = DisplayEntry(session.displayEntry.seq + 1, effect.date, PostSort.POPULAR)
                 onTabClick(Tab.Display)
             }
-            is HomeEffect.OpenRecord -> onTabClick(Tab.Record)
+            is HomeEffect.OpenRecord -> {
+                session.recordRequestedDate = effect.date
+                onTabClick(Tab.Record)
+                // A blocked / ignored tab move (guest) never reaches the record route: do not leave the request behind.
+                if (nav.top != Route.TabRoot(Tab.Record)) session.recordRequestedDate = null
+            }
             HomeEffect.OpenNotifications -> open(Route.Notifications)
             is HomeEffect.OpenIssue -> {
                 session.issueBanner = effect.banner
@@ -114,6 +121,18 @@ class MainCoordinator(
     fun onDisplayOpenFeed(post: PostSummary) {
         session.feedSeeds[post.id] = post
         open(Route.Feed(post.id, FeedSource.Display))
+    }
+
+    /** Record tab "피드에서 보기": my post's detail seeded with the thumbnail; back returns to the record tab. */
+    fun onRecordOpenFeed(entry: FeedEntry.FromRecord) {
+        session.recordSeeds[entry.postId] = entry
+        open(Route.Feed(entry.postId, FeedSource.ById))
+    }
+
+    /** Record tab "전시 보러가기": the display tab of [date] pushed on top of the record tab (REQ-REC-035, REQ-NAV-030). */
+    fun onRecordOpenDisplay(date: LocalDate) {
+        session.displayEntry = DisplayEntry(session.displayEntry.seq + 1, date, null)
+        open(Route.TabRoot(Tab.Display))
     }
 
     /** The post was deleted: the feed on top is popped and the deletion toast shown (REQ-NAV-039/040). */
@@ -136,7 +155,10 @@ class MainCoordinator(
     private fun open(route: Route) {
         val outcome = nav.open(route)
         if (outcome is NavOutcome.Blocked) showToast(copy[outcome.copyKey])
-        if (outcome !is NavOutcome.Navigated && outcome !is NavOutcome.Replaced && route is Route.Feed) session.feedSeeds.remove(route.postId)
+        if (outcome !is NavOutcome.Navigated && outcome !is NavOutcome.Replaced && route is Route.Feed) {
+            session.feedSeeds.remove(route.postId)
+            session.recordSeeds.remove(route.postId)
+        }
     }
 
     private fun HomePost.toSeed() = PostSummary(

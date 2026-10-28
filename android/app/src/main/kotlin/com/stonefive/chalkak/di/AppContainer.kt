@@ -95,6 +95,9 @@ import kr.chalkak.core.network.HttpRefreshApi
 import kr.chalkak.core.network.OkHttpFactory
 import kr.chalkak.core.network.SessionStore
 import kr.chalkak.core.network.TokenRefresher
+import kr.chalkak.core.data.record.DefaultRecordRepository
+import kr.chalkak.core.data.record.RecordRepository
+import kr.chalkak.feature.record.RecordStateHolder
 import okhttp3.OkHttpClient
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -178,6 +181,8 @@ class AppContainer(
 
     val authRepository: AuthRepository by lazy { DefaultAuthRepository(apiClient, sessionStore, userDataResetter, clock) }
     val homeRepository: HomeRepository by lazy { DefaultHomeRepository(apiClient) }
+
+    val recordRepository: RecordRepository by lazy { DefaultRecordRepository(apiClient) }
     val bannerRepository: BannerRepository by lazy { DefaultBannerRepository(apiClient) }
     val postRepository: PostRepository by lazy { DefaultPostRepository(apiClient) }
     val postCreationRepository: PostCreationRepository by lazy { DefaultPostCreationRepository(apiClient) }
@@ -338,6 +343,20 @@ class AppContainer(
             } else {
                 { url, modifier -> CoilPhotoImage(loader, url, modifier) }
             },
+            // screen_view comes from the navigation controller only (D-22): the record holder's own would double it.
+            newRecordHolder = { scope, mode ->
+                RecordStateHolder(
+                    scope = scope,
+                    clock = clock,
+                    repository = recordRepository,
+                    postChanges = postChanges,
+                    analytics = NoScreenViews,
+                    mode = mode,
+                    renderer = platform.calendarRenderer(loader),
+                    saver = platform.calendarSaver,
+                )
+            },
+            today = kstCalendar::today,
             issueWeb = { url, onNavigate, onLoaded, onFailed -> IssueWebView(url, onNavigate, onLoaded, onFailed, Modifier.fillMaxSize()) },
         )
     }
