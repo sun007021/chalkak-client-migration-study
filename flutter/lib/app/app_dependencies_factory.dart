@@ -20,6 +20,7 @@ import '../features/boot/domain/auth_gate.dart';
 import '../features/boot/domain/pending_navigation.dart';
 import '../features/boot/domain/update_gate.dart';
 import '../features/home/domain/home_preload.dart';
+import '../features/like/domain/like_data_cleaner.dart';
 import '../features/navigation/main_dependencies_factory.dart';
 import '../features/onboarding/data/api_sign_up_repository.dart';
 import '../features/onboarding/data/url_launcher_external_link_launcher.dart';
@@ -57,6 +58,8 @@ AppDependencies buildAppDependencies(AppConfig config) {
   final cleaner = CompositeUserDataCleaner([
     pendingNavigation,
     main.preloadCache,
+    LikeDataCleaner(likes: main.likeStore, postEvents: main.postEvents),
+    main.recordCleaner,
   ]);
   const pushRegistrar = _NoopPushRegistrar();
   final signatureRepository = ApiSignatureRepository(client: client);

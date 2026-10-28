@@ -7,9 +7,16 @@ import '../../../core/copy/ko.g.dart';
 import '../../../core/ui/test_id.dart';
 import '../../../core/ui/toast/toast_controller.dart';
 import '../../../core/ui/toast/toast_host.dart';
+import '../../display/domain/display_models.dart';
+import '../../display/presentation/display_screen.dart';
+import '../../display/presentation/display_view_model.dart';
+import '../../feed/domain/feed_target.dart';
 import '../../home/domain/home_state.dart';
 import '../../home/domain/home_view_model.dart';
 import '../../home/presentation/home_screen.dart';
+import '../../record/domain/record_state.dart';
+import '../../record/domain/record_view_model.dart';
+import '../../record/presentation/record_screen.dart';
 import '../domain/main_shell_view_model.dart';
 import 'main_shell_navigator.dart';
 import 'navigation_test_ids.dart';
@@ -17,8 +24,8 @@ import 'navigation_test_ids.dart';
 /// 메인 화면: 탭 본문 + 하단 바(홈, 전시, 가운데 업로드, 기록, 설정).
 /// - 하단 바 `bottom-bar.root`, 탭 `bottom-bar.tab-*`(선택된 탭만 selected), 업로드 버튼
 ///   `bottom-bar.upload-button`(selected 없음, 접근성 이름 Copy.navTabUploadA11y, 아이콘 "+").
-/// - 탭 본문: 홈은 [HomeScreen](`home.root`), 전시·기록·설정은 자리표시자(`display.root`,
-///   `record.root`, `settings.root`)이며 한 번 만든 뒤 탭을 오가도 상태를 유지한다(REQ-NAV-005).
+/// - 탭 본문: 홈은 [HomeScreen](`home.root`), 전시·기록은 각 화면(ViewModel을 받지 못하면 자리표시자),
+///   설정은 자리표시자(`settings.root`)이며 한 번 만든 뒤 탭을 오가도 상태를 유지한다(REQ-NAV-005).
 /// - 업로드 게이트 확인 중에는 `upload-entry.loading`을 보인다.
 /// - [HomeViewModel] 이벤트를 [MainShellViewModel]/[MainShellNavigator]로 연결한다:
 ///   OpenUploadGate -> onUploadPressed, OpenRecordTab -> openRecord, OpenDisplayTab ->
@@ -35,6 +42,8 @@ class MainShell extends StatefulWidget {
     required this.navigator,
     required this.toast,
     required this.aiCardBuilder,
+    this.displayFactory,
+    this.record,
   });
 
   final MainShellViewModel shell;
@@ -42,6 +51,14 @@ class MainShell extends StatefulWidget {
   final MainShellNavigator navigator;
   final ToastController toast;
   final HomeAiCardBuilder aiCardBuilder;
+
+  /// 전시 탭 ViewModel을 처음 열 때 만든다(홈 랭킹 더보기로 열면 그 날짜·정렬이 [DisplayTarget]).
+  /// 셸이 소유하고 정리한다. null이면 전시 탭은 자리표시자다.
+  final DisplayViewModel Function(DisplayTarget? target)? displayFactory;
+
+  /// 기록 탭 ViewModel. 소유와 정리는 만든 쪽이 한다. null이면 기록 탭은 자리표시자다.
+  /// 탭이 선택될 때와 이동에서 돌아올 때 `enter`, 앱 복귀 때 `onForeground`, 탭을 떠날 때 `onHidden`을 부른다.
+  final RecordViewModel? record;
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -53,7 +70,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   final Set<String> _pending = {};
   StreamSubscription<HomeEvent>? _homeEvents;
   StreamSubscription<MainShellEvent>? _shellEvents;
+  StreamSubscription<RecordEvent>? _recordEvents;
   late BottomDestination _selected = widget.shell.selected;
+  DisplayViewModel? _display;
 
   @override
   void initState() {
@@ -62,6 +81,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     widget.shell.addListener(_onShellChanged);
     _homeEvents = widget.home.events.listen(_onHomeEvent);
     _shellEvents = widget.shell.events.listen(_onShellEvent);
+    _recordEvents = widget.record?.events.listen(_onRecordEvent);
     widget.shell.start();
     unawaited(widget.home.load());
   }
@@ -72,30 +92,113 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     widget.shell.removeListener(_onShellChanged);
     unawaited(_homeEvents?.cancel());
     unawaited(_shellEvents?.cancel());
+    unawaited(_recordEvents?.cancel());
     _homeScroll.dispose();
+    _display?.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed &&
-        widget.shell.selected == BottomDestination.home) {
+    if (state != AppLifecycleState.resumed) return;
+    if (widget.shell.selected == BottomDestination.home) {
       unawaited(widget.home.onForeground());
     }
+    if (widget.shell.selected == BottomDestination.record) {
+      unawaited(widget.record?.onForeground());
+    }
+    unawaited(_display?.onResumed());
   }
 
   void _onShellChanged() {
     final selected = widget.shell.selected;
     if (selected != _selected) {
+      final leftRecord = _selected == BottomDestination.record;
       final cameToHome = selected == BottomDestination.home;
       setState(() {
         _selected = selected;
         _visited.add(selected);
       });
+      if (leftRecord) widget.record?.onHidden();
+      if (selected == BottomDestination.record) _enterRecord();
       if (cameToHome) unawaited(widget.home.onBecameVisible());
+      if (selected == BottomDestination.display) {
+        if (_display == null) {
+          _ensureDisplay();
+        } else {
+          _applyDisplayTarget();
+        }
+      }
     } else {
       setState(() {});
     }
+  }
+
+  /// 기록 탭이 열릴 때: 홈이 넘긴 날짜가 있으면 그 날짜를 고르며 들어간다.
+  void _enterRecord() {
+    final record = widget.record;
+    if (record == null) return;
+    unawaited(
+      record.enter(requestedDate: widget.shell.takeRecordTarget()?.date),
+    );
+  }
+
+  void _onRecordEvent(RecordEvent event) {
+    switch (event) {
+      case RecordOpenFeed(:final photo):
+        unawaited(() async {
+          await _open(
+            'feed',
+            () => widget.navigator.openFeedTarget(
+              FeedTarget(
+                postId: photo.postId,
+                origin: FeedOrigin.record,
+                isMine: true,
+                thumbnailUrl: photo.thumbnailImageUrl,
+              ),
+            ),
+          );
+          // 돌아오면 보던 달·날짜를 유지한 채 재검증한다(REQ-REC-036).
+          if (mounted && widget.shell.selected == BottomDestination.record) {
+            unawaited(widget.record?.enter());
+          }
+        }());
+      case RecordOpenDisplay(:final date):
+        widget.shell.openDisplay(date: date, popular: false);
+      case RecordGoToLogin():
+        widget.navigator.goToLogin();
+    }
+  }
+
+  /// 전시 탭이 열릴 때: 처음이면 만들고, 이미 있으면 홈이 넘긴 날짜·정렬로 옮긴다.
+  void _applyDisplayTarget() {
+    final display = _display;
+    if (display == null) return;
+    final target = widget.shell.takeDisplayTarget();
+    if (target == null) return;
+    unawaited(() async {
+      await display.selectDate(target.date);
+      await display.selectSort(
+        target.popular ? DisplaySort.popular : DisplaySort.recent,
+      );
+    }());
+  }
+
+  DisplayViewModel? _ensureDisplay() {
+    final factory = widget.displayFactory;
+    if (factory == null) return null;
+    final existing = _display;
+    if (existing != null) return existing;
+    final display = factory(widget.shell.takeDisplayTarget());
+    _display = display;
+    unawaited(display.load());
+    return display;
+  }
+
+  Future<void> _openDisplayFeed(FeedTarget target) async {
+    final display = _display;
+    await _open('feed', () => widget.navigator.openFeedTarget(target));
+    if (display != null && mounted) unawaited(display.onReturnedFromFeed());
   }
 
   void _onHomeEvent(HomeEvent event) {
@@ -125,6 +228,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       case ScrollToTop(:final destination):
         if (destination == BottomDestination.home && _homeScroll.hasClients) {
           _homeScroll.jumpTo(0);
+        }
+        if (destination == BottomDestination.display) {
+          unawaited(_display?.onTabReselected());
         }
       case NavigateToUpload(:final topicDate):
         unawaited(
@@ -177,7 +283,13 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         ),
         bottomNavigationBar: _BottomBar(
           selected: _selected,
-          onTab: shell.selectTab,
+          onTab: (destination) {
+            final reselectedRecord =
+                destination == BottomDestination.record &&
+                destination == _selected;
+            shell.selectTab(destination);
+            if (reselectedRecord) _enterRecord();
+          },
           onUpload: () => unawaited(shell.onUploadPressed()),
         ),
       ),
@@ -193,8 +305,24 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         scrollController: _homeScroll,
       ),
     ),
-    BottomDestination.display => const _TabPlaceholder('display.root'),
-    BottomDestination.record => const _TabPlaceholder('record.root'),
+    BottomDestination.display => switch (_display) {
+      final display? => SafeArea(
+        bottom: false,
+        child: DisplayScreen(
+          viewModel: display,
+          onToast: (message) => widget.toast.show(message.text),
+          onOpenFeed: (target) => unawaited(_openDisplayFeed(target)),
+        ),
+      ),
+      null => const _TabPlaceholder('display.root'),
+    },
+    BottomDestination.record => switch (widget.record) {
+      final record? => SafeArea(
+        bottom: false,
+        child: RecordScreen(viewModel: record),
+      ),
+      null => const _TabPlaceholder('record.root'),
+    },
     BottomDestination.settings => const _TabPlaceholder('settings.root'),
   };
 }

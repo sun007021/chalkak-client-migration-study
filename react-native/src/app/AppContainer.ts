@@ -21,7 +21,21 @@ import type { UserDataCache } from '../core/push/UserDataCache';
 import { UserDataCacheRegistry } from '../core/push/UserDataCacheRegistry';
 import { ToastCenter } from '../core/toast/ToastCenter';
 import type { ToastPresenter } from '../core/toast/ToastPresenter';
-import { AuthRepository } from '../data/auth/AuthRepository';
+import { AuthRepository, type PendingSignUp } from '../data/auth/AuthRepository';
+import { SignUpRepository } from '../data/auth/SignUpRepository';
+import { SignatureRepository } from '../data/signature/SignatureRepository';
+import { SignUpFlowOwner } from '../features/onboarding/SignUpFlowOwner';
+import { SignUpFlowViewModel } from '../features/onboarding/SignUpFlowViewModel';
+import { SIGNATURE_CANVAS } from '../features/signature/SignatureCanvas';
+import { SignatureEncoder } from '../features/signature/SignatureEncoder';
+import { SignatureFlowViewModel } from '../features/signature/SignatureFlowViewModel';
+import type { SignatureRasterizer } from '../features/signature/SignatureRasterizer';
+import {
+  SignatureChangeSubmitter,
+  SignUpSubmitter,
+} from '../features/signature/SignatureSubmitter';
+import { SoftwareSignatureRasterizer } from '../features/signature/SoftwareSignatureRasterizer';
+import type { Sleeper } from '../core/http/Sleeper';
 import { BannerRepository } from '../data/banner/BannerRepository';
 import { NotificationRepository } from '../data/notification/NotificationRepository';
 import { PostRepository } from '../data/post/PostRepository';
@@ -81,6 +95,9 @@ export interface Dependencies {
   readonly storeOpener: StoreOpener;
   readonly visibility: AppVisibility;
   readonly linkOpener: ExternalLinkOpener;
+  readonly sleeper: Sleeper;
+  /** 사인 PNG를 만드는 래스터라이저. 기본은 순수 TS 구현(다섯 플랫폼이 같은 알고리즘). */
+  readonly signatureRasterizer: SignatureRasterizer;
   /** 기본은 화면 위에 그리는 ToastCenter(`container.toastCenter`). 테스트는 Fake를 넣는다. */
   readonly toast: ToastPresenter;
   /** 좋아요·AI 리뷰 PR이 실제 구현으로 바꾼다. 그 전에는 아무 일도 하지 않는 구현이다. */
@@ -114,6 +131,13 @@ export class AppContainer {
   readonly homeOwner: HomeViewModelOwner;
   /** phase가 login인 동안 로그인 ViewModel을 만들고 버린다. 화면은 이것을 구독해 받는다. */
   readonly loginOwner: LoginViewModelOwner;
+  /** phase가 sign-up인 동안 가입 흐름(약관 -> 사인 -> 미리보기) ViewModel을 만들고 버린다. */
+  readonly signUpFlowOwner: SignUpFlowOwner;
+  readonly signatureRepository: SignatureRepository;
+  private readonly signUpRepository: SignUpRepository;
+  private readonly linkOpener: ExternalLinkOpener;
+  private readonly sleeper: Sleeper;
+  private readonly signatureRasterizer: SignatureRasterizer;
   private readonly socialLoginClient: SocialLoginClient;
   private readonly nonceGenerator: NonceGenerator;
   private readonly pushRegistrar: PushRegistrar;
@@ -125,6 +149,9 @@ export class AppContainer {
     this.dependencies = dependencies;
     this.toast = dependencies.toast;
     this.toastCenter = toastCenter;
+    this.linkOpener = dependencies.linkOpener;
+    this.sleeper = dependencies.sleeper;
+    this.signatureRasterizer = dependencies.signatureRasterizer;
     this.config = dependencies.config;
     this.clock = dependencies.clock;
     this.sessionStore = dependencies.sessionStore;
@@ -158,10 +185,67 @@ export class AppContainer {
     this.loginOwner = new LoginViewModelOwner(this.bootViewModel, () =>
       this.createLoginViewModel(),
     );
+    this.signatureRepository = new SignatureRepository({ api: this.api });
+    this.signUpRepository = new SignUpRepository({
+      api: this.api,
+      authRepository: this.authRepository,
+    });
+    this.signUpFlowOwner = new SignUpFlowOwner(this.bootViewModel, (pending) =>
+      this.createSignUpFlow(pending),
+    );
     this.homeOwner = new HomeViewModelOwner({
       boot: this.bootViewModel,
       create: (mode) => this.createHomeViewModel(mode),
       registerCache: (cache) => this.cacheRegistry.register(cache),
+    });
+  }
+
+  /** 소유자(signUpFlowOwner)만 부른다. 가입이 끝나거나 버려지면 소유자가 dispose한다. */
+  private createSignUpFlow(pending: PendingSignUp): SignUpFlowViewModel {
+    return new SignUpFlowViewModel({
+      pending,
+      analytics: this.analytics,
+      authNavigator: this.bootViewModel,
+      pushRegistrar: this.pushRegistrar,
+      linkOpener: this.linkOpener,
+      createSignatureFlow: (host) =>
+        new SignatureFlowViewModel({
+          mode: 'onboarding',
+          canvas: SIGNATURE_CANVAS,
+          encoder: new SignatureEncoder(this.signatureRasterizer),
+          submitter: new SignUpSubmitter({
+            signUpRepository: this.signUpRepository,
+            authRepository: this.authRepository,
+            pending,
+            sleeper: this.sleeper,
+          }),
+          analytics: this.analytics,
+          toast: this.toast,
+          authNavigator: this.bootViewModel,
+          onCompleted: host.onCompleted,
+          onExit: host.onExit,
+        }),
+    });
+  }
+
+  /**
+   * 설정의 사인 변경 흐름(change 모드)을 만든다. 호출자(설정 화면의 내비게이션)가 소유하고 버린다.
+   * 완료 시 호출자가 스택을 닫고 SignatureCardViewModel.refresh()를 부른다.
+   */
+  createSignatureChangeFlow(host: {
+    onCompleted: () => void;
+    onExit: () => void;
+  }): SignatureFlowViewModel {
+    return new SignatureFlowViewModel({
+      mode: 'change',
+      canvas: SIGNATURE_CANVAS,
+      encoder: new SignatureEncoder(this.signatureRasterizer),
+      submitter: new SignatureChangeSubmitter(this.signatureRepository),
+      analytics: this.analytics,
+      toast: this.toast,
+      authNavigator: this.bootViewModel,
+      onCompleted: host.onCompleted,
+      onExit: host.onExit,
     });
   }
 
@@ -192,7 +276,7 @@ export class AppContainer {
       url,
       analytics: this.analytics,
       toast: this.toast,
-      linkOpener: this.dependencies.linkOpener,
+      linkOpener: this.linkOpener,
     });
   }
 
@@ -226,6 +310,7 @@ export class AppContainer {
       events,
       logger,
     });
+    const sleeper = overrides.sleeper ?? new SystemSleeper();
     const api =
       overrides.api ??
       new ApiClient({
@@ -234,7 +319,7 @@ export class AppContainer {
         sessionStore,
         tokenRefresher,
         events,
-        sleeper: new SystemSleeper(),
+        sleeper,
         clock,
         logger,
       });
@@ -266,6 +351,8 @@ export class AppContainer {
         visibility,
         linkOpener: overrides.linkOpener ?? new LinkingExternalLinkOpener(),
         toast: overrides.toast ?? toastCenter!,
+        sleeper,
+        signatureRasterizer: overrides.signatureRasterizer ?? new SoftwareSignatureRasterizer(),
         likes: overrides.likes ?? new NoopLikeController(),
         aiReview: overrides.aiReview ?? new NoopAiReviewPoller(),
       },
