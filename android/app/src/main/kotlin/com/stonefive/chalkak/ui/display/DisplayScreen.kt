@@ -105,6 +105,7 @@ fun DisplayScreen(
     callbacks: DisplayCallbacks,
     remoteImage: RemoteImage,
     modifier: Modifier = Modifier,
+    scrollToTopCount: Int = 0,
 ) {
     val copy = LocalCopy.current
     var pickerOpen by rememberSaveable { mutableStateOf(false) }
@@ -132,7 +133,7 @@ fun DisplayScreen(
                         }
                     }
                     // A new date starts at the top (the grid must not keep its anchor on a post that is in both lists).
-                    DisplayStatus.Content -> androidx.compose.runtime.key(state.date) { Content(state, callbacks, remoteImage) }
+                    DisplayStatus.Content -> androidx.compose.runtime.key(state.date) { Content(state, callbacks, remoteImage, scrollToTopCount) }
                 }
                 if (state.isRefreshing) {
                     LinearProgressIndicator(
@@ -256,9 +257,12 @@ private fun SortTab(sort: PostSort, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Content(state: DisplayUiState, callbacks: DisplayCallbacks, remoteImage: RemoteImage) {
+private fun Content(state: DisplayUiState, callbacks: DisplayCallbacks, remoteImage: RemoteImage, scrollToTopCount: Int) {
     val copy = LocalCopy.current
     val gridState = rememberLazyStaggeredGridState()
+    // Re-selecting the tab (count changes after this composition began) scrolls to the top.
+    val initialScrollCount = remember { scrollToTopCount }
+    LaunchedEffect(scrollToTopCount) { if (scrollToTopCount != initialScrollCount) gridState.animateScrollToItem(0) }
     val onReachedEnd by rememberUpdatedState(callbacks.onReachedEnd)
     LaunchedEffect(gridState) {
         snapshotFlow {

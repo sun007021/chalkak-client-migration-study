@@ -156,7 +156,7 @@ private fun Detail(state: FeedUiState, content: FeedContent, callbacks: FeedCall
         }
         ZoomablePhoto(Modifier.fillMaxWidth().testTag("feed.photo").semantics { contentDescription = alt }) {
             remoteImage(content.originalImageUrl ?: content.thumbnailImageUrl, Modifier.fillMaxWidth())
-            content.signatureImageUrl?.let { signature ->
+            content.signatureImageUrl?.takeIf { it.isNotBlank() }?.let { signature ->
                 remoteImage(signature, Modifier.align(Alignment.BottomEnd).fillMaxWidth(0.4f).padding(8.dp).testTag("feed.signature-image"))
             }
         }

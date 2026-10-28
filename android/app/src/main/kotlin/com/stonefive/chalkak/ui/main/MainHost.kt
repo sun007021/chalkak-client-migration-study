@@ -19,16 +19,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.stonefive.chalkak.copy.LocalCopy
+import com.stonefive.chalkak.ui.display.DisplayRoute
+import com.stonefive.chalkak.ui.feed.FeedRoute
 import com.stonefive.chalkak.ui.home.HomeRoute
 import com.stonefive.chalkak.ui.issue.IssueWebRoute
 import com.stonefive.chalkak.viewmodel.SessionHolders
 import com.stonefive.chalkak.viewmodel.rememberStateHolder
-import com.stonefive.chalkak.ui.home.RemoteImage
+import com.stonefive.chalkak.ui.common.RemoteImage
 import com.stonefive.chalkak.ui.issue.IssueWebContent
+import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
 import kr.chalkak.core.data.post.LikeController
 import kr.chalkak.core.data.post.PostChanges
+import kr.chalkak.core.data.post.PostSort
 import kr.chalkak.feature.auth.HomeMode
+import kr.chalkak.feature.display.DisplayStateHolder
+import kr.chalkak.feature.display.FeedEntry
+import kr.chalkak.feature.display.FeedStateHolder
 import kr.chalkak.feature.home.ExternalLinkOpener
 import kr.chalkak.feature.home.HomeStateHolder
 import kr.chalkak.feature.navigation.AccessMode
@@ -57,7 +64,7 @@ class ScrollToTopSignal {
     }
 }
 
-/** Tab content of the tabs this PR does not build (display, record, settings): a box tagged `<tab>.root`. */
+/** Tab content of the tabs this PR does not build (record, settings): a box tagged `<tab>.root`. */
 @Composable
 fun TabPlaceholder(tab: Tab, modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize().testTag("${tab.analyticsName}.root"), contentAlignment = Alignment.Center) {
@@ -76,7 +83,8 @@ private fun RoutePlaceholder(tag: String, modifier: Modifier = Modifier) {
  *
  * - [newHomeHolder]: built once per home screen with the holder scope. The home holder's `LikeToggler` is a `LikeControllerToggler(likes)`.
  * - [likes] / [postChanges]: shared like state; the APP resets both on account switch (logout, login as another user).
- * - [otherTab]: content of display / record / settings (default [TabPlaceholder]); gets the tab's [ScrollToTopSignal].
+ * - [newDisplayHolder] / [newFeedHolder]: display and feed holders, kept in the session's ViewModel store (a new login gets new ones).
+ * - [otherTab]: content of record / settings (default [TabPlaceholder]); gets the tab's [ScrollToTopSignal].
  * - [issueWeb]: the WebView adapter slot for the banner web screen.
  */
 class MainDependencies(
@@ -85,7 +93,13 @@ class MainDependencies(
     val postChanges: PostChanges,
     val uploadGate: UploadEntryGate,
     val issueOpener: ExternalLinkOpener,
+    /** Display tab holder; the owner's scope, the date and sort the tab must open with (null = today, default sort). */
+    val newDisplayHolder: (scope: CoroutineScope, date: LocalDate?, sort: PostSort?) -> DisplayStateHolder,
+    /** Post detail holder for one feed entry. */
+    val newFeedHolder: (scope: CoroutineScope, entry: FeedEntry) -> FeedStateHolder,
     val image: RemoteImage = { _, _ -> },
+    /** Photo slot of display and feed (width given, height from the image's ratio); same type as [image]. */
+    val photo: RemoteImage = image,
     val issueWeb: IssueWebContent = { _, _, _, _ -> },
     val otherTab: @Composable (tab: Tab, scrollToTop: ScrollToTopSignal) -> Unit = { tab, _ -> TabPlaceholder(tab) },
 )
@@ -93,7 +107,7 @@ class MainDependencies(
 /**
  * Main area host (everything behind the boot gate except login / sign-up screens): collects `nav.state`, renders [MainShell] and lets
  * [MainCoordinator] execute every `NavOutcome` and home effect. System back goes to `nav.onSystemBack()`; `ExitApp` calls [onExitApp].
- * Screens other than home and the banner web page are presence-only placeholders until their PRs land.
+ * Screens other than home, display, feed and the banner web page are presence-only placeholders until their PRs land.
  *
  * [sessionKey] changes when a new login starts (see `RootSession`), so a new account never sees the previous account's home holder.
  * The host never sends analytics itself.
@@ -131,6 +145,7 @@ private fun MainHostContent(
     val coordinator = remember(nav, deps, session, copy) {
         MainCoordinator(nav, deps, session, copy, showToast = { latestToast(it) }, exitApp = { latestExit() })
     }
+    LaunchedEffect(navState.stack) { session.feeds.retain(navState.stack) }
     val homeList = rememberLazyListState()
     val idleSignal = remember { ScrollToTopSignal() }
 
@@ -159,9 +174,39 @@ private fun MainHostContent(
                     onWeekMore = coordinator::onWeekMore,
                 )
             }
-            is Route.TabRoot -> deps.otherTab(route.tab, if (route.tab == Tab.Display) session.displayScroll else idleSignal)
+            Route.TabRoot(Tab.Display) -> {
+                val entry = session.displayEntry
+                val holder = rememberStateHolder("display-$sessionKey-${entry.seq}") { scope ->
+                    deps.newDisplayHolder(scope, entry.date, entry.sort)
+                }
+                // Upload success asks for its topic date through the controller; the route applies it once, then it is consumed.
+                val requestedDate = navState.displayDateRequest
+                DisplayRoute(
+                    holder = holder,
+                    remoteImage = deps.photo,
+                    onOpenFeed = coordinator::onDisplayOpenFeed,
+                    requestedDate = requestedDate,
+                    scrollToTopCount = session.displayScroll.count,
+                )
+                LaunchedEffect(requestedDate) { if (requestedDate != null) nav.consumeDisplayDateRequest() }
+            }
+            is Route.TabRoot -> deps.otherTab(route.tab, idleSignal)
             Route.Notifications -> RoutePlaceholder("notifications.root")
-            is Route.Feed -> RoutePlaceholder("feed.root")
+            is Route.Feed -> {
+                val slot = session.feeds.slotFor(navState.stack.lastIndex, route, session.feedSeeds)
+                val holder = rememberStateHolder("feed-$sessionKey-${slot.id}") { scope -> deps.newFeedHolder(scope, slot.entry) }
+                slot.holder = holder
+                FeedRoute(
+                    holder = holder,
+                    remoteImage = deps.photo,
+                    onBack = coordinator::onSystemBack,
+                    onDeleted = coordinator::onFeedDeleted,
+                    onClosed = { coordinator.onFeedClosed() },
+                    onLoginRequired = coordinator::onFeedLoginRequired,
+                    // Only the top route is composed: a feed under another screen must live on; its entry's removal finishes it.
+                    finishOnLeave = false,
+                )
+            }
             Route.PhotoUpload -> RoutePlaceholder("upload.root")
             is Route.PhotoUploadSuccess -> RoutePlaceholder("upload-success.root")
             is Route.NotificationDetail -> RoutePlaceholder("notification-detail.root")

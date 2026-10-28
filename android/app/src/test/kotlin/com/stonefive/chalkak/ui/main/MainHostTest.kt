@@ -127,20 +127,20 @@ class MainHostTest {
     }
 
     @Test
-    fun `TC-NAV-008 전시 탭을 다시 누르면 전시 화면에 맨 위로 스크롤 신호가 한 번 간다`() {
+    fun `TC-NAV-008 전시 탭을 다시 누르면 전시 화면이 다시 확인하고 화면과 선택은 그대로이다`() {
         launch()
         tap("bottom-bar.tab-display")
-        rule.waitForIdle()
-        assertEquals(0, rig.displaySignals.last(), "selecting the tab is not a scroll request")
+        rule.awaitTag("display.grid")
+        val first = rig.posts.posts.calls.size
         tap("bottom-bar.tab-display")
-        assertEquals(1, rig.displaySignals.last())
-        tap("bottom-bar.tab-display")
-        assertEquals(2, rig.displaySignals.last())
+        rule.waitUntil(2_000) { rig.posts.posts.calls.size > first }
         node("display.root").assertExists()
+        assertSelectedTab(Tab.Display)
+        assertEquals(1, rig.displayRequests.size, "re-selecting keeps the holder")
     }
 
     @Test
-    fun `TC-NAV-008 설정 탭을 다시 눌러도 화면은 그대로이고 전시 신호도 없다`() {
+    fun `TC-NAV-008 설정 탭을 다시 눌러도 화면은 그대로이고 전시는 다시 확인하지 않는다`() {
         launch()
         tap("bottom-bar.tab-settings")
         val screens = rig.analytics.screens.toList()
@@ -148,7 +148,8 @@ class MainHostTest {
         node("settings.root").assertExists()
         assertSelectedTab(Tab.Settings)
         assertEquals(screens, rig.analytics.screens.toList())
-        assertTrue(rig.displaySignals.isEmpty())
+        assertTrue(rig.displayRequests.isEmpty())
+        assertTrue(rig.posts.posts.calls.isEmpty())
     }
 
     @Test

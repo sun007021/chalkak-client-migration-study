@@ -48,6 +48,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import coil3.ImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import com.stonefive.chalkak.ui.components.CoilPhotoImage
 import com.stonefive.chalkak.ui.components.CoilRemoteImage
 import com.stonefive.chalkak.ui.issue.IssueWebView
 import com.stonefive.chalkak.ui.main.MainDependencies
@@ -282,10 +283,17 @@ class AppContainer(
             postChanges = postChanges,
             uploadGate = UploadEntryGate { enterUploadGate() },
             issueOpener = ExternalLinkOpener(platform.linkBrowser),
+            newDisplayHolder = ::newDisplayHolder,
+            newFeedHolder = ::newFeedHolder,
             image = if (loader == null) {
                 { _, _ -> }
             } else {
                 { url, modifier -> CoilRemoteImage(loader, url, modifier) }
+            },
+            photo = if (loader == null) {
+                { _, _ -> }
+            } else {
+                { url, modifier -> CoilPhotoImage(loader, url, modifier) }
             },
             issueWeb = { url, onNavigate, onLoaded, onFailed -> IssueWebView(url, onNavigate, onLoaded, onFailed, Modifier.fillMaxSize()) },
         )

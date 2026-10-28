@@ -17,7 +17,9 @@ import kr.chalkak.feature.display.FeedStateHolder
  * Collects [holder] state; `onScreenShown()` on enter, `onScreenHidden()` and `onCleared()` when the route leaves (not on
  * rotation: the holder survives it); forwards [FeedCallbacks]; effects: `Deleted` -> [onDeleted], `Closed` -> [onClosed],
  * `LoginRequired` -> [onLoginRequired]; back (button or system) -> [onBack]. The holder serves one post, so a route that
- * leaves is finished: keep the route composed while another screen is stacked over it only if the holder must live on.
+ * leaves is finished ([finishOnLeave], default). A host that composes only the top route (MainHost) passes `false` and calls
+ * `holder.onCleared()` itself once the entry is popped, so a feed covered by another stacked screen keeps its like/title
+ * subscriptions and just revalidates when it shows again.
  */
 @Composable
 fun FeedRoute(
@@ -28,6 +30,7 @@ fun FeedRoute(
     onClosed: (postId: String) -> Unit,
     onLoginRequired: () -> Unit,
     modifier: Modifier = Modifier,
+    finishOnLeave: Boolean = true,
 ) {
     val state by holder.state.collectAsState()
     val back by rememberUpdatedState(onBack)
@@ -46,7 +49,7 @@ fun FeedRoute(
     LaunchedEffect(holder) { holder.onScreenShown() }
     ScreenGoneEffect(holder) {
         holder.onScreenHidden()
-        holder.onCleared()
+        if (finishOnLeave) holder.onCleared()
     }
     BackHandler(enabled = state.edit == null && !state.deleteConfirmVisible && !state.deleting) { back() }
 
