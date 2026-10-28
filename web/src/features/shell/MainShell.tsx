@@ -21,6 +21,8 @@ export interface TabRouteHandle {
 /** 탭 화면이 Outlet 컨텍스트로 받는 값. */
 export interface ShellContext {
   mode: SessionMode;
+  /** 탭 재선택 구독(전시 맨 위 스크롤 등)에 쓰는 셸 ViewModel. */
+  shell: MainShellViewModel;
 }
 
 export const useShellContext = (): ShellContext => useOutletContext<ShellContext>();
@@ -107,8 +109,7 @@ export function MainShell({ mode }: { mode: SessionMode }): ReactNode {
   const slot = useContext(BottomBarSlotContext);
   const create = useCallback(() => container.createMainShellViewModel(mode), [container, mode]);
   const vm = useOwnedViewModel(create);
-  const context: ShellContext = { mode };
-
+  
   // 토스트가 하단 바 위에 뜨도록 높이를 CSS 변수로 알린다.
   useEffect(() => {
     const root = document.documentElement;
@@ -117,6 +118,7 @@ export function MainShell({ mode }: { mode: SessionMode }): ReactNode {
   }, []);
 
   if (!vm || !slot) return null;
+  const context: ShellContext = { mode, shell: vm };
   return (
     <div style={{ minHeight: '100dvh', paddingBottom: BAR_HEIGHT, boxSizing: 'border-box' }}>
       <Outlet context={context} />

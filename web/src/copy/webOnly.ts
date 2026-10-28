@@ -17,6 +17,14 @@ export const webOnlyCopy = {
   'home.banner.more-error': '더 불러오지 못했어요',
   /** 좋아요 버튼의 접근성 이름. {n}은 좋아요 수. 눌림 상태는 aria-pressed로 노출한다(TC-LIKE-034, 임시). */
   'like.a11y': '좋아요 {n}개',
+  /** 전시: 기존 사진을 둔 채 새로고침·재검증 중, 다음 페이지 읽는 중, 제목 없는 사진의 대체 텍스트. */
+  'display.refresh-indicator': '새로고침 중',
+  'display.load-more': '불러오는 중',
+  'display.photo-alt': '사진',
+  /** 추천 카드 페이저의 접근성 이름. */
+  'display.featured.a11y': '추천 사진',
+  /** 상세: 삭제 요청 중 표시. */
+  'feed.deleting': '삭제 중',
 } as const;
 
 export type WebOnlyCopyKey = keyof typeof webOnlyCopy;

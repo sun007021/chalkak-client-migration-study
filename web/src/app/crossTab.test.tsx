@@ -52,8 +52,9 @@ describe('다른 탭의 로그아웃·계정 전환 전파', () => {
   it('REQ-NAV-022 탭 A에서 로그아웃하면 탭 B가 캐시를 비우고 로그인으로 replace 이동하며, 탭 A는 자기 신호를 받지 않는다', async () => {
     const { tabA, tabB } = setup();
     await tabA.container.store.write(memberSession());
-    const { path, router } = renderApp(tabB.container, '/display');
-    await screen.findByTestId('display.root');
+    // 서버를 부르지 않는 보호 화면(설정)에서 확인한다: 전시 화면은 열릴 때 스스로 목록을 읽으므로 "전파만으로는 서버를 부르지 않는다"를 가릴 수 없다.
+    const { path, router } = renderApp(tabB.container, '/settings');
+    await screen.findByTestId('settings.root');
     const cleared = vi.fn();
     tabB.container.userCaches.register({ clear: cleared });
     tabA.ff.route('POST /auth/logout', () => loadFixture('auth/logout__no-content.json').toResponse());
