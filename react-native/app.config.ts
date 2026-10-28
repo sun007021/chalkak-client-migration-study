@@ -24,6 +24,10 @@ const config: ExpoConfig = {
   ios: { bundleIdentifier: 'com.chalkak.study.rn', supportsTablet: false },
   android: {
     package: 'com.chalkak.study.rn',
+    // FCM 푸시: Firebase 콘솔의 google-services.json 경로를 환경변수로 준다(커밋 금지). 없으면 Android 푸시 토큰을 받지 못한다.
+    ...(process.env.GOOGLE_SERVICES_JSON
+      ? { googleServicesFile: process.env.GOOGLE_SERVICES_JSON }
+      : {}),
     // 앨범(업로드)은 시스템 포토 피커, 기록의 달력 이미지 저장은 쓰기 전용(REQ-REC-038)이라 미디어 읽기 권한은 쓰지 않는다.
     // 라이브러리 매니페스트가 넣는 쓰이지 않는 권한을 지운다(Play 사진·동영상 권한 정책).
     // CAMERA는 막지 않는다: expo-image-picker 58.0.10의 launchCameraAsync는 ensureCameraPermissionsAreGranted()로 CAMERA 권한을 요구한다.
@@ -51,6 +55,8 @@ const config: ExpoConfig = {
   plugins: [
     // D-21: Android OkHttp의 자동 재시도(비멱등 요청 포함)를 끈다.
     './plugins/withOkHttpNoRetry',
+    // 푸시 알림. 서버 푸시의 기본 Android 채널은 앱이 만드는 채널(moderation_push)과 같다.
+    ['expo-notifications', { defaultChannel: 'moderation_push' }],
     [
       'expo-image-picker',
       {

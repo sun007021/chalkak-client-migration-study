@@ -59,6 +59,7 @@ import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.ui.components.Loading
 import com.stonefive.chalkak.ui.theme.ChalkakTheme
 import com.stonefive.chalkak.ui.theme.Continuous
+import com.stonefive.chalkak.ui.common.RemoteImage
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kr.chalkak.core.data.home.Banner
 import kr.chalkak.core.data.home.CalendarEntry
@@ -73,9 +74,6 @@ import kr.chalkak.feature.home.Section
 import kr.chalkak.feature.home.TopicHeader
 import kr.chalkak.feature.home.WeekDay
 import java.time.LocalDate
-
-/** Loads a remote image; a null [url] (unusable server value) draws the fallback image. Real adapter lives in the app container. */
-typealias RemoteImage = @Composable (url: String?, modifier: Modifier) -> Unit
 
 /** Every user action of the home screen. All default to no-ops so a test sets only what it observes. */
 class HomeCallbacks(

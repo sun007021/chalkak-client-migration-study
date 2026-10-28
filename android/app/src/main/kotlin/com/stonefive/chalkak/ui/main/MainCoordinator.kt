@@ -3,6 +3,9 @@ package com.stonefive.chalkak.ui.main
 import com.stonefive.chalkak.copy.Copy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kr.chalkak.core.data.home.HomePost
+import kr.chalkak.core.data.post.PostSort
+import kr.chalkak.core.data.post.PostSummary
 import kr.chalkak.feature.home.HomeEffect
 import kr.chalkak.feature.navigation.FeedSource
 import kr.chalkak.feature.navigation.NavOutcome
@@ -65,8 +68,16 @@ class MainCoordinator(
         when (effect) {
             is HomeEffect.ShowToast -> showToast(copy[effect.copyKey])
             HomeEffect.OpenUpload -> onUploadClick()
-            is HomeEffect.OpenFeed -> open(Route.Feed(effect.postId, if (effect.seed != null) FeedSource.Display else FeedSource.ById))
-            is HomeEffect.OpenDisplay -> onTabClick(Tab.Display)
+            is HomeEffect.OpenFeed -> {
+                val seed = effect.seed
+                if (seed != null) session.feedSeeds[effect.postId] = seed.toSeed()
+                open(Route.Feed(effect.postId, if (seed != null) FeedSource.Display else FeedSource.ById))
+            }
+            // REQ-HOME-031: the section's date, most popular first. The tab itself is selected like a bottom bar tap.
+            is HomeEffect.OpenDisplay -> {
+                session.displayEntry = DisplayEntry(session.displayEntry.seq + 1, effect.date, PostSort.POPULAR)
+                onTabClick(Tab.Display)
+            }
             is HomeEffect.OpenRecord -> onTabClick(Tab.Record)
             HomeEffect.OpenNotifications -> open(Route.Notifications)
             is HomeEffect.OpenIssue -> {
@@ -79,8 +90,45 @@ class MainCoordinator(
     /** "이번 주 기록 보러가기": the record tab. */
     fun onWeekMore() = onTabClick(Tab.Record)
 
+    /** Display list item tapped: the feed opens seeded with that item. */
+    fun onDisplayOpenFeed(post: PostSummary) {
+        session.feedSeeds[post.id] = post
+        open(Route.Feed(post.id, FeedSource.Display))
+    }
+
+    /** The post was deleted: the feed on top is popped and the deletion toast shown (REQ-NAV-039/040). */
+    fun onFeedDeleted(@Suppress("UNUSED_PARAMETER") postId: String, toastCopyKey: String) {
+        val outcome = nav.onPostDeleted()
+        showToast(copy[(outcome as? NavOutcome.Navigated)?.toastCopyKey ?: toastCopyKey])
+    }
+
+    /** The post is gone (404 on edit or like): the detail closes, the lists already dropped it through `PostChanges`. */
+    fun onFeedClosed() {
+        if (nav.top is Route.Feed) onSystemBack()
+    }
+
+    /**
+     * A 401 that survived the refresh: the network layer also reports it as `AuthEvent.GoToLogin`, which `ChalkakRoot` turns into
+     * `nav.onSessionEnded()` (new session key, signup context discarded). Doing it here as well would end the session twice.
+     */
+    fun onFeedLoginRequired() = Unit
+
     private fun open(route: Route) {
         val outcome = nav.open(route)
         if (outcome is NavOutcome.Blocked) showToast(copy[outcome.copyKey])
+        if (outcome !is NavOutcome.Navigated && outcome !is NavOutcome.Replaced && route is Route.Feed) session.feedSeeds.remove(route.postId)
     }
+
+    private fun HomePost.toSeed() = PostSummary(
+        id = id,
+        authorId = authorId,
+        originalImageUrl = originalImageUrl,
+        thumbnailImageUrl = thumbnailImageUrl,
+        // Home cards carry no signature; the detail answer fills it in (the feed draws no signature for a blank url).
+        signatureOriginalImageUrl = "",
+        title = title,
+        likeCount = likeCount,
+        isLiked = isLiked,
+        isMine = isMine,
+    )
 }
