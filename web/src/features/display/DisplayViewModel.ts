@@ -1,8 +1,11 @@
 import { FIRST_TOPIC_DATE } from '../../constants';
 import { t } from '../../copy/ko';
 import { NetworkError, SessionChangedError } from '../../core/net/errors';
+import { StaleGuard } from '../../core/state/StaleGuard';
+import type { Ticket } from '../../core/state/StaleGuard';
 import { ViewModel } from '../../core/state/ViewModel';
 import type { Clock } from '../../core/time/Clock';
+import { MidnightWatcher } from '../../core/time/MidnightWatcher';
 import { kstToday } from '../../core/time/kst';
 import type { DateString } from '../../core/time/kst';
 import type { ToastController } from '../../core/ui/ToastController';
@@ -15,6 +18,7 @@ import type { GuestGate } from '../shell/GuestGate';
 import { clampDisplayDate, isArchiveDate, shiftDate, toPickedDate } from './displayDates';
 import type { DisplaySort } from './displayDates';
 import type { DisplayRepository, PostsPage } from './DisplayRepository';
+import { DisplayListingCache } from './DisplayListingCache';
 
 /** 전시 본문. 날짜 이동 중 404·실패는 상태를 바꾸지 않는다(이전 ready 복원, 토스트). */
 export type DisplayBody =
@@ -88,41 +92,13 @@ export interface DisplayViewModelDeps {
 /** 아카이브 추천 카드 수(REQ-DISP-018). */
 const FEATURED_COUNT = 5;
 
-/** (날짜, 요청 정렬) 하나의 캐시: 페이지별 목록과 다음 페이지를 이어 받는 데 필요한 값. */
-interface Listing {
-  topicTitle: string;
-  /** 서버가 준 페이지 단위. 첫 페이지 재검증은 pages[0]만 바꾸고 뒤쪽은 유지한다. */
-  pages: PostItem[][];
-  /** pages를 이어 붙여 id 중복을 제거한 목록. */
-  posts: PostItem[];
-  hasNext: boolean;
-  /** 랜덤 첫 페이지 응답의 시드(랜덤이 아니거나 서버가 주지 않았으면 null). */
-  seed: string | null;
-}
-
 type View = { kind: 'loading' } | { kind: 'empty' } | { kind: 'error'; network: boolean } | { kind: 'ready' };
 
 const keyOf = (date: DateString, requestSort: DisplaySort): string => `${date}|${requestSort}`;
 const isCancel = (error: unknown): boolean => (error instanceof Error && error.name === 'AbortError') || error instanceof SessionChangedError;
 
-function flatten(pages: readonly PostItem[][]): PostItem[] {
-  const seen = new Set<string>();
-  const out: PostItem[] = [];
-  for (const page of pages) {
-    for (const post of page) {
-      const id = post.id.toLowerCase();
-      if (seen.has(id)) continue;
-      seen.add(id);
-      out.push(post);
-    }
-  }
-  return out;
-}
-
-const withPages = (listing: Listing, pages: PostItem[][], patch: Partial<Pick<Listing, 'hasNext' | 'seed'>> = {}): Listing => ({ ...listing, ...patch, pages, posts: flatten(pages) });
-
 export class DisplayViewModel extends ViewModel<DisplayState> {
-  private readonly cache = new Map<string, Listing>();
+  private readonly cache = new DisplayListingCache();
   private view: View = { kind: 'loading' };
   /** 지금 목록으로 보여 주는 캐시 키와 그 날짜. 날짜 이동 중에는 state.date(이동하려는 날짜)와 다를 수 있다. */
   private shown: { key: string; date: DateString } | null = null;
@@ -133,14 +109,18 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
   private pageFailures = 0;
   private started = false;
   private visible = false;
-  /** 계정 전환마다 올린다. 이전 계정의 늦은 응답은 캐시에도 남기지 않는다. */
-  private generation = 0;
-  /** 로드·이동·재검증을 시작할 때마다 올린다. 최신이 아닌 응답은 캐시에만 반영한다. */
-  private navSeq = 0;
-  /** 아직 유효한 로드·재검증이 있으면 그 번호. 화면 이탈이 지운다. */
-  private activeNav: number | null = null;
+  /** 계정 전환마다 무효화한다(snapshot 티켓 여러 개가 함께 쓴다). 이전 계정의 늦은 응답은 캐시에도 남기지 않는다. */
+  private readonly accountGuard = new StaleGuard();
+  /** 로드·이동·재검증을 시작할 때마다 새 티켓을 연다. 최신이 아닌 응답은 캐시에만 반영한다. */
+  private readonly navGuard = new StaleGuard();
+  /** 다음 페이지 요청의 최신성(이동·화면 이탈이 무효화). */
+  private readonly pageGuard = new StaleGuard();
+  /** 아직 유효한 로드·재검증이 있으면 그 티켓과 키. 같은 키의 요청이 진행 중이면 새로 보내지 않고 그 약속을 공유한다. 화면 이탈이 지운다. */
+  private active: { ticket: Ticket; key: string } | null = null;
+  private readonly midnight: MidnightWatcher;
+  /** 진행 중인 첫 페이지 읽기(키별). 더 새 요청이 이전 요청을 밀어낸 뒤 같은 키로 돌아와도 같은 네트워크 요청을 공유한다. */
+  private readonly reads = new Map<string, Promise<unknown>>();
   private inflight: Promise<void> = Promise.resolve();
-  private pageSeq = 0;
   private readonly unsubscribeChanges: () => void;
 
   constructor(protected readonly deps: DisplayViewModelDeps) {
@@ -159,6 +139,7 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
       scrollToTop: 0,
     });
     this.unsubscribeChanges = deps.changes.subscribe((change) => this.applyChange(change));
+    this.midnight = new MidnightWatcher({ clock: deps.clock, onDateChanged: () => this.onDateChanged() });
   }
 
   // ---------------------------------------------------------------- 진입·수명
@@ -183,6 +164,7 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
   onShown(): Promise<void> {
     if (this.visible) return this.inflight;
     this.visible = true;
+    this.midnight.start();
     if (!this.started) {
       this.started = true;
       const today = kstToday(this.deps.clock);
@@ -191,19 +173,30 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
     const today = kstToday(this.deps.clock);
     if (today !== this.state.today) this.publish({ today });
     // 마운트 직후 applyRoute가 시작한 첫 로드가 아직 유효하면 그대로 기다린다(같은 첫 페이지를 두 번 받지 않는다).
-    if (this.activeNav !== null) return this.inflight;
+    if (this.active !== null) return this.inflight;
     return this.refreshCurrent();
   }
 
   /** 화면이 숨겨지거나 떨어진다: 진행 중 요청을 무효화한다. 취소는 오류 토스트·오류 화면이 되지 않는다(TC-DISP-048). */
   onHidden(): void {
     this.visible = false;
-    this.navSeq += 1;
-    this.activeNav = null;
-    this.pageSeq += 1;
+    this.midnight.stop();
+    this.navGuard.invalidate();
+    this.active = null;
+    this.pageGuard.invalidate();
     this.paging = false;
     this.refreshing = false;
     this.publish();
+  }
+
+  /** 보이는 채로 KST 자정을 넘었다: today(날짜 상한)를 갱신하고, 진행 중인 요청이 없으면 지금 키를 맞춘다(아카이브가 된 날짜는 인기순으로, REQ-DISP-015). */
+  private onDateChanged(): void {
+    if (!this.visible) return;
+    if (this.active !== null) {
+      this.publish({ today: kstToday(this.deps.clock) });
+      return;
+    }
+    void this.refreshCurrent();
   }
 
   /** 이전 날짜(하루 전). 하한이거나 첫 로딩 중이면 아무 일도 없다. 이동 중이면 이동하려는 날짜 기준이다(TC-DISP-038). */
@@ -241,7 +234,7 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
   /** 전시 탭 재선택: scrollToTop +1, 기존 전시를 유지한 채 첫 페이지 재검증(성공 → 교체, 실패 → 유지 + 토스트). */
   onTabReselect(): Promise<void> {
     this.publish({ scrollToTop: this.state.scrollToTop + 1 });
-    if (this.activeNav !== null) return this.inflight;
+    if (this.active !== null) return this.inflight;
     return this.refreshCurrent();
   }
 
@@ -250,8 +243,8 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
     const shown = this.shown;
     const listing = shown ? this.cache.get(shown.key) : undefined;
     if (!shown || !listing || this.view.kind !== 'ready' || !listing.hasNext || this.paging || this.refreshing) return;
-    const generation = this.generation;
-    const token = ++this.pageSeq;
+    const account = this.accountGuard.snapshot();
+    const ticket = this.pageGuard.begin();
     const page = listing.pages.length + 1;
     const { seed } = listing;
     const requestSort = this.requestSortOf(shown.key);
@@ -260,18 +253,12 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
     const stamp = this.deps.likes.beginRead();
     try {
       const result = await this.deps.repository.fetchPosts({ topicDate: shown.date, sort: requestSort, page, randomSeed: seed });
-      if (generation !== this.generation) return;
-      const current = this.cache.get(shown.key);
-      if (current && current.pages.length === page - 1 && current.seed === seed) {
-        this.cache.set(
-          shown.key,
-          result ? withPages(current, [...current.pages, this.settle(result.posts, stamp)], { hasNext: this.hasNextOf(result, requestSort) }) : withPages(current, current.pages, { hasNext: false }),
-        );
-      }
-      if (token === this.pageSeq) this.paging = false;
+      if (!account.isCurrent()) return;
+      this.cache.append(shown.key, { page, seed, posts: result ? this.settle(result.posts, stamp) : null, hasNext: result ? this.hasNextOf(result, requestSort) : false });
+      if (ticket.isCurrent()) this.paging = false;
       this.publish();
     } catch (error) {
-      if (generation !== this.generation || token !== this.pageSeq) return;
+      if (!account.isCurrent() || !ticket.isCurrent()) return;
       this.paging = false;
       if (!isCancel(error)) {
         this.pageFailures += 1;
@@ -312,11 +299,12 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
 
   /** 계정 전환·로그아웃: 캐시·시드·상태를 버리고 처음 상태로. 이전 계정의 늦은 응답은 무시한다. 보이고 있으면 곧바로 다시 불러온다. */
   resetForAccountChange(): void {
-    this.generation += 1;
-    this.navSeq += 1;
-    this.pageSeq += 1;
-    this.activeNav = null;
+    this.accountGuard.invalidate();
+    this.navGuard.invalidate();
+    this.pageGuard.invalidate();
+    this.active = null;
     this.cache.clear();
+    this.reads.clear();
     this.view = { kind: 'loading' };
     this.shown = null;
     this.good = null;
@@ -347,9 +335,10 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
 
   override dispose(): void {
     this.unsubscribeChanges();
-    this.generation += 1;
-    this.navSeq += 1;
-    this.activeNav = null;
+    this.midnight.stop();
+    this.accountGuard.invalidate();
+    this.navGuard.invalidate();
+    this.active = null;
     super.dispose();
   }
 
@@ -379,10 +368,12 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
     const today = this.state.today;
     const requestSort: DisplaySort = isArchiveDate(date, today) ? 'popular' : sort;
     const key = keyOf(date, requestSort);
-    const nav = ++this.navSeq;
-    const generation = this.generation;
-    this.activeNav = nav;
-    this.pageSeq += 1;
+    // 같은 키의 읽기가 이미 진행 중이면 새 요청을 보내지 않고 그 약속을 공유한다(상태는 그 요청이 시작될 때 이미 이 날짜·정렬로 게시됐다).
+    if (this.active?.key === key && this.active.ticket.isCurrent() && date === this.state.date && sort === this.state.sort) return this.inflight;
+    const nav = this.navGuard.begin();
+    const account = this.accountGuard.snapshot();
+    this.active = { ticket: nav, key };
+    this.pageGuard.invalidate();
     this.paging = false;
     const dateChanged = date !== this.state.date;
     const featuredPage = dateChanged ? 0 : this.state.featuredPage;
@@ -394,7 +385,7 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
       this.good = { date, sort, featuredPage };
       this.refreshing = true;
       this.publish({ date, sort, featuredPage });
-      return (this.inflight = this.revalidate(key, date, requestSort, nav, generation));
+      return (this.inflight = this.revalidate(key, date, requestSort, nav, account));
     }
     const hadContent = this.view.kind === 'ready' && this.shown !== null;
     if (hadContent) this.refreshing = true;
@@ -403,17 +394,17 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
       this.refreshing = false;
     }
     this.publish({ date, sort, featuredPage });
-    return (this.inflight = this.loadFresh({ key, date, sort, requestSort, nav, generation, hadContent }));
+    return (this.inflight = this.loadFresh({ key, date, sort, requestSort, nav, account, hadContent }));
   }
 
-  private async loadFresh(args: { key: string; date: DateString; sort: DisplaySort; requestSort: DisplaySort; nav: number; generation: number; hadContent: boolean }): Promise<void> {
-    const { key, date, sort, requestSort, nav, generation, hadContent } = args;
+  private async loadFresh(args: { key: string; date: DateString; sort: DisplaySort; requestSort: DisplaySort; nav: Ticket; account: Ticket; hadContent: boolean }): Promise<void> {
+    const { key, date, sort, requestSort, nav, account, hadContent } = args;
     let result: { title: string; page: PostsPage; stamp: number } | null;
     try {
       result = await this.fetchFirst(date, requestSort);
     } catch (error) {
-      if (generation !== this.generation || nav !== this.navSeq) return;
-      this.activeNav = null;
+      if (!account.isCurrent() || !nav.isCurrent()) return;
+      this.active = null;
       if (isCancel(error)) {
         this.refreshing = false;
         this.publish();
@@ -429,10 +420,10 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
       }
       return;
     }
-    if (generation !== this.generation) return;
-    if (result) this.cache.set(key, this.listingOf(result.title, result.page, requestSort, result.stamp));
-    if (nav !== this.navSeq) return;
-    this.activeNav = null;
+    if (!account.isCurrent()) return;
+    if (result) this.cache.start(key, this.listingInit(result.title, result.page, requestSort, result.stamp));
+    if (!nav.isCurrent()) return;
+    this.active = null;
     if (!result && hadContent) {
       this.restore();
       this.deps.toast.show(t('display.date-missing'));
@@ -460,51 +451,60 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
   }
 
   private startRevalidate(key: string, date: DateString): Promise<void> {
-    const nav = ++this.navSeq;
-    this.activeNav = nav;
+    if (this.active?.key === key && this.active.ticket.isCurrent()) return this.inflight;
+    const nav = this.navGuard.begin();
+    this.active = { ticket: nav, key };
     this.refreshing = true;
     this.publish();
-    return (this.inflight = this.revalidate(key, date, this.requestSortOf(key), nav, this.generation));
+    return (this.inflight = this.revalidate(key, date, this.requestSortOf(key), nav, this.accountGuard.snapshot()));
   }
 
   /** 캐시된 목록의 첫 페이지를 다시 받아 교체한다(같은 시드의 뒤쪽 페이지는 유지). 실패하면 목록을 유지하고 토스트. */
-  private async revalidate(key: string, date: DateString, requestSort: DisplaySort, nav: number, generation: number): Promise<void> {
+  private async revalidate(key: string, date: DateString, requestSort: DisplaySort, nav: Ticket, account: Ticket): Promise<void> {
     const listing = this.cache.get(key);
     if (!listing) return;
     const stamp = this.deps.likes.beginRead();
     let page: PostsPage | null;
     try {
-      page = await this.deps.repository.fetchPosts({ topicDate: date, sort: requestSort, page: 1, randomSeed: listing.seed });
+      page = await this.shareRead(`revalidate|${key}|${listing.seed ?? ''}`, () => this.deps.repository.fetchPosts({ topicDate: date, sort: requestSort, page: 1, randomSeed: listing.seed }));
     } catch (error) {
-      if (generation !== this.generation || nav !== this.navSeq) return;
-      this.activeNav = null;
+      if (!account.isCurrent() || !nav.isCurrent()) return;
+      this.active = null;
       this.refreshing = false;
       this.publish();
       if (!isCancel(error)) this.deps.toast.show(this.failureCopy(error));
       return;
     }
-    if (generation !== this.generation) return;
-    const current = this.cache.get(key);
-    if (current && page) {
-      const first = this.settle(page.posts, stamp);
-      const keepsTail = requestSort !== 'random' || page.randomSeed === current.seed;
-      this.cache.set(
-        key,
-        keepsTail
-          ? withPages(current, [first, ...current.pages.slice(1)], { hasNext: current.pages.length > 1 ? current.hasNext : this.hasNextOf(page, requestSort) })
-          : withPages(current, [first], { hasNext: this.hasNextOf(page, requestSort), seed: page.randomSeed }),
-      );
+    if (!account.isCurrent()) return;
+    if (page) {
+      const keepsTail = requestSort !== 'random' || page.randomSeed === this.cache.get(key)?.seed;
+      this.cache.replaceFirst(key, { first: this.settle(page.posts, stamp), keepsTail, hasNext: this.hasNextOf(page, requestSort), seed: page.randomSeed });
     }
-    if (nav !== this.navSeq) {
+    if (!nav.isCurrent()) {
       this.publish();
       return;
     }
-    this.activeNav = null;
+    this.active = null;
     this.refreshing = false;
     this.publish();
   }
 
-  private async fetchFirst(date: DateString, requestSort: DisplaySort): Promise<{ title: string; page: PostsPage; stamp: number } | null> {
+  /** 같은 id의 읽기가 진행 중이면 그 약속을 돌려주고, 없으면 시작한다. 끝나면(성공·실패) 목록에서 뺀다. */
+  private shareRead<T>(id: string, start: () => Promise<T>): Promise<T> {
+    const running = this.reads.get(id) as Promise<T> | undefined;
+    if (running) return running;
+    const promise = start().finally(() => {
+      if (this.reads.get(id) === promise) this.reads.delete(id);
+    });
+    this.reads.set(id, promise);
+    return promise;
+  }
+
+  private fetchFirst(date: DateString, requestSort: DisplaySort): Promise<{ title: string; page: PostsPage; stamp: number } | null> {
+    return this.shareRead(`first|${keyOf(date, requestSort)}`, () => this.readFirst(date, requestSort));
+  }
+
+  private async readFirst(date: DateString, requestSort: DisplaySort): Promise<{ title: string; page: PostsPage; stamp: number } | null> {
     const topic = await this.deps.repository.fetchTopic(date);
     if (!topic) return null;
     const stamp = this.deps.likes.beginRead();
@@ -525,9 +525,8 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
     return page.hasNext && (requestSort !== 'random' || page.randomSeed !== null);
   }
 
-  private listingOf(title: string, page: PostsPage, requestSort: DisplaySort, stamp: number): Listing {
-    const first = this.settle(page.posts, stamp);
-    return { topicTitle: title, pages: [first], posts: flatten([first]), hasNext: this.hasNextOf(page, requestSort), seed: requestSort === 'random' ? page.randomSeed : null };
+  private listingInit(title: string, page: PostsPage, requestSort: DisplaySort, stamp: number) {
+    return { topicTitle: title, first: this.settle(page.posts, stamp), hasNext: this.hasNextOf(page, requestSort), seed: requestSort === 'random' ? page.randomSeed : null };
   }
 
   private visiblePost(postId: string): PostItem | undefined {
@@ -543,15 +542,7 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
   // ---------------------------------------------------------------- 변경 이벤트
 
   private applyChange(change: PostChange): void {
-    const same = (post: PostItem): boolean => post.id.toLowerCase() === change.postId.toLowerCase();
-    for (const [key, listing] of this.cache) {
-      if (!listing.pages.some((page) => page.some(same))) continue;
-      let pages: PostItem[][];
-      if (change.type === 'like') pages = listing.pages.map((page) => page.map((post) => (same(post) ? { ...post, isLiked: change.isLiked, likeCount: change.likeCount } : post)));
-      else if (change.type === 'title') pages = listing.pages.map((page) => page.map((post) => (same(post) ? { ...post, title: change.title } : post)));
-      else pages = listing.pages.map((page) => page.filter((post) => !same(post)));
-      this.cache.set(key, withPages(listing, pages));
-    }
+    this.cache.applyChange(change);
     this.publish();
   }
 

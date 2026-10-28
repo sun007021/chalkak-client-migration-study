@@ -7,6 +7,11 @@ import { canEnterTab, planTabNavigation } from './tabs';
 import type { TabHistoryState, TabNavigation } from './tabs';
 import type { UploadEntry } from './UploadEntry';
 
+/** 같은 탭 재선택 알림의 구독 창구(탭 화면이 필요한 것은 이것뿐이다). */
+export interface ReselectSource {
+  subscribeReselect(listener: (tab: TabDestination) => void): () => void;
+}
+
 export interface MainShellState {
   mode: SessionMode;
 }
@@ -22,7 +27,7 @@ export interface MainShellDeps {
  * 메인 셸(하단 바) 로직. 선택된 탭은 URL에서만 파생되므로(화면이 현재 탭을 넘긴다) 상태로 들고 있지 않다.
  * selectTab은 허용되면 분석을 보내고 이동 계획을 돌려준다(이동은 화면이 한다).
  */
-export class MainShellViewModel extends ViewModel<MainShellState> {
+export class MainShellViewModel extends ViewModel<MainShellState> implements ReselectSource {
   private readonly reselectListeners = new Set<(tab: TabDestination) => void>();
 
   constructor(private readonly deps: MainShellDeps) {

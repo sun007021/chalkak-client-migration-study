@@ -10,7 +10,7 @@ import type { CopyKey } from '../../copy/ko';
 import { useScreenView } from '../../core/analytics/useScreenView';
 import { useOwnedViewModel } from '../../core/state/useOwnedViewModel';
 import type { SessionMode } from '../boot/authGate';
-import type { MainShellViewModel } from './MainShellViewModel';
+import type { MainShellViewModel, ReselectSource } from './MainShellViewModel';
 import { MAIN_TABS, adjacentTab, canEnterTab, readTabHistoryState } from './tabs';
 
 /** 탭 라우트의 handle. 현재 탭은 URL 문자열이 아니라 일치한 라우트에서 읽는다. */
@@ -21,8 +21,8 @@ export interface TabRouteHandle {
 /** 탭 화면이 Outlet 컨텍스트로 받는 값. */
 export interface ShellContext {
   mode: SessionMode;
-  /** 탭 재선택 구독(전시 맨 위 스크롤 등)에 쓰는 셸 ViewModel. */
-  shell: MainShellViewModel;
+  /** 탭 재선택 구독(전시 맨 위 스크롤 등). 셸 ViewModel 전체가 아니라 구독 하나만 내준다. */
+  shell: ReselectSource;
 }
 
 export const useShellContext = (): ShellContext => useOutletContext<ShellContext>();
@@ -109,7 +109,7 @@ export function MainShell({ mode }: { mode: SessionMode }): ReactNode {
   const slot = useContext(BottomBarSlotContext);
   const create = useCallback(() => container.createMainShellViewModel(mode), [container, mode]);
   const vm = useOwnedViewModel(create);
-  
+
   // 토스트가 하단 바 위에 뜨도록 높이를 CSS 변수로 알린다.
   useEffect(() => {
     const root = document.documentElement;
