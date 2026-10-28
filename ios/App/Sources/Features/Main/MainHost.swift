@@ -14,6 +14,8 @@ struct MainHost: View {
 
     var body: some View {
         MainView(container: container, session: session)
+            .task { await container.pushHub.sessionStarted(session) }
+            .onDisappear { container.pushHub.sessionEnded(session) }
     }
 }
 
@@ -60,10 +62,13 @@ struct MainView: View {
                         .toolbar(.hidden, for: .navigationBar)
                 }
         }
+        .overlay { SettingsAccountDialogs(account: session.settings.account) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("main.root")
         .onChange(of: shell.path) { old, new in
             syncEntries(with: new)
+            // 업로드·피드백이 열리거나 닫히면 보류된 푸시 탭을 다시 평가한다(REQ-PUSH-031).
+            Task { await container.pushHub.gateMayHaveChanged(session) }
             // 알림함이 닫히면 미읽음 점을 다시 확인한다.
             if old.contains(.notifications), !new.contains(.notifications) {
                 Task { await session.home.notificationsClosed() }
@@ -79,8 +84,16 @@ struct MainView: View {
             session.home.consumeNeedsLogin()
             Task { await container.launch.handleReauthenticationRequired() }
         }
+        .onChange(of: session.push.needsLogin) { _, needsLogin in
+            guard needsLogin else { return }
+            session.push.consumeNeedsLogin()
+            Task { await container.launch.handleReauthenticationRequired() }
+        }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await session.home.appBecameActive() } }
+            guard phase == .active else { return }
+            Task { await session.home.appBecameActive() }
+            Task { await session.settings.appBecameActive() }
+            Task { await container.pushHub.appBecameActive() }
         }
         // 푸시·알림의 "AI 결과 열기" 요청을 받아 게시물 상세가 가져가게 둔다.
         .onChange(of: shell.aiResultRequest) { _, request in
@@ -99,7 +112,7 @@ struct MainView: View {
         case .record:
             RecordHost(container: container, session: session)
         case .settings:
-            PlaceholderView(title: NavCopy.label(for: .settings), identifier: "settings")
+            SettingsScreen(container: container, session: session)
         }
     }
 
@@ -113,19 +126,17 @@ struct MainView: View {
         case .feed(let entry):
             FeedScreen(container: container, session: session, entry: entry)
         case .notifications:
-            PlaceholderView(title: AnalyticsScreen.notifications.rawValue, identifier: "notifications", onBack: { shell.pop() })
-        case .notificationDetail:
-            PlaceholderView(title: AnalyticsScreen.notificationDetail.rawValue, identifier: "notification-detail", onBack: { shell.pop() })
+            NotificationInboxScreen(container: container, session: session)
+        case .notificationDetail(let notificationId):
+            NotificationDetailScreen(container: container, session: session, notificationId: notificationId)
         case .feedback:
-            PlaceholderView(title: AnalyticsScreen.feedback.rawValue, identifier: "feedback", onBack: { shell.pop() })
+            FeedbackScreen(container: container, session: session)
         case .upload(let topicDate):
             UploadScreen(container: container, session: session, topicDate: topicDate)
         case .changeSignature:
-            PlaceholderView(title: AnalyticsScreen.changeSignature.rawValue, identifier: "change-signature", onBack: { shell.pop() })
+            ChangeSignatureDrawingScreen(container: container, session: session)
         case .changeSignaturePreview:
-            PlaceholderView(title: AnalyticsScreen.changeSignaturePreview.rawValue, identifier: "change-signature-preview", onBack: { shell.pop() })
-        case .notificationDetail:
-            PlaceholderView(title: AnalyticsScreen.notificationDetail.rawValue, identifier: "notification-detail", onBack: { shell.pop() })
+            ChangeSignaturePreviewScreen(container: container, session: session)
         }
     }
 
