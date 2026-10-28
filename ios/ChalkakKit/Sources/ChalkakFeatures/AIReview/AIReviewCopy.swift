@@ -33,6 +33,8 @@ public enum AIReviewCopy {
     public static let weaknessTitle = "아쉬운 점"
     public static let suggestionTitle = "다음엔 이렇게"
     public static let criteriaDialogTitle = "찰칵AI는 어떤 기준으로 점수를 내나요?"
+    /// 시트·다이얼로그 닫기 버튼(`common.close`).
+    public static let close = "닫기"
     // 폴링·오류
     public static let pollTimeout = "처리가 오래 걸리고 있어요. 나중에 다시 확인해 주세요."
     public static let errorNetwork = "네트워크 연결을 확인해 주세요."

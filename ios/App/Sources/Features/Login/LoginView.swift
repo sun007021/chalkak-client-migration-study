@@ -1,21 +1,49 @@
 import SwiftUI
 import ChalkakFeatures
 
-/// 로그인 화면이 나타날 때마다 새 ViewModel을 만들어 쓰는 호스트. 완료 목적지는 앱 루트에 알린다.
+/// 로그인 화면이 나타날 때마다 새 ViewModel을 만들어 쓰는 호스트. 완료 목적지는 앱 루트에 알리고,
+/// 가입이 필요하면(`.terms`) 로그인 화면 위에 가입 흐름(약관 → 사인 → 미리보기)을 덮는다.
 struct LoginHost: View {
     @State private var viewModel: LoginViewModel
+    @State private var signUpContext: SignUpContext?
+    private let container: AppContainer
     private let launch: AppLaunchViewModel
 
     init(container: AppContainer) {
         _viewModel = State(initialValue: container.makeLoginViewModel())
+        self.container = container
         launch = container.launch
     }
 
     var body: some View {
-        LoginView(viewModel: viewModel)
-            .onChange(of: viewModel.state) { _, state in
-                if case .completed(let destination) = state { launch.loginCompleted(destination) }
+        ZStack {
+            LoginView(viewModel: viewModel)
+                .accessibilityHidden(signUpContext != nil)
+            if let context = signUpContext {
+                OnboardingHost(
+                    container: container,
+                    context: context,
+                    onExitToLogin: { message in exitOnboarding(message: message) },
+                    onSignedUp: { launch.loginCompleted(.main(.member)) }
+                )
             }
+        }
+        .onChange(of: viewModel.state) { _, state in
+            guard case .completed(let destination) = state else { return }
+            switch destination {
+            case .main:
+                launch.loginCompleted(destination)
+            case .terms(let context):
+                signUpContext = context
+            }
+        }
+    }
+
+    /// 가입 흐름을 닫고 로그인 화면으로 돌아온다(가입 컨텍스트 폐기). 문구가 있으면 토스트로 알린다.
+    private func exitOnboarding(message: String?) {
+        signUpContext = nil
+        viewModel.onAppear()
+        if let message { container.toast.show(message) }
     }
 }
 
@@ -40,9 +68,6 @@ struct LoginView: View {
                     }
                 }
                 .id(notice.id)
-            }
-            if case .completed(.terms) = viewModel.state {
-                TermsPlaceholder()
             }
         }
         .accessibilityElement(children: .contain)
@@ -123,19 +148,5 @@ struct LoginView: View {
         .disabled(!viewModel.isInteractionEnabled)
         .accessibilityLabel(AuthCopy.loginKakao)
         .accessibilityIdentifier("login.kakao-button")
-    }
-}
-
-/// 약관 동의 화면(TERMS PR)이 오기 전까지의 자리표시자.
-private struct TermsPlaceholder: View {
-    var body: some View {
-        ZStack {
-            ChalkakColor.background.ignoresSafeArea()
-            Text("약관 동의 화면 준비 중")
-                .font(ChalkakFont.body)
-                .foregroundStyle(ChalkakColor.textPrimary)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("terms.root")
     }
 }

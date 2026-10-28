@@ -1,5 +1,6 @@
 import { loadFixture } from './fixtures';
 import type { FakeFetch, Responder } from './fakeFetch';
+import { outsideHome } from './homeRequests';
 
 /** shared/fixtures 응답을 그대로 돌려주는 Responder. */
 export const fx =
@@ -30,4 +31,5 @@ export function routeChange(ff: FakeFetch, o: { uploads?: Responder[]; put?: Res
   ff.route(CARD_GET, ...(o.get ?? [fx('signature/users-me-signature__get-success.json')]));
 }
 
-export const sequence = (ff: FakeFetch): string[] => ff.calls.map((c) => `${c.method} ${c.path}`);
+/** 호출 순서. 홈이 열리며 보내는 읽기 요청은 뺀다(가입·변경 흐름의 요청만 본다). */
+export const sequence = (ff: FakeFetch): string[] => outsideHome(ff).map((c) => `${c.method} ${c.path}`);

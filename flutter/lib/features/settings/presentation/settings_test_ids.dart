@@ -1,0 +1,31 @@
+/// docs/testing/testids.md의 설정 탭 식별자. `Semantics(identifier:)`와 `Key`에 같은 값을 쓴다.
+abstract final class SettingsTestIds {
+  static const root = 'settings.root';
+  static const signatureCard = 'settings.signature-card';
+  static const signatureImage = 'settings.signature-image';
+  static const signatureLoading = 'settings.signature-loading';
+  static const signatureError = 'settings.signature-error';
+  static const signatureRetryButton = 'settings.signature-retry-button';
+  static const signatureChangeButton = 'settings.signature-change-button';
+  static const pushSection = 'settings.push-section';
+  static const pushTopicToggle = 'settings.push-topic-toggle';
+  static const pushModerationToggle = 'settings.push-moderation-toggle';
+  static const pushAiToggle = 'settings.push-ai-toggle';
+  static const pushLoading = 'settings.push-loading';
+  static const pushError = 'settings.push-error';
+  static const pushRetryButton = 'settings.push-retry-button';
+  static const feedbackRow = 'settings.feedback-row';
+  static const privacyRow = 'settings.privacy-row';
+  static const termsRow = 'settings.terms-row';
+  static const versionRow = 'settings.version-row';
+  static const versionValue = 'settings.version-value';
+  static const logoutRow = 'settings.logout-row';
+  static const withdrawRow = 'settings.withdraw-row';
+  static const loginButton = 'settings.login-button';
+  static const logoutDialog = 'settings.logout-dialog';
+  static const logoutConfirmButton = 'settings.logout-confirm-button';
+  static const logoutCancelButton = 'settings.logout-cancel-button';
+  static const withdrawDialog = 'settings.withdraw-dialog';
+  static const withdrawConfirmButton = 'settings.withdraw-confirm-button';
+  static const withdrawCancelButton = 'settings.withdraw-cancel-button';
+}

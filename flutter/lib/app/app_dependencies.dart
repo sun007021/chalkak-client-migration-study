@@ -13,6 +13,7 @@ import '../features/onboarding/domain/legal_document.dart';
 import '../features/onboarding/domain/sign_up_context.dart';
 import '../features/onboarding/domain/sign_up_use_case.dart';
 import '../features/onboarding/presentation/legal_document_sheet.dart';
+import '../features/settings/settings_dependencies.dart';
 import '../features/signature/domain/change_signature_use_case.dart';
 import '../features/signature/domain/signature_renderer.dart';
 import '../features/signature/domain/signature_repository.dart';
@@ -42,6 +43,7 @@ class AppDependencies {
     required this.legalWebViewBuilder,
     required this.main,
     required this.notification,
+    required this.settings,
   });
 
   final SessionManager sessions;
@@ -67,4 +69,7 @@ class AppDependencies {
 
   /// 알림함·푸시(탭 처리, 기기 등록, 수신). [pushRegistrar]는 `notification.registrar`다.
   final NotificationDependencies notification;
+
+  /// 설정 탭(푸시 수신 설정, 앱 버전)과 피드백.
+  final SettingsDependencies settings;
 }

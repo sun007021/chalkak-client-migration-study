@@ -44,6 +44,28 @@ struct FeedCopyTests {
         for (key, text) in pairs { #expect(try SharedCopy.require(key) == text, "\(key)") }
     }
 
+    @Test("shared/copy/ko.json과 문구가 같다(전시 화면)")
+    func matchesSharedCopyDisplayScreen() throws {
+        let pairs: [(String, String)] = [
+            ("display.header.desc-latest", DisplayCopy.descLatest),
+            ("display.header.desc-archive", DisplayCopy.descArchive),
+            ("display.sort.recent", DisplayCopy.sortRecent),
+            ("display.sort.popular", DisplayCopy.sortPopular),
+            ("display.sort.random", DisplayCopy.sortRandom),
+            ("display.nav.previous", DisplayCopy.navPrevious),
+            ("display.nav.next", DisplayCopy.navNext),
+            ("display.picker.title", DisplayCopy.pickerTitle),
+            ("display.retry", DisplayCopy.retry),
+            ("common.confirm", DisplayCopy.pickerConfirm),
+            ("common.close", AIReviewCopy.close),
+        ]
+        for (key, text) in pairs { #expect(try SharedCopy.require(key) == text, "\(key)") }
+        #expect(DisplayCopy.sortLabel(.random) == "랜덤순")
+        #expect(DisplayCopy.pickerYear(2026) == (try SharedCopy.require("display.picker.year")).replacingOccurrences(of: "{n}", with: "2026"))
+        #expect(DisplayCopy.pickerMonth(9) == (try SharedCopy.require("display.picker.month")).replacingOccurrences(of: "{n}", with: "9"))
+        #expect(DisplayCopy.pickerDay(17) == (try SharedCopy.require("display.picker.day")).replacingOccurrences(of: "{n}", with: "17"))
+    }
+
     struct MessageCase: Sendable, CustomTestStringConvertible {
         let operation: FeedOperation
         let failure: FeedFailure

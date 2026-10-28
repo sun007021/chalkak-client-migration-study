@@ -37,7 +37,7 @@ import ChalkakData
 /// - `PostChangeLedger`에 삭제·비공개가 기록되면 즉시 두 랭킹·주간 기록 칸에서 빼고, 히어로가 그 게시물이면 `.empty(banned: false)`로 바꾼다.
 @MainActor
 @Observable
-public final class HomeViewModel: PostChangeObserver {
+public final class HomeViewModel: PostChangeObserver, UnreadRefreshing {
     public private(set) var topicHeader: TopicHeaderState = .loading
     public private(set) var week: SectionState<WeekRecord> = .loading
     /// 어제 랭킹 (`home.ranking-*`)
@@ -210,8 +210,11 @@ public final class HomeViewModel: PostChangeObserver {
         }
     }
 
-    public func notificationsClosed() async { await work.run { [self] in await loadUnread() } }
-    public func pushReceived() async { await work.run { [self] in await loadUnread() } }
+    public func notificationsClosed() async { await refreshUnread() }
+    public func pushReceived() async { await refreshUnread() }
+
+    /// 읽음 성공·상세 404 같은 알림 이동 처리 뒤 미읽음만 다시 조회한다(`UnreadRefreshing`).
+    public func refreshUnread() async { await work.run { [self] in await loadUnread() } }
 
     public func consumeNeedsLogin() { needsLogin = false }
 

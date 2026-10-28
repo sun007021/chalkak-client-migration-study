@@ -31,6 +31,7 @@ import '../features/onboarding/data/url_launcher_external_link_launcher.dart';
 import '../features/onboarding/domain/sign_up_context.dart';
 import '../features/onboarding/domain/sign_up_use_case.dart';
 import '../features/onboarding/presentation/legal_web_view.dart';
+import '../features/settings/settings_dependencies_factory.dart';
 import '../features/signature/data/api_signature_repository.dart';
 import '../features/signature/data/api_signature_uploader.dart';
 import '../features/signature/data/ui_signature_renderer.dart';
@@ -42,6 +43,7 @@ import 'app_dependencies.dart';
 AppDependencies buildAppDependencies(
   AppConfig config, {
   PushPlatform push = const PushPlatform.disabled(),
+  String appVersion = '',
 }) {
   final sessions = SessionManager(
     store: SecureTokenStore(
@@ -67,6 +69,11 @@ AppDependencies buildAppDependencies(
     promptFlag: SharedPreferencesPermissionPromptFlag(),
     toast: main.toast,
   );
+  final settings = buildSettingsDependencies(
+    client: client,
+    permission: push.permission,
+    appVersion: appVersion,
+  );
   final cleaner = CompositeUserDataCleaner([
     notification.registrar,
     notification.coordinator,
@@ -75,6 +82,7 @@ AppDependencies buildAppDependencies(
     LikeDataCleaner(likes: main.likeStore, postEvents: main.postEvents),
     main.recordCleaner,
     main.homeAiReview,
+    settings.dataCleaner,
   ]);
   final pushRegistrar = notification.registrar;
   final signatureRepository = ApiSignatureRepository(client: client);
@@ -132,5 +140,6 @@ AppDependencies buildAppDependencies(
     legalWebViewBuilder: LegalWebView.build,
     main: main,
     notification: notification,
+    settings: settings,
   );
 }
