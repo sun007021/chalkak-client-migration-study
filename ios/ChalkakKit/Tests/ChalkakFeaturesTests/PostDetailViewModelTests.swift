@@ -582,4 +582,40 @@ struct PostDetailViewModelTests {
         #expect(vm.needsLogin)
         #expect(vm.like == LikeState(isLiked: false, likeCount: 10))
     }
+    // MARK: L2 연결용 보조(AI 대상, 다시 시도)
+
+    @Test("AI 피드백 대상은 상세 응답 뒤에만 있고 topicDate와 내 게시물 판정을 담는다")
+    func aiReviewTargetAfterConfirmation() async {
+        let world = FeedWorld()
+        let vm = world.makeDetail(.mine(postId: F.postID(minePost), thumbnailURL: nil))
+        #expect(vm.aiReviewTarget == nil)
+        await world.setDetail(F.detail(minePost, authorId: F.userAID, topicDate: F.today))
+        await vm.onAppear()
+        #expect(vm.aiReviewTarget == AIReviewTarget(postId: F.postID(minePost), topicDate: F.today, isMine: true))
+
+        let other = world.makeDetail(.listItem(F.listItem(otherPost)))
+        #expect(other.aiReviewTarget == nil)
+        await world.setDetail(F.detail(otherPost, authorId: F.userBID))
+        await other.onAppear()
+        #expect(other.aiReviewTarget?.isMine == false)
+    }
+
+    @Test("오류 화면의 다시 시도는 상세를 다시 불러오고 screen_view를 다시 보내지 않는다")
+    func retryReloadsWithoutScreenView() async {
+        let world = FeedWorld()
+        let vm = world.makeDetail(.mine(postId: F.postID(minePost), thumbnailURL: nil))
+        await world.posts.setDetailHandler { _ in throw FeedFailure.server(status: 500) }
+        await vm.onAppear()
+        guard case .failed = vm.state else {
+            Issue.record("오류 상태여야 한다: \(vm.state)")
+            return
+        }
+        await world.setDetail(F.detail(minePost, authorId: F.userAID))
+        await vm.retry()
+        #expect(vm.state == .content)
+        #expect(vm.isConfirmed)
+        #expect(world.analytics.events == [.screenView(.feed, screenClass: nil)])
+        await vm.retry() // 오류가 아니면 아무 일도 없다
+        #expect(vm.state == .content)
+    }
 }

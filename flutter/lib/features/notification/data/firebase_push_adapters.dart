@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:app_settings/app_settings.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../../../core/push/notification_permission.dart';
@@ -45,9 +46,16 @@ class FirebasePushTokenProvider implements PushTokenProvider {
 /// `firebase_messaging`이 Android 13+의 "아직 묻지 않음"과 "거부"를 구분해 준다.
 /// Android 12 이하는 런타임 권한이 없어 알림이 켜져 있으면 허용으로 읽힌다.
 class FirebaseNotificationPermission implements NotificationPermission {
-  FirebaseNotificationPermission(this._gateway);
+  FirebaseNotificationPermission(
+    this._gateway, {
+    Future<void> Function()? openSettings,
+  }) : _openSettings = openSettings ?? _openAppNotificationSettings;
 
   final FirebaseMessagingGateway _gateway;
+  final Future<void> Function() _openSettings;
+
+  static Future<void> _openAppNotificationSettings() =>
+      AppSettings.openAppSettings(type: AppSettingsType.notification);
 
   @override
   Future<OsPermissionStatus> status() async =>
@@ -57,6 +65,9 @@ class FirebaseNotificationPermission implements NotificationPermission {
   Future<OsPermissionStatus> request() async =>
       mapAuthorization(await _gateway.requestPermission());
 
+  @override
+  Future<void> openSystemSettings() => _openSettings();
+
   static OsPermissionStatus mapAuthorization(AuthorizationStatus status) =>
       switch (status) {
         AuthorizationStatus.authorized ||
@@ -65,6 +76,27 @@ class FirebaseNotificationPermission implements NotificationPermission {
         AuthorizationStatus.denied ||
         AuthorizationStatus.deniedPermanently => OsPermissionStatus.denied,
       };
+}
+
+/// Firebase가 없는 구성(설정 없음, 초기화 실패)의 권한 창구. 푸시를 받을 수 없으니 OS 권한을 읽거나 묻지
+/// 않고, 스위치를 서버 설정에만 연결한다(Web과 같다, REQ-SET-019). 거부로 답하면 설정 탭이 켜기를 막고
+/// 시스템 설정으로만 보내 다시는 켤 수 없게 되므로 [OsPermissionStatus.notRequired]로 답한다.
+/// 시스템 앱 알림 설정 열기는 Firebase 없이도 동작해 그대로 연다.
+class NoFirebaseNotificationPermission implements NotificationPermission {
+  const NoFirebaseNotificationPermission({this._openSettings});
+
+  final Future<void> Function()? _openSettings;
+
+  @override
+  Future<OsPermissionStatus> status() async => OsPermissionStatus.notRequired;
+
+  @override
+  Future<OsPermissionStatus> request() async => OsPermissionStatus.notRequired;
+
+  @override
+  Future<void> openSystemSettings() =>
+      (_openSettings ??
+      FirebaseNotificationPermission._openAppNotificationSettings)();
 }
 
 /// FCM 수신 창구. 알림을 누른 이벤트는 FCM이 만든 시스템 알림과 앱이 직접 만든 로컬 알림(Android 포그라운드)

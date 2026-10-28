@@ -64,5 +64,16 @@ if (hasAndroidSdk && file("app/build.gradle.kts").exists()) {
             }
         }
     }
+    // Kakao SDK (only with -PkakaoNativeAppKey): its repository is not reachable from every sandbox, so it is never added otherwise.
+    if (!providers.gradleProperty("kakaoNativeAppKey").orNull.isNullOrBlank()) {
+        dependencyResolutionManagement {
+            repositories {
+                maven {
+                    url = uri("https://devrepo.kakao.com/nexus/content/groups/public/")
+                    content { includeGroup("com.kakao.sdk") }
+                }
+            }
+        }
+    }
     include(":app")
 }

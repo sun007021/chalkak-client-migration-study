@@ -28,7 +28,7 @@ class AiResultSheetTest {
         val content = ui()
         assertEquals("빛을 따라 시선이 흐르는 안정적인 구도", content.summary)
         assertEquals("7.5", content.scoreText)
-        assertEquals(listOf(AiCriterionRow("구도", "7.5")), content.criteria)
+        assertEquals(listOf(AiCriterionRow("COMPOSITION", "구도", "7.5")), content.criteria)
         assertEquals(
             listOf("ai.result.strength", "ai.result.weakness", "ai.result.suggestion"),
             content.sections.map { it.titleCopyKey },

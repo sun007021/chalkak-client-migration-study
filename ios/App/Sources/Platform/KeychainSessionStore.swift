@@ -39,6 +39,24 @@ actor KeychainSessionStore: SessionStore {
         deleteItem()
     }
 
+    /// 저장된 세션의 userId만 동기로 읽는다(`ViewerContext`가 동기 조회를 요구한다). 항목을 지우거나 고치지 않는다.
+    nonisolated func storedUserId() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data,
+              let stored = try? JSONDecoder().decode(StoredSession.self, from: data),
+              !stored.userId.isEmpty
+        else { return nil }
+        return stored.userId
+    }
+
     // MARK: - Keychain
 
     private var baseQuery: [String: Any] {

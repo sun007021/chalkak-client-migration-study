@@ -13,6 +13,10 @@ junit4 = "4.13.2"
 kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 androidx-test-core = { module = "androidx.test:core", version = "1.7.0" }
 robolectric = "4.16.1"
+playAppUpdate = "2.1.0"
+kakaoSdk = "2.21.6"
+coil = "3.3.0"
+exifinterface = "1.4.1"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -39,6 +43,11 @@ junit4 = { module = "junit:junit", version.ref = "junit4" }
 kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 androidx-test-core = { module = "androidx.test:core", version = "1.7.0" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+play-app-update = { module = "com.google.android.play:app-update", version.ref = "playAppUpdate" }
+androidx-exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "exifinterface" }
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
+kakao-sdk-user = { module = "com.kakao.sdk:v2-user", version.ref = "kakaoSdk" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

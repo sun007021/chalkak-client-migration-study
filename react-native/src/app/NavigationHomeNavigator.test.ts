@@ -3,19 +3,21 @@ import { NavigationHomeNavigator } from './NavigationHomeNavigator';
 
 function setup(ready = true) {
   const navigate = jest.fn();
-  const navigator = new NavigationHomeNavigator({ isReady: () => ready, navigate } as never);
-  return { navigator, navigate };
+  const gate = { open: jest.fn() };
+  const navigator = new NavigationHomeNavigator({ isReady: () => ready, navigate } as never, gate);
+  return { navigator, navigate, gate };
 }
 
 describe('NavigationHomeNavigator', () => {
   it('각 목적지로 이동한다', () => {
-    const { navigator, navigate } = setup();
+    const { navigator, navigate, gate } = setup();
     navigator.openUploadGate();
     navigator.openNotifications();
     navigator.openPostDetail({ postId: 'p1', seed: null });
     navigator.openBanner({ id: 'b1', webViewUrl: 'https://web.example.test/1' });
+    // 업로드는 화면으로 곧바로 가지 않고 게이트(GET /posts/today 확인)를 거친다.
+    expect(gate.open).toHaveBeenCalledTimes(1);
     expect(navigate.mock.calls).toEqual([
-      ['Upload'],
       ['Notifications'],
       ['PostDetail', { postId: 'p1' }],
       ['IssueWeb', { url: 'https://web.example.test/1' }],

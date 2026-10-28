@@ -67,8 +67,7 @@ class PushForegroundHandler {
     } on Object {
       return const SuppressForeground();
     }
-    if (status != OsPermissionStatus.granted &&
-        status != OsPermissionStatus.notRequired) {
+    if (!status.allowsDelivery) {
       return const SuppressForeground();
     }
 

@@ -43,6 +43,18 @@ val sharedDir = rootProject.projectDir.parentFile.resolve("shared")
 val apiBaseUrlOverride: String? = providers.gradleProperty("apiBaseUrl").orNull?.takeIf { it.isNotBlank() }
 fun String.asBuildConfigString(): String = "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
+// `-PkakaoNativeAppKey=...` (never committed): turns the real Kakao SDK on. Without it the app builds with an adapter that reports
+// KakaoSdkResult.ConfigError (login shows `auth.login.error.config`), because devrepo.kakao.com is not reachable from every CI/sandbox.
+// settings.gradle.kts adds the Kakao Maven repository under the same condition.
+val kakaoNativeAppKey: String = providers.gradleProperty("kakaoNativeAppKey").orNull?.trim().orEmpty()
+val kakaoSdkEnabled: Boolean = kakaoNativeAppKey.isNotEmpty()
+
+// `-PfakeSocialLogin=true`: E2E builds get a SocialLoginClient that returns a fixture idToken (docs/testing/strategy.md section 2). Debug only.
+val fakeSocialLogin: Boolean = providers.gradleProperty("fakeSocialLogin").orNull.toBoolean()
+
+// `-PforceUpdateCheck=true` switches the Play In-App Update gate on (FORCE_UPDATE_CHECK_ENABLED, default off, REQ-BOOT-014).
+val forceUpdateCheck: Boolean = providers.gradleProperty("forceUpdateCheck").orNull.toBoolean()
+
 android {
     namespace = "com.stonefive.chalkak"
     compileSdk = 36
@@ -54,16 +66,26 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "KAKAO_NATIVE_APP_KEY", kakaoNativeAppKey.asBuildConfigString())
+        buildConfigField("boolean", "KAKAO_SDK_ENABLED", kakaoSdkEnabled.toString())
+        buildConfigField("boolean", "FORCE_UPDATE_CHECK_ENABLED", forceUpdateCheck.toString())
+        // Kakao's AuthCodeHandlerActivity needs the scheme `kakao<native app key>`; the placeholder value is harmless without a key.
+        manifestPlaceholders["kakaoNativeAppKey"] = kakaoNativeAppKey.ifEmpty { "not-configured" }
+        // Without the SDK the AuthCodeHandlerActivity class does not exist: keep its exported manifest entry disabled.
+        manifestPlaceholders["kakaoAuthEnabled"] = kakaoSdkEnabled.toString()
     }
 
     buildTypes {
         debug {
             buildConfigField("String", "API_BASE_URL", (apiBaseUrlOverride ?: "http://10.0.2.2:4010").asBuildConfigString())
+            buildConfigField("boolean", "FAKE_SOCIAL_LOGIN", fakeSocialLogin.toString())
         }
         release {
             // Release never points at the mock server; the default is the dev server unless -PapiBaseUrl is given.
             buildConfigField("String", "API_BASE_URL", (apiBaseUrlOverride ?: "https://chalkak-dev.pysun.kr").asBuildConfigString())
             isMinifyEnabled = false
+            // A fake login must never ship: the property is ignored (and false) in release.
+            buildConfigField("boolean", "FAKE_SOCIAL_LOGIN", "false")
         }
     }
     compileOptions {
@@ -81,6 +103,11 @@ android {
             all {
                 // BuildConfigTest pins the default API_BASE_URL only when -PapiBaseUrl did not replace it.
                 if (apiBaseUrlOverride != null) it.systemProperty("apiBaseUrlOverridden", "true")
+                // `Fixtures` (core:common test fixtures) reads shared/ at run time; declare it as an input like the JVM modules do.
+                it.systemProperty("shared.dir", sharedDir.path)
+                it.inputs.dir(sharedDir.resolve("fixtures")).withPropertyName("sharedFixtures")
+                it.inputs.dir(sharedDir.resolve("copy")).withPropertyName("sharedCopy")
+                it.inputs.file(sharedDir.resolve("constants.json")).withPropertyName("sharedConstants")
             }
         }
     }
@@ -102,6 +129,9 @@ androidComponents {
             outputDir.set(layout.buildDirectory.dir("generated/sharedAssets/${variant.name}"))
         }
         variant.sources.assets?.addGeneratedSourceDirectory(task, CopySharedAssetsTask::outputDir)
+        // Exactly one KakaoSdkFactory exists: the real SDK adapter (kakaoOn) or the ConfigError stand-in (kakaoOff).
+        val kakaoDir = if (kakaoSdkEnabled) "src/kakaoOn/kotlin" else "src/kakaoOff/kotlin"
+        variant.sources.kotlin?.addStaticSourceDirectory(layout.projectDirectory.dir(kakaoDir).asFile.path)
     }
 }
 
@@ -129,6 +159,11 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.play.app.update)
+    implementation(libs.androidx.exifinterface)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+    if (kakaoSdkEnabled) implementation(libs.kakao.sdk.user)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
@@ -140,4 +175,7 @@ dependencies {
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Holder-level fakes and shared/fixtures readers (FakeHomeRepository, FakePostRepository, Fixtures, FakeClock).
+    testImplementation(testFixtures(project(":core:common")))
+    testImplementation(testFixtures(project(":core:data")))
 }

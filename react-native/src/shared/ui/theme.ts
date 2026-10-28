@@ -7,6 +7,9 @@ export const colors = {
   accent: '#FF5A36',
   border: '#E5E5E5',
   danger: '#D33',
+  /** 화면 위를 덮는 로딩 레이어 배경과 그 위의 표시 색. */
+  overlay: 'rgba(0,0,0,0.25)',
+  onOverlay: '#FFFFFF',
 } as const;
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 } as const;
