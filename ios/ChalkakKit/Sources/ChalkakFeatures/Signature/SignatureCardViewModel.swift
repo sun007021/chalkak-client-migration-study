@@ -63,6 +63,29 @@ public final class SignatureCardViewModel {
         activeWork.cancel()
     }
 
+    /// 사인 변경 흐름이 끝났을 때 설정 쪽이 알려 준다(TC-SET-009~011).
+    /// - 성공(`succeeded == true`): 변경 전에 시작된 진행 중 조회는 낡은 결과이므로 응답이 늦게 와도 반영하지 않고(세대 무효화),
+    ///   조회 중이었더라도 새 `GET`을 보낸다. 카드는 원본 URL을 대입하지 않고 그 `GET`의 결과(썸네일 우선)로 바뀐다(D-18). 돌아오면 그 `GET`이 끝난 상태다.
+    /// - 실패: 아무것도 바꾸지 않는다. 진행 중이던 조회는 정상 반영된다.
+    public func signatureChangeFinished(succeeded: Bool) async {
+        guard succeeded, access == .member else { return }
+        // 진행 중이던 조회는 낡은 결과다: 세대를 올려 늦은 응답을 버리고, 조회 중 가드(`isLoading`)를 풀어 새 `GET`을 보낸다.
+        generation += 1
+        isLoading = false
+        activeWork.cancel()
+        await screenAppeared()
+    }
+
+    /// 로그아웃·계정 전환: 이전 계정의 사인 이미지·상태·알림을 지우고 진행 중 조회를 취소하며, 이전 계정의 늦은 응답은 반영하지 않는다(TC-SET-037).
+    public func reset() {
+        generation += 1
+        isLoading = false
+        activeWork.cancel()
+        imageURL = nil
+        needsRegistration = false
+        notice = nil
+    }
+
     private func handleFailure(_ error: any Error) {
         if error.isCancellation { return }
         // 401은 재인증 이벤트가 로그인으로 보낸다.

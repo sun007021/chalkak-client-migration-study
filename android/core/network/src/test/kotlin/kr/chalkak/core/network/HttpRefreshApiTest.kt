@@ -6,6 +6,8 @@ import kr.chalkak.core.network.testing.RouteDispatcher
 import kr.chalkak.core.network.testing.TestSessions
 import kr.chalkak.core.network.testing.api
 import okhttp3.mockwebserver.MockResponse
+import kr.chalkak.core.network.testing.LOOPBACK_V4
+import kr.chalkak.core.network.testing.loopbackUrl
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.SocketPolicy
 import kotlin.test.AfterTest
@@ -16,8 +18,8 @@ import kotlin.test.assertNull
 
 class HttpRefreshApiTest {
     private val dispatcher = RouteDispatcher()
-    private val server = MockWebServer().apply { this.dispatcher = this@HttpRefreshApiTest.dispatcher; start() }
-    private val baseUrl = (ApiBaseUrl.parse(server.url("/").toString()) as ApiBaseUrlResult.Valid).baseUrl
+    private val server = MockWebServer().apply { this.dispatcher = this@HttpRefreshApiTest.dispatcher; start(LOOPBACK_V4, 0) }
+    private val baseUrl = (ApiBaseUrl.parse(server.loopbackUrl("/")) as ApiBaseUrlResult.Valid).baseUrl
     private fun refreshApi(responseTimeoutMs: Long = 15_000) =
         HttpRefreshApi(baseUrl, OkHttpFactory.apiClient(NetworkConfig(responseTimeoutMs = responseTimeoutMs)))
     private val path = api("/auth/refresh")
