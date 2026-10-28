@@ -18,6 +18,21 @@ class AndroidExternalBrowser(private val context: Context) : ExternalBrowser {
     }
 }
 
+/**
+ * Banner links (`OpenExternal`) in the system browser, with the three outcomes the home feature turns into toasts:
+ * no app can show the link, or the launch failed for another reason (for example a security exception).
+ */
+class AndroidLinkBrowser(private val context: Context) : kr.chalkak.feature.home.ExternalBrowser {
+    override fun open(url: String): kr.chalkak.feature.home.BrowserOpenResult = try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        kr.chalkak.feature.home.BrowserOpenResult.Opened
+    } catch (e: ActivityNotFoundException) {
+        kr.chalkak.feature.home.BrowserOpenResult.NoBrowser
+    } catch (e: RuntimeException) {
+        kr.chalkak.feature.home.BrowserOpenResult.Failed
+    }
+}
+
 /** Opens this app's store page: `market://` first, then the https URL when no store app answers. Fallback of the update gate. */
 class StoreOpener(private val context: Context) {
     fun open(): Boolean {

@@ -103,6 +103,11 @@ android {
             all {
                 // BuildConfigTest pins the default API_BASE_URL only when -PapiBaseUrl did not replace it.
                 if (apiBaseUrlOverride != null) it.systemProperty("apiBaseUrlOverridden", "true")
+                // `Fixtures` (core:common test fixtures) reads shared/ at run time; declare it as an input like the JVM modules do.
+                it.systemProperty("shared.dir", sharedDir.path)
+                it.inputs.dir(sharedDir.resolve("fixtures")).withPropertyName("sharedFixtures")
+                it.inputs.dir(sharedDir.resolve("copy")).withPropertyName("sharedCopy")
+                it.inputs.file(sharedDir.resolve("constants.json")).withPropertyName("sharedConstants")
             }
         }
     }
@@ -155,6 +160,8 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.play.app.update)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     if (kakaoSdkEnabled) implementation(libs.kakao.sdk.user)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
@@ -167,4 +174,7 @@ dependencies {
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Holder-level fakes and shared/fixtures readers (FakeHomeRepository, FakePostRepository, Fixtures, FakeClock).
+    testImplementation(testFixtures(project(":core:common")))
+    testImplementation(testFixtures(project(":core:data")))
 }
