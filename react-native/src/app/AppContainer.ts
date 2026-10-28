@@ -40,6 +40,7 @@ import { BannerRepository } from '../data/banner/BannerRepository';
 import { NotificationRepository } from '../data/notification/NotificationRepository';
 import { LikeRepository } from '../data/like/LikeRepository';
 import { PostRepository } from '../data/post/PostRepository';
+import { RecordRepository } from '../data/record/RecordRepository';
 import { TopicRepository } from '../data/topic/TopicRepository';
 import type { AiReviewPoller } from '../features/ai-review/AiReviewPoller';
 import { NoopAiReviewPoller } from '../features/ai-review/NoopAiReviewPoller';
@@ -50,6 +51,11 @@ import { HomeViewModel } from '../features/home/HomeViewModel';
 import { HomeViewModelOwner } from '../features/home/HomeViewModelOwner';
 import { DisplayViewModel } from '../features/display/DisplayViewModel';
 import { DisplayViewModelOwner } from '../features/display/DisplayViewModelOwner';
+import type { CalendarImageRenderer, CalendarImageSaver } from '../features/record/CalendarImage';
+import { MediaLibraryCalendarImageSaver } from '../features/record/MediaLibraryCalendarImageSaver';
+import { RecordViewModel } from '../features/record/RecordViewModel';
+import { RecordViewModelOwner } from '../features/record/RecordViewModelOwner';
+import { ViewShotCalendarImageRenderer } from '../features/record/ViewShotCalendarImageRenderer';
 import type { FeedNavigator } from '../features/feed/FeedNavigator';
 import type { FeedTarget } from '../features/feed/FeedTarget';
 import { FeedViewModel } from '../features/feed/FeedViewModel';
@@ -57,7 +63,23 @@ import { DefaultLikeController } from '../features/like/DefaultLikeController';
 import type { LikeController } from '../features/like/LikeController';
 import { DefaultPostChanges } from '../features/post/PostChanges';
 import { NavigationDisplayNavigator } from './NavigationDisplayNavigator';
+import { PostCreationRepository } from '../data/post/PostCreationRepository';
+import { PhotoEditViewModel } from '../features/photo-edit/PhotoEditViewModel';
+import { createDefaultMediaServices } from '../features/upload/createDefaultMediaServices';
+import { DefaultPostCreationNotifier } from '../features/upload/DefaultPostCreationNotifier';
+import type { MediaServices } from '../features/upload/MediaServices';
+import { PhotoUploadViewModel } from '../features/upload/PhotoUploadViewModel';
+import { PostImageEncoder } from '../features/upload/PostImageEncoder';
+import { UploadEntryGateOwner } from '../features/upload/UploadEntryGateOwner';
+import { UploadEntryGateViewModel } from '../features/upload/UploadEntryGateViewModel';
+import { UploadPreparation } from '../features/upload/UploadPreparation';
+import { UploadSubmitter } from '../features/upload/UploadSubmitter';
+import { UploadSuccessViewModel } from '../features/upload/UploadSuccessViewModel';
+import type { UploadSuccessParams } from '../features/upload/UploadNavigator';
+import { NavigationUploadNavigator } from './NavigationUploadNavigator';
 import { NavigationHomeNavigator } from './NavigationHomeNavigator';
+import { NavigationRecordNavigator } from './NavigationRecordNavigator';
+import { TabReturnHint } from './TabReturnHint';
 import type { RootStackParamList } from './navigation/routes';
 import { LoginViewModel } from '../features/auth/LoginViewModel';
 import { LoginViewModelOwner } from '../features/auth/LoginViewModelOwner';
@@ -83,6 +105,7 @@ import { ExpoSecureKeyValueStorage } from '../core/session/ExpoSecureKeyValueSto
 import { SecureSessionStore } from '../core/session/SecureSessionStore';
 import type { SessionStore } from '../core/session/SessionStore';
 import { type Clock, SystemClock } from '../core/time/Clock';
+import type { KstDate } from '../core/time/KstDate';
 import { TOAST_DURATION_MS } from '../shared/constants';
 
 /** 컨테이너가 조립하는 의존성 전체. 새 의존성은 여기에 추가한다. */
@@ -111,8 +134,16 @@ export interface Dependencies {
   /** 없으면 컨테이너가 실제 구현(DefaultLikeController)을 만든다. 테스트는 Fake를 넣는다. 어느 쪽이든 clearAll이 있으면 로그아웃 때 비우는 캐시에 올린다. */
   readonly likes?: LikeController;
   readonly aiReview: AiReviewPoller;
+  /** 기록 탭의 달력 이미지 렌더러·저장소. 없으면 컨테이너가 기본 구현을 쓴다(기록 PR). */
+  readonly calendarImageRenderer?: CalendarImageRenderer;
+  readonly calendarImageSaver?: CalendarImageSaver;
   /** 로그아웃·탈퇴·계정 전환 때 비울 사용자별 캐시. 캐시를 가진 기능 PR이 추가한다. */
   readonly userDataCaches: readonly UserDataCache[];
+  /**
+   * 업로드·편집의 네이티브 경계(사진 선택기, 이미지 엔진, 갤러리 저장, 파일). 없으면 컨테이너가 실제 구현
+   * (expo-image-picker, expo-image-manipulator, expo-media-library, expo-file-system)을 만든다. 테스트는 Fake를 넣는다.
+   */
+  readonly media?: MediaServices;
 }
 
 function isUserDataCache(value: object): value is UserDataCache {
@@ -143,10 +174,21 @@ export class AppContainer {
   readonly homeOwner: HomeViewModelOwner;
   /** 메인에 있는 동안 전시 ViewModel을 만들고 버린다. 전시 탭 화면은 이것을 구독해 받는다. */
   readonly displayOwner: DisplayViewModelOwner;
+  /** 메인에 있는 동안 기록 ViewModel을 만들고 버린다. 기록 탭 화면은 이것을 구독해 받는다. */
+  readonly recordOwner: RecordViewModelOwner;
+  /**
+   * 기본 렌더러(view-shot)를 쓸 때만 있다. 기록 화면에 마운트하는 캡처 호스트가 이것으로 달력 뷰를 그려 캡처한다.
+   * 테스트가 Fake 렌더러를 넣으면 null이라 호스트를 마운트하지 않는다.
+   */
+  readonly calendarCapture: ViewShotCalendarImageRenderer | null;
   /** 전시·홈·피드가 같이 쓰는 좋아요 저장소(D-04). 기본은 실제 컨트롤러다. */
   readonly likes: LikeController;
   /** 상세에서 일어난 제목 수정·삭제를 전시 등이 따라 반영하게 하는 채널. 계정 전환 때 비운다. */
   readonly postChanges = new DefaultPostChanges();
+  /** 게시물이 만들어졌음을 홈(히어로 갱신) 등에 알린다. 표시 PR의 PostChanges와 의미가 달라 별도 채널이다. */
+  readonly postCreationNotifier = new DefaultPostCreationNotifier();
+  /** 업로드 진입 게이트(하단 + 버튼, 홈 히어로 버튼)의 소유자. 확인 중 표시(upload-entry.loading)는 이것을 구독한다. */
+  readonly uploadGateOwner: UploadEntryGateOwner;
   /** phase가 login인 동안 로그인 ViewModel을 만들고 버린다. 화면은 이것을 구독해 받는다. */
   readonly loginOwner: LoginViewModelOwner;
   /** phase가 sign-up인 동안 가입 흐름(약관 -> 사인 -> 미리보기) ViewModel을 만들고 버린다. */
@@ -160,8 +202,24 @@ export class AppContainer {
   private readonly nonceGenerator: NonceGenerator;
   private readonly pushRegistrar: PushRegistrar;
   private readonly dependencies: Dependencies;
-  private readonly homeNavigator = new NavigationHomeNavigator(this.navigationHandle);
+  /** 홈 히어로 버튼은 업로드 화면으로 곧바로 가지 않고 하단 + 버튼과 같은 게이트를 누른다. */
+  private readonly homeNavigator = new NavigationHomeNavigator(this.navigationHandle, {
+    open: () => this.uploadGateOwner.press(),
+  });
+  private readonly uploadNavigator = new NavigationUploadNavigator(this.navigationHandle);
+  private mediaServices: MediaServices | null;
+  /** 홈·업로드·피드 등이 함께 쓰는 저장소(요청 경로가 같아 하나만 만든다). */
+  private postRepositoryInstance: PostRepository | null = null;
+  private topicRepositoryInstance: TopicRepository | null = null;
   private readonly displayNavigator = new NavigationDisplayNavigator(this.navigationHandle);
+  /** 기록에서 연 전시 탭이 뒤로 가기에서 기록으로 돌아오게 하는 힌트(MainTabs의 전시 탭이 읽는다). */
+  readonly tabReturnHint = new TabReturnHint();
+  private readonly recordNavigator = new NavigationRecordNavigator(
+    this.navigationHandle,
+    this.tabReturnHint,
+  );
+  private readonly calendarImageRenderer: CalendarImageRenderer;
+  private readonly calendarImageSaver: CalendarImageSaver;
   private readonly cacheRegistry = new UserDataCacheRegistry();
 
   private constructor(dependencies: Dependencies, toastCenter: ToastCenter | null) {
@@ -204,6 +262,7 @@ export class AppContainer {
     this.loginOwner = new LoginViewModelOwner(this.bootViewModel, () =>
       this.createLoginViewModel(),
     );
+    this.mediaServices = dependencies.media ?? null;
     this.likes = dependencies.likes ?? this.createDefaultLikes();
     if (dependencies.likes && isUserDataCache(dependencies.likes)) {
       this.cacheRegistry.register(dependencies.likes);
@@ -227,6 +286,110 @@ export class AppContainer {
       create: (mode) => this.createDisplayViewModel(mode),
       registerCache: (cache) => this.cacheRegistry.register(cache),
     });
+    this.uploadGateOwner = new UploadEntryGateOwner({
+      boot: this.bootViewModel,
+      create: (mode) => this.createUploadGate(mode),
+    });
+    // 업로드가 끝나면 홈이 히어로(작성 상태)와 이번 주 기록을 다시 불러온다.
+    this.postCreationNotifier.subscribe(() => {
+      void this.homeOwner.getSnapshot().viewModel?.refresh();
+    });
+    const calendarImage = resolveCalendarImageRenderer(dependencies.calendarImageRenderer);
+    this.calendarCapture = calendarImage.capture;
+    this.calendarImageRenderer = calendarImage.renderer;
+    this.calendarImageSaver =
+      dependencies.calendarImageSaver ?? new MediaLibraryCalendarImageSaver();
+    this.recordOwner = new RecordViewModelOwner({
+      boot: this.bootViewModel,
+      create: (mode) => this.createRecordViewModel(mode),
+      registerCache: (cache) => this.cacheRegistry.register(cache),
+    });
+  }
+
+  private get postRepository(): PostRepository {
+    return (this.postRepositoryInstance ??= new PostRepository({ api: this.api }));
+  }
+
+  private get topicRepository(): TopicRepository {
+    return (this.topicRepositoryInstance ??= new TopicRepository({ api: this.api }));
+  }
+
+  /** 네이티브 경계. 처음 필요할 때 실제 구현을 만든다(Fake를 넣은 테스트는 만들지 않는다). */
+  get media(): MediaServices {
+    this.mediaServices ??= createDefaultMediaServices(this.dependencies.appInfo.platform);
+    return this.mediaServices;
+  }
+
+  /** 소유자(uploadGateOwner)만 부른다. */
+  private createUploadGate(mode: MainMode): UploadEntryGateViewModel {
+    return new UploadEntryGateViewModel({
+      mode,
+      posts: this.postRepository,
+      toast: this.toast,
+      authFlow: this.bootViewModel,
+      navigator: this.uploadNavigator,
+      analytics: this.analytics,
+    });
+  }
+
+  /** 업로드 라우트(내비게이션)만 부른다. 화면을 열 때마다 만들고 닫을 때 dispose한다(진행 중 작업과 임시 파일 정리). */
+  createPhotoUploadViewModel(topicDate: KstDate): PhotoUploadViewModel {
+    const { api, media } = this;
+    const repository = new PostCreationRepository({ api });
+    const preparation = new UploadPreparation({
+      repository,
+      encoder: new PostImageEncoder({ engine: media.engine, files: media.files }),
+      files: media.files,
+      monotonic: media.monotonic,
+    });
+    return new PhotoUploadViewModel({
+      entry: { topicDate },
+      clock: this.clock,
+      platform: media.platform,
+      topics: this.topicRepository,
+      picker: media.picker,
+      gallery: media.gallery,
+      permissions: media.permissions,
+      engine: media.engine,
+      preparation,
+      submitter: new UploadSubmitter({
+        repository,
+        posts: this.postRepository,
+        preparation,
+      }),
+      createEditor: (request) =>
+        new PhotoEditViewModel({ engine: media.engine, files: media.files, ...request }),
+      toast: this.toast,
+      analytics: this.analytics,
+      navigator: this.uploadNavigator,
+      notifier: this.postCreationNotifier,
+      authFlow: this.bootViewModel,
+    });
+  }
+
+  /** 성공 라우트(내비게이션)만 부른다. */
+  createUploadSuccessViewModel(params: UploadSuccessParams): UploadSuccessViewModel {
+    return new UploadSuccessViewModel({
+      params,
+      analytics: this.analytics,
+      navigator: this.uploadNavigator,
+    });
+  }
+
+  /** 소유자(recordOwner)만 부른다. */
+  private createRecordViewModel(mode: MainMode): RecordViewModel {
+    return new RecordViewModel({
+      mode,
+      clock: this.clock,
+      records: new RecordRepository({ api: this.api }),
+      changes: this.postChanges,
+      navigator: this.recordNavigator,
+      toast: this.toast,
+      authFlow: this.bootViewModel,
+      visibility: this.dependencies.visibility,
+      imageRenderer: this.calendarImageRenderer,
+      imageSaver: this.calendarImageSaver,
+    });
   }
 
   /** 실제 좋아요 컨트롤러. 로그아웃·계정 전환 때 진행 중 요청과 값을 버리도록 캐시 레지스트리에 올린다. */
@@ -242,12 +405,12 @@ export class AppContainer {
 
   /** 소유자(displayOwner)만 부른다. */
   private createDisplayViewModel(mode: MainMode): DisplayViewModel {
-    const { api, clock } = this;
+    const { clock } = this;
     return new DisplayViewModel({
       mode,
       clock,
-      topics: new TopicRepository({ api }),
-      posts: new PostRepository({ api }),
+      topics: this.topicRepository,
+      posts: this.postRepository,
       likes: this.likes,
       changes: this.postChanges,
       navigator: this.displayNavigator,
@@ -262,7 +425,7 @@ export class AppContainer {
       target,
       userId,
       clock: this.clock,
-      posts: new PostRepository({ api: this.api }),
+      posts: this.postRepository,
       likes: this.likes,
       changes: this.postChanges,
       navigator,
@@ -328,8 +491,8 @@ export class AppContainer {
     return new HomeViewModel({
       mode,
       clock,
-      topics: new TopicRepository({ api }),
-      posts: new PostRepository({ api }),
+      topics: this.topicRepository,
+      posts: this.postRepository,
       notifications: new NotificationRepository({ api }),
       // ISSUE 목록 ViewModel은 홈이 소유한다(홈이 로드·정리·dispose를 시키고 HomeScreen은 홈을 통해서만 받는다).
       bannerFeed: new BannerFeedViewModel({ repository: new BannerRepository({ api }) }),
@@ -427,11 +590,26 @@ export class AppContainer {
         sleeper,
         signatureRasterizer: overrides.signatureRasterizer ?? new SoftwareSignatureRasterizer(),
         likes: overrides.likes,
+        media: overrides.media,
+        calendarImageRenderer: overrides.calendarImageRenderer,
+        calendarImageSaver: overrides.calendarImageSaver,
         aiReview: overrides.aiReview ?? new NoopAiReviewPoller(),
       },
       toastCenter,
     );
   }
+}
+
+/**
+ * 주입된 렌더러가 있으면 그것을(캡처 호스트 없음), 없으면 view-shot 렌더러를 만들고 호스트가 쓸 수 있게 함께 돌려준다.
+ */
+function resolveCalendarImageRenderer(injected: CalendarImageRenderer | undefined): {
+  renderer: CalendarImageRenderer;
+  capture: ViewShotCalendarImageRenderer | null;
+} {
+  if (injected) return { renderer: injected, capture: null };
+  const capture = new ViewShotCalendarImageRenderer();
+  return { renderer: capture, capture };
 }
 
 /** iOS는 iTunes lookup, Android는 Play 즉시 업데이트(네이티브 모듈을 붙이기 전에는 조회 불가 -> 통과). */

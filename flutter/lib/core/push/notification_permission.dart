@@ -6,7 +6,10 @@ enum OsPermissionStatus {
   denied,
 
   /// 런타임 권한이 없는 환경(Android 12 이하). 요청하지 않고 알림은 표시할 수 있다.
-  notRequired,
+  notRequired;
+
+  /// 알림을 표시하거나 켤 수 있는 상태(허용, 또는 런타임 권한이 없는 환경).
+  bool get allowsDelivery => this == granted || this == notRequired;
 }
 
 /// OS 알림 권한 창구(iOS 알림·배지·소리, Android 13+ `POST_NOTIFICATIONS`).
@@ -16,4 +19,8 @@ abstract interface class NotificationPermission {
 
   /// OS 권한 대화상자를 띄운다. 호출 자체가 실패하면 던진다.
   Future<OsPermissionStatus> request();
+
+  /// 시스템의 앱 알림 설정 화면을 연다(iOS 앱 설정, Android 앱 알림 설정). 설정 탭이 권한이
+  /// 거부된 기기에서 스위치를 켜려 할 때 쓴다(REQ-SET-015). 열지 못하면 던진다.
+  Future<void> openSystemSettings();
 }

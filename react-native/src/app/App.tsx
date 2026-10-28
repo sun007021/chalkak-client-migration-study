@@ -14,6 +14,7 @@ import { AppContainer, type Dependencies } from './AppContainer';
 import { AppContainerProvider, useAppContainer } from './AppContainerContext';
 import { BootHost } from './BootHost';
 import { RootNavigator } from './RootNavigator';
+import { UploadEntryOverlay } from './UploadEntryOverlay';
 
 type AppProps = {
   /** 앱 루트(`index.ts`)가 `readAppConfig()`로 읽은 결과. 이 컴포넌트는 전역을 읽지 않는다. */
@@ -43,6 +44,7 @@ function AppNavigation() {
   return (
     <NavigationContainer ref={navigationHandle}>
       <AppShell />
+      <UploadEntryOverlay />
       {toastCenter ? <ToastHost center={toastCenter} /> : null}
     </NavigationContainer>
   );

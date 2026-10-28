@@ -13,6 +13,10 @@ public enum UploadCopy {
     public static let title = "전시하기"              // upload.title
     public static let submit = "전시하기"             // upload.submit
     public static let submitting = "전시 중..."         // upload.submitting
+    public static let subheading = "앨범에서 고르거나 지금 찍어요"            // upload.subheading
+    public static let permissionTitle = "촬영 사진 저장 권한"          // upload.permission.save
+    public static let permissionSettings = "설정 열기"             // upload.permission.settings
+    public static let permissionShootWithoutSaving = "저장 없이 촬영"  // upload.no-save-capture
     public static let captionPlaceholder = "작품 제목은 선택이에요." // upload.caption.placeholder
     public static let cameraSaveFailed = "사진을 갤러리에 저장하지 못했어요."   // upload.camera.save-failed
     public static let errorNetwork = "네트워크 연결을 확인해 주세요."       // upload.error.network

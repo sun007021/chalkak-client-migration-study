@@ -1,4 +1,4 @@
-import { encodePng } from './encodePng';
+import { encodePng } from '../../core/image/png';
 import type { RasterRequest, SignatureRasterizer } from './SignatureRasterizer';
 import type { Point, Stroke } from './Stroke';
 

@@ -12,10 +12,12 @@ import { KakaoCallbackScreen, LoginScreen } from '../features/auth/LoginScreen';
 import { resolveAuthGate } from '../features/boot/authGate';
 import type { AuthGateDecision } from '../features/boot/authGate';
 import { BootScreen, SplashView } from '../features/boot/BootScreen';
+import { HomeScreen } from '../features/home/HomeScreen';
 import { TermsScreen } from '../features/onboarding/TermsScreen';
 import { SignatureDrawScreen } from '../features/signature/SignatureDrawScreen';
 import { SignaturePreviewScreen } from '../features/signature/SignaturePreviewScreen';
-import { BottomBarSlotContext, HomePlaceholder, MainShell, TabGate, TabPlaceholder } from '../features/shell/MainShell';
+import { MemberOnly } from '../features/shell/MemberOnly';
+import { BottomBarSlotContext, MainShell, TabGate, TabPlaceholder } from '../features/shell/MainShell';
 import type { TabRouteHandle } from '../features/shell/MainShell';
 import { ContainerProvider } from './AppContext';
 import type { AppContainer } from './container';
@@ -111,7 +113,7 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
         {
           element: <RequireSession container={container}>{(mode) => <MainShell mode={mode} />}</RequireSession>,
           children: [
-            { path: ROUTES.home, handle: homeHandle, element: <HomePlaceholder /> },
+            { path: ROUTES.home, handle: homeHandle, element: <HomeScreen /> },
             { path: ROUTES.display, handle: displayHandle, element: <TabPlaceholder tab="display" testId="display.root" /> },
             {
               path: ROUTES.record,
@@ -124,6 +126,15 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
             },
             { path: ROUTES.settings, handle: settingsHandle, element: <TabPlaceholder tab="settings" testId="settings.root" /> },
           ],
+        },
+        // 알림함·게시물 상세는 다음 PR의 화면이 대체하는 자리표시(홈 이동 계약 검증용). 탭 셸 밖이라 하단 바가 없고 회원만 들어온다(게스트는 홈으로).
+        {
+          element: <RequireSession container={container}>{(mode) => <MemberOnly mode={mode} action="notification"><Outlet /></MemberOnly>}</RequireSession>,
+          children: [{ path: ROUTES.notifications, element: <div data-testid="notifications.root" /> }],
+        },
+        {
+          element: <RequireSession container={container}>{(mode) => <MemberOnly mode={mode} action="feed"><Outlet /></MemberOnly>}</RequireSession>,
+          children: [{ path: `${ROUTES.feed}/:postId`, element: <div data-testid="feed.root" /> }],
         },
         ...devSessionRoutes(container),
         { path: '*', element: <Navigate to={ROUTES.boot} replace /> },

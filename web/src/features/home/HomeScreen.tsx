@@ -1,0 +1,401 @@
+import { useCallback, useEffect, useRef } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import { Link, useNavigate } from 'react-router';
+import { useContainer } from '../../app/AppContext';
+import { HOME_BELOW_STATE, displayPath } from '../../app/paths';
+import { t } from '../../copy/ko';
+import { webOnlyCopy } from '../../copy/webOnly';
+import { useScreenView } from '../../core/analytics/useScreenView';
+import { useViewModel } from '../../core/state/useViewModel';
+import { useShellContext } from '../shell/MainShell';
+import type { BannerFeedState } from './BannerFeed';
+import { bannerSentinelIndex } from './BannerFeed';
+import type { HomeState, HomeViewModel, RankingKey, RankingSection } from './HomeViewModel';
+import { RouterHomeNavigator } from './RouterHomeNavigator';
+import { formatTopicHeaderDate } from './homeDates';
+import type { PostSummary } from './homeModels';
+import type { VisibilityObserverFactory } from '../../core/ui/VisibilityObserver';
+
+/**
+ * 홈 탭 화면. 로직은 HomeViewModel에 있고 여기서는 그리기만 한다.
+ * ViewModel은 컨테이너가 모드별로 보관하므로(REQ-HOME-040) 화면은 붙고 떨어질 뿐이다: 붙으면 이동 수단을 꽂고 onShown(처음이면 전체 로드, 아니면 조용한 갱신),
+ * 문서가 다시 보일 때 onShown, 숨겨지거나 떨어지면 onHidden.
+ */
+export function HomeScreen(): ReactNode {
+  const { mode } = useShellContext();
+  const container = useContainer();
+  const navigate = useNavigate();
+  useScreenView('home');
+  const { viewModel: vm, navigator } = container.homeSession(mode);
+
+  useEffect(() => {
+    const detach = navigator.attach(new RouterHomeNavigator((to, options) => navigate(to, options)));
+    void vm.onShown();
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') vm.onHidden();
+      else void vm.onShown();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      vm.onHidden();
+      detach();
+    };
+  }, [vm, navigator, navigate]);
+
+  return <HomeView vm={vm} mode={mode} />;
+}
+
+const sectionStyle: CSSProperties = { padding: '12px 16px' };
+const rowStyle: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 };
+const headingStyle: CSSProperties = { margin: 0, fontSize: 18 };
+const plainButton: CSSProperties = { border: 0, padding: 0, background: 'none', font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' };
+const thumbStyle: CSSProperties = { display: 'block', width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 8, background: '#e5e5e5' };
+const placeholderStyle: CSSProperties = { width: '100%', aspectRatio: '1 / 1', borderRadius: 8, background: '#e5e5e5' };
+
+function HomeView({ vm, mode }: { vm: HomeViewModel; mode: 'member' | 'guest' }): ReactNode {
+  const container = useContainer();
+  const state = useViewModel(vm);
+  const banners = useViewModel(vm.banners);
+  return (
+    <div data-testid="home.root" data-mode={mode}>
+      <div data-testid="home.scroll">
+        <Header vm={vm} state={state} />
+        {state.refreshing ? (
+          <div data-testid="home.refresh-indicator" role="status" aria-busy="true" style={{ padding: '4px 16px', fontSize: 12, background: '#f2f2f2' }}>
+            {webOnlyCopy['home.refresh-indicator']}
+          </div>
+        ) : null}
+        <Hero vm={vm} state={state} />
+        <AiCard vm={vm} state={state} />
+        <Weekly vm={vm} state={state} />
+        <Ranking vm={vm} state={state} which="yesterday" />
+        <Ranking vm={vm} state={state} which="popular" />
+        <Issues vm={vm} banners={banners} observe={container.visibilityObserver} />
+      </div>
+    </div>
+  );
+}
+
+function Header({ vm, state }: { vm: HomeViewModel; state: HomeState }): ReactNode {
+  const topic = state.topic;
+  return (
+    <header style={sectionStyle}>
+      <div style={rowStyle}>
+        <div>
+          {topic.status === 'ready' && topic.topic ? (
+            <div data-testid="home.topic-date">{t('home.topic.header', { 'M월 d일': formatTopicHeaderDate(topic.topic.topicDate) })}</div>
+          ) : null}
+          <h1 data-testid="home.topic-title" style={headingStyle}>
+            {topic.status === 'loading' ? t('home.topic.loading') : null}
+            {topic.status === 'error' ? t('home.topic.error') : null}
+            {topic.status === 'ready' ? (topic.topic ? topic.topic.title : t('home.topic.not-ready')) : null}
+          </h1>
+          {topic.status === 'error' ? (
+            <button type="button" data-testid="home.retry-button" onClick={() => void vm.retryTopic()}>
+              {t('common.retry')}
+            </button>
+          ) : null}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" aria-label={webOnlyCopy['home.refresh']} disabled={state.refreshing} onClick={() => void vm.refresh()}>
+            <span aria-hidden="true">↻</span>
+          </button>
+          <button type="button" data-testid="home.notification-button" aria-label={t('noti.inbox.title')} style={{ position: 'relative' }} onClick={() => vm.onNotificationPress()}>
+            <span aria-hidden="true">🔔</span>
+            {state.hasUnread ? (
+              <span data-testid="home.notification-unread-dot" style={{ position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: 4, background: '#e53935' }} />
+            ) : null}
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function Hero({ vm, state }: { vm: HomeViewModel; state: HomeState }): ReactNode {
+  const { hero, topic } = state;
+  return (
+    <section style={sectionStyle}>
+      {hero.kind === 'loading' ? (
+        <div data-testid="home.hero-loading" role="status" aria-busy="true">
+          {t('home.topic.loading')}
+        </div>
+      ) : null}
+      {hero.kind === 'no-open-topic' ? <div data-testid="home.hero-no-open-topic">{t('home.hero.no-open-topic')}</div> : null}
+      {hero.kind === 'empty' ? (
+        <div data-testid="home.hero-empty">
+          <p>{topic.status === 'ready' && topic.topic ? t('home.hero.empty', { 주제: topic.topic.title }) : topic.status === 'loading' ? t('home.topic.loading') : t('home.hero.no-topic')}</p>
+          <button type="button" data-testid="home.hero-upload-button" onClick={() => vm.onHeroPress()}>
+            {t('nav.tab.upload.a11y')}
+          </button>
+        </div>
+      ) : null}
+      {hero.kind === 'processing' ? <div data-testid="home.hero-processing">{t('home.hero.processing')}</div> : null}
+      {hero.kind === 'photo' ? (
+        <div data-testid="home.hero-photo" style={{ position: 'relative' }}>
+          {hero.thumbnailUrl ? <img src={hero.thumbnailUrl} alt="" style={thumbStyle} /> : <div style={placeholderStyle} />}
+          {hero.pending ? (
+            <span data-testid="home.hero-pending-badge" style={{ position: 'absolute', top: 8, left: 8, padding: '2px 8px', borderRadius: 8, background: '#111', color: '#fff', fontSize: 12 }}>
+              {t('home.hero.pending-badge')}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+      {hero.kind === 'error' ? (
+        <div>
+          <p data-testid="home.hero-error">{t('home.hero.error')}</p>
+          <button type="button" data-testid="home.hero-retry-button" onClick={() => void vm.retryHero()}>
+            {t('home.hero.retry')}
+          </button>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function AiCard({ vm, state }: { vm: HomeViewModel; state: HomeState }): ReactNode {
+  const ai = state.ai;
+  if (ai.kind === 'hidden') return null;
+  return (
+    <section data-testid="home.ai-card" style={sectionStyle}>
+      {ai.status === 'NONE' ? (
+        <button type="button" data-testid="home.ai-request-button" disabled={ai.requesting} onClick={() => void vm.onAiRequestPress()}>
+          {t('ai.card.request')}
+        </button>
+      ) : null}
+      {ai.status === 'PROCESSING' ? <p data-testid="home.ai-processing">{t('ai.card.processing')}</p> : null}
+      {ai.status === 'COMPLETED' ? (
+        <div>
+          <p data-testid="home.ai-completed">{t('ai.card.completed')}</p>
+          <button type="button" data-testid="home.ai-detail-button" onClick={() => vm.onAiDetailPress()}>
+            {t('ai.card.detail')}
+          </button>
+        </div>
+      ) : null}
+      {ai.status === 'FAILED' ? (
+        <div>
+          <p data-testid="home.ai-failed">{t('ai.card.failed')}</p>
+          {ai.canRequestAgain ? (
+            <button type="button" data-testid="home.ai-retry-button" disabled={ai.requesting} onClick={() => void vm.onAiRequestPress()}>
+              {t('ai.card.retry')}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/** "10월 27일 화요일"(대기면 뒤에 "대기"). 요일 글자는 일요일 시작 7칸의 순서와 같다. */
+function weekDayLabel(date: string, weekday: string, pending: boolean): string {
+  const base = `${formatTopicHeaderDate(date)} ${weekday}${webOnlyCopy['home.week.weekday-suffix']}`;
+  return pending ? `${base} ${t('home.weekly.pending')}` : base;
+}
+
+function Weekly({ vm, state }: { vm: HomeViewModel; state: HomeState }): ReactNode {
+  const weekly = state.weekly;
+  const labels = [...t('record.weekday')];
+  return (
+    <section data-testid="home.week-section" style={sectionStyle}>
+      <div style={rowStyle}>
+        <h2 style={headingStyle}>{t('home.weekly.title')}</h2>
+        {weekly.status === 'ready' ? <span data-testid="home.week-count">{`${weekly.count}/7`}</span> : null}
+        <button type="button" aria-label={`${t('home.weekly.title')} ${t('home.weekly.more')}`} style={plainButton} onClick={() => vm.onWeeklyMorePress()}>
+          {t('home.weekly.more')}
+        </button>
+      </div>
+      {weekly.status === 'error' ? (
+        <div>
+          <p data-testid="home.week-error">{t('home.weekly.error')}</p>
+          <button type="button" data-testid="home.week-retry-button" onClick={() => void vm.retryWeekly()}>
+            {t('common.retry')}
+          </button>
+        </div>
+      ) : null}
+      {weekly.status === 'ready' ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, textAlign: 'center' }}>
+          {labels.map((label) => (
+            <span key={label} aria-hidden="true">
+              {label}
+            </span>
+          ))}
+          {weekly.days.map((day, index) => (
+            <button
+              key={day.date}
+              type="button"
+              data-testid={`home.week-day-${day.date}`}
+              aria-label={weekDayLabel(day.date, labels[index] ?? '', day.entry?.status === 'PENDING')}
+              disabled={!day.entry} style={{ ...plainButton, textAlign: 'center' }}
+              onClick={() => vm.onWeekDayPress(day.date)}
+            >
+              <span>{Number(day.date.slice(8))}</span>
+              {day.entry ? (
+                <span data-testid={`home.week-photo-${day.date}`} style={{ display: 'block' }}>
+                  {day.entry.thumbnailImageUrl ? <img src={day.entry.thumbnailImageUrl} alt="" style={thumbStyle} /> : <span style={{ ...placeholderStyle, display: 'block' }} />}
+                  {day.entry.status === 'PENDING' ? <small>{t('home.weekly.pending')}</small> : null}
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+// check-testids가 리터럴을 찾으므로 어제 랭킹/오늘 인기의 식별자는 맵으로 둔다.
+const RANKING_IDS = {
+  yesterday: {
+    section: 'home.ranking-section',
+    more: 'home.ranking-more-link',
+    empty: 'home.ranking-empty',
+    error: 'home.ranking-error',
+    retry: 'home.ranking-retry-button',
+    item: (id: string) => `home.ranking-item-${id}`,
+  },
+  popular: {
+    section: 'home.popular-section',
+    more: 'home.popular-more-link',
+    empty: 'home.popular-empty',
+    error: 'home.popular-error',
+    retry: 'home.popular-retry-button',
+    item: (id: string) => `home.popular-item-${id}`,
+  },
+} as const;
+
+function Ranking({ vm, state, which }: { vm: HomeViewModel; state: HomeState; which: RankingKey }): ReactNode {
+  const ids = RANKING_IDS[which];
+  const section: RankingSection = state[which];
+  const title = which === 'yesterday' ? t('home.ranking.yesterday-title') : t('home.ranking.today-title');
+  return (
+    <section data-testid={ids.section} style={sectionStyle}>
+      <div style={rowStyle}>
+        <h2 style={headingStyle}>{title}</h2>
+        <Link
+          to={displayPath(which === 'yesterday' ? state.yesterdayDate : state.todayDate, 'popular')}
+          state={HOME_BELOW_STATE}
+          data-testid={ids.more}
+          aria-label={`${title} ${webOnlyCopy['home.ranking.more']}`}
+          style={{ color: 'inherit' }}
+        >
+          {webOnlyCopy['home.ranking.more']}
+        </Link>
+      </div>
+      {section.status === 'loading' ? <div role="status" aria-busy="true" /> : null}
+      {section.status === 'error' ? (
+        <div>
+          <p data-testid={ids.error}>{t('home.ranking.error', { '섹션 제목': title })}</p>
+          <button type="button" data-testid={ids.retry} onClick={() => void vm.retryRanking(which)}>
+            {t('common.retry')}
+          </button>
+        </div>
+      ) : null}
+      {section.status === 'ready' && section.posts.length === 0 ? <p data-testid={ids.empty}>{t('home.ranking.empty')}</p> : null}
+      {section.status === 'ready' && section.posts.length > 0 ? (
+        <ul style={{ display: 'flex', gap: 8, overflowX: 'auto', margin: 0, padding: 0, listStyle: 'none' }}>
+          {section.posts.map((post) => (
+            <RankingItem key={post.id} testId={ids.item(post.id)} post={post} onPress={() => vm.onRankingItemPress(which, post.id)} />
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
+function RankingItem({ testId, post, onPress }: { testId: string; post: PostSummary; onPress: () => void }): ReactNode {
+  const src = post.thumbnailImageUrl ?? post.originalImageUrl;
+  return (
+    <li style={{ flex: '0 0 40%' }}>
+      <button type="button" data-testid={testId} style={{ ...plainButton, width: '100%' }} onClick={onPress}>
+        <img src={src} alt={post.title ? '' : webOnlyCopy['home.ranking.photo-alt']} style={thumbStyle} />
+        {post.title ? <span>{post.title}</span> : null}
+      </button>
+    </li>
+  );
+}
+
+function Issues({ vm, banners, observe }: { vm: HomeViewModel; banners: BannerFeedState; observe: VisibilityObserverFactory | null }): ReactNode {
+  if (banners.status === 'error') {
+    return (
+      <section style={sectionStyle}>
+        <p data-testid="home.issue-error">{t('home.banner.error')}</p>
+        <button type="button" data-testid="home.issue-retry-button" onClick={() => void vm.retryBanners()}>
+          {t('common.retry')}
+        </button>
+      </section>
+    );
+  }
+  if (banners.status !== 'ready' || banners.banners.length === 0) return null;
+  const sentinelAt = bannerSentinelIndex(banners.banners.length);
+  const showSentinel = banners.hasNext && !banners.loadingMore && !banners.moreFailed;
+  return (
+    <section data-testid="home.issue-section" style={sectionStyle}>
+      <h2 style={headingStyle}>{t('home.banner.title')}</h2>
+      <ul style={{ display: 'flex', flexDirection: 'column', gap: 12, margin: 0, padding: 0, listStyle: 'none' }}>
+        {banners.banners.map((banner, index) => (
+          <li key={banner.id}>
+            {showSentinel && index === sentinelAt ? <VisibilitySentinel key={banners.banners.length} observe={observe} onVisible={() => void vm.onBannerSentinelVisible()} /> : null}
+            <BannerCard vm={vm} id={banner.id} title={banner.title} subtitle={banner.subtitle} thumbnailUrl={banner.thumbnailUrl} />
+          </li>
+        ))}
+      </ul>
+      {banners.loadingMore ? (
+        <p role="status" aria-busy="true">
+          {webOnlyCopy['home.banner.loading-more']}
+        </p>
+      ) : null}
+      {banners.moreFailed ? (
+        <div>
+          <span>{webOnlyCopy['home.banner.more-error']}</span>
+          <button type="button" onClick={() => void vm.retryBannerMore()}>
+            {t('common.retry')}
+          </button>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function BannerCard({ vm, id, title, subtitle, thumbnailUrl }: { vm: HomeViewModel; id: string; title: string; subtitle: string; thumbnailUrl: string | null }): ReactNode {
+  const link = vm.bannerLinkFor(id);
+  const content = (
+    <>
+      {thumbnailUrl ? <img src={thumbnailUrl} alt="" style={thumbStyle} /> : <span style={{ ...placeholderStyle, display: 'block' }} />}
+      <strong style={{ display: 'block' }}>{title}</strong>
+      <span>{subtitle}</span>
+    </>
+  );
+  const testId = `home.issue-item-${id}`;
+  if (link?.kind === 'link') {
+    // 새 탭은 브라우저가 연다(noopener라 window.open 성공 여부를 알 수 없는 한계를 피한다).
+    return (
+      <a href={link.href} target="_blank" rel="noopener noreferrer" data-testid={testId} style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}>
+        {content}
+      </a>
+    );
+  }
+  // 열 수 없는 주소(방어): 링크가 아니라 안내만 한다.
+  return (
+    <button type="button" data-testid={testId} style={{ ...plainButton, width: '100%' }} onClick={() => vm.onBlockedBannerPress()}>
+      {content}
+    </button>
+  );
+}
+
+/** 목록 끝 근처에 놓는 1px 요소. 화면에 보이면(마운트 직후 이미 보이는 경우 포함) onVisible. 관찰 수단이 없으면 아무것도 하지 않는다. */
+export function VisibilitySentinel({ onVisible, observe }: { onVisible: () => void; observe: VisibilityObserverFactory | null }): ReactNode {
+  const ref = useRef<HTMLSpanElement | null>(null);
+  const latest = useRef(onVisible);
+  useEffect(() => {
+    latest.current = onVisible;
+  }, [onVisible]);
+  const notify = useCallback(() => latest.current(), []);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || !observe) return;
+    const watch = observe(element, notify);
+    return () => watch.disconnect();
+  }, [observe, notify]);
+  return <span ref={ref} aria-hidden="true" style={{ display: 'block', height: 1 }} />;
+}
