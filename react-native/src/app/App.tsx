@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import type { AppConfigResult } from '../core/config/AppConfig';
 import { useViewModelState } from '../core/state/useViewModelState';
+import { ToastHost } from '../core/toast/ToastHost';
 import { LoginScreen } from '../features/auth/LoginScreen';
 import { ConfigErrorScreen } from '../features/config/ConfigErrorScreen';
 import { PlaceholderScreen } from '../features/placeholder/PlaceholderScreen';
@@ -29,11 +30,20 @@ export function App({ configResult, overrides }: AppProps) {
   return (
     <SafeAreaProvider>
       <AppContainerProvider container={container}>
-        <NavigationContainer>
-          <AppShell />
-        </NavigationContainer>
+        <AppNavigation />
       </AppContainerProvider>
     </SafeAreaProvider>
+  );
+}
+
+/** 내비게이션 컨테이너와 화면 위 오버레이(토스트). 내비게이션 핸들은 컨테이너(AppContainer)가 소유한다. */
+function AppNavigation() {
+  const { navigationHandle, toastCenter } = useAppContainer();
+  return (
+    <NavigationContainer ref={navigationHandle}>
+      <AppShell />
+      {toastCenter ? <ToastHost center={toastCenter} /> : null}
+    </NavigationContainer>
   );
 }
 
