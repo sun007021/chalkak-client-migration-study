@@ -8,12 +8,15 @@ import '../core/ui/toast/toast_host.dart';
 import '../features/banner/domain/banner_models.dart';
 import '../features/banner/domain/banner_web_view_model.dart';
 import '../features/banner/presentation/banner_web_screen.dart';
+import '../features/feed/domain/feed_target.dart';
 import '../features/home/domain/home_models.dart';
+import '../features/like/domain/toast_message.dart' as like;
 import '../features/navigation/main_composition.dart';
 import '../features/navigation/presentation/main_shell.dart';
 import '../features/navigation/presentation/main_shell_navigator.dart';
 import 'app_dependencies.dart';
 import 'app_routes.dart';
+import 'feed_route.dart';
 
 /// `/main`: 세션이 게스트인지 읽은 뒤 [MainShell]을 만든다.
 /// ViewModel(홈, 셸, 배너 목록)은 이 위젯이 만들고 화면이 사라질 때 함께 정리한다.
@@ -32,6 +35,7 @@ class _MainRouteHostState extends State<MainRouteHost> {
     context,
     widget.dependencies,
   );
+  StreamSubscription<like.ToastMessage>? _likeToasts;
   bool _disposed = false;
 
   @override
@@ -48,6 +52,13 @@ class _MainRouteHostState extends State<MainRouteHost> {
       guest = false;
     }
     if (_disposed || !mounted) return;
+    // 좋아요 실패·게스트 토스트는 여기서 한 번만 구독해 메인 토스트로 보낸다. 컨트롤러가 자기 id를 매기므로
+    // 저장소 쪽 id와 겹치지 않고, 같은 문구가 연달아 나가도 둘 다 표시된다(D-20).
+    final main = widget.dependencies.main;
+    unawaited(_likeToasts?.cancel());
+    _likeToasts = main.likeStore.toasts.listen(
+      (message) => main.toast.show(message.text),
+    );
     setState(
       () => _parts = MainComposition.create(
         dependencies: widget.dependencies.main,
@@ -60,6 +71,7 @@ class _MainRouteHostState extends State<MainRouteHost> {
   @override
   void dispose() {
     _disposed = true;
+    unawaited(_likeToasts?.cancel());
     _parts?.dispose();
     super.dispose();
   }
@@ -74,11 +86,15 @@ class _MainRouteHostState extends State<MainRouteHost> {
       navigator: _navigator,
       toast: widget.dependencies.main.toast,
       aiCardBuilder: widget.dependencies.main.aiCardBuilder,
+      displayFactory: (target) => MainComposition.createDisplay(
+        dependencies: widget.dependencies.main,
+        target: target,
+      ),
     );
   }
 }
 
-/// 셸의 이동 요청을 라우터/네비게이터로 보낸다. 알림함·피드·업로드 화면은 해당 PR이 추가하기 전까지
+/// 셸의 이동 요청을 라우터/네비게이터로 보낸다. 알림함·업로드 화면은 해당 PR이 추가하기 전까지
 /// 이동하지 않고 바로 끝난다.
 class _RouterNavigator implements MainShellNavigator {
   _RouterNavigator(this._context, this._dependencies);
@@ -90,7 +106,38 @@ class _RouterNavigator implements MainShellNavigator {
   Future<void> openNotifications() => Future<void>.value();
 
   @override
-  Future<void> openFeed(PostSummary seed) => Future<void>.value();
+  Future<void> openFeed(PostSummary seed) => openFeedTarget(
+    FeedTarget(
+      postId: seed.id,
+      origin: FeedOrigin.home,
+      isMine: seed.isMine,
+      thumbnailUrl: seed.thumbnailImageUrl,
+    ),
+  );
+
+  @override
+  Future<void> openFeedTarget(FeedTarget target) async {
+    if (!_context.mounted) return;
+    String? userId;
+    try {
+      final session = await _dependencies.sessions.read();
+      if (session != null && !session.isGuest && session.userId.isNotEmpty) {
+        userId = session.userId;
+      }
+    } on Object {
+      userId = null;
+    }
+    if (!_context.mounted) return;
+    await Navigator.of(_context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) => FeedRoute(
+          dependencies: _dependencies,
+          target: target,
+          userId: userId,
+        ),
+      ),
+    );
+  }
 
   @override
   Future<void> openUpload(KstDate topicDate) => Future<void>.value();

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:chalkak/core/auth/session.dart';
+import 'package:chalkak/core/post_events/post_event_bus.dart';
 import 'package:chalkak/core/time/kst_date.dart';
 import 'package:chalkak/core/ui/test_id.dart';
 import 'package:chalkak/core/ui/toast/toast_controller.dart';
@@ -10,12 +11,15 @@ import 'package:chalkak/features/banner/domain/banner_list_controller.dart';
 import 'package:chalkak/features/banner/domain/banner_models.dart';
 import 'package:chalkak/features/banner/presentation/banner_test_ids.dart';
 import 'package:chalkak/features/banner/presentation/banner_web_view_builder.dart';
+import 'package:chalkak/features/feed/domain/feed_target.dart';
 import 'package:chalkak/features/home/data/api_home_repository.dart';
 import 'package:chalkak/features/home/domain/home_models.dart';
 import 'package:chalkak/features/home/domain/home_preload.dart';
 import 'package:chalkak/features/home/domain/home_state.dart';
 import 'package:chalkak/features/home/domain/home_view_model.dart';
 import 'package:chalkak/features/home/presentation/home_test_ids.dart';
+import 'package:chalkak/features/like/domain/like_store.dart';
+import 'package:chalkak/features/navigation/domain/guest_flag.dart';
 import 'package:chalkak/features/navigation/domain/guest_guard.dart';
 import 'package:chalkak/features/navigation/domain/main_shell_view_model.dart';
 import 'package:chalkak/features/navigation/domain/upload_entry_gate.dart';
@@ -26,6 +30,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart' show test;
 
 import 'auth_fakes.dart';
+import 'display_fakes.dart';
 import 'fake_adapter.dart';
 import 'fake_analytics_tracker.dart';
 import 'net_harness.dart' show advance, sessionAt, sessionGuest, settle, t0, v1;
@@ -296,6 +301,14 @@ class FakeMainNavigator implements MainShellNavigator {
     return _record('feed');
   }
 
+  final List<FeedTarget> feedTargets = [];
+
+  @override
+  Future<void> openFeedTarget(FeedTarget target) {
+    feedTargets.add(target);
+    return _record('feed');
+  }
+
   @override
   Future<void> openUpload(KstDate topicDate) {
     uploadDates.add(topicDate);
@@ -327,6 +340,16 @@ class HomeFakes {
   final HomePreloadCache preloadCache = HomePreloadCache();
   final FakeBannerLinkLauncher launcher = FakeBannerLinkLauncher();
   final FakeBannerWebViewBuilder webView = FakeBannerWebViewBuilder();
+  final PostEventBus postEvents = PostEventBus();
+  final GuestFlag guestFlag = GuestFlag();
+  final FakeDisplayRepository displayRepository = FakeDisplayRepository();
+  final FakePostRepository postRepository = FakePostRepository();
+  final FakeLikeRepository likeRepository = FakeLikeRepository();
+  late final LikeStore likeStore = LikeStore(
+    repository: likeRepository,
+    events: postEvents,
+    isGuest: () => guestFlag.value,
+  );
 
   MainDependencies get dependencies => MainDependencies(
     homeRepository: home,
@@ -340,6 +363,11 @@ class HomeFakes {
       HomeTestIds.aiCard,
       child: SizedBox(width: 10, height: 10),
     ),
+    displayRepository: displayRepository,
+    postRepository: postRepository,
+    likeStore: likeStore,
+    postEvents: postEvents,
+    guestFlag: guestFlag,
   );
 }
 

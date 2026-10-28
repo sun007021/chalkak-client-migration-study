@@ -1,5 +1,6 @@
 import '../../../core/time/kst_date.dart';
 import '../../banner/domain/banner_models.dart';
+import '../../feed/domain/feed_target.dart';
 import '../../home/domain/home_models.dart';
 
 /// 메인 셸이 다른 화면으로 가야 할 때 부르는 창구. 실제 구현은 라우터가 맡고,
@@ -12,6 +13,9 @@ abstract interface class MainShellNavigator {
 
   /// 게시물 상세(피드). [seed]의 이미지·좋아요 값을 먼저 보여 준다.
   Future<void> openFeed(PostSummary seed);
+
+  /// 전시 탭이 연 상세. 닫히면 전시가 목록을 다시 검증한다.
+  Future<void> openFeedTarget(FeedTarget target);
 
   /// 업로드 화면(다음 PR). [topicDate]를 고정한다.
   Future<void> openUpload(KstDate topicDate);
