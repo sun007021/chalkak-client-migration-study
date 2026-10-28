@@ -57,7 +57,7 @@ app/src/main/kotlin/com/stonefive/chalkak/
 - 문구와 상수: `copySharedAssets<Variant>` Gradle 태스크가 `shared/copy/ko.json`, `shared/constants.json`을 빌드 때 `assets/shared/...`로 복사한다(`app/build/generated/sharedAssets`). 복사본을 커밋하지 않고, `shared/`가 바뀌면 태스크가 다시 돈다. 런타임에는 `Copy.load(context)`가 읽는다.
 - 세션 저장: `KeystoreRecordStorage`는 `SecureRecordStorage`(`:core:data`)를 구현한다. 여섯 값을 JSON 한 덩어리로 만들어 Keystore AES-256-GCM 키(`SecretCipher`)로 암호화해 SharedPreferences(`auth_session`)에 쓴다. `androidx.security:security-crypto`는 deprecated라 쓰지 않았다. 백업·기기 이전에서 제외한다. 복호화가 실패하면 예외를 던지고, 호출 쪽(`PersistentSessionStore`)이 "세션 없음"으로 보고 지운다.
 - `google()`은 SDK가 있을 때만 `settings.gradle.kts`에 들어간다(pluginManagement와 dependencyResolutionManagement 모두, 필요한 group만). SDK가 없으면 `:app`도 빠지고 순수 모듈만 빌드된다.
-- 루트 `build.gradle.kts`의 `alias(libs.plugins.android.application) apply false`는 필요하다. 빠지면 Kotlin Gradle 플러그인과 AGP가 서로 다른 classloader에 올라가 `NoClassDefFoundError: BaseVariant`로 죽는다. AGP 9는 Kotlin을 내장하므로 `kotlin-android` 플러그인은 적용하지 않는다.
+- AGP는 루트 `build.gradle.kts`의 `buildscript { classpath }`로 올린다(SDK가 있을 때만, 버전은 `libs.versions.toml`의 `agp`). Kotlin Gradle 플러그인과 같은 classloader에 있어야 한다. 빠지면 `NoClassDefFoundError: BaseVariant`로 죽는다. `alias(...) apply false`로 올리면 SDK 없는 환경에서도 AGP를 받으려다 실패해서 쓰지 않았다. 그래서 `:app`은 `id("com.android.application")`를 버전 없이 쓴다. AGP 9는 Kotlin을 내장하므로 `kotlin-android` 플러그인은 적용하지 않는다.
 - 이 환경의 SDK는 platform 36까지라서 compileSdk 37을 요구하는 androidx 최신판(core 1.19, lifecycle 2.11)은 쓸 수 없다. core-ktx 1.17.0, lifecycle 2.10.0, activity 1.12.0을 쓴다.
 
 ### StateHolder를 ViewModel로 감싸기

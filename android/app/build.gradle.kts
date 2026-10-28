@@ -6,7 +6,7 @@ import org.gradle.api.tasks.PathSensitivity
 import javax.inject.Inject
 
 plugins {
-    alias(libs.plugins.android.application)
+    id("com.android.application") // version: root buildscript classpath (agp in libs.versions.toml)
     alias(libs.plugins.kotlin.compose)
 }
 
