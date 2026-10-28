@@ -22,7 +22,8 @@ object DateFormats {
     fun calendarFileName(month: YearMonth): String =
         "chalkak-calendar-${pad4(month.year)}-${pad2(month.monthValue)}.png"
 
-    private fun monthDay(date: LocalDate): String = "${date.monthValue}월 ${date.dayOfMonth}일"
+    /** "M월 d일" (header of the exhibition tab). */
+    fun monthDay(date: LocalDate): String = "${date.monthValue}월 ${date.dayOfMonth}일"
 
     private fun pad2(value: Int): String = value.toString().padStart(2, '0')
 

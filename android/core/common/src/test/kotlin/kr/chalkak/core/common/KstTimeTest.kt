@@ -98,6 +98,7 @@ class KstTimeTest {
                 assertEquals("2026-10-27", Kst.formatApiDate(date), "locale=$tag")
                 assertEquals("chalkak-calendar-2026-10.png", DateFormats.calendarFileName(YearMonth.of(2026, 10)), "locale=$tag")
                 assertEquals("10월 27일의 주제", DateFormats.topicLabel(date), "locale=$tag")
+                assertEquals("10월 27일", DateFormats.monthDay(date), "locale=$tag")
                 assertEquals("10월 27일 00:00", DateFormats.notificationTime(Instant.parse("2026-10-26T15:00:00Z")), "locale=$tag")
             }
         }
