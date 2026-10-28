@@ -150,6 +150,7 @@ class MainRig(val mode: AccessMode = AccessMode.Member) {
             otherTabsComposed += tab
             TabPlaceholder(tab)
         },
+        today = kr.chalkak.core.common.KstCalendar(postClock)::today,
         newRecordHolder = { scope, recordMode ->
             RecordStateHolder(scope, postClock, recordRepo, changes, NoAnalytics, recordMode, recordRenderer, recordSaver)
         },

@@ -35,8 +35,6 @@ import com.stonefive.chalkak.ui.common.RemoteImage
 import com.stonefive.chalkak.ui.issue.IssueWebContent
 import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
-import kr.chalkak.core.common.KstCalendar
-import kr.chalkak.core.common.SystemClock
 import kr.chalkak.core.data.post.LikeController
 import kr.chalkak.core.data.post.PostChanges
 import kr.chalkak.core.data.post.PostSort
@@ -121,8 +119,8 @@ class MainDependencies(
     val otherTab: @Composable (tab: Tab, scrollToTop: ScrollToTopSignal) -> Unit = { tab, _ -> TabPlaceholder(tab) },
     /** Record tab holder (A7); null = the record tab is still the [otherTab] placeholder. */
     val newRecordHolder: ((scope: CoroutineScope, mode: HomeMode) -> RecordStateHolder)? = null,
-    /** KST today for the record calendar's today marker; the app passes its clock-based calendar. */
-    val today: () -> LocalDate = { KstCalendar(SystemClock).today() },
+    /** KST today for the record calendar's today marker; always from the injected clock (TC-TIME-029). */
+    val today: () -> LocalDate,
 )
 
 /**

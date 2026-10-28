@@ -17,6 +17,8 @@ import coil3.ImageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.request.allowHardware
+import coil3.size.Precision
+import coil3.size.Scale
 import coil3.toBitmap
 import com.stonefive.chalkak.copy.Copy
 import java.io.ByteArrayOutputStream
@@ -24,6 +26,9 @@ import java.io.File
 import java.time.YearMonth
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import kr.chalkak.core.data.record.RecordPostStatus
 import kr.chalkak.feature.record.CalendarImageRenderer
@@ -36,27 +41,27 @@ import kr.chalkak.feature.record.SaveOutcome
  * Thumbnails come through the app's image loader; a photo that cannot be loaded leaves its cell with the day number only.
  */
 class AndroidCalendarImageRenderer(
-    context: Context,
     private val copy: Copy,
-    private val imageLoader: ImageLoader?,
+    private val loadThumb: suspend (url: String) -> Bitmap?,
 ) : CalendarImageRenderer {
-    private val app = context.applicationContext
+    constructor(context: Context, copy: Copy, imageLoader: ImageLoader?) : this(copy, coilThumbLoader(context.applicationContext, imageLoader))
 
     override suspend fun render(month: YearMonth, cells: List<RecordCell>): ByteArray {
-        val thumbs = cells.mapNotNull { it.post }.associate { it.postId to loadThumb(it.thumbnailImageUrl) }
+        // All thumbnails in parallel, each with its own deadline: a slow or dead image only costs its own cell.
+        val thumbs = coroutineScope {
+            cells.mapNotNull { it.post }
+                .map { post -> post.postId to async { withTimeoutOrNull(THUMB_TIMEOUT_MS) { runCatchingLoad(post.thumbnailImageUrl) } } }
+                .associate { (id, job) -> id to job.await() }
+        }
         return withContext(Dispatchers.Default) { draw(month, cells, thumbs) }
     }
 
-    private suspend fun loadThumb(url: String): Bitmap? {
-        val loader = imageLoader ?: return null
-        return try {
-            val request = ImageRequest.Builder(app).data(url).allowHardware(false).build()
-            (loader.execute(request) as? SuccessResult)?.image?.toBitmap()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            null
-        }
+    private suspend fun runCatchingLoad(url: String): Bitmap? = try {
+        loadThumb(url)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
     }
 
     private fun draw(month: YearMonth, cells: List<RecordCell>, thumbs: Map<String, Bitmap?>): ByteArray {
@@ -90,7 +95,11 @@ class AndroidCalendarImageRenderer(
             canvas.drawText(date.dayOfMonth.toString(), rect.left + 8f, rect.top + 30f, if (thumb != null) onPhoto else number)
             if (post?.status == RecordPostStatus.PENDING) canvas.drawCircle(rect.right - 14f, rect.bottom - 14f, 8f, dot)
         }
-        return ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+        try {
+            return ByteArrayOutputStream().also { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) { "png encode failed" } }.toByteArray()
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     private companion object {
@@ -99,8 +108,25 @@ class AndroidCalendarImageRenderer(
         const val PAD = 4f
         const val HEADER = 140
         const val WEEKDAYS = 70
+        const val THUMB_TIMEOUT_MS = 8_000L
     }
 }
+
+/** Coil thumbnail source: decoded at the cell size (square crop), never at the photo's full resolution. */
+private fun coilThumbLoader(app: Context, imageLoader: ImageLoader?): suspend (String) -> Bitmap? = load@{ url ->
+    val loader = imageLoader ?: return@load null
+    val request = ImageRequest.Builder(app)
+        .data(url)
+        .size(THUMB_PX)
+        .precision(Precision.EXACT)
+        .scale(Scale.FILL)
+        .allowHardware(false)
+        .build()
+    // The cached bitmap belongs to Coil's memory cache: it is only drawn, never recycled here.
+    (loader.execute(request) as? SuccessResult)?.image?.toBitmap()
+}
+
+private const val THUMB_PX = 152
 
 /**
  * Writes the PNG into `Pictures/Chalkak` through MediaStore (REQ-REC-038). From API 29 no permission is needed; below it the legacy
