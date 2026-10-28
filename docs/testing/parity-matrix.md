@@ -21,7 +21,7 @@
 | UPL | [upload-edit.md](catalog/upload-edit.md) | 92 | 3 | 3 | 0/92 | 81/92 | 3/92 | 0/92 | 0/92 |
 | EDIT | [upload-edit.md](catalog/upload-edit.md) | 51 | 4 | 4 | 0/51 | 41/51 | 0/51 | 0/51 | 0/51 |
 | AIR | [ai-review.md](catalog/ai-review.md) | 61 | 2 | 2 | 0/61 | 53/61 | 0/61 | 0/61 | 0/61 |
-| REC | [record.md](catalog/record.md) | 45 | 2 | 2 | 0/45 | 42/45 | 0/45 | 0/45 | 0/45 |
+| REC | [record.md](catalog/record.md) | 45 | 2 | 2 | 0/45 | 42/45 | 41/45 | 0/45 | 0/45 |
 | NOTI | [notification-push.md](catalog/notification-push.md) | 57 | 2 | 2 | 0/57 | 48/57 | 0/57 | 0/57 | 0/57 |
 | PUSH | [notification-push.md](catalog/notification-push.md) | 77 | 4 | 6 | 0/77 | 67/77 | 0/77 | 0/77 | 0/77 |
 | SET | [settings-feedback.md](catalog/settings-feedback.md) | 56 | 3 | 3 | 0/56 | 47/56 | 0/56 | 0/56 | 0/56 |
