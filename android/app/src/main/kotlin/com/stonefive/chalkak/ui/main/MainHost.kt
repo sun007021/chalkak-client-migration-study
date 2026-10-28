@@ -12,6 +12,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -22,7 +23,11 @@ import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.ui.display.DisplayRoute
 import com.stonefive.chalkak.ui.feed.FeedRoute
 import com.stonefive.chalkak.ui.home.HomeRoute
+import com.stonefive.chalkak.platform.PhotoPreview
+import com.stonefive.chalkak.platform.UploadPlatform
 import com.stonefive.chalkak.ui.issue.IssueWebRoute
+import com.stonefive.chalkak.ui.upload.UploadRoute
+import com.stonefive.chalkak.ui.upload.UploadSuccessScreen
 import com.stonefive.chalkak.viewmodel.SessionHolders
 import com.stonefive.chalkak.viewmodel.rememberStateHolder
 import com.stonefive.chalkak.ui.common.RemoteImage
@@ -42,7 +47,9 @@ import kr.chalkak.feature.navigation.AccessMode
 import kr.chalkak.feature.navigation.NavigationController
 import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
+import kr.chalkak.feature.upload.PhotoUploadStateHolder
 import kr.chalkak.feature.upload.UploadGateEffect
+import java.time.LocalDate
 
 /**
  * Upload entry gate port: the host calls it once per accepted upload-button tap (`GET /posts/today` lives behind it). The answer is
@@ -86,6 +93,7 @@ private fun RoutePlaceholder(tag: String, modifier: Modifier = Modifier) {
  * - [newDisplayHolder] / [newFeedHolder]: display and feed holders, kept in the session's ViewModel store (a new login gets new ones).
  * - [otherTab]: content of record / settings (default [TabPlaceholder]); gets the tab's [ScrollToTopSignal].
  * - [issueWeb]: the WebView adapter slot for the banner web screen.
+ * - [newUploadHolder] / [uploadPlatform]: the upload flow (picker, camera, editor) behind the upload and success routes.
  */
 class MainDependencies(
     val newHomeHolder: (scope: CoroutineScope, mode: HomeMode) -> HomeStateHolder,
@@ -101,6 +109,9 @@ class MainDependencies(
     /** Photo slot of display and feed (width given, height from the image's ratio); same type as [image]. */
     val photo: RemoteImage = image,
     val issueWeb: IssueWebContent = { _, _, _, _ -> },
+    /** Built once per opened upload screen (a fresh holder each time: a finished upload holder cannot be reused). */
+    val newUploadHolder: (scope: CoroutineScope, topicDate: LocalDate) -> PhotoUploadStateHolder,
+    val uploadPlatform: UploadPlatform,
     val otherTab: @Composable (tab: Tab, scrollToTop: ScrollToTopSignal) -> Unit = { tab, _ -> TabPlaceholder(tab) },
 )
 
@@ -207,8 +218,41 @@ private fun MainHostContent(
                     finishOnLeave = false,
                 )
             }
-            Route.PhotoUpload -> RoutePlaceholder("upload.root")
-            is Route.PhotoUploadSuccess -> RoutePlaceholder("upload-success.root")
+            Route.PhotoUpload -> {
+                val topicDate = session.uploadTopicDate
+                if (topicDate == null) {
+                    LaunchedEffect(Unit) { coordinator.onSystemBack() }
+                } else {
+                    val holder = rememberStateHolder("upload-$sessionKey-${session.uploadSerial}") { scope -> deps.newUploadHolder(scope, topicDate) }
+                    UploadRoute(
+                        holder = holder,
+                        platform = deps.uploadPlatform,
+                        onClose = coordinator::onSystemBack,
+                        onShowSuccess = { info -> coordinator.onUploadSucceeded(info, holder.state.value.photo, holder.state.value.edit) },
+                        // The 401 also arrives as AuthEvent.GoToLogin (session end); what the holder kept is dropped with it.
+                        onReauthRequired = holder::onSessionEnded,
+                    )
+                }
+            }
+            is Route.PhotoUploadSuccess -> {
+                val result = session.uploadResult
+                if (result == null) {
+                    LaunchedEffect(Unit) { coordinator.onSystemBack() }
+                } else {
+                    val platform = deps.uploadPlatform
+                    val preview by produceState<PhotoPreview?>(null, result) { value = result.photo?.let { platform.previews.load(it) } }
+                    val photoContent: (@Composable (Modifier) -> Unit)? = result.photo?.let { photo ->
+                        { m -> platform.editPainter.Preview(photo, result.edit, m) }
+                    }
+                    UploadSuccessScreen(
+                        info = result.info,
+                        preview = preview,
+                        onConfirm = coordinator::onUploadSuccessConfirmed,
+                        edit = result.edit,
+                        photoContent = photoContent,
+                    )
+                }
+            }
             is Route.NotificationDetail -> RoutePlaceholder("notification-detail.root")
             Route.Feedback -> RoutePlaceholder("feedback.root")
             Route.BannerWeb -> {

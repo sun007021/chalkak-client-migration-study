@@ -16,6 +16,7 @@ import com.stonefive.chalkak.platform.PhotoPreview
 import com.stonefive.chalkak.platform.PhotoPreviewLoader
 import com.stonefive.chalkak.platform.UploadPlatform
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kr.chalkak.core.common.testing.FakeMonotonicClock
 import kr.chalkak.core.data.home.testing.FakeHomeRepository
 import kr.chalkak.core.data.upload.PostCreations
@@ -167,28 +168,36 @@ class UploadHolderRig(
     val platform: UploadPlatform,
 )
 
+/** The real [PhotoUploadStateHolder] on fakes (what `MainDependencies.newUploadHolder` builds in the app). */
+fun fakeUploadHolder(
+    scope: CoroutineScope,
+    codec: FakeUploadCodec = FakeUploadCodec(),
+    topicDate: LocalDate = UPLOAD_ENTRY_DATE,
+    hasCamera: Boolean = true,
+) = PhotoUploadStateHolder(
+    scope = scope,
+    topicDate = topicDate,
+    home = FakeHomeRepository(),
+    creation = FakePostCreationRepository(),
+    uploader = FakePostImageUploader(),
+    encoder = PostImageEncoder(codec, SmallWebp()),
+    codec = codec,
+    files = MemoryTempImages(),
+    gallery = GallerySaver { true },
+    toaster = AppToaster { },
+    camera = CameraAvailability { hasCamera },
+    monotonic = FakeMonotonicClock(),
+    creations = PostCreations(),
+    analytics = RecordingAnalytics(),
+)
+
 /** The real [PhotoUploadStateHolder] on fakes. Photo preview: always [previewOf] a 4000x3000 image. */
 fun uploadHolderRig(scope: HolderScope, hasCamera: Boolean = true): UploadHolderRig {
     val codec = FakeUploadCodec()
     val acquirer = FakePhotoAcquirer()
     val editSource = FakeEditSource()
     val painter = RecordingEditPainter()
-    val holder = PhotoUploadStateHolder(
-        scope = scope.scope,
-        topicDate = UPLOAD_ENTRY_DATE,
-        home = FakeHomeRepository(),
-        creation = FakePostCreationRepository(),
-        uploader = FakePostImageUploader(),
-        encoder = PostImageEncoder(codec, SmallWebp()),
-        codec = codec,
-        files = MemoryTempImages(),
-        gallery = GallerySaver { true },
-        toaster = AppToaster { },
-        camera = CameraAvailability { hasCamera },
-        monotonic = FakeMonotonicClock(),
-        creations = PostCreations(),
-        analytics = RecordingAnalytics(),
-    )
+    val holder = fakeUploadHolder(scope.scope, codec, hasCamera = hasCamera)
     val platform = UploadPlatform(acquirer, PhotoPreviewLoader { previewOf() }, editSource, painter)
     return UploadHolderRig(holder, codec, acquirer, editSource, painter, platform)
 }

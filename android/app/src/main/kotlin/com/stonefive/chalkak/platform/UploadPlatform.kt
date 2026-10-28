@@ -45,8 +45,12 @@ class UploadPlatform(
 /**
  * 4x5 `android.graphics.ColorMatrix` arrays of the filters (same values as `PhotoFilter.matrix`, additive column in 0..255 units).
  * Each array is built once and cached (the same instance comes back on every call). Null for ORIGINAL.
+ * Callers must not modify the returned array.
  */
 object FilterColorMatrices {
-    @Suppress("UNUSED_PARAMETER")
-    fun of(filter: PhotoFilter): FloatArray? = null // STUB (TDD step 1)
+    private val cache: Map<PhotoFilter, FloatArray> = PhotoFilter.entries.mapNotNull { filter ->
+        filter.matrix?.let { matrix -> filter to FloatArray(matrix.size) { matrix[it].toFloat() } }
+    }.toMap()
+
+    fun of(filter: PhotoFilter): FloatArray? = cache[filter]
 }
