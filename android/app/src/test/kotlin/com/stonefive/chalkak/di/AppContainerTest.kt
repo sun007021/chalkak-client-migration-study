@@ -2,7 +2,12 @@ package com.stonefive.chalkak.di
 
 import com.stonefive.chalkak.copy.Copy
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
+import kr.chalkak.core.network.AuthEvent
 import kr.chalkak.core.common.SystemClock
 import kr.chalkak.core.data.auth.SecureRecordStorage
 import kr.chalkak.core.data.auth.SessionRecord
@@ -40,5 +45,20 @@ class AppContainerTest {
         val thrown = assertFailsWith<IllegalStateException> { container.userDataResetter.resetAll() }
         assertSame(boom, thrown)
         assertEquals(listOf("a", "b"), calls)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `every auth event reaches every collector (boot gate and navigation shell)`() = runTest(UnconfinedTestDispatcher()) {
+        val receivedByBoot = mutableListOf<AuthEvent>()
+        val receivedByShell = mutableListOf<AuthEvent>()
+        val a = launch { container.authEventFlow.collect { receivedByBoot += it } }
+        val b = launch { container.authEventFlow.collect { receivedByShell += it } }
+        container.authEventSink.onEvent(AuthEvent.GoToLogin)
+        container.authEventSink.onEvent(AuthEvent.GoToLogin)
+        assertEquals(listOf<AuthEvent>(AuthEvent.GoToLogin, AuthEvent.GoToLogin), receivedByBoot)
+        assertEquals(listOf<AuthEvent>(AuthEvent.GoToLogin, AuthEvent.GoToLogin), receivedByShell)
+        a.cancel()
+        b.cancel()
     }
 }
