@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../core/copy/ko.g.dart';
-import '../core/ui/test_id.dart';
-import '../core/ui/test_ids.dart';
 import '../features/auth/domain/signup_credentials.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/login_view_model.dart';
@@ -12,10 +9,11 @@ import '../features/boot/domain/update_gate.dart';
 import '../features/boot/presentation/boot_screen.dart';
 import 'app_dependencies.dart';
 import 'app_routes.dart';
+import 'main_route.dart';
 import 'sign_up_routes.dart';
 import 'view_model_host.dart';
 
-/// splash(`/`), login, main 자리표시자(`home.root`), 가입 흐름(`sign_up_routes.dart`).
+/// splash(`/`), login, main(`MainRouteHost`), 가입 흐름(`sign_up_routes.dart`).
 /// - splash는 BootViewModel을 만들어 [BootScreen]을 그리고, Ready면 login 또는 main으로
 ///   `go`한다(스택 교체). 업데이트 버튼은 `updateGate.openStore()`.
 /// - login은 LoginViewModel을 만들어 이벤트를 받아 main(`go`) 또는 가입 흐름(`SignUpContext.begin` 후
@@ -86,27 +84,11 @@ GoRouter createAppRouter(AppDependencies dependencies) {
       ),
       GoRoute(
         path: AppRoutes.main,
-        builder: (context, state) =>
-            const _PlaceholderScreen(id: TestIds.homeRoot),
+        builder: (context, state) => MainRouteHost(dependencies: dependencies),
       ),
       buildSignUpRoute(dependencies),
     ],
   );
-}
-
-/// 홈 PR이 실제 화면으로 바꾸기 전까지 쓰는 빈 화면.
-class _PlaceholderScreen extends StatelessWidget {
-  const _PlaceholderScreen({required this.id});
-
-  final String id;
-
-  @override
-  Widget build(BuildContext context) {
-    return TestId(
-      id,
-      child: const Scaffold(body: Center(child: Text(Copy.appName))),
-    );
-  }
 }
 
 /// 가입에 쓸 idToken·rawNonce를 메모리 컨텍스트에 두고 약관으로 간다.

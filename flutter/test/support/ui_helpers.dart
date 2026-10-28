@@ -11,7 +11,14 @@ Finder byId(String id) => find.byKey(Key(id));
 
 /// `clock.now()`를 FIXTURE_NOW로 고정한 위젯 테스트. 세션 만료 판정이 fixture와 맞아야 한다.
 void widgetTest(String name, Future<void> Function(WidgetTester tester) body) {
-  testWidgets(name, (tester) => atFixtureNow(() => body(tester)));
+  testWidgets(
+    name,
+    (tester) => atFixtureNow(() async {
+      await body(tester);
+      // 화면을 내려 토스트 타이머처럼 화면이 소유한 대기 타이머를 정리한다.
+      await tester.pumpWidget(const SizedBox.shrink());
+    }),
+  );
 }
 
 /// 화면 하나를 단독으로 띄운다. 진행 표시가 계속 도는 화면이 있어 pumpAndSettle은 쓰지 않는다.
