@@ -4,7 +4,7 @@ import SwiftUI
 struct ChalkakNavBar: View {
     let title: String
     let backIdentifier: String
-    let titleIdentifier: String
+    let titleIdentifier: String?
     let onBack: () -> Void
 
     var body: some View {
@@ -12,7 +12,7 @@ struct ChalkakNavBar: View {
             Text(title)
                 .font(ChalkakFont.headline)
                 .foregroundStyle(ChalkakColor.textPrimary)
-                .accessibilityIdentifier(titleIdentifier)
+                .accessibilityIdentifier(titleIdentifier ?? "")
             HStack {
                 Button(action: onBack) {
                     Image(systemName: "chevron.left")
