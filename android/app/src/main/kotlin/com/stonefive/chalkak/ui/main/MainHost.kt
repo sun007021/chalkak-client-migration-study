@@ -49,7 +49,6 @@ import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
 import kr.chalkak.feature.upload.PhotoUploadStateHolder
 import kr.chalkak.feature.upload.UploadGateEffect
-import java.time.LocalDate
 
 /**
  * Upload entry gate port: the host calls it once per accepted upload-button tap (`GET /posts/today` lives behind it). The answer is

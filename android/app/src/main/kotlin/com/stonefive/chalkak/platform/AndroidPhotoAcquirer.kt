@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kr.chalkak.core.common.Clock
 import kr.chalkak.feature.upload.PickerResult
 import kr.chalkak.feature.upload.image.PhotoSource
 import kr.chalkak.feature.upload.image.PickedPhoto
@@ -21,6 +22,7 @@ class AndroidPhotoAcquirer(
     context: Context,
     private val activity: CurrentActivity,
     private val bridge: PhotoPickBridge,
+    private val clock: Clock,
 ) : PhotoAcquirer {
     private val app = context.applicationContext
     private val captureDir = File(app.cacheDir, CAPTURE_DIR)
@@ -74,7 +76,7 @@ class AndroidPhotoAcquirer(
     /** Old captures of earlier visits are removed first; the file of the current visit stays until the cache is cleared. */
     private fun newCaptureFile(): File {
         captureDir.mkdirs()
-        val cutoff = System.currentTimeMillis() - STALE_AFTER_MS
+        val cutoff = clock.now().toEpochMilli() - STALE_AFTER_MS
         captureDir.listFiles()?.filter { it.lastModified() < cutoff }?.forEach(File::delete)
         return File(captureDir, "capture-${UUID.randomUUID()}.jpg")
     }

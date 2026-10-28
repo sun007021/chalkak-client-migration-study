@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.stonefive.chalkak.copy.Copy
+import kr.chalkak.core.common.Clock
 import kr.chalkak.feature.upload.AppToaster
 import kr.chalkak.feature.upload.CameraAvailability
 import kr.chalkak.feature.upload.GallerySaver
@@ -30,8 +31,8 @@ import kr.chalkak.feature.upload.image.PhotoCodec
 import kr.chalkak.feature.upload.image.PickedPhoto
 import kr.chalkak.feature.upload.image.WebpCompressor
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -56,12 +57,12 @@ class AndroidTempImageStore(private val directory: File) : TempImageStore {
  * Copies a captured photo into `Pictures/Chalkak/chalkak-photo-*.jpg` through MediaStore (REQ-UPL-016). From API 29 no permission is
  * needed; below it `WRITE_EXTERNAL_STORAGE` must already be granted, otherwise this throws and the holder reports the failure.
  */
-class AndroidGallerySaver(context: Context, private val sources: PhotoSources) : GallerySaver {
+class AndroidGallerySaver(context: Context, private val sources: PhotoSources, private val clock: Clock) : GallerySaver {
     private val app = context.applicationContext
 
     override suspend fun saveCapture(photo: PickedPhoto): Boolean = withContext(Dispatchers.IO) {
         val bytes = sources.bytes(photo) ?: return@withContext false
-        val name = "chalkak-photo-" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date()) + ".jpg"
+        val name = "chalkak-photo-" + NAME_TIME.format(clock.now()) + ".jpg"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) saveScoped(name, bytes) else saveLegacy(name, bytes)
     }
 
@@ -100,6 +101,7 @@ class AndroidGallerySaver(context: Context, private val sources: PhotoSources) :
 
     private companion object {
         const val FOLDER = "Chalkak"
+        val NAME_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.US).withZone(ZoneId.systemDefault())
     }
 }
 
@@ -124,7 +126,7 @@ class UploadAdapters(
     val camera: CameraAvailability,
 ) {
     companion object {
-        fun android(context: Context, activity: CurrentActivity, bridge: PhotoPickBridge, copy: Copy): UploadAdapters {
+        fun android(context: Context, activity: CurrentActivity, bridge: PhotoPickBridge, copy: Copy, clock: Clock): UploadAdapters {
             val app = context.applicationContext
             val sources = PhotoSources(app.contentResolver)
             val bitmaps = OrientedBitmaps(sources)
@@ -132,7 +134,7 @@ class UploadAdapters(
             val previews = PhotoPreviews(bitmaps)
             return UploadAdapters(
                 platform = UploadPlatform(
-                    acquirer = AndroidPhotoAcquirer(app, activity, bridge),
+                    acquirer = AndroidPhotoAcquirer(app, activity, bridge, clock),
                     previews = AndroidPhotoPreviewLoader(previews),
                     editSource = AndroidEditImageSource(previews, codec),
                     editPainter = ComposeEditPreviewPainter(previews),
@@ -140,7 +142,7 @@ class UploadAdapters(
                 codec = codec,
                 compressor = AndroidWebpCompressor(),
                 files = AndroidTempImageStore(File(app.cacheDir, "upload-temp")),
-                gallery = AndroidGallerySaver(app, sources),
+                gallery = AndroidGallerySaver(app, sources, clock),
                 toaster = AndroidToaster(app, copy),
                 camera = CameraAvailability { app.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY) },
             )

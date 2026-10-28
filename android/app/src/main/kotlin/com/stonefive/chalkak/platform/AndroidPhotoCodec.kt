@@ -33,7 +33,8 @@ class OrientedBitmaps(private val sources: PhotoSources) {
     /** Header only. Null = empty, unreadable or not an image. */
     fun bounds(photo: PickedPhoto): ImageSize? {
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        sources.open(photo)?.use { BitmapFactory.decodeStream(it, null, options) } ?: return null
+        val stream = sources.open(photo) ?: return null
+        stream.use { BitmapFactory.decodeStream(it, null, options) } // returns null by design: only the header is read
         if (options.outWidth <= 0 || options.outHeight <= 0) return null
         val exif = exif(photo)
         return if (exif.swapsSides()) ImageSize(options.outHeight, options.outWidth) else ImageSize(options.outWidth, options.outHeight)

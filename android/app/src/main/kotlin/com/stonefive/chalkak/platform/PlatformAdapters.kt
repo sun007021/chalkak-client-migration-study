@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.stonefive.chalkak.BuildConfig
 import com.stonefive.chalkak.copy.Copy
+import kr.chalkak.core.common.SystemClock
 import kr.chalkak.core.common.analytics.AnalyticsTracker
 import kr.chalkak.feature.auth.ConfiguredUpdateChecker
 import kr.chalkak.feature.auth.HomePreloader
@@ -70,7 +71,7 @@ class PlatformAdapters(
                 currentActivity = activity,
                 updateFlowBridge = bridge,
                 photoPickBridge = photoBridge,
-                upload = UploadAdapters.android(app, activity, photoBridge, copy),
+                upload = UploadAdapters.android(app, activity, photoBridge, copy, SystemClock),
             )
         }
 
