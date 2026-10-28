@@ -1,7 +1,14 @@
 import type { ApiClient } from '../../core/http/ApiClient';
 import type { KstDate } from '../../core/time/KstDate';
 import { PAGE_SIZE } from '../../shared/constants';
-import type { CalendarMonth, PostListPage, PostSort, TodayPost } from './PostModels';
+import type {
+  CalendarMonth,
+  PostDetail,
+  PostListPage,
+  PostSort,
+  TitleUpdateResult,
+  TodayPost,
+} from './PostModels';
 import { decodeCalendarMonth, decodePostListPage, decodeTodayPost } from './postDecoders';
 
 export type PostRepositoryDeps = { api: ApiClient };
@@ -13,6 +20,8 @@ export type ListPostsInput = {
   page?: number;
   /** 기본 PAGE_SIZE(20) */
   pageSize?: number;
+  /** random 정렬의 2페이지부터(첫 페이지 재검증에도) 보낸다. `[A-Za-z0-9_-]{1,64}`만 허용(어기면 요청 없이 throw). */
+  randomSeed?: string;
   signal?: AbortSignal;
 };
 
@@ -36,6 +45,25 @@ export class PostRepository {
       },
       decodePostListPage,
     );
+  }
+
+  /** GET /posts/{postId} (인증 필수). */
+  getDetail(_postId: string, _signal?: AbortSignal): Promise<PostDetail> {
+    throw new Error('not implemented');
+  }
+
+  /** PUT /posts/{postId} 본문 `{"title": 문자열 | null}`(키 필수). 호출자가 trim한 값을 넘긴다. */
+  updateTitle(
+    _postId: string,
+    _title: string | null,
+    _signal?: AbortSignal,
+  ): Promise<TitleUpdateResult> {
+    throw new Error('not implemented');
+  }
+
+  /** DELETE /posts/{postId} → 204. */
+  delete(_postId: string, _signal?: AbortSignal): Promise<void> {
+    throw new Error('not implemented');
   }
 
   /** GET /posts/today (인증 필수). */

@@ -15,8 +15,10 @@ import type {
   CalendarEntry,
   CalendarMonth,
   CalendarStatus,
+  PostDetail,
   PostListPage,
   PostSummary,
+  TitleUpdateResult,
   TodayModerationStatus,
   TodayPost,
 } from './PostModels';
@@ -89,4 +91,14 @@ function decodeCalendarEntry(raw: unknown): CalendarEntry {
     thumbnailImageUrl: optStr(o, 'thumbnailImageUrl'),
     status: oneOf(o, 'status', CALENDAR_STATUS),
   };
+}
+
+/** 필수 필드 누락·likeCount 문자열/음수·topic 누락이면 throw. thumbnailImageUrl은 null 허용. */
+export function decodePostDetail(_raw: unknown): PostDetail {
+  throw new Error('not implemented');
+}
+
+/** `{postId, title}`; title은 null 허용. */
+export function decodeTitleUpdate(_raw: unknown): TitleUpdateResult {
+  throw new Error('not implemented');
 }
