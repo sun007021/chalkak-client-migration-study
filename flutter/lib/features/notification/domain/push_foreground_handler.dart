@@ -1,6 +1,4 @@
-// 구현 전 껍데기: 본문이 비어 있어 필드가 아직 쓰이지 않는다. 구현하면서 이 줄을 지운다.
-// ignore_for_file: unused_field
-
+import '../../../core/copy/ko.g.dart';
 import '../../../core/push/notification_permission.dart';
 import '../../../core/push/push_message_source.dart';
 import 'unread_refresher.dart';
@@ -52,6 +50,41 @@ class PushForegroundHandler {
   final UnreadRefresher _unread;
   final bool showsLocalNotification;
 
-  Future<ForegroundDecision> handle(PushMessage message) =>
-      throw UnimplementedError();
+  Future<ForegroundDecision> handle(PushMessage message) async {
+    // 표시 여부와 무관하게 미읽음 점을 갱신한다. 실패는 이전 표시를 유지한다.
+    try {
+      await _unread.refreshUnread();
+    } on Object {
+      // 삼킨다.
+    }
+
+    final OsPermissionStatus status;
+    try {
+      status = await _permission.status();
+    } on Object {
+      return const SuppressForeground();
+    }
+    if (status != OsPermissionStatus.granted &&
+        status != OsPermissionStatus.notRequired) {
+      return const SuppressForeground();
+    }
+
+    final body = message.body;
+    final decision = ShowForeground(
+      title: message.title ?? '',
+      body: (body == null || body.isEmpty) ? Copy.pushDefaultBody : body,
+    );
+    if (showsLocalNotification) {
+      try {
+        await _presenter.show(
+          channelId: androidPushChannelId,
+          title: decision.title,
+          body: decision.body,
+        );
+      } on Object {
+        // 표시 실패가 수신 처리를 막지 않는다.
+      }
+    }
+    return decision;
+  }
 }

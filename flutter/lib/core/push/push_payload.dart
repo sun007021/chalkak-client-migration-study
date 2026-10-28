@@ -12,7 +12,12 @@ enum PushType {
   final String wire;
 
   /// 알 수 없는 문자열과 null은 null.
-  static PushType? fromWire(String? raw) => throw UnimplementedError();
+  static PushType? fromWire(String? raw) {
+    for (final t in values) {
+      if (t.wire == raw) return t;
+    }
+    return null;
+  }
 }
 
 /// 플랫폼이 넘겨준 푸시 `data`를 정리한 값(REQ-PUSH-021, TC-PUSH-049~050).
@@ -30,8 +35,20 @@ class PushPayload {
   });
 
   /// 평탄한 `data` 맵(iOS `userInfo` 최상위, Android 인텐트 extra, 플러그인 `RemoteMessage.data`)에서 만든다.
-  factory PushPayload.fromData(Map<Object?, Object?> data) =>
-      throw UnimplementedError();
+  factory PushPayload.fromData(Map<Object?, Object?> data) {
+    String? str(String key) {
+      final v = data[key];
+      return v is String ? v : null;
+    }
+
+    return PushPayload(
+      type: str('type'),
+      notificationId: str('notificationId'),
+      sourceType: str('sourceType'),
+      sourceId: str('sourceId'),
+      eventId: str('eventId'),
+    );
+  }
 
   /// 서버가 보낸 원문 type. 알려진 값은 [pushType]으로 본다.
   final String? type;
@@ -48,13 +65,13 @@ class PushPayload {
 abstract final class PushPayloadAdapters {
   /// iOS APNs `userInfo`: 커스텀 키가 `aps`와 같은 최상위에 평탄하게 있다.
   static PushPayload fromApnsUserInfo(Map<Object?, Object?> userInfo) =>
-      throw UnimplementedError();
+      PushPayload.fromData(userInfo);
 
   /// Android 인텐트 extras(`google.message_id` 등 플랫폼 키가 섞여 있다).
   static PushPayload fromAndroidExtras(Map<Object?, Object?> extras) =>
-      throw UnimplementedError();
+      PushPayload.fromData(extras);
 
   /// Flutter 메시징 플러그인의 `RemoteMessage.data`.
   static PushPayload fromPluginData(Map<Object?, Object?> data) =>
-      throw UnimplementedError();
+      PushPayload.fromData(data);
 }

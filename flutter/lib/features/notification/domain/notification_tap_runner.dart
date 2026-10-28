@@ -1,8 +1,7 @@
-// 구현 전 껍데기: 본문이 비어 있어 필드가 아직 쓰이지 않는다. 구현하면서 이 줄을 지운다.
-// ignore_for_file: unused_field
-
 import 'package:dio/dio.dart';
 
+import '../../../core/copy/ko.g.dart';
+import '../../../core/network/api_error.dart';
 import '../../../core/ui/toast/toast_controller.dart';
 import '../../auth/domain/user_data_cleaner.dart';
 import 'notification_navigator.dart';
@@ -52,10 +51,99 @@ class NotificationTapRunner implements UserDataCleaner {
   /// 열려 있는 알림함 목록을 첫 페이지부터 다시 불러온다(없으면 아무것도 하지 않는다).
   final Future<void> Function() _refreshInbox;
 
-  Future<TapResult> run(NavigatePlan plan, {CancelToken? cancelToken}) =>
-      throw UnimplementedError();
+  /// [clearAll]마다 올라간다. 요청을 보낸 시점의 값과 다르면 계정이 바뀐 것이다.
+  int _generation = 0;
+  final Set<CancelToken> _inflight = {};
+
+  Future<TapResult> run(NavigatePlan plan, {CancelToken? cancelToken}) async {
+    final readId = plan.readNotificationId;
+    if (readId == null) {
+      if (cancelToken?.isCancelled ?? false) return TapResult.cancelled;
+      await _navigate(plan.destination);
+      return TapResult.navigated;
+    }
+
+    final generation = _generation;
+    // clearAll이 진행 중 요청을 끊을 수 있도록 호출자의 토큰과 별개의 토큰을 쓴다.
+    final own = CancelToken();
+    _inflight.add(own);
+    final link = cancelToken?.whenCancel.then((_) {
+      if (!own.isCancelled) own.cancel();
+    });
+    // link는 결과를 쓰지 않는다. 오류가 나도 처리되지 않은 예외로 번지지 않게 한다.
+    link?.catchError((Object _) {});
+
+    try {
+      await _repository.markRead(readId, cancelToken: own);
+    } on Object catch (error) {
+      if (_isStale(generation, own, cancelToken)) return TapResult.cancelled;
+      return _onReadFailed(error, plan.destination);
+    } finally {
+      _inflight.remove(own);
+    }
+    if (_isStale(generation, own, cancelToken)) return TapResult.cancelled;
+
+    await _navigate(plan.destination);
+    await _safely(_unread.refreshUnread);
+    return TapResult.navigated;
+  }
+
+  bool _isStale(int generation, CancelToken own, CancelToken? caller) =>
+      generation != _generation ||
+      own.isCancelled ||
+      (caller?.isCancelled ?? false);
+
+  Future<TapResult> _onReadFailed(
+    Object error,
+    NotificationDestination destination,
+  ) async {
+    if (error is ApiError) {
+      if (error.isCancelled) return TapResult.cancelled;
+      if (error.status == 401) {
+        _navigator.goToLogin();
+        return TapResult.loginRequired;
+      }
+      if (error.isNetwork) {
+        _toast.show(Copy.notiReadErrorNetwork);
+        await _navigate(destination);
+        return TapResult.navigatedReadFailed;
+      }
+    }
+    // 404, 403, 400, 5xx, 응답 계약 위반은 같다: 사라졌거나 처리할 수 없는 알림이다(D-24).
+    _toast.show(Copy.notiGone);
+    await _safely(_refreshInbox);
+    await _safely(_unread.refreshUnread);
+    return TapResult.gone;
+  }
+
+  Future<void> _navigate(NotificationDestination destination) {
+    return switch (destination) {
+      HomeDestination(:final scrollToTopAndRefresh) => _navigator.openHome(
+        scrollToTopAndRefresh: scrollToTopAndRefresh,
+      ),
+      InboxDestination() => _navigator.openInbox(),
+      FeedDestination(:final target, :final openAiFeedback) =>
+        _navigator.openFeed(target, openAiFeedback: openAiFeedback),
+      NotificationDetailDestination(:final notificationId) =>
+        _navigator.openNotificationDetail(notificationId),
+    };
+  }
+
+  /// 미읽음·목록 새로고침 실패는 이동 결과에 영향을 주지 않는다.
+  Future<void> _safely(Future<void> Function() action) async {
+    try {
+      await action();
+    } on Object {
+      // 이전 표시를 유지한다.
+    }
+  }
 
   /// 진행 중인 읽음 요청의 결과를 버리게 한다.
   @override
-  Future<void> clearAll() => throw UnimplementedError();
+  Future<void> clearAll() async {
+    _generation++;
+    for (final token in List.of(_inflight)) {
+      if (!token.isCancelled) token.cancel();
+    }
+  }
 }

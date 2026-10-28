@@ -1,6 +1,4 @@
-// 구현 전 껍데기: 본문이 비어 있어 필드가 아직 쓰이지 않는다. 구현하면서 이 줄을 지운다.
-// ignore_for_file: unused_field
-
+import '../../../core/copy/ko.g.dart';
 import '../../../core/push/notification_permission.dart';
 import '../../../core/ui/toast/toast_controller.dart';
 
@@ -30,6 +28,25 @@ class NotificationPermissionPrompt {
   final PermissionPromptFlag _flag;
   final ToastSink _toast;
 
-  Future<void> onMainEntered({required bool isGuest}) =>
-      throw UnimplementedError();
+  /// 같은 프로세스에서 겹쳐 들어온 호출(재진입)은 한 번만 처리한다.
+  Future<void>? _running;
+
+  Future<void> onMainEntered({required bool isGuest}) {
+    if (isGuest) return Future<void>.value();
+    return _running ??= _run().whenComplete(() => _running = null);
+  }
+
+  Future<void> _run() async {
+    try {
+      if (await _flag.isRequested()) return;
+      // 요청 호출이 실패해도 표시는 남긴다(REQ-PUSH-001, 006): 같은 설치에서 반복해 묻지 않는다.
+      await _flag.markRequested();
+      final status = await _permission.status();
+      if (status != OsPermissionStatus.notDetermined) return;
+      await _permission.request();
+    } on Object {
+      // 권한 확인·요청 실패. 로그인과 홈 진입을 막지 않고 안내만 한다.
+      _toast.show(Copy.notiPermError);
+    }
+  }
 }

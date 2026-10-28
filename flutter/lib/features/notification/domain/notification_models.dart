@@ -1,3 +1,5 @@
+import '../../../core/time/kst_format.dart';
+
 /// 알림 `type`. 알 수 없는 값은 [unknown](REQ-NOTI-021, TC-NOTI-024).
 enum NotificationType {
   postApproved('POST_APPROVED'),
@@ -12,7 +14,12 @@ enum NotificationType {
   const NotificationType(this.wire);
   final String wire;
 
-  static NotificationType fromWire(String raw) => throw UnimplementedError();
+  static NotificationType fromWire(String raw) {
+    for (final t in values) {
+      if (t != unknown && t.wire == raw) return t;
+    }
+    return unknown;
+  }
 }
 
 /// 알림함 목록의 알림 하나(`GET /notifications`, REQ-NOTI-003).
@@ -52,10 +59,24 @@ class NotificationItem {
   bool get isUnread => readAt == null;
 
   /// KST "M월 d일 HH:mm"(REQ-NOTI-033, D-09). 기기 시간대·로캘과 무관하다.
-  String get timeLabel => throw UnimplementedError();
+  String get timeLabel => KstFormat.notificationTime(createdAt);
 
   /// 이미 읽은 항목이면 최초 [readAt]을 유지한다(TC-NOTI-037).
-  NotificationItem markRead(DateTime at) => throw UnimplementedError();
+  NotificationItem markRead(DateTime at) {
+    if (readAt != null) return this;
+    return NotificationItem(
+      id: id,
+      type: type,
+      rawType: rawType,
+      title: title,
+      body: body,
+      createdAt: createdAt,
+      sourceType: sourceType,
+      sourceId: sourceId,
+      thumbnailImageUrl: thumbnailImageUrl,
+      readAt: at,
+    );
+  }
 }
 
 /// `GET /notifications` 한 페이지.

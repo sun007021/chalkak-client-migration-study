@@ -1,5 +1,4 @@
-// 구현 전 껍데기: 본문이 비어 있어 필드가 아직 쓰이지 않는다. 구현하면서 이 줄을 지운다.
-// ignore_for_file: unused_field
+import 'dart:async';
 
 import '../../../core/push/push_message_source.dart';
 import '../../../core/push/push_token_provider.dart';
@@ -28,7 +27,58 @@ class PushBootstrap {
   final PushTapCoordinator _coordinator;
   final PushForegroundHandler _foreground;
 
-  Future<void> start() => throw UnimplementedError();
+  final List<StreamSubscription<void>> _subscriptions = [];
+  bool _started = false;
+  bool _disposed = false;
 
-  Future<void> dispose() => throw UnimplementedError();
+  Future<void> start() async {
+    if (_started || _disposed) return;
+    _started = true;
+    _subscriptions
+      ..add(_listen<PushMessage>(_messages.foreground, _foreground.handle))
+      ..add(
+        _listen<PushMessage>(
+          _messages.opened,
+          (m) => _coordinator.onTapped(m.payload),
+        ),
+      )
+      ..add(
+        _listen<String>(_tokens.tokenRefreshed, _registrar.onTokenRefreshed),
+      );
+
+    // 콜드 스타트: 종료 상태에서 알림을 눌러 시작된 경우 1회만 읽힌다.
+    try {
+      final initial = await _messages.initialMessage();
+      if (initial != null && !_disposed) {
+        await _coordinator.onTapped(initial.payload);
+      }
+    } on Object {
+      // 시작 메시지를 읽지 못해도 다른 스트림은 계속 동작한다.
+    }
+  }
+
+  /// 한 이벤트의 처리 실패가 구독을 끊지 않게 감싼다.
+  StreamSubscription<T> _listen<T>(
+    Stream<T> stream,
+    Future<Object?> Function(T event) handle,
+  ) {
+    return stream.listen((event) async {
+      if (_disposed) return;
+      try {
+        await handle(event);
+      } on Object {
+        // 처리 실패는 삼키고 다음 이벤트를 받는다.
+      }
+    }, onError: (Object _) {});
+  }
+
+  Future<void> dispose() async {
+    _disposed = true;
+    final subscriptions = List.of(_subscriptions);
+    _subscriptions.clear();
+    for (final subscription in subscriptions) {
+      // 취소 완료를 기다리지 않는다. 구독은 취소 요청 즉시 이벤트를 받지 않는다.
+      unawaited(subscription.cancel().catchError((Object _) {}));
+    }
+  }
 }
