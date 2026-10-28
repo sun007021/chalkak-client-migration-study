@@ -12,6 +12,8 @@ import { KakaoCallbackScreen, LoginScreen } from '../features/auth/LoginScreen';
 import { resolveAuthGate } from '../features/boot/authGate';
 import type { AuthGateDecision } from '../features/boot/authGate';
 import { BootScreen, SplashView } from '../features/boot/BootScreen';
+import { DisplayScreen } from '../features/display/DisplayScreen';
+import { FeedScreen } from '../features/feed/FeedScreen';
 import { HomeScreen } from '../features/home/HomeScreen';
 import { TermsScreen } from '../features/onboarding/TermsScreen';
 import { SignatureDrawScreen } from '../features/signature/SignatureDrawScreen';
@@ -114,7 +116,7 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
           element: <RequireSession container={container}>{(mode) => <MainShell mode={mode} />}</RequireSession>,
           children: [
             { path: ROUTES.home, handle: homeHandle, element: <HomeScreen /> },
-            { path: ROUTES.display, handle: displayHandle, element: <TabPlaceholder tab="display" testId="display.root" /> },
+            { path: ROUTES.display, handle: displayHandle, element: <DisplayScreen /> },
             {
               path: ROUTES.record,
               handle: recordHandle,
@@ -134,7 +136,7 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
         },
         {
           element: <RequireSession container={container}>{(mode) => <MemberOnly mode={mode} action="feed"><Outlet /></MemberOnly>}</RequireSession>,
-          children: [{ path: `${ROUTES.feed}/:postId`, element: <div data-testid="feed.root" /> }],
+          children: [{ path: `${ROUTES.feed}/:postId`, element: <FeedScreen /> }],
         },
         ...devSessionRoutes(container),
         { path: '*', element: <Navigate to={ROUTES.boot} replace /> },
