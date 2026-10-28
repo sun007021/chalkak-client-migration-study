@@ -30,6 +30,9 @@ async function setup(first: RouteValue = SUCCESS) {
   return { ...net, router, toast, authFlow, vm };
 }
 
+const gets = (h: { transport: { requestsTo(m: string, p: string): unknown[] } }) =>
+  h.transport.requestsTo('GET', '/users/me/signature');
+
 const thumbOf = (fixture: string) =>
   fixtureBody<Record<string, string>>(fixture).signatureThumbnailImageUrl;
 
@@ -69,7 +72,7 @@ describe('SignatureCardViewModel 설정 탭 재조회 (SET)', () => {
       'signature/users-me-signature__get-thumbnail-null',
     );
     expect(h.vm.getSnapshot().imageUrl).toBe(body.signatureOriginalImageUrl);
-    expect(h.router.calls(GET)).toHaveLength(2);
+    expect(gets(h)).toHaveLength(2);
   });
 
   it('TC-SET-005 이미 사인이 보이는 상태에서 재조회가 실패하면 기존 사인을 유지하고 토스트만 띄운다', async () => {
@@ -120,6 +123,7 @@ describe('SignatureCardViewModel 설정 탭 재조회 (SET)', () => {
     );
 
     const old = h.vm.refresh();
+    await flush(); // 낡은 조회 요청이 서버(Fake)에 도달한 뒤 변경이 끝난다
     await h.vm.onSignatureChanged();
     expect(h.vm.getSnapshot().imageUrl).toBe(thumbOf(SUCCESS));
 
@@ -149,7 +153,7 @@ describe('SignatureCardViewModel 설정 탭 재조회 (SET)', () => {
       'signature/users-me-signature__get-thumbnail-null',
     );
     expect(h.vm.getSnapshot().imageUrl).toBe(body.signatureOriginalImageUrl);
-    expect(h.router.calls(GET)).toHaveLength(2);
+    expect(gets(h)).toHaveLength(2);
     expect(h.transport.requests.filter((r) => r.method === 'PUT')).toHaveLength(0);
   });
 

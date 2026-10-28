@@ -34,7 +34,8 @@ describe('SignatureCard 설정 탭 오류 상태', () => {
     await fireEvent.press(screen.getByTestId('settings.signature-retry-button'));
     expect(await screen.findByTestId('settings.signature-image')).toBeOnTheScreen();
     expect(screen.queryByTestId('settings.signature-error')).not.toBeOnTheScreen();
-    expect(router.calls(GET)).toHaveLength(2);
+    // router.set이 호출 기록을 새로 시작하므로 다시 불러오기 이후의 요청만 센다.
+    expect(router.calls(GET)).toHaveLength(1);
   });
 
   it('TC-SET-005 이미 사인이 보이는 상태의 재조회 실패에는 오류 상태를 만들지 않는다(빈 카드로 바꾸지 않음)', async () => {

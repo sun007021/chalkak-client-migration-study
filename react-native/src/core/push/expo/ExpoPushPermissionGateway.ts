@@ -1,5 +1,5 @@
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 import type { PushPermissionGateway, PushPermissionStatus } from '../PushPermissionGateway';
 import { ensureAndroidChannel } from './expoNotificationSetup';
@@ -30,5 +30,9 @@ export class ExpoPushPermissionGateway implements PushPermissionGateway {
         ios: { allowAlert: true, allowBadge: true, allowSound: true },
       }),
     );
+  }
+
+  async openSystemSettings(): Promise<void> {
+    await Linking.openSettings();
   }
 }

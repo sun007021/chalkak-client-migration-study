@@ -6,15 +6,20 @@ import {
   CancelledError,
   ReauthenticationRequiredError,
 } from '../../core/http/ApiError';
+import type { UserDataCache } from '../../core/push/UserDataCache';
+import type { AuthFlowNavigator } from '../auth/AuthFlowNavigator';
+import { AuthErrorPolicy } from '../common/AuthErrorPolicy';
 import type { SignatureRepository } from '../../data/signature/SignatureRepository';
 
 export type SignatureCardState = {
   /** 보여 줄 이미지(썸네일 우선). 없으면 null(빈 상태). */
   imageUrl: string | null;
   loading: boolean;
+  /** 보이던 사인이 없는 채로 조회가 실패했다(오류 문구 + 다시 불러오기, TC-SET-006). 성공하거나 초기화되면 false. */
+  loadError: boolean;
 };
 
-/** 설정의 "사인 재설정" 카드를 위한 진입 인터페이스. 설정 화면(PR11)이 소유자가 되어 만들고 버린다. */
+/** 설정의 "사인 재설정" 카드를 위한 진입 인터페이스. 설정 화면이 소유자가 되어 만들고 버린다. */
 export interface SignatureChangeNavigator {
   openSignatureChange(): void;
 }
@@ -23,14 +28,23 @@ export type SignatureCardDeps = {
   repository: SignatureRepository;
   toast: ToastPresenter;
   navigator: SignatureChangeNavigator;
+  /** 갱신 뒤에도 남은 401에서 로그인으로 보낸다. 없으면 세션 이벤트에만 맡긴다. */
+  authFlow?: Pick<AuthFlowNavigator, 'toLogin'>;
 };
 
-export class SignatureCardViewModel extends Observable<SignatureCardState> {
+export class SignatureCardViewModel
+  extends Observable<SignatureCardState>
+  implements UserDataCache
+{
   private abortController: AbortController | null = null;
   private released = false;
+  /** 조회 한 번의 식별자. 변경 성공·계정 전환이 올려 낡은 응답을 버린다. */
+  private generation = 0;
+  private readonly authErrors: AuthErrorPolicy | null;
 
   constructor(private readonly deps: SignatureCardDeps) {
-    super({ imageUrl: null, loading: false });
+    super({ imageUrl: null, loading: false, loadError: false });
+    this.authErrors = deps.authFlow ? new AuthErrorPolicy(deps.authFlow) : null;
   }
 
   override dispose(): void {
@@ -45,29 +59,60 @@ export class SignatureCardViewModel extends Observable<SignatureCardState> {
    */
   async refresh(): Promise<void> {
     if (this.getSnapshot().loading || this.released) return;
-    const controller = new AbortController();
-    this.abortController = controller;
-    this.setState({ ...this.getSnapshot(), loading: true });
-    try {
-      const current = await this.deps.repository.getCurrent(controller.signal);
-      if (this.released) return;
-      this.setState({ imageUrl: current?.imageUrl ?? null, loading: false });
-    } catch (error) {
-      if (this.released) return;
-      this.setState({ ...this.getSnapshot(), loading: false });
-      // 취소(로그아웃·계정 전환)와 401은 조용히 넘긴다: 로그인 이동은 세션 이벤트가 맡는다.
-      if (
-        !(error instanceof CancelledError) &&
-        !(error instanceof AuthenticationRequiredError) &&
-        !(error instanceof ReauthenticationRequiredError)
-      ) {
-        this.deps.toast.show(t('sign.load.error'));
-      }
-    }
+    await this.load();
+  }
+
+  /** 사인 변경 성공 뒤: 진행 중이던 조회는 낡았으므로 버리고 GET으로 다시 조회한다(D-18). */
+  async onSignatureChanged(): Promise<void> {
+    if (this.released) return;
+    await this.load();
+  }
+
+  /** 로그아웃·계정 전환: 진행 중 조회를 버리고 이전 계정의 사인을 지운다. */
+  clearAll(): void {
+    this.invalidate();
+    this.setState({ imageUrl: null, loading: false, loadError: false });
   }
 
   /** "변경하기". */
   onChangePress(): void {
     this.deps.navigator.openSignatureChange();
+  }
+
+  private invalidate(): void {
+    this.generation += 1;
+    this.abortController?.abort();
+    this.abortController = null;
+  }
+
+  private async load(): Promise<void> {
+    this.invalidate();
+    const generation = this.generation;
+    const controller = new AbortController();
+    this.abortController = controller;
+    this.setState({ ...this.getSnapshot(), loading: true, loadError: false });
+    try {
+      const current = await this.deps.repository.getCurrent(controller.signal);
+      if (this.released || generation !== this.generation) return;
+      this.setState({ imageUrl: current?.imageUrl ?? null, loading: false, loadError: false });
+    } catch (error) {
+      if (this.released || generation !== this.generation) return;
+      this.abortController = null;
+      const state = this.getSnapshot();
+      // 취소(로그아웃·계정 전환)와 401은 조용히 넘긴다: 만료는 세션 이벤트가, 남은 401은 정책이 로그인으로 보낸다.
+      if (error instanceof CancelledError || this.handleAuth(error, generation)) {
+        this.setState({ ...state, loading: false });
+        return;
+      }
+      this.setState({ ...state, loading: false, loadError: state.imageUrl === null });
+      this.deps.toast.show(t('sign.load.error'));
+    }
+  }
+
+  private handleAuth(error: unknown, key: number): boolean {
+    if (this.authErrors) return this.authErrors.handle(error, key);
+    return (
+      error instanceof AuthenticationRequiredError || error instanceof ReauthenticationRequiredError
+    );
   }
 }

@@ -4,11 +4,14 @@ import {
 } from '@react-navigation/native-stack';
 
 import { useEffect, useMemo } from 'react';
+import { BackHandler } from 'react-native';
 
 import { KstDate } from '../core/time/KstDate';
+import { FeedbackScreen } from '../features/feedback/FeedbackScreen';
 import type { FeedTarget } from '../features/feed/FeedTarget';
 import { NotificationDetailScreen } from '../features/notification/NotificationDetailScreen';
 import { NotificationInboxScreen } from '../features/notification/NotificationInboxScreen';
+import { SignatureStep } from '../features/signature/SignatureStep';
 import { PhotoUploadScreen } from '../features/upload/PhotoUploadScreen';
 import { UploadSuccessScreen } from '../features/upload/UploadSuccessScreen';
 import { useAppContainer } from './AppContainerContext';
@@ -39,6 +42,8 @@ export function RootNavigator() {
         getId={({ params }) => params.notificationId}
       />
       <Stack.Screen name="IssueWeb" component={IssueWebScreenRoute} />
+      <Stack.Screen name="Feedback" component={FeedbackScreenRoute} />
+      <Stack.Screen name="SignatureChange" component={SignatureChangeScreenRoute} />
       <Stack.Screen name="Upload" component={UploadScreenRoute} />
       <Stack.Screen
         name="UploadSuccess"
@@ -100,6 +105,50 @@ function IssueWebScreenRoute({
   navigation,
 }: NativeStackScreenProps<RootStackParamList, 'IssueWeb'>) {
   return <IssueWebRoute url={route.params.url} onBack={() => navigation.goBack()} />;
+}
+
+/**
+ * 피드백 화면 라우트. 열 때 ViewModel을 만들고 닫을 때 dispose한다(전송 중 요청 취소). screen_view는 start()가 한 번 보낸다.
+ * 닫기는 goBack이라 설정 탭으로 돌아온다.
+ */
+function FeedbackScreenRoute({
+  navigation,
+}: NativeStackScreenProps<RootStackParamList, 'Feedback'>) {
+  const container = useAppContainer();
+  const viewModel = useOwnedViewModel(() =>
+    container.createFeedbackViewModel({ close: () => navigation.goBack() }),
+  );
+  useEffect(() => viewModel?.start(), [viewModel]);
+  return viewModel ? <FeedbackScreen viewModel={viewModel} /> : null;
+}
+
+/**
+ * 설정의 사인 변경 흐름 라우트(가입과 같은 그리기/미리보기 화면). 완료하면 닫고 설정의 사인 카드를 다시 조회한다.
+ * 안드로이드 하드웨어 뒤로는 흐름의 뒤로(미리보기 -> 그리기 -> 닫기)를 따른다.
+ */
+function SignatureChangeScreenRoute({
+  navigation,
+}: NativeStackScreenProps<RootStackParamList, 'SignatureChange'>) {
+  const container = useAppContainer();
+  const flow = useOwnedViewModel(() =>
+    container.createSignatureChangeFlow({
+      onCompleted: () => {
+        navigation.goBack();
+        void container.settingsOwner.getSnapshot().viewModel?.signatureCard.onSignatureChanged();
+      },
+      onExit: () => navigation.goBack(),
+    }),
+  );
+  useEffect(() => {
+    flow?.start();
+    if (!flow) return undefined;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      flow.back();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [flow]);
+  return <SignatureStep flow={flow} />;
 }
 
 /**

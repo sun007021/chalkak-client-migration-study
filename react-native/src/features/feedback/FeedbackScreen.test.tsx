@@ -28,7 +28,7 @@ describe('FeedbackScreen', () => {
     await renderFeedback();
     expect(screen.getByTestId('feedback.root')).toBeOnTheScreen();
     expect(screen.getByTestId('feedback.guide-text')).toHaveTextContent(t('fdbk.intro.title'));
-    expect(screen.getByTestId('feedback.guide-text')).toHaveTextContent(t('fdbk.intro.body'));
+    expect(screen.getByTestId('feedback.guide-body')).toHaveTextContent(t('fdbk.intro.body'));
     expect(screen.getByTestId('feedback.input').props.placeholder).toBe(
       t('fdbk.field.placeholder'),
     );

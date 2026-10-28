@@ -1,7 +1,8 @@
 import { createNavigationContainerRef } from '@react-navigation/native';
 import { getRandomBytes } from 'expo-crypto';
 
-import { ConsoleAnalyticsTracker } from '../core/analytics/ConsoleAnalyticsTracker';
+import type { AnalyticsBackend } from '../core/analytics/AnalyticsBackend';
+import { createAnalyticsTracker } from '../core/analytics/createAnalyticsTracker';
 import type { AnalyticsTracker } from '../core/analytics/AnalyticsTracker';
 import { KakaoSocialLoginClient } from '../core/auth/KakaoSocialLoginClient';
 import { type NonceGenerator, SecureNonceGenerator } from '../core/auth/NonceGenerator';
@@ -31,6 +32,16 @@ import type { PushRegistrar } from '../core/push/PushRegistrar';
 import type { PushTokenProvider } from '../core/push/PushTokenProvider';
 import type { UserDataCache } from '../core/push/UserDataCache';
 import { UserDataCacheRegistry } from '../core/push/UserDataCacheRegistry';
+import { AppInfoVersionProvider } from '../core/config/AppVersionProvider';
+import { NotificationSettingsRepository } from '../data/settings/NotificationSettingsRepository';
+import { FeedbackRepository } from '../data/feedback/FeedbackRepository';
+import { AccountActionsViewModel } from '../features/auth/AccountActionsViewModel';
+import type { FeedbackNavigator } from '../features/feedback/FeedbackNavigator';
+import { FeedbackViewModel } from '../features/feedback/FeedbackViewModel';
+import { SettingsViewModel } from '../features/settings/SettingsViewModel';
+import { SettingsViewModelOwner } from '../features/settings/SettingsViewModelOwner';
+import { SignatureCardViewModel } from '../features/signature/SignatureCardViewModel';
+import { NavigationSettingsNavigator } from './NavigationSettingsNavigator';
 import { ToastCenter } from '../core/toast/ToastCenter';
 import type { ToastPresenter } from '../core/toast/ToastPresenter';
 import { AuthRepository, type PendingSignUp } from '../data/auth/AuthRepository';
@@ -192,7 +203,9 @@ type PushPorts = {
 };
 
 /** 테스트가 일부만 바꿀 수 있는 의존성. 푸시 포트는 필요한 것만 `push`에 넣고 토큰 공급자는 `pushTokens`다. */
-type ContainerOverrides = Partial<Omit<Dependencies, 'push'>> & {
+export type ContainerOverrides = Partial<Omit<Dependencies, 'push'>> & {
+  /** 분석 백엔드(Firebase 설정이 있을 때만). 없으면 로그 출력 tracker다(`analytics`를 직접 주면 그것이 우선). */
+  analyticsBackend?: AnalyticsBackend | null;
   push?: Partial<PushPorts>;
   pushTokens?: PushTokenProvider;
 };
@@ -227,6 +240,8 @@ export class AppContainer {
   readonly displayOwner: DisplayViewModelOwner;
   /** 메인에 있는 동안 기록 ViewModel을 만들고 버린다. 기록 탭 화면은 이것을 구독해 받는다. */
   readonly recordOwner: RecordViewModelOwner;
+  /** 메인에 있는 동안 설정 ViewModel을 만들고 버린다. 설정 탭 화면은 이것을 구독해 받는다. */
+  readonly settingsOwner: SettingsViewModelOwner;
   /**
    * 기본 렌더러(view-shot)를 쓸 때만 있다. 기록 화면에 마운트하는 캡처 호스트가 이것으로 달력 뷰를 그려 캡처한다.
    * 테스트가 Fake 렌더러를 넣으면 null이라 호스트를 마운트하지 않는다.
@@ -273,6 +288,7 @@ export class AppContainer {
     this.navigationHandle,
     this.tabReturnHint,
   );
+  private readonly settingsNavigator = new NavigationSettingsNavigator(this.navigationHandle);
   private readonly calendarImageRenderer: CalendarImageRenderer;
   private readonly calendarImageSaver: CalendarImageSaver;
   private readonly cacheRegistry = new UserDataCacheRegistry();
@@ -387,6 +403,11 @@ export class AppContainer {
       create: (mode) => this.createRecordViewModel(mode),
       registerCache: (cache) => this.cacheRegistry.register(cache),
     });
+    this.settingsOwner = new SettingsViewModelOwner({
+      boot: this.bootViewModel,
+      create: (mode) => this.createSettingsViewModel(mode),
+      registerCache: (cache) => this.cacheRegistry.register(cache),
+    });
   }
 
   private get postRepository(): PostRepository {
@@ -457,6 +478,52 @@ export class AppContainer {
       analytics: this.analytics,
       navigator: this.uploadNavigator,
     });
+  }
+
+  /** 소유자(settingsOwner)만 부른다. 사인 카드·계정 동작은 설정 ViewModel이 소유하고 함께 버린다. */
+  private createSettingsViewModel(mode: MainMode): SettingsViewModel {
+    const toast = this.toast;
+    return new SettingsViewModel({
+      mode,
+      settings: new NotificationSettingsRepository({ api: this.api }),
+      signatureCard: new SignatureCardViewModel({
+        repository: this.signatureRepository,
+        toast,
+        navigator: this.settingsNavigator,
+        authFlow: this.bootViewModel,
+      }),
+      account: new AccountActionsViewModel({
+        authRepository: this.authRepository,
+        navigator: this.bootViewModel,
+        toast,
+      }),
+      permission: this.dependencies.push.permission,
+      visibility: this.dependencies.visibility,
+      appVersion: new AppInfoVersionProvider(this.dependencies.appInfo),
+      analytics: this.analytics,
+      linkOpener: this.linkOpener,
+      toast,
+      navigator: this.settingsNavigator,
+      authFlow: this.bootViewModel,
+    });
+  }
+
+  /**
+   * 피드백 라우트만 부른다(열 때 만들고 닫을 때 dispose). 로그아웃·계정 전환 때 전송 중 요청을 버리도록
+   * 캐시 레지스트리에 올리고, dispose하면 해제한다.
+   */
+  createFeedbackViewModel(navigator: FeedbackNavigator): FeedbackViewModel {
+    let unregister: (() => void) | null = null;
+    const viewModel = new FeedbackViewModel({
+      repository: new FeedbackRepository({ api: this.api }),
+      analytics: this.analytics,
+      toast: this.toast,
+      navigator,
+      authFlow: this.bootViewModel,
+      onDisposed: () => unregister?.(),
+    });
+    unregister = this.cacheRegistry.register(viewModel);
+    return viewModel;
   }
 
   /** 소유자(recordOwner)만 부른다. */
@@ -778,7 +845,8 @@ export class AppContainer {
         api,
         featureFlags,
         appInfo,
-        analytics: overrides.analytics ?? new ConsoleAnalyticsTracker(),
+        analytics:
+          overrides.analytics ?? createAnalyticsTracker(overrides.analyticsBackend ?? null),
         socialLoginClient:
           overrides.socialLoginClient ??
           selectSocialLoginClient(featureFlags, new KakaoSocialLoginClient(new SeoulKakaoSdk())),

@@ -302,7 +302,7 @@ describe('SettingsViewModel 기기 알림 권한', () => {
       permission: 'granted',
       routes: { [GET_PUSH]: 'settings/notification-settings__get-ai-off' },
     });
-    h.permission.status = 'denied';
+    h.permission.current = 'denied';
     await h.viewModel.onPushToggle('aiReview');
     expect(h.permission.settingsOpened).toBe(1);
     expect(h.router.calls(PATCH_PUSH)).toHaveLength(0);
@@ -321,9 +321,9 @@ describe('SettingsViewModel 기기 알림 권한', () => {
       permission: 'undetermined',
       routes: { [GET_PUSH]: 'settings/notification-settings__get-ai-off' },
     });
-    h.permission.requestResult = 'granted';
+    h.permission.resultOnRequest = 'granted';
     await h.viewModel.onPushToggle('aiReview');
-    expect(h.permission.requests).toBe(1);
+    expect(h.permission.requestCalls).toBe(1);
     expect(h.patchBodies()).toEqual([{ aiReviewPushEnabled: true }]);
     expect(values(h)?.aiReview).toBe(true);
   });
@@ -333,9 +333,9 @@ describe('SettingsViewModel 기기 알림 권한', () => {
       permission: 'undetermined',
       routes: { [GET_PUSH]: 'settings/notification-settings__get-ai-off' },
     });
-    h.permission.requestResult = 'denied';
+    h.permission.resultOnRequest = 'denied';
     await h.viewModel.onPushToggle('aiReview');
-    expect(h.permission.requests).toBe(1);
+    expect(h.permission.requestCalls).toBe(1);
     expect(h.router.calls(PATCH_PUSH)).toHaveLength(0);
     expect(values(h)?.aiReview).toBe(false);
     expect(saving(h).aiReview).toBe(false);
@@ -343,11 +343,11 @@ describe('SettingsViewModel 기기 알림 권한', () => {
 
   it('REQ-SET-017 포그라운드로 돌아오면 권한 상태를 다시 확인하되 스위치 값은 서버 값 그대로다', async () => {
     const h = await shown({ permission: 'denied' });
-    const before = h.permission.statusChecks;
-    h.permission.status = 'granted';
+    const before = h.permission.statusCalls;
+    h.permission.current = 'granted';
     h.visibility.emit('foreground');
     await flush();
-    expect(h.permission.statusChecks).toBeGreaterThan(before);
+    expect(h.permission.statusCalls).toBeGreaterThan(before);
     expect(h.viewModel.getSnapshot().devicePermission).toBe('granted');
     expect(values(h)).toEqual({ topic: true, moderation: true, aiReview: true });
     expect(h.router.calls(PATCH_PUSH)).toHaveLength(0);
@@ -355,10 +355,10 @@ describe('SettingsViewModel 기기 알림 권한', () => {
 
   it('REQ-SET-017 백그라운드 전환에서는 확인하지 않고, 화면을 떠나면(onHidden) 구독을 해제한다', async () => {
     const h = await shown();
-    const before = h.permission.statusChecks;
+    const before = h.permission.statusCalls;
     h.visibility.emit('background');
     await flush();
-    expect(h.permission.statusChecks).toBe(before);
+    expect(h.permission.statusCalls).toBe(before);
     h.viewModel.onHidden();
     expect(h.visibility.listenerCount).toBe(0);
   });

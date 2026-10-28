@@ -269,7 +269,7 @@ describe('FeedbackViewModel 실패 처리', () => {
     );
     h.viewModel.onTextChange('내용');
     await h.viewModel.submit();
-    expect(h.posts()).toHaveLength(1);
+    expect(h.posts()).toHaveLength(2); // 401 -> 갱신 -> 1회 재전송
     expect(h.router.calls('POST /auth/refresh')).toHaveLength(1);
     expect(h.toast.messages).toEqual([t('fdbk.success')]);
     expect(h.authFlow.calls).toEqual([]);

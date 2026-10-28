@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 
 import { FakeAnalyticsTracker } from '../core/analytics/__testing__/FakeAnalyticsTracker';
 import { createNetHarness } from '../core/http/__testing__/createNetHarness';
-import { FakeNotificationPermission } from '../core/push/__testing__/FakeNotificationPermission';
+import { FakePushPermissionGateway } from '../core/push/__testing__/FakePushPermissionGateway';
 import { FixtureRouter, type RouteValue } from '../data/__testing__/FixtureRouter';
 import { GUEST_ROUTES, MEMBER_ROUTES, NOW } from '../features/home/__testing__/createHomeHarness';
 import { SETTINGS_ROUTES } from '../features/settings/__testing__/createSettingsHarness';
@@ -22,7 +22,7 @@ async function renderApp(mode: 'member' | 'guest', extra: Record<string, RouteVa
       : { ...GUEST_ROUTES, ...extra },
   ).install(net.transport);
   const analytics = new FakeAnalyticsTracker();
-  const permission = new FakeNotificationPermission('granted');
+  const permission = new FakePushPermissionGateway('granted');
   await render(
     <App
       configResult={OK}
@@ -32,7 +32,7 @@ async function renderApp(mode: 'member' | 'guest', extra: Record<string, RouteVa
         events: net.events,
         api: net.api,
         analytics,
-        notificationPermission: permission,
+        push: { permission },
         appInfo: { platform: 'ios', bundleId: 'b', version: '1.1.1', appStoreId: null },
       }}
     />,

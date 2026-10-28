@@ -71,12 +71,12 @@ describe('SettingsScreen 회원', () => {
     await flush();
     const text = JSON.stringify(screen.toJSON());
     const order = [
-      t('settings.section.app'),
-      t('settings.section.push'),
-      t('settings.section.account'),
-      t('settings.section.feedback'),
-      t('settings.section.info'),
-    ].map((title) => text.indexOf(title));
+      'settings.signature-card',
+      'settings.push-section',
+      'settings.logout-row',
+      'settings.feedback-row',
+      'settings.privacy-row',
+    ].map((id) => text.indexOf(`"testID":"${id}"`));
     expect(order.every((index) => index >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
@@ -134,7 +134,8 @@ describe('SettingsScreen 회원', () => {
     await flush();
     expect(screen.queryByTestId('settings.push-error')).not.toBeOnTheScreen();
     expect(toggle('topic')).toBeEnabled();
-    expect(h.callsOf(GET_PUSH)).toBe(2);
+    // router.set이 호출 기록을 새로 시작하므로 다시 시도 이후의 요청만 센다.
+    expect(h.callsOf(GET_PUSH)).toBe(1);
   });
 
   it('TC-SET-023 토글을 누르면 응답 전에 즉시 바뀌어 보이고 PATCH는 해당 항목만 나간다', async () => {

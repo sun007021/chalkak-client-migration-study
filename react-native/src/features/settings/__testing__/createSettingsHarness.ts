@@ -3,8 +3,8 @@ import { createNetHarness } from '../../../core/http/__testing__/createNetHarnes
 import { FakeAppVisibility } from '../../../core/lifecycle/__testing__/FakeAppVisibility';
 import { FakeExternalLinkOpener } from '../../../core/linking/__testing__/FakeExternalLinkOpener';
 import { FakePushRegistrar } from '../../../core/push/__testing__/FakePushRegistrar';
-import { FakeNotificationPermission } from '../../../core/push/__testing__/FakeNotificationPermission';
-import type { DevicePermissionStatus } from '../../../core/push/NotificationPermissionGateway';
+import { FakePushPermissionGateway } from '../../../core/push/__testing__/FakePushPermissionGateway';
+import type { PushPermissionStatus } from '../../../core/push/PushPermissionGateway';
 import { UserDataCacheRegistry } from '../../../core/push/UserDataCacheRegistry';
 import { FakeToastPresenter } from '../../../core/toast/__testing__/FakeToastPresenter';
 import { FixtureRouter, type RouteValue } from '../../../data/__testing__/FixtureRouter';
@@ -35,7 +35,7 @@ export const SETTINGS_ROUTES: Record<string, RouteValue> = {
 export type SettingsHarnessOptions = {
   mode?: MainMode;
   routes?: Record<string, RouteValue>;
-  permission?: DevicePermissionStatus;
+  permission?: PushPermissionStatus;
 };
 
 /** 설정 탭 한 벌: 실제 ViewModel·리포지토리·AccountActions + Fake transport·저장소·권한·분석·토스트·링크·내비게이터. */
@@ -61,7 +61,7 @@ export async function createSettingsHarness(options: SettingsHarnessOptions = {}
   const toast = new FakeToastPresenter();
   const authFlow = new FakeAuthFlowNavigator();
   const navigator = new FakeSettingsNavigator();
-  const permission = new FakeNotificationPermission(options.permission ?? 'granted');
+  const permission = new FakePushPermissionGateway(options.permission ?? 'granted');
   const visibility = new FakeAppVisibility();
   const linkOpener = new FakeExternalLinkOpener();
 

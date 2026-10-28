@@ -14,6 +14,12 @@ export class FakePushPermissionGateway implements PushPermissionGateway {
     return this.current;
   }
 
+  settingsOpened = 0;
+
+  async openSystemSettings(): Promise<void> {
+    this.settingsOpened += 1;
+  }
+
   async request(): Promise<PushPermissionStatus> {
     this.requestCalls += 1;
     if (this.failRequest) throw new Error('permission request failed');

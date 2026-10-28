@@ -31,6 +31,7 @@ describe('SignatureCardViewModel', () => {
     expect(h.vm.getSnapshot()).toEqual({
       imageUrl: body.signatureThumbnailImageUrl,
       loading: false,
+      loadError: false,
     });
   });
 

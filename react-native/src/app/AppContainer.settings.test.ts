@@ -2,7 +2,7 @@ import type { AnalyticsBackend } from '../core/analytics/AnalyticsBackend';
 import { createNetHarness } from '../core/http/__testing__/createNetHarness';
 import { deferred } from '../core/http/__testing__/FakeTransport';
 import { fixtureResponse } from '../core/http/__testing__/loadFixture';
-import { FakeNotificationPermission } from '../core/push/__testing__/FakeNotificationPermission';
+import { FakePushPermissionGateway } from '../core/push/__testing__/FakePushPermissionGateway';
 import { FakeToastPresenter } from '../core/toast/__testing__/FakeToastPresenter';
 import { FixtureRouter } from '../data/__testing__/FixtureRouter';
 import { FakeFeedbackNavigator } from '../features/feedback/__testing__/FakeFeedbackNavigator';
@@ -21,7 +21,7 @@ async function create(mode: 'member' | 'guest' = 'member') {
   else await net.sessionStore.enterGuest();
   const router = new FixtureRouter(SETTINGS_ROUTES).install(net.transport);
   const toast = new FakeToastPresenter();
-  const permission = new FakeNotificationPermission('granted');
+  const permission = new FakePushPermissionGateway('granted');
   const backendEvents: { name: string; params: unknown }[] = [];
   const analyticsBackend: AnalyticsBackend = {
     logEvent: (name, params) => backendEvents.push({ name, params }),
@@ -34,7 +34,7 @@ async function create(mode: 'member' | 'guest' = 'member') {
       events: net.events,
       api: net.api,
       toast,
-      notificationPermission: permission,
+      push: { permission },
       appInfo: { platform: 'ios', bundleId: 'b', version: '3.4.5', appStoreId: null },
       analyticsBackend,
     },

@@ -112,7 +112,8 @@ describe('SettingsViewModel 설정 탭이 보일 때 (회원)', () => {
       status: 'ready',
       values: { topic: true, moderation: true, aiReview: true },
     });
-    expect(h.callsOf(GET_PUSH)).toBe(2);
+    // router.set이 호출 기록을 새로 시작하므로 다시 시도 이후의 요청만 센다.
+    expect(h.callsOf(GET_PUSH)).toBe(1);
   });
 
   it.each([
