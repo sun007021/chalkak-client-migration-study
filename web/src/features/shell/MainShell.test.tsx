@@ -173,7 +173,7 @@ describe('새로고침 복원과 URL', () => {
   });
 
   it('TC-NAV-045 앱이 정의하지 않은 경로·딥링크형 URL은 어떤 화면도 열지 않고 부팅 판정대로 홈이 열린다', async () => {
-    for (const url of ['/feed/11111111-1111-4111-8111-111111111111', '/notifications', '/home/extra', '/chalkak:/open']) {
+    for (const url of ['/feed', '/notification', '/home/extra', '/chalkak:/open']) {
       const h = makeHarness({ session: memberSession() });
       const { path, unmount } = renderApp(h.container, url);
       await screen.findByTestId('home.root');
