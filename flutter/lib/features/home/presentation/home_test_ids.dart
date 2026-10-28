@@ -46,6 +46,13 @@ abstract final class HomeTestIds {
   static const issueError = 'home.issue-error';
   static const issueRetryButton = 'home.issue-retry-button';
 
+  // 스펙(REQ-HOME-024, 033)에 있는 동작이지만 testids.md에 아직 id가 없다. 위와 같은 임시 이름이다.
+  static const weekMoreLink = 'home.week-more-link';
+  static String rankingLikeButton(String postId) =>
+      'home.ranking-like-button-$postId';
+  static String popularLikeButton(String postId) =>
+      'home.popular-like-button-$postId';
+
   static const aiCard = 'home.ai-card';
 
   static const issueSection = 'home.issue-section';

@@ -1,7 +1,8 @@
-// ignore_for_file: unused_field
 import 'package:flutter/foundation.dart';
 
+import '../../../core/analytics/analytics_constants.dart';
 import '../../../core/analytics/analytics_tracker.dart';
+import '../../../core/copy/ko.g.dart';
 import '../../../core/ui/toast/toast_controller.dart';
 import 'banner_link_launcher.dart';
 import 'banner_web_policy.dart';
@@ -49,15 +50,86 @@ class BannerWebViewModel extends ChangeNotifier {
   final ToastSink _toast;
   final BannerLinkLauncher _launcher;
 
-  Uri get url => throw UnimplementedError();
-  BannerWebState get state => throw UnimplementedError();
+  BannerWebState _state = const BannerWebState(status: BannerWebStatus.loading);
+  bool _started = false;
+  bool _disposed = false;
 
-  void start() => throw UnimplementedError();
-  void onLoadFinished() => throw UnimplementedError();
-  void onLoadFailed() => throw UnimplementedError();
-  void retry() => throw UnimplementedError();
+  Uri get url => _url;
+  BannerWebState get state => _state;
+
+  void start() {
+    if (_started) return;
+    _started = true;
+    _analytics.logEvent(AnalyticsEvent.screenView(ScreenNames.issue));
+    if (!BannerWebNavigationPolicy.isLoadable(_url)) {
+      _setState(const BannerWebState(status: BannerWebStatus.unsafeUrl));
+    }
+  }
+
+  void onLoadFinished() => _settle(BannerWebStatus.shown);
+
+  void onLoadFailed() => _settle(BannerWebStatus.loadError);
+
+  void retry() {
+    if (_state.status != BannerWebStatus.loadError) return;
+    _setState(
+      BannerWebState(
+        status: BannerWebStatus.loading,
+        reloadToken: _state.reloadToken + 1,
+      ),
+    );
+  }
 
   Future<NavigationDecision> onNavigationRequest(
     WebNavigationRequest request,
-  ) => throw UnimplementedError();
+  ) async {
+    final decision = BannerWebNavigationPolicy.decide(request);
+    if (decision == NavigationDecision.openExternal) {
+      await _openExternal(request.url);
+    }
+    return decision;
+  }
+
+  Future<void> _openExternal(Uri url) async {
+    BannerLaunchResult result;
+    try {
+      result = await _launcher.open(url);
+    } on Object {
+      // 플랫폼 오류도 사용자에게는 "열지 못했다"로 같다.
+      result = BannerLaunchResult.failed;
+    }
+    if (_disposed) return;
+    switch (result) {
+      case BannerLaunchResult.opened:
+        break;
+      case BannerLaunchResult.noBrowser:
+        _toast.show(Copy.bannerWebNoBrowser);
+      case BannerLaunchResult.failed:
+        _toast.show(Copy.bannerWebOpenFailed);
+    }
+  }
+
+  /// 안전하지 않은 주소나 이미 오류인 화면은 늦게 온 로드 콜백으로 바뀌지 않는다.
+  void _settle(BannerWebStatus status) {
+    final current = _state.status;
+    if (current == BannerWebStatus.unsafeUrl) return;
+    if (current == BannerWebStatus.loadError &&
+        status == BannerWebStatus.shown) {
+      // 오류 뒤 다시 시도 전에는 성공으로 덮지 않는다.
+      return;
+    }
+    _setState(BannerWebState(status: status, reloadToken: _state.reloadToken));
+  }
+
+  void _setState(BannerWebState next) {
+    if (_disposed) return;
+    _state = next;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 }

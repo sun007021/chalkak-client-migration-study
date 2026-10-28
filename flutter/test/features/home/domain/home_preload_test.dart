@@ -85,6 +85,8 @@ void main() {
     expect(p.done, isTrue);
     expect(r.cache.take(guest: false, today: _today), isNull);
 
+    // resolve는 가상 시간을 흘리지 않으므로 지연 없는 응답으로 다시 건다.
+    r.api.standard();
     resolve(async, _preloader(r).preload(guest: false));
     r.cache.clearAll();
     expect(r.cache.take(guest: false, today: _today), isNull);

@@ -34,6 +34,11 @@ import 'net_harness.dart' show advance, sessionAt, sessionGuest, settle, t0, v1;
 FakeResponse fx(String name, {Duration delay = Duration.zero}) =>
     FakeResponse.fixture(name, delay: delay);
 
+/// GET은 5xx에서 최초 1회 + 재시도 2회(D-21)로 응답을 3개 소비한다. 한 번의 호출이 끝내 실패하는
+/// 응답 열을 만든다. 뒤에 성공 응답을 이으면 "실패 뒤 다시 시도로 성공"을 스크립트할 수 있다.
+List<FakeResponse> failing(String name) =>
+    List.filled(3, fx(name), growable: true);
+
 class _Seq {
   _Seq(this.responses);
   final List<FakeResponse> responses;

@@ -128,7 +128,7 @@ void main() {
   fakeTest('TC-HOME-009 서버 오류는 Error이고 다시 시도로 1회 재요청해 성공하면 해당 상태가 된다', (async) {
     final r = HomeRig();
     r.api.today([
-      fx('home/posts-today__500-server-error.json'),
+      ...failing('home/posts-today__500-server-error.json'),
       fx('home/posts-today__posted-approved.json'),
     ]);
     r.loadHome(async);

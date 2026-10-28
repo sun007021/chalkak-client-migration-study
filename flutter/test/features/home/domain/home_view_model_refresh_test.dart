@@ -207,9 +207,10 @@ void main() {
       DateTime.utc(2026, 10, 27, 14, 59, 59),
       (async) {
         final r = HomeRig(now: DateTime.utc(2026, 10, 27, 14, 59, 59));
-        r.loadHome(async);
+        // 로드에 5초를 흘리면 자정을 넘으므로 1초 안에서만 진행한다.
+        r.loadHome(async, wait: const Duration(milliseconds: 100));
         r.home.onBecameVisible();
-        advance(async, _wait);
+        advance(async, const Duration(milliseconds: 100));
         expect(r.home.state.today, const KstDate(2026, 10, 27));
         expect(r.api.topicDatesRequested.toSet(), {'2026-10-27', '2026-10-26'});
       },

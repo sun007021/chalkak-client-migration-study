@@ -1,4 +1,3 @@
-// ignore_for_file: unused_field
 /// 웹뷰가 한 이동 요청을 어떻게 처리할지(REQ-BANR-014~018).
 enum NavigationDecision {
   /// 웹뷰 안에서 그대로 진행.
@@ -49,9 +48,33 @@ abstract final class BannerWebNavigationPolicy {
   /// - 사용자가 누른 http(s) 링크(새 탭, 같은 호스트·같은 URL 포함): openExternal.
   /// - 같은 문서 안 앵커(`#...`) 이동: allowInApp. 새 탭 앵커는 openExternal.
   /// - 그 밖의 스킴(`tel:`, `mailto:`, `intent:`, `javascript:`, `file:`, 커스텀): block.
-  static NavigationDecision decide(WebNavigationRequest request) =>
-      throw UnimplementedError();
+  static NavigationDecision decide(WebNavigationRequest request) {
+    final url = request.url;
+    if (request.isInitialLoad) {
+      return isLoadable(url)
+          ? NavigationDecision.allowInApp
+          : NavigationDecision.block;
+    }
+    if (!request.isMainFrame) return NavigationDecision.allowInApp;
+    if (!_isWebScheme(url) || !request.isUserInitiated) {
+      return NavigationDecision.block;
+    }
+    if (!request.isNewWindow &&
+        _isSameDocumentAnchor(url, request.currentUrl)) {
+      return NavigationDecision.allowInApp;
+    }
+    return NavigationDecision.openExternal;
+  }
 
   /// 배너 `webViewUrl`을 웹뷰에 로드해도 되는지(https + 호스트 있음).
-  static bool isLoadable(Uri url) => throw UnimplementedError();
+  static bool isLoadable(Uri url) =>
+      url.scheme == 'https' && url.host.isNotEmpty;
+
+  static bool _isWebScheme(Uri url) =>
+      (url.scheme == 'https' || url.scheme == 'http') && url.host.isNotEmpty;
+
+  static bool _isSameDocumentAnchor(Uri url, Uri? current) =>
+      current != null &&
+      url.hasFragment &&
+      url.removeFragment() == current.removeFragment();
 }

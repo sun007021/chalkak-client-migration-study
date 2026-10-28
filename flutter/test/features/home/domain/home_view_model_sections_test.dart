@@ -88,7 +88,7 @@ void main() {
       async,
     ) {
       final r = HomeRig();
-      r.api.topic('2026-10-27', [fx('home/topics__500-server-error.json')]);
+      r.api.topic('2026-10-27', [fx('display/topics__500-server-error.json')]);
       r.loadHome(async);
       expect(r.home.state.topic, isA<TopicError>());
 
@@ -135,10 +135,11 @@ void main() {
     fakeTest('TC-HOME-020 랭킹 다시 시도는 그 섹션만 다시 부른다', (async) {
       final r = HomeRig();
       r.api.popular('2026-10-27', [
-        fx('home/posts-list__500-server-error.json'),
+        ...failing('home/posts-list__500-server-error.json'),
         fx('home/posts-list__popular-8.json'),
       ]);
       r.loadHome(async);
+      expect(r.home.state.popular, isA<RankingError>());
       final today = r.api.todayCalls;
       final cal = r.api.calendarCalls;
       r.home.retryRanking(RankingKind.popular);
@@ -179,19 +180,25 @@ void main() {
     );
 
     fakeTestAt(
-      'TC-HOME-025 일요일(11/1)이면 11/1~11/7, 토요일(10/31)이면 10/25~10/31이다',
+      'TC-HOME-025 일요일(11/1)이면 11/1~11/7이다',
       DateTime.utc(2026, 11, 1, 3),
       (async) {
         final r = HomeRig(now: DateTime.utc(2026, 11, 1, 3));
         r.loadHome(async);
         expect(_dates(r).first, '2026-11-01');
         expect(_dates(r).last, '2026-11-07');
+      },
+    );
 
-        final sat = DateTime.utc(2026, 10, 31, 3);
-        final r2 = HomeRig(now: sat);
-        r2.loadHome(async);
-        expect(_dates(r2).first, '2026-10-25');
-        expect(_dates(r2).last, '2026-10-31');
+    // 시계는 테스트 하나에 하나뿐이라 토요일은 따로 시작한다.
+    fakeTestAt(
+      'TC-HOME-025 토요일(10/31)이면 10/25~10/31이다',
+      DateTime.utc(2026, 10, 31, 3),
+      (async) {
+        final r = HomeRig(now: DateTime.utc(2026, 10, 31, 3));
+        r.loadHome(async);
+        expect(_dates(r).first, '2026-10-25');
+        expect(_dates(r).last, '2026-10-31');
       },
     );
 
@@ -292,7 +299,7 @@ void main() {
     fakeTest('TC-HOME-032 주간 조회가 실패하면 그 섹션만 오류이고 다시 시도로 복구된다', (async) {
       final r = HomeRig();
       r.api.calendar(2026, 10, [
-        fx('home/posts-calendar__500-server-error.json'),
+        ...failing('home/posts-calendar__500-server-error.json'),
         fx('home/posts-calendar__2026-10-week-approved.json'),
       ]);
       r.loadHome(async);
@@ -310,7 +317,7 @@ void main() {
         final r = HomeRig(now: DateTime.utc(2026, 9, 30, 3));
         r.api.calendar(2026, 9, [fx('home/posts-calendar__2026-09-week.json')]);
         r.api.calendar(2026, 10, [
-          fx('home/posts-calendar__500-server-error.json'),
+          ...failing('home/posts-calendar__500-server-error.json'),
           fx('home/posts-calendar__2026-10-week-approved.json'),
         ]);
         r.loadHome(async);

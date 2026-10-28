@@ -48,7 +48,7 @@ void main() {
   fakeTest('TC-BANR-010 오류 뒤 retry로 다시 불러온다', (async) {
     final (r, c) = rig(async);
     r.api.banners(1, [
-      fx('banner/banners__500-server-error.json'),
+      ...failing('banner/banners__500-server-error.json'),
       fx('banner/banners__page1-10.json'),
     ]);
     load(async, c);
@@ -98,7 +98,7 @@ void main() {
     final (r, c) = rig(async);
     load(async, c);
     r.api.banners(2, [
-      fx('banner/banners__500-server-error.json'),
+      ...failing('banner/banners__500-server-error.json'),
       FakeResponse.json(200, {
         'currentPage': 2,
         'pageSize': 10,

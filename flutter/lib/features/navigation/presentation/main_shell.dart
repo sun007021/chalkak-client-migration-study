@@ -1,11 +1,18 @@
-// ignore_for_file: unused_field
-import 'package:flutter/widgets.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+
+import '../../../core/analytics/analytics_constants.dart';
+import '../../../core/copy/ko.g.dart';
+import '../../../core/ui/test_id.dart';
 import '../../../core/ui/toast/toast_controller.dart';
+import '../../../core/ui/toast/toast_host.dart';
+import '../../home/domain/home_state.dart';
 import '../../home/domain/home_view_model.dart';
 import '../../home/presentation/home_screen.dart';
 import '../domain/main_shell_view_model.dart';
 import 'main_shell_navigator.dart';
+import 'navigation_test_ids.dart';
 
 /// 메인 화면: 탭 본문 + 하단 바(홈, 전시, 가운데 업로드, 기록, 설정).
 /// - 하단 바 `bottom-bar.root`, 탭 `bottom-bar.tab-*`(선택된 탭만 selected), 업로드 버튼
@@ -40,7 +47,271 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
+  final ScrollController _homeScroll = ScrollController();
+  final Set<BottomDestination> _visited = {BottomDestination.home};
+  final Set<String> _pending = {};
+  StreamSubscription<HomeEvent>? _homeEvents;
+  StreamSubscription<MainShellEvent>? _shellEvents;
+  late BottomDestination _selected = widget.shell.selected;
+
   @override
-  Widget build(BuildContext context) => throw UnimplementedError();
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    widget.shell.addListener(_onShellChanged);
+    _homeEvents = widget.home.events.listen(_onHomeEvent);
+    _shellEvents = widget.shell.events.listen(_onShellEvent);
+    widget.shell.start();
+    unawaited(widget.home.load());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.shell.removeListener(_onShellChanged);
+    unawaited(_homeEvents?.cancel());
+    unawaited(_shellEvents?.cancel());
+    _homeScroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        widget.shell.selected == BottomDestination.home) {
+      unawaited(widget.home.onForeground());
+    }
+  }
+
+  void _onShellChanged() {
+    final selected = widget.shell.selected;
+    if (selected != _selected) {
+      final cameToHome = selected == BottomDestination.home;
+      setState(() {
+        _selected = selected;
+        _visited.add(selected);
+      });
+      if (cameToHome) unawaited(widget.home.onBecameVisible());
+    } else {
+      setState(() {});
+    }
+  }
+
+  void _onHomeEvent(HomeEvent event) {
+    switch (event) {
+      case OpenUploadGate():
+        unawaited(widget.shell.onUploadPressed());
+      case OpenFeed(:final post):
+        unawaited(_open('feed', () => widget.navigator.openFeed(post)));
+      case OpenRecordTab(:final date):
+        widget.shell.openRecord(date: date);
+      case OpenDisplayTab(:final date, :final popular):
+        widget.shell.openDisplay(date: date, popular: popular);
+      case OpenNotifications():
+        unawaited(
+          _open('notifications', () async {
+            await widget.navigator.openNotifications();
+            unawaited(widget.home.refreshUnread());
+          }),
+        );
+      case OpenBanner(:final item):
+        unawaited(_open('banner', () => widget.navigator.openBanner(item)));
+    }
+  }
+
+  void _onShellEvent(MainShellEvent event) {
+    switch (event) {
+      case ScrollToTop(:final destination):
+        if (destination == BottomDestination.home && _homeScroll.hasClients) {
+          unawaited(
+            _homeScroll.animateTo(
+              0,
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
+            ),
+          );
+        }
+      case NavigateToUpload(:final topicDate):
+        unawaited(
+          _open('upload', () => widget.navigator.openUpload(topicDate)),
+        );
+      case NavigateToLogin():
+        widget.navigator.goToLogin();
+    }
+  }
+
+  /// 같은 이동이 끝나기 전의 반복 요청(연타)은 무시한다(REQ-NAV-032).
+  Future<void> _open(String name, Future<void> Function() action) async {
+    if (!_pending.add(name)) return;
+    try {
+      await action();
+    } on Object {
+      // 이동 실패는 이동한 쪽 화면이 알린다. 셸은 중복 방지 표시만 풀면 된다.
+    } finally {
+      _pending.remove(name);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final shell = widget.shell;
+    return ToastHost(
+      controller: widget.toast,
+      child: Scaffold(
+        body: Stack(
+          children: [
+            IndexedStack(
+              index: BottomDestination.values.indexOf(_selected),
+              children: [
+                for (final destination in BottomDestination.values)
+                  _visited.contains(destination)
+                      ? _tab(destination)
+                      : const SizedBox.shrink(),
+              ],
+            ),
+            if (shell.isCheckingUpload)
+              const Positioned.fill(
+                child: TestId(
+                  NavigationTestIds.uploadEntryLoading,
+                  child: ModalBarrier(dismissible: false),
+                ),
+              ),
+            if (shell.isCheckingUpload)
+              const Center(child: CircularProgressIndicator()),
+          ],
+        ),
+        bottomNavigationBar: _BottomBar(
+          selected: _selected,
+          onTab: shell.selectTab,
+          onUpload: () => unawaited(shell.onUploadPressed()),
+        ),
+      ),
+    );
+  }
+
+  Widget _tab(BottomDestination destination) => switch (destination) {
+    BottomDestination.home => SafeArea(
+      bottom: false,
+      child: HomeScreen(
+        viewModel: widget.home,
+        aiCardBuilder: widget.aiCardBuilder,
+        scrollController: _homeScroll,
+      ),
+    ),
+    BottomDestination.display => const _TabPlaceholder('display.root'),
+    BottomDestination.record => const _TabPlaceholder('record.root'),
+    BottomDestination.settings => const _TabPlaceholder('settings.root'),
+  };
+}
+
+/// 다른 PR이 실제 화면으로 바꾸기 전까지 쓰는 빈 탭.
+class _TabPlaceholder extends StatelessWidget {
+  const _TabPlaceholder(this.id);
+
+  final String id;
+
+  @override
+  Widget build(BuildContext context) =>
+      TestId(id, child: const SizedBox.expand());
+}
+
+class _BottomBar extends StatelessWidget {
+  const _BottomBar({
+    required this.selected,
+    required this.onTab,
+    required this.onUpload,
+  });
+
+  final BottomDestination selected;
+  final void Function(BottomDestination) onTab;
+  final VoidCallback onUpload;
+
+  @override
+  Widget build(BuildContext context) {
+    return TestId(
+      NavigationTestIds.bottomBarRoot,
+      child: Material(
+        elevation: 8,
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 64,
+            child: Row(
+              children: [
+                _tab(
+                  BottomDestination.home,
+                  NavigationTestIds.tabHome,
+                  Icons.home_outlined,
+                  Copy.navTabHome,
+                ),
+                _tab(
+                  BottomDestination.display,
+                  NavigationTestIds.tabDisplay,
+                  Icons.photo_library_outlined,
+                  Copy.navTabDisplay,
+                ),
+                Expanded(
+                  child: Center(
+                    child: TestId.button(
+                      NavigationTestIds.uploadButton,
+                      child: IconButton.filled(
+                        icon: const Icon(Icons.add),
+                        tooltip: Copy.navTabUploadA11y,
+                        onPressed: onUpload,
+                      ),
+                    ),
+                  ),
+                ),
+                _tab(
+                  BottomDestination.record,
+                  NavigationTestIds.tabRecord,
+                  Icons.calendar_month_outlined,
+                  Copy.navTabRecord,
+                ),
+                _tab(
+                  BottomDestination.settings,
+                  NavigationTestIds.tabSettings,
+                  Icons.settings_outlined,
+                  Copy.navTabSettings,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _tab(
+    BottomDestination destination,
+    String id,
+    IconData icon,
+    String label,
+  ) {
+    final isSelected = destination == selected;
+    final color = isSelected ? Colors.black : Colors.black54;
+    return Expanded(
+      child: TestId.button(
+        id,
+        child: Semantics(
+          button: true,
+          selected: isSelected,
+          label: label,
+          excludeSemantics: true,
+          onTap: () => onTab(destination),
+          child: InkWell(
+            onTap: () => onTab(destination),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: color),
+                Text(label, style: TextStyle(color: color, fontSize: 12)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

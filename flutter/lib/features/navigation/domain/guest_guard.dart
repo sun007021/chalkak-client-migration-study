@@ -1,4 +1,4 @@
-// ignore_for_file: unused_field
+import '../../../core/copy/ko.g.dart';
 import '../../../core/ui/toast/toast_controller.dart';
 
 /// 게스트가 막히는 동작(D-05). 문구는 `Copy.navGuest*`.
@@ -11,7 +11,14 @@ enum GuestRestriction {
   feedback;
 
   /// 해당 동작의 토스트 문구.
-  String get message => throw UnimplementedError();
+  String get message => switch (this) {
+    record => Copy.navGuestRecord,
+    upload => Copy.navGuestUpload,
+    feed => Copy.navGuestFeed,
+    like => Copy.navGuestLike,
+    notification => Copy.navGuestNotification,
+    feedback => Copy.navGuestFeedback,
+  };
 }
 
 /// 게스트 제한 판정. 게스트면 [GuestRestriction.message] 토스트를 띄우고 true를 돌려준다.
@@ -22,8 +29,12 @@ class GuestGuard {
   final bool _isGuest;
   final ToastSink _toast;
 
-  bool get isGuest => throw UnimplementedError();
+  bool get isGuest => _isGuest;
 
   /// true면 막혔으니 호출한 쪽은 동작을 중단한다.
-  bool blocks(GuestRestriction restriction) => throw UnimplementedError();
+  bool blocks(GuestRestriction restriction) {
+    if (!_isGuest) return false;
+    _toast.show(restriction.message);
+    return true;
+  }
 }

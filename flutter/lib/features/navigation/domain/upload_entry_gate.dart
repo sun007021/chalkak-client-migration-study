@@ -1,7 +1,9 @@
-// ignore_for_file: unused_field
 import 'package:dio/dio.dart';
 
+import '../../../core/copy/ko.g.dart';
+import '../../../core/network/api_error.dart';
 import '../../../core/time/kst_date.dart';
+import '../../home/domain/home_models.dart';
 import '../../home/domain/today_post_repository.dart';
 
 /// 업로드 진입 게이트 결과(D-14 1항).
@@ -41,6 +43,30 @@ class UploadEntryGate {
 
   final TodayPostRepository _todayPost;
 
-  Future<UploadGateResult> enter({CancelToken? cancelToken}) =>
-      throw UnimplementedError();
+  /// 어떤 실패도 던지지 않고 [UploadGateResult]로 돌려준다.
+  Future<UploadGateResult> enter({CancelToken? cancelToken}) async {
+    final TodayPost today;
+    try {
+      today = await _todayPost.today(cancelToken: cancelToken);
+    } on ApiError catch (error) {
+      return _failure(error);
+    } on Object {
+      // 예상 밖의 오류도 사용자에게는 "확인하지 못했다"로 같다.
+      return const UploadGateBlocked(Copy.uploadGateCheckFailed);
+    }
+    if (today.isPosted) {
+      return const UploadGateBlocked(Copy.uploadGateAlreadyPosted);
+    }
+    return UploadGateAllowed(today.topicDate);
+  }
+
+  static UploadGateResult _failure(ApiError error) {
+    if (error.isCancelled) return const UploadGateCancelled();
+    return switch (error.status) {
+      401 => const UploadGateLoginRequired(),
+      404 => const UploadGateBlocked(Copy.uploadGateNoTopic),
+      403 => const UploadGateBlocked(Copy.uploadGateBanned),
+      _ => const UploadGateBlocked(Copy.uploadGateCheckFailed),
+    };
+  }
 }

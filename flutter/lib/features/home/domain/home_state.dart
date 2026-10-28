@@ -1,4 +1,3 @@
-// ignore_for_file: unused_field
 import '../../../core/time/kst_date.dart';
 import '../../banner/domain/banner_list_controller.dart';
 import '../../banner/domain/banner_models.dart';
@@ -107,7 +106,7 @@ final class WeeklyReady extends WeeklyState {
   final List<WeekDay> days;
 
   /// 사진이 있는 날 수("N/7").
-  int get recordedCount => throw UnimplementedError();
+  int get recordedCount => days.where((day) => day.entry != null).length;
 }
 
 final class WeeklyError extends WeeklyState {

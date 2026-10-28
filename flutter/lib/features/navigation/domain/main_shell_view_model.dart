@@ -1,8 +1,11 @@
-// ignore_for_file: unused_field
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/analytics/analytics_constants.dart';
 import '../../../core/analytics/analytics_tracker.dart';
+import '../../../core/copy/ko.g.dart';
 import '../../../core/time/kst_date.dart';
 import '../../../core/ui/toast/toast_controller.dart';
 import 'guest_guard.dart';
@@ -65,25 +68,118 @@ class MainShellViewModel extends ChangeNotifier {
   final UploadEntryGate _uploadGate;
   final ToastSink _toast;
 
-  BottomDestination get selected => throw UnimplementedError();
-  bool get isCheckingUpload => throw UnimplementedError();
-  Stream<MainShellEvent> get events => throw UnimplementedError();
+  final StreamController<MainShellEvent> _events =
+      StreamController<MainShellEvent>.broadcast();
+  final CancelToken _cancelToken = CancelToken();
 
-  RecordTarget? get recordTarget => throw UnimplementedError();
-  DisplayTarget? get displayTarget => throw UnimplementedError();
+  BottomDestination _selected = BottomDestination.home;
+  bool _isCheckingUpload = false;
+  bool _started = false;
+  bool _disposed = false;
+  RecordTarget? _recordTarget;
+  DisplayTarget? _displayTarget;
 
-  void start() => throw UnimplementedError();
-  void selectTab(BottomDestination destination) => throw UnimplementedError();
-  Future<void> onUploadPressed() => throw UnimplementedError();
+  BottomDestination get selected => _selected;
+  bool get isCheckingUpload => _isCheckingUpload;
+  Stream<MainShellEvent> get events => _events.stream;
+
+  RecordTarget? get recordTarget => _recordTarget;
+  DisplayTarget? get displayTarget => _displayTarget;
+
+  void start() {
+    if (_started) return;
+    _started = true;
+    _logScreen(_selected);
+  }
+
+  void selectTab(BottomDestination destination) {
+    if (_disposed) return;
+    if (destination == BottomDestination.record &&
+        _guard.blocks(GuestRestriction.record)) {
+      return;
+    }
+    _analytics.logEvent(AnalyticsEvent.bottomNavigationSelected(destination));
+    final reselected = destination == _selected;
+    if (!reselected) {
+      _selected = destination;
+      _logScreen(destination);
+      notifyListeners();
+    }
+    // 홈은 올 때마다 초기 상태(REQ-NAV-004), 전시는 재선택만(REQ-NAV-007).
+    final scrollsToTop =
+        destination == BottomDestination.home ||
+        (reselected && destination == BottomDestination.display);
+    if (scrollsToTop) _emit(ScrollToTop(destination));
+  }
+
+  Future<void> onUploadPressed() async {
+    if (_disposed || _isCheckingUpload) return;
+    if (_guard.blocks(GuestRestriction.upload)) return;
+    _isCheckingUpload = true;
+    notifyListeners();
+    UploadGateResult result;
+    try {
+      result = await _uploadGate.enter(cancelToken: _cancelToken);
+    } on Object {
+      result = const UploadGateBlocked(Copy.uploadGateCheckFailed);
+    }
+    if (_disposed) return;
+    _isCheckingUpload = false;
+    notifyListeners();
+    switch (result) {
+      case UploadGateAllowed(:final topicDate):
+        _emit(NavigateToUpload(topicDate));
+      case UploadGateBlocked(:final message):
+        _toast.show(message);
+      case UploadGateLoginRequired():
+        _emit(const NavigateToLogin());
+      case UploadGateCancelled():
+        break;
+    }
+  }
 
   /// 홈에서 기록 탭으로(이번 주 칸/보러가기). [date]가 있으면 [recordTarget]에 둔다.
   /// 게스트 제한은 [selectTab]과 같다.
-  void openRecord({KstDate? date}) => throw UnimplementedError();
+  void openRecord({KstDate? date}) {
+    if (_guard.isGuest) {
+      _guard.blocks(GuestRestriction.record);
+      return;
+    }
+    _recordTarget = date == null ? null : RecordTarget(date);
+    selectTab(BottomDestination.record);
+  }
 
   /// 홈에서 전시 탭으로(랭킹 더보기). [displayTarget]에 둔다.
-  void openDisplay({required KstDate date, required bool popular}) =>
-      throw UnimplementedError();
+  void openDisplay({required KstDate date, required bool popular}) {
+    _displayTarget = DisplayTarget(date: date, popular: popular);
+    selectTab(BottomDestination.display);
+  }
 
-  RecordTarget? takeRecordTarget() => throw UnimplementedError();
-  DisplayTarget? takeDisplayTarget() => throw UnimplementedError();
+  RecordTarget? takeRecordTarget() {
+    final target = _recordTarget;
+    _recordTarget = null;
+    return target;
+  }
+
+  DisplayTarget? takeDisplayTarget() {
+    final target = _displayTarget;
+    _displayTarget = null;
+    return target;
+  }
+
+  void _logScreen(BottomDestination destination) {
+    _analytics.logEvent(AnalyticsEvent.screenView(destination.value));
+  }
+
+  void _emit(MainShellEvent event) {
+    if (!_disposed) _events.add(event);
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _cancelToken.cancel();
+    unawaited(_events.close());
+    super.dispose();
+  }
 }

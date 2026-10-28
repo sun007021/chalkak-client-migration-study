@@ -1,4 +1,5 @@
-// ignore_for_file: unused_field
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../constants/app_constants.dart';
@@ -26,17 +27,50 @@ class ToastController extends ChangeNotifier implements ToastSink {
 
   final Duration duration;
 
-  ToastMessage? get current => throw UnimplementedError();
+  ToastMessage? _current;
+  bool _screenVisible = true;
+  bool _disposed = false;
+  int _sequence = 0;
+  Timer? _timer;
 
-  bool get screenVisible => throw UnimplementedError();
-  set screenVisible(bool value) => throw UnimplementedError();
+  ToastMessage? get current => _current;
+
+  bool get screenVisible => _screenVisible;
+  set screenVisible(bool value) {
+    if (_screenVisible == value) return;
+    _screenVisible = value;
+    if (!value) _dismiss();
+  }
 
   @override
-  void show(String message) => throw UnimplementedError();
+  void show(String message) {
+    if (_disposed || !_screenVisible) return;
+    _timer?.cancel();
+    _current = ToastMessage(id: ++_sequence, text: message);
+    _timer = Timer(duration, _dismiss);
+    notifyListeners();
+  }
+
+  void _dismiss() {
+    _timer?.cancel();
+    _timer = null;
+    if (_disposed || _current == null) return;
+    _current = null;
+    notifyListeners();
+  }
+
+  /// 토스트를 그리던 화면이 사라질 때 알림 없이 타이머와 현재 토스트를 정리한다.
+  void cancelPending() {
+    _timer?.cancel();
+    _timer = null;
+    _current = null;
+  }
 
   @override
   void dispose() {
+    _disposed = true;
+    _timer?.cancel();
+    _timer = null;
     super.dispose();
-    throw UnimplementedError();
   }
 }

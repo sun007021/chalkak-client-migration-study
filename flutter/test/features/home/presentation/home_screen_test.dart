@@ -172,7 +172,7 @@ void main() {
   widgetTest('TC-HOME-009 Error: 문구와 다시 시도 버튼, 탭하면 복구된다', (tester) async {
     final r = HomeRig();
     r.api.today([
-      fx('home/posts-today__500-server-error.json'),
+      ...failing('home/posts-today__500-server-error.json'),
       fx('home/posts-today__posted-approved.json'),
     ]);
     await _pump(tester, r);
@@ -303,7 +303,7 @@ void main() {
     await _pump(tester, r);
     expect(byId(HomeTestIds.notificationUnreadDot), findsOneWidget);
     r.api.unread([fx('home/notifications-unread-status__false.json')]);
-    await r.home.refreshUnread();
+    unawaited(r.home.refreshUnread());
     await _settle(tester);
     expect(byId(HomeTestIds.notificationUnreadDot), findsNothing);
   });
