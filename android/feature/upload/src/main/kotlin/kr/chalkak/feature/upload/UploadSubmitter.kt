@@ -1,8 +1,10 @@
 package kr.chalkak.feature.upload
 
+import java.time.LocalDate
 import kr.chalkak.core.common.MonotonicClock
 import kr.chalkak.core.common.PostTitle
 import kr.chalkak.core.common.analytics.AnalyticsTracker
+import kr.chalkak.core.common.analytics.screenViewSafely
 import kr.chalkak.core.data.home.HomeRepository
 import kr.chalkak.core.data.home.ModerationStatus
 import kr.chalkak.core.data.upload.PostCreated
@@ -11,9 +13,9 @@ import kr.chalkak.core.data.upload.PostCreations
 import kr.chalkak.core.data.upload.PostImageUploader
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
+import kr.chalkak.core.network.guardedApiCall
 import kr.chalkak.feature.upload.edit.PhotoEdit
 import kr.chalkak.feature.upload.image.PickedPhoto
-import java.time.LocalDate
 
 /** The "전시하기" flow (REQ-UPL-037..059): wait for the preparation, check the lease, PUT, POST, recover. */
 internal class UploadSubmitter(

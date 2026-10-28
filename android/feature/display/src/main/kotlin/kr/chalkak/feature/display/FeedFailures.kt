@@ -2,6 +2,7 @@ package kr.chalkak.feature.display
 
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ErrorCode
+import kr.chalkak.core.network.httpStatus
 
 /** Copy key per failed detail call (D-02: only errorCode + HTTP status + the called API decide, never the message). */
 internal object FeedFailures {

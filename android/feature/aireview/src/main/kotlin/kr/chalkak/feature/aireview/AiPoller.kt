@@ -6,6 +6,7 @@ import kr.chalkak.core.common.MonotonicClock
 import kr.chalkak.core.data.aireview.AiReview
 import kr.chalkak.core.data.aireview.AiReviewRepository
 import kr.chalkak.core.network.ApiResult
+import kr.chalkak.core.network.guardedApiCall
 
 internal enum class PollEnd { Stopped, WindowEnded }
 

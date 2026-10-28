@@ -11,6 +11,8 @@ import kr.chalkak.core.data.upload.PostCreationRepository
 import kr.chalkak.core.data.upload.UploadPolicy
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
+import kr.chalkak.core.network.JobTracker
+import kr.chalkak.core.network.guardedApiCall
 import kr.chalkak.feature.upload.edit.PhotoEdit
 import kr.chalkak.feature.upload.image.EncodeOutcome
 import kr.chalkak.feature.upload.image.PickedPhoto
@@ -40,7 +42,7 @@ internal class UploadPreparer(
     private val files: TempImageStore,
     private val monotonic: MonotonicClock,
     private val store: UploadStore,
-    private val jobs: UploadJobs,
+    private val jobs: JobTracker,
 ) {
     var prepared: PreparedUpload? = null
     private var job: Job? = null
