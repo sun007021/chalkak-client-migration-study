@@ -41,8 +41,14 @@ enum AiPill {
 
 /// 결과 시트의 기준 한 줄. 점수는 소수 첫째 자리 문자열이다.
 class AiCriterionRow {
-  const AiCriterionRow({required this.label, required this.scoreText});
+  const AiCriterionRow({
+    required this.key,
+    required this.label,
+    required this.scoreText,
+  });
 
+  /// 서버 기준 키(`criteria-item-{key}` testID에 쓴다).
+  final String key;
   final String label;
   final String scoreText;
 }
@@ -81,6 +87,7 @@ class AiResultUi {
       criteria: [
         for (final c in result.criteria)
           AiCriterionRow(
+            key: c.key,
             label: c.label,
             scoreText: AiScoreFormat.format(c.score),
           ),

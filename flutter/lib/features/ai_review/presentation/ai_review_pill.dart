@@ -1,6 +1,10 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
+import '../../../core/ui/test_id.dart';
 import '../domain/ai_review_session.dart';
+import '../domain/ai_review_state.dart';
+import 'ai_review_host.dart';
+import 'ai_review_test_ids.dart';
 
 /// 상세 화면(`FeedScreen.aiSlot`)의 AI 피드백 알약과 시트 표시.
 ///
@@ -29,6 +33,47 @@ class AiReviewPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    throw UnimplementedError();
+    return AiReviewHost(
+      session: session,
+      visible: visible,
+      builder: (context, state) {
+        final id = _id(state.pill);
+        if (id == null) return const SizedBox.shrink();
+        final theme = Theme.of(context);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TestId.button(
+              id,
+              child: FilledButton.tonal(
+                onPressed: state.pill.enabled ? session.onPillPressed : null,
+                child: Text(state.pill.label!),
+              ),
+            ),
+            if (state.notice != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: TestId(
+                  AiReviewTestIds.feedMessage,
+                  child: Text(state.notice!, style: theme.textTheme.bodySmall),
+                ),
+              ),
+          ],
+        );
+      },
+    );
   }
+
+  static String? _id(AiPill pill) => switch (pill) {
+    AiPill.hidden => null,
+    AiPill.checking => AiReviewTestIds.feedChecking,
+    AiPill.recheck => AiReviewTestIds.feedRecheckButton,
+    AiPill.request => AiReviewTestIds.feedRequestButton,
+    AiPill.requesting => AiReviewTestIds.feedRequesting,
+    AiPill.processing => AiReviewTestIds.feedProcessing,
+    AiPill.view => AiReviewTestIds.feedResultButton,
+    AiPill.retry => AiReviewTestIds.feedRetryButton,
+    AiPill.failed => AiReviewTestIds.feedFailedButton,
+  };
 }

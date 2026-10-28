@@ -203,7 +203,6 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
   /// 화면이 보이지 않게 됐다(백그라운드·덮임·다른 탭). 폴링 중단, 진행 중 응답 폐기.
   void onHidden() {
     if (_disposed) return;
-    final wasActive = _visible;
     _visible = false;
     _invalidate();
     _windowStart = null;
@@ -214,7 +213,7 @@ class AiReviewSession extends ChangeNotifier implements UserDataCleaner {
       _checking = false;
       _recheck = _review == null;
     }
-    if (wasActive || changed) _notify();
+    if (changed) _notify();
   }
 
   /// 알약·카드 탭.
