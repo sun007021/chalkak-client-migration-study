@@ -50,6 +50,7 @@ import { HomeViewModel } from '../features/home/HomeViewModel';
 import { HomeViewModelOwner } from '../features/home/HomeViewModelOwner';
 import { DisplayViewModel } from '../features/display/DisplayViewModel';
 import { DisplayViewModelOwner } from '../features/display/DisplayViewModelOwner';
+import type { CalendarImageRenderer, CalendarImageSaver } from '../features/record/CalendarImage';
 import type { FeedNavigator } from '../features/feed/FeedNavigator';
 import type { FeedTarget } from '../features/feed/FeedTarget';
 import { FeedViewModel } from '../features/feed/FeedViewModel';
@@ -111,6 +112,9 @@ export interface Dependencies {
   /** 없으면 컨테이너가 실제 구현(DefaultLikeController)을 만든다. 테스트는 Fake를 넣는다. 어느 쪽이든 clearAll이 있으면 로그아웃 때 비우는 캐시에 올린다. */
   readonly likes?: LikeController;
   readonly aiReview: AiReviewPoller;
+  /** 기록 탭의 달력 이미지 렌더러·저장소. 없으면 컨테이너가 기본 구현을 쓴다(기록 PR). */
+  readonly calendarImageRenderer?: CalendarImageRenderer;
+  readonly calendarImageSaver?: CalendarImageSaver;
   /** 로그아웃·탈퇴·계정 전환 때 비울 사용자별 캐시. 캐시를 가진 기능 PR이 추가한다. */
   readonly userDataCaches: readonly UserDataCache[];
 }

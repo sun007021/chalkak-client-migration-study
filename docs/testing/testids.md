@@ -311,6 +311,10 @@
 | record | 빈 상태                | `record.empty-state`                 | 데이터 0건일 때만 존재                         |
 | record | 오류 상태(콘텐츠 없음) | `record.error-state`                 | 콘텐츠가 없을 때의 전체 오류 화면              |
 | record | 다시 시도 버튼         | `record.retry-button`                | 오류 상태 안                                   |
+| record | 날짜 칸 썸네일         | `record.day-photo-{yyyy-mm-dd}`      | 기록이 있는 날만 존재 (RN 추가)                |
+| record | 날짜 칸 반영 중 배지   | `record.day-pending-{yyyy-mm-dd}`    | PENDING인 날만 존재 (RN 추가)                  |
+| record | 오늘 표시              | `record.today-marker`                | 오늘(KST) 날짜 칸 안에 하나만 존재 (RN 추가)   |
+| record | 오류 메시지            | `record.error-message`               | 오류 상태 안, "기록을 불러오지 못했어요" (RN 추가) |
 
 ### 알림함
 
