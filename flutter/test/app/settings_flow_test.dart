@@ -34,7 +34,11 @@ const _changePut = 'signature/users-me-signature__put-success.json';
 const _feedbackCreated = 'feedback/feedbacks__created.json';
 
 /// 메인(홈)에 들어온 앱. 탈퇴 API는 실서버가 아니라 FakeAdapter가 받는다.
-Future<AppHarness> _enterMain(WidgetTester tester, {bool guest = false}) async {
+Future<AppHarness> _enterMain(
+  WidgetTester tester, {
+  bool guest = false,
+  String feedback = _feedbackCreated,
+}) async {
   tester.view.physicalSize = const Size(800, 6000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -46,7 +50,7 @@ Future<AppHarness> _enterMain(WidgetTester tester, {bool guest = false}) async {
     ..on('GET', meSignaturePath, [fx(_sigOk), fx(_sigNullThumb)])
     ..on('GET', notificationSettingsPath, [fx(_pushAllTrue)])
     ..on('POST', AuthHttpHarness.logoutPath, [fx(_logoutOk)])
-    ..on('POST', '$v1/feedbacks', [fx(_feedbackCreated)]);
+    ..on('POST', '$v1/feedbacks', [fx(feedback)]);
   await tester.pumpWidget(h.app);
   await tester.pump(const Duration(milliseconds: 100));
   h.preloader.completer.complete();
@@ -169,7 +173,7 @@ void main() {
   });
 
   widgetTest(
-    'TC-FDBK-001 피드백 보내기를 누르면 피드백 화면이 열리고 screen_view(feedback)를 한 번 보낸다',
+    'TC-SET-050 TC-FDBK-001 피드백 보내기를 누르면 피드백 화면이 열리고 screen_view(feedback)를 한 번 보낸다',
     (tester) async {
       final h = await _enterMain(tester);
       await _openSettings(tester);
@@ -186,6 +190,54 @@ void main() {
       expect(byId(SettingsTestIds.root), findsOneWidget);
     },
   );
+
+  widgetTest('TC-FDBK-032 시스템 뒤로 가기로도 피드백 화면이 닫히고 설정으로 돌아간다', (tester) async {
+    await _enterMain(tester);
+    await _openSettings(tester);
+    await tester.tap(byId(SettingsTestIds.feedbackRow));
+    await _settle(tester);
+    expect(byId(FeedbackTestIds.root), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await _settle(tester);
+    expect(byId(FeedbackTestIds.root), findsNothing);
+    expect(byId(SettingsTestIds.root), findsOneWidget);
+  });
+
+  widgetTest('TC-FDBK-031 전송이 실패한 뒤 백그라운드 복귀와 화면 크기 변화에도 입력이 유지된다', (
+    tester,
+  ) async {
+    await _enterMain(
+      tester,
+      feedback: 'feedback/feedbacks__internal-error.json',
+    );
+    await _openSettings(tester);
+    await tester.tap(byId(SettingsTestIds.feedbackRow));
+    await _settle(tester);
+    final input = find.descendant(
+      of: byId(FeedbackTestIds.input),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(input, '유지되어야 하는 내용');
+    await tester.pump();
+    await tester.tap(byId(FeedbackTestIds.submitButton));
+    await _settle(tester, ticks: 11);
+    expect(byId(FeedbackTestIds.errorMessage), findsOneWidget);
+
+    for (final state in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    tester.view.physicalSize = const Size(1200, 4000);
+    await _settle(tester, ticks: 3);
+    expect(tester.widget<TextField>(input).controller?.text, '유지되어야 하는 내용');
+    expect(byId(FeedbackTestIds.errorMessage), findsOneWidget);
+  });
 
   widgetTest('TC-FDBK-020 피드백을 보내면 화면이 닫히고 설정으로 돌아오며 감사 토스트가 보인다', (
     tester,
