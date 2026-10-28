@@ -1,6 +1,7 @@
 import '../../../core/copy/ko.g.dart';
 import '../../../core/push/notification_permission.dart';
 import '../../../core/push/push_message_source.dart';
+import '../../../core/push/push_payload_codec.dart';
 import 'unread_refresher.dart';
 
 /// Android 알림 채널 id(`push.channel.name`은 "게시물 검수 알림", 임시 유지: 확인 필요 6).
@@ -8,10 +9,12 @@ const String androidPushChannelId = 'moderation_push';
 
 /// 앱이 직접 알림을 만드는 플랫폼(Android)의 표시 창구.
 abstract interface class LocalNotificationPresenter {
+  /// [payload]는 푸시 `data`를 문자열로 실은 값이다. 사용자가 이 알림을 누르면 같은 푸시 탭으로 처리한다.
   Future<void> show({
     required String channelId,
     required String title,
     required String body,
+    String? payload,
   });
 }
 
@@ -80,6 +83,7 @@ class PushForegroundHandler {
           channelId: androidPushChannelId,
           title: decision.title,
           body: decision.body,
+          payload: PushPayloadCodec.encode(message.payload),
         );
       } on Object {
         // 표시 실패가 수신 처리를 막지 않는다.

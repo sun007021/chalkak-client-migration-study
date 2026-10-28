@@ -67,12 +67,13 @@ class ApiNotificationRepository implements NotificationRepository {
       pageSize: map['pageSize']! as int,
       hasNext: map['hasNext']! as bool,
       items: [
-        for (final n in map['notifications']! as List) _parseItem(n! as Map),
+        for (final n in map['notifications']! as List)
+          _parseItem(n! as Map<Object?, Object?>),
       ],
     );
   }
 
-  static NotificationItem _parseItem(Map map) {
+  static NotificationItem _parseItem(Map<Object?, Object?> map) {
     final rawType = map['type']! as String;
     return NotificationItem(
       id: map['id']! as String,

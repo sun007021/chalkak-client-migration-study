@@ -58,6 +58,15 @@ class PushPayload {
   final String? eventId;
 
   PushType? get pushType => PushType.fromWire(type);
+
+  /// 로컬 알림 payload처럼 문자열로 실어 보낼 평탄한 `data` 맵. 없는 필드는 뺀다.
+  Map<String, String> toData() => {
+    'type': ?type,
+    'notificationId': ?notificationId,
+    'sourceType': ?sourceType,
+    'sourceId': ?sourceId,
+    'eventId': ?eventId,
+  };
 }
 
 /// 플랫폼별 원본 맵을 같은 [PushPayload]로 바꾼다(TC-PUSH-050).

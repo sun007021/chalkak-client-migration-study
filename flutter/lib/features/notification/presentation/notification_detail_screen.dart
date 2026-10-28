@@ -6,9 +6,8 @@ import '../../../core/copy/ko.g.dart';
 import '../../../core/ui/app_network_image.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/notification_models.dart';
-import 'notification_test_ids.dart';
-
 import 'notification_detail_view_model.dart';
+import 'notification_test_ids.dart';
 
 /// 알림 상세 화면(단독 위젯).
 /// testids.md `notification-detail.*`: 루트, 제목 바 "알림 상세", 뒤로, 알림 제목·본문,

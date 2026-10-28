@@ -6,9 +6,8 @@ import '../../../core/copy/ko.g.dart';
 import '../../../core/ui/app_network_image.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/notification_models.dart';
-import 'notification_test_ids.dart';
-
 import 'notification_inbox_view_model.dart';
+import 'notification_test_ids.dart';
 
 /// 알림함 화면(단독 위젯).
 /// testids.md `notifications.*`([NotificationTestIds]):

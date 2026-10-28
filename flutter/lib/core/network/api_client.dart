@@ -88,6 +88,27 @@ class ApiClient {
     );
   }
 
+  /// 지금 세션의 토큰을 `POST /auth/refresh`로 갱신한다. [TokenRefresher]의 single-flight를
+  /// ApiClient 요청과 공유한다(같은 refresh token을 두 곳에서 따로 보내면 서버가 재사용으로 보고 세션을 폐기한다).
+  /// ApiClient 밖에서 세션 갱신이 필요한 곳(푸시 기기 등록의 session_id 확인)을 위한 좁은 창구이며
+  /// [TokenRefresher] 자체는 공개하지 않는다.
+  /// - 게스트·세션 없음·refresh token 만료·갱신 중 로그아웃/계정 전환이면 null.
+  /// - 401 `REAUTHENTICATION_REQUIRED`면 세션을 지우고(정리 이벤트 발행) [ApiError]를 던진다.
+  Future<Session?> refreshSession() async {
+    final current = await _sessions.read();
+    if (current == null ||
+        current.isGuest ||
+        current.isRefreshExpired(clock.now())) {
+      return null;
+    }
+    try {
+      return await _refresher.refresh(current);
+    } on ApiError catch (error) {
+      if (error.isCancelled) return null;
+      rethrow;
+    }
+  }
+
   Uri _url(ApiRequest r) => _apiRoot.replace(
     path: '${_apiRoot.path}${r.path}',
     queryParameters: r.query.isEmpty ? null : r.query,

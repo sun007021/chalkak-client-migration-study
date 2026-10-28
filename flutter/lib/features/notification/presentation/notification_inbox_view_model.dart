@@ -95,7 +95,6 @@ class NotificationInboxViewModel extends ChangeNotifier {
   /// 다음에 요청할 페이지 번호.
   int _nextPage = 2;
 
-  @override
   NotificationInboxState get state => _state;
   Stream<InboxEvent> get events => _events.stream;
 

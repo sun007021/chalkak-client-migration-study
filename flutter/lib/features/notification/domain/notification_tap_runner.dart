@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 
 import '../../../core/copy/ko.g.dart';
@@ -71,7 +73,7 @@ class NotificationTapRunner implements UserDataCleaner {
       if (!own.isCancelled) own.cancel();
     });
     // link는 결과를 쓰지 않는다. 오류가 나도 처리되지 않은 예외로 번지지 않게 한다.
-    link?.catchError((Object _) {});
+    if (link != null) unawaited(link.catchError((Object _) {}));
 
     try {
       await _repository.markRead(readId, cancelToken: own);

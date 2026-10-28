@@ -505,14 +505,17 @@ class FakePushMessageSource implements PushMessageSource {
 
 class FakeLocalNotificationPresenter implements LocalNotificationPresenter {
   final List<({String channelId, String title, String body})> shown = [];
+  final List<String?> payloads = [];
 
   @override
   Future<void> show({
     required String channelId,
     required String title,
     required String body,
+    String? payload,
   }) async {
     shown.add((channelId: channelId, title: title, body: body));
+    payloads.add(payload);
   }
 }
 

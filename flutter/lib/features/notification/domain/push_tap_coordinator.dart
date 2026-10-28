@@ -136,7 +136,12 @@ class PushTapCoordinator implements UserDataCleaner {
     try {
       await _runner.run(NotificationRouter.fromPush(pending.payload));
     } on Object {
-      // 이동 실패는 삼킨다. 이미 소비했으므로 되풀이하지 않는다.
+      // 이동 계획을 실행하다 실패했다. 이미 소비했으므로 되풀이하지 않고, 탭이 사라지지 않게 알림함으로 보낸다.
+      try {
+        await _navigator.openInbox();
+      } on Object {
+        // 알림함 이동도 실패하면 앱이 열린 상태로 둔다.
+      }
     }
   }
 
