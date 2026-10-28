@@ -58,6 +58,13 @@ Future<void> _pickAndFinishEdit(WidgetTester tester, _Screen s) async {
   await settleUi(tester, frames: 30);
 }
 
+/// 화면을 내리면 요청은 취소되지만 FakeAdapter의 지연 타이머(Future.delayed)는 취소되지 않는다.
+/// 남은 가짜 시간을 흘려 보내 "화면 해제 후 타이머 대기" 검사를 통과시킨다.
+Future<void> _drainFakeNetworkTimers(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(seconds: 31));
+}
+
 String _topicTitle() =>
     ((Fixture.load('home/topics__open-2026-10-27.json') as Map)['title']!)
         as String;
@@ -177,6 +184,7 @@ void main() {
     await _pickAndFinishEdit(tester, s);
     expect(byId(UploadTestIds.preparingIndicator), findsOneWidget);
     expect(isEnabled(tester, UploadTestIds.submitButton), isTrue);
+    await _drainFakeNetworkTimers(tester);
   });
 
   widgetTest('TC-UPL-047 제출 중에는 전시 중... 문구와 진행 표시가 보이고 버튼은 비활성이다', (
@@ -199,6 +207,7 @@ void main() {
     );
     expect(byId(UploadTestIds.submittingIndicator), findsOneWidget);
     expect(isEnabled(tester, UploadTestIds.submitButton), isFalse);
+    await _drainFakeNetworkTimers(tester);
   });
 
   widgetTest('TC-UPL-080 한글 11자를 입력하면 10자까지만 보인다', (tester) async {
