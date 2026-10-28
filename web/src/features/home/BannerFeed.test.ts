@@ -303,3 +303,74 @@ describe('BannerFeed 취소·초기화', () => {
     expect(h.feed.state).toEqual({ status: 'loading' });
   });
 });
+
+describe('BannerFeed 추가 페이지와 1페이지 요청의 관계 (REQ-BANR-010)', () => {
+  it('TC-BANR-016 새로고침이 진행 중이면 센티넬이 보여도 추가 페이지 요청을 시작하지 않는다', async () => {
+    const h = setup();
+    await h.finish(h.feed.load());
+    const gate = deferred<void>();
+    h.router.set(P1, async () => {
+      await gate.promise;
+      return loadFixture('banner/banners__page1-10.json').toResponse();
+    });
+    const refreshing = h.feed.refresh();
+    await settle();
+    await h.feed.onSentinelVisible();
+    expect(h.router.calls(P2)).toHaveLength(0);
+    gate.resolve();
+    await h.finish(refreshing);
+    expect(ready(h.feed.state).banners).toHaveLength(10);
+  });
+
+  it('TC-BANR-016 추가 페이지 요청 중 새로고침이 이기면 늦은 추가 응답은 버려지고 새로고침 결과가 남는다', async () => {
+    const late = deferred<void>();
+    const h = setup({
+      [P2]: async () => {
+        await late.promise;
+        return loadFixture('banner/banners__page2-last.json').toResponse();
+      },
+    });
+    await h.finish(h.feed.load());
+    const more = h.feed.onSentinelVisible();
+    await settle();
+    expect(ready(h.feed.state).loadingMore).toBe(true);
+    await h.finish(h.feed.refresh());
+    late.resolve();
+    await more;
+    expect(ready(h.feed.state)).toMatchObject({ loadingMore: false, nextPage: 2, hasNext: true });
+    expect(ready(h.feed.state).banners).toHaveLength(10);
+  });
+
+  it('TC-BANR-012 추가 페이지 요청은 진행 중인 1페이지 요청을 취소하지 않는다(상태가 ready가 아니면 시작도 하지 않는다)', async () => {
+    const gate = deferred<void>();
+    const h = setup({
+      [P1]: async () => {
+        await gate.promise;
+        return loadFixture('banner/banners__page1-10.json').toResponse();
+      },
+    });
+    const loading = h.feed.load();
+    await settle();
+    await h.feed.onSentinelVisible();
+    gate.resolve();
+    await h.finish(loading);
+    expect(ready(h.feed.state).banners).toHaveLength(10);
+    expect(h.router.calls(P2)).toHaveLength(0);
+  });
+
+  it('TC-BANR-013 추가 페이지가 실패하면 센티넬로는 다시 요청하지 않고 retryMore가 같은 page=2를 요청한다', async () => {
+    const h = setup({ [P2]: 'banner/banners__500-server-error' });
+    await h.finish(h.feed.load());
+    await h.finish(h.feed.onSentinelVisible());
+    expect(ready(h.feed.state)).toMatchObject({ moreFailed: true, loadingMore: false, nextPage: 2 });
+    const calls = h.router.calls(P2).length;
+    await h.feed.onSentinelVisible();
+    expect(h.router.calls(P2)).toHaveLength(calls);
+
+    h.router.set(P2, 'banner/banners__page2-last');
+    await h.feed.retryMore();
+    expect(ready(h.feed.state)).toMatchObject({ moreFailed: false, hasNext: false });
+    expect(ready(h.feed.state).banners).toHaveLength(13);
+    expect(h.router.calls(P2)).toHaveLength(1);
+  });
+});
