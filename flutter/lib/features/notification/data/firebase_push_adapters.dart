@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:app_settings/app_settings.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../../../core/push/notification_permission.dart';
@@ -45,9 +46,16 @@ class FirebasePushTokenProvider implements PushTokenProvider {
 /// `firebase_messaging`이 Android 13+의 "아직 묻지 않음"과 "거부"를 구분해 준다.
 /// Android 12 이하는 런타임 권한이 없어 알림이 켜져 있으면 허용으로 읽힌다.
 class FirebaseNotificationPermission implements NotificationPermission {
-  FirebaseNotificationPermission(this._gateway);
+  FirebaseNotificationPermission(
+    this._gateway, {
+    Future<void> Function()? openSettings,
+  }) : _openSettings = openSettings ?? _openAppNotificationSettings;
 
   final FirebaseMessagingGateway _gateway;
+  final Future<void> Function() _openSettings;
+
+  static Future<void> _openAppNotificationSettings() =>
+      AppSettings.openAppSettings(type: AppSettingsType.notification);
 
   @override
   Future<OsPermissionStatus> status() async =>
@@ -56,6 +64,9 @@ class FirebaseNotificationPermission implements NotificationPermission {
   @override
   Future<OsPermissionStatus> request() async =>
       mapAuthorization(await _gateway.requestPermission());
+
+  @override
+  Future<void> openSystemSettings() => _openSettings();
 
   static OsPermissionStatus mapAuthorization(AuthorizationStatus status) =>
       switch (status) {
