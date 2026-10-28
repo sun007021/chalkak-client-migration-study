@@ -44,7 +44,10 @@ function HomeTab() {
   useFocusEffect(useCallback(() => analytics.screenView('home'), [analytics]));
   if (!viewModel || !focused) return <View style={{ flex: 1 }} />;
   return (
-    <HomeScreen viewModel={viewModel} renderAiCard={(postId) => <HomeAiCard postId={postId} />} />
+    <HomeScreen
+      viewModel={viewModel}
+      renderAiCard={(postId, topicDate) => <HomeAiCard postId={postId} topicDate={topicDate} />}
+    />
   );
 }
 

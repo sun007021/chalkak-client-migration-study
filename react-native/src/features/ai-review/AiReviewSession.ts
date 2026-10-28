@@ -21,7 +21,7 @@ export interface AiReviewSession extends AiReviewPoller {
   getSnapshot(): Readonly<AiReviewState>;
   subscribe(listener: () => void): () => void;
   /** 같은 게시물이어도 항상 GET부터 확인하고 새 창을 연다(상세 재진입, 다시 확인). */
-  refresh(postId: string): void;
+  refresh(postId: string, owner?: object): void;
   /** 사용자가 확정한 POST. 진행 중이면 무시한다. 오류는 토스트/인증 정책으로 처리하고 던지지 않는다. */
-  request(postId: string): Promise<void>;
+  request(postId: string, owner?: object): Promise<void>;
 }

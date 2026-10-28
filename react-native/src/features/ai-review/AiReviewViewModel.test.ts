@@ -6,7 +6,9 @@ import {
   COMPLETED,
   FAILED_RETRY,
   GET_AI,
+  GET_OTHER_AI,
   NONE,
+  OTHER_POST_ID,
   POST_202,
   POST_AI,
   POST_ID,
@@ -634,5 +636,45 @@ describe('AiReviewViewModel 용어 (TC-AIR-054)', () => {
     }
     expect(seen.length).toBeGreaterThan(0);
     expect(seen.filter((s) => s.includes('AI 리뷰'))).toEqual([]);
+  });
+});
+
+describe('AiReviewViewModel 두 화면이 폴러를 나눠 쓸 때', () => {
+  async function twoViewModels() {
+    const h = await createAiReviewHarness({
+      routes: { [GET_AI]: PROCESSING, [GET_OTHER_AI]: PROCESSING },
+    });
+    const make = (postId: string, surface: 'feed' | 'home') =>
+      new AiReviewViewModel({
+        target: { postId, topicDate: TODAY, isMine: true },
+        mode: 'member',
+        surface,
+        entry: 'normal',
+        clock: h.clock,
+        poller: h.poller,
+        visibility: h.visibility,
+      });
+    return { h, homeCard: make(POST_ID, 'home'), detail: make(OTHER_POST_ID, 'feed') };
+  }
+
+  it('홈 카드가 먼저 보이고 상세가 열린 뒤 홈 카드가 내려가도 상세의 폴링은 계속된다', async () => {
+    const { h, homeCard, detail } = await twoViewModels();
+    await homeCard.onShown();
+    await detail.onShown();
+    await h.pollSleeper.settle();
+    homeCard.onHidden();
+    const before = h.timesOf(GET_OTHER_AI).length;
+    await h.pollSleeper.advance(6 * SEC);
+    expect(h.timesOf(GET_OTHER_AI)).toHaveLength(before + 2);
+  });
+
+  it('뒤로 가기: 상세가 내려가고 홈 카드가 다시 보이면 홈 게시물을 폴링한다(어느 순서로 와도)', async () => {
+    const { h, homeCard, detail } = await twoViewModels();
+    await detail.onShown();
+    await h.pollSleeper.settle();
+    await homeCard.onShown();
+    detail.onHidden();
+    await h.pollSleeper.advance(6 * SEC);
+    expect(h.timesOf(GET_AI)).toHaveLength(3);
   });
 });

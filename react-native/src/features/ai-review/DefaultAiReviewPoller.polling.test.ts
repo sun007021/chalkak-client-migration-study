@@ -500,6 +500,8 @@ describe('AiReviewPoller 시작·정지·중복 (TC-AIR-018, 019, 042, 043)', ()
     slow.release();
     await h.pollSleeper.settle();
     expect(h.poller.getSnapshot().review?.status).toBe('COMPLETED');
+    expect(h.toast.messages).toEqual([]);
+    expect(h.authFlow.calls).toEqual([]);
   });
 });
 

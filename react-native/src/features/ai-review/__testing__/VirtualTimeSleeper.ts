@@ -38,9 +38,17 @@ export class VirtualTimeSleeper implements Sleeper {
     return this.waiters.length;
   }
 
-  /** 대기 중인 비동기 작업이 더 진행할 수 없을 때까지 기다린다(시계는 움직이지 않는다). */
+  /**
+   * 대기 중인 비동기 작업이 더 진행할 수 없을 때까지 기다린다(시계는 움직이지 않는다).
+   * 새 sleep 호출이나 대기자 변화가 두 번 연달아 없을 때까지 돌고, 무한 루프를 막으려고 상한(50)을 둔다.
+   */
   async settle(): Promise<void> {
-    for (let i = 0; i < 3; i += 1) await macrotask();
+    let quiet = 0;
+    for (let round = 0; round < 50 && quiet < 2; round += 1) {
+      const before = `${this.calls.length}:${this.waiters.length}`;
+      await macrotask();
+      quiet = before === `${this.calls.length}:${this.waiters.length}` ? quiet + 1 : 0;
+    }
   }
 
   /** 시계를 ms만큼 앞으로 보낸다. 중간에 깨어난 sleep이 새로 건 sleep도 같은 구간 안이면 이어서 푼다. */

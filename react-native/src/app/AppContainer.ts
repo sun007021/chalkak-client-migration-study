@@ -138,6 +138,8 @@ export interface Dependencies {
   readonly likes?: LikeController;
   /** 없으면 실제 폴러(DefaultAiReviewPoller)를 만든다. 테스트는 Fake를 넣는다. */
   readonly aiReview?: AiReviewPoller;
+  /** 알약·카드·시트까지 그리는 폴러(화면용 면 포함). 주면 aiReview도 이것이 된다. 둘 다 없으면 실제 폴러를 만든다. */
+  readonly aiReviewSession?: AiReviewSession;
   /** 기록 탭의 달력 이미지 렌더러·저장소. 없으면 컨테이너가 기본 구현을 쓴다(기록 PR). */
   readonly calendarImageRenderer?: CalendarImageRenderer;
   readonly calendarImageSaver?: CalendarImageSaver;
@@ -148,10 +150,6 @@ export interface Dependencies {
    * (expo-image-picker, expo-image-manipulator, expo-media-library, expo-file-system)을 만든다. 테스트는 Fake를 넣는다.
    */
   readonly media?: MediaServices;
-}
-
-function isAiReviewSession(value: AiReviewPoller): value is AiReviewSession {
-  return typeof (value as Partial<AiReviewSession>).getSnapshot === 'function';
 }
 
 function isUserDataCache(value: object): value is UserDataCache {
@@ -193,8 +191,8 @@ export class AppContainer {
   readonly likes: LikeController;
   /** 홈과 상세가 함께 쓰는 AI 피드백 폴러(앱에 하나). */
   readonly aiReview: AiReviewPoller;
-  /** 알약·카드·시트를 그릴 수 있는 폴러인가(테스트 Fake는 false). */
-  readonly aiReviewUiAvailable: boolean;
+  /** 알약·카드·시트를 그릴 수 있는 폴러. `aiReview`만 주입한 테스트에서는 null이라 AI 영역을 그리지 않는다. */
+  readonly aiReviewSession: AiReviewSession | null;
   /** 상세에서 일어난 제목 수정·삭제를 전시 등이 따라 반영하게 하는 채널. 계정 전환 때 비운다. */
   readonly postChanges = new DefaultPostChanges();
   /** 게시물이 만들어졌음을 홈(히어로 갱신) 등에 알린다. 표시 PR의 PostChanges와 의미가 달라 별도 채널이다. */
@@ -279,10 +277,15 @@ export class AppContainer {
     if (dependencies.likes && isUserDataCache(dependencies.likes)) {
       this.cacheRegistry.register(dependencies.likes);
     }
-    this.aiReview = dependencies.aiReview ?? this.createDefaultAiReview();
-    this.aiReviewUiAvailable = isAiReviewSession(this.aiReview);
-    if (dependencies.aiReview && isUserDataCache(dependencies.aiReview)) {
-      this.cacheRegistry.register(dependencies.aiReview);
+    const injectedAiReview = dependencies.aiReviewSession ?? dependencies.aiReview;
+    if (injectedAiReview) {
+      this.aiReview = injectedAiReview;
+      this.aiReviewSession = dependencies.aiReviewSession ?? null;
+      if (isUserDataCache(injectedAiReview)) this.cacheRegistry.register(injectedAiReview);
+    } else {
+      const poller = this.createDefaultAiReview();
+      this.aiReview = poller;
+      this.aiReviewSession = poller;
     }
     this.cacheRegistry.register(this.postChanges);
     this.signatureRepository = new SignatureRepository({ api: this.api });
@@ -436,15 +439,15 @@ export class AppContainer {
 
   /**
    * AI 피드백 알약(상세)·카드(홈) ViewModel. 화면을 그리는 소유자(React 컴포넌트)만 부르고 버릴 때 dispose한다.
-   * 주입된 폴러가 화면용 면(AiReviewSession)을 갖지 않으면(테스트 Fake) aiReviewUiAvailable이 false라 AI 영역을 그리지 않는다.
+   * 화면용 폴러(aiReviewSession)가 없으면 호출하지 않는다.
    */
   createAiReviewViewModel(params: {
     target: AiReviewTarget;
     surface: 'feed' | 'home';
     entry?: 'normal' | 'push';
   }): AiReviewViewModel {
-    const poller = this.aiReview;
-    if (!isAiReviewSession(poller)) throw new Error('AI 피드백 화면용 폴러가 아닙니다');
+    const poller = this.aiReviewSession;
+    if (!poller) throw new Error('AI 피드백 화면용 폴러가 주입되지 않았습니다');
     return new AiReviewViewModel({
       target: params.target,
       mode: 'member',
@@ -648,6 +651,7 @@ export class AppContainer {
         calendarImageRenderer: overrides.calendarImageRenderer,
         calendarImageSaver: overrides.calendarImageSaver,
         aiReview: overrides.aiReview,
+        aiReviewSession: overrides.aiReviewSession,
       },
       toastCenter,
     );

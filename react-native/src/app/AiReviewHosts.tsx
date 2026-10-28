@@ -1,53 +1,53 @@
-import { useCallback } from 'react';
-
-import { todayKst } from '../core/time/kst';
 import type { KstDate } from '../core/time/KstDate';
 import { AiReviewCard } from '../features/ai-review/ui/AiReviewCard';
 import { AiReviewSection } from '../features/ai-review/ui/AiReviewSection';
 import { useAppContainer } from './AppContainerContext';
-import { useOwnedViewModel } from './useOwnedViewModel';
+import { OwnedViewModelHost } from './OwnedViewModelHost';
+
+type Surface = 'feed' | 'home';
 
 /**
- * 상세의 AI 피드백 알약 소유자. ViewModel은 게시물 하나마다 만들고 이 컴포넌트가 사라질 때 dispose한다.
- * 상세 응답으로 내 게시물과 주제 날짜가 확정된 뒤에만 그려진다(FeedScreen의 renderAiReview).
+ * AI 피드백 ViewModel 소유자. 게시물(과 주제 날짜)마다 만들고 이 컴포넌트가 사라질 때 dispose한다.
+ * 화면용 폴러가 없으면(테스트 Fake) 아무것도 그리지 않는다.
  */
+function AiReviewHost({
+  postId,
+  topicDate,
+  surface,
+}: {
+  postId: string;
+  topicDate: KstDate;
+  surface: Surface;
+}) {
+  const container = useAppContainer();
+  if (!container.aiReviewSession) return null;
+  return (
+    <OwnedViewModelHost
+      key={`${postId}:${topicDate.toString()}`}
+      create={() =>
+        container.createAiReviewViewModel({
+          target: { postId, topicDate, isMine: true },
+          surface,
+        })
+      }
+    >
+      {(viewModel) =>
+        surface === 'feed' ? (
+          <AiReviewSection viewModel={viewModel} />
+        ) : (
+          <AiReviewCard viewModel={viewModel} />
+        )
+      }
+    </OwnedViewModelHost>
+  );
+}
+
+/** 상세의 알약. 상세 응답으로 내 게시물과 주제 날짜가 확정된 뒤에만 그려진다(FeedScreen의 renderAiReview). */
 export function FeedAiReview({ postId, topicDate }: { postId: string; topicDate: KstDate }) {
-  const container = useAppContainer();
-  if (!container.aiReviewUiAvailable) return null;
-  return <OwnedFeedAiReview key={postId} postId={postId} topicDate={topicDate} />;
+  return <AiReviewHost postId={postId} topicDate={topicDate} surface="feed" />;
 }
 
-function OwnedFeedAiReview({ postId, topicDate }: { postId: string; topicDate: KstDate }) {
-  const container = useAppContainer();
-  const create = useCallback(
-    () =>
-      container.createAiReviewViewModel({
-        target: { postId, topicDate, isMine: true },
-        surface: 'feed',
-      }),
-    [container, postId, topicDate],
-  );
-  const viewModel = useOwnedViewModel(create);
-  return viewModel ? <AiReviewSection viewModel={viewModel} /> : null;
-}
-
-/** 홈 AI 카드 소유자. 카드는 오늘 승인된 내 사진일 때만 그려지므로 주제 날짜는 오늘이다. */
-export function HomeAiCard({ postId }: { postId: string }) {
-  const container = useAppContainer();
-  if (!container.aiReviewUiAvailable) return null;
-  return <OwnedHomeAiCard key={postId} postId={postId} />;
-}
-
-function OwnedHomeAiCard({ postId }: { postId: string }) {
-  const container = useAppContainer();
-  const create = useCallback(
-    () =>
-      container.createAiReviewViewModel({
-        target: { postId, topicDate: todayKst(container.clock), isMine: true },
-        surface: 'home',
-      }),
-    [container, postId],
-  );
-  const viewModel = useOwnedViewModel(create);
-  return viewModel ? <AiReviewCard viewModel={viewModel} /> : null;
+/** 홈 카드. 홈이 넘겨 준 오늘 주제 날짜(카드를 보이는 조건)로 요청 자격을 판정한다. */
+export function HomeAiCard({ postId, topicDate }: { postId: string; topicDate: KstDate }) {
+  return <AiReviewHost postId={postId} topicDate={topicDate} surface="home" />;
 }

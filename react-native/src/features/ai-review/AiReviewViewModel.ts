@@ -56,6 +56,9 @@ const DISABLED: readonly AiPillKind[] = ['checking', 'requesting', 'processing']
  */
 export class AiReviewViewModel extends Observable<AiReviewViewState> {
   private sheetRequest: SheetRequest = null;
+  /** 시트·다이얼로그·푸시 소비처럼 이 ViewModel이 바꾸는 입력의 변경 번호. */
+  private revision = 0;
+  private lastInputs: { poller: unknown; revision: number; today: string } | null = null;
   private criteriaDialogOpen = false;
   private shown = false;
   private pushPending: boolean;
@@ -82,7 +85,7 @@ export class AiReviewViewModel extends Observable<AiReviewViewState> {
     this.shown = true;
     this.stopPoller ??= this.deps.poller.subscribe(() => this.onPollerChanged());
     this.stopVisibility ??= this.deps.visibility.subscribe((state) => {
-      if (state === 'background') this.deps.poller.stop();
+      if (state === 'background') this.deps.poller.stop(this);
       else this.check();
     });
     this.check();
@@ -96,7 +99,7 @@ export class AiReviewViewModel extends Observable<AiReviewViewState> {
     this.stopPoller = null;
     this.stopVisibility?.();
     this.stopVisibility = null;
-    if (this.active) this.deps.poller.stop();
+    if (this.active) this.deps.poller.stop(this);
   }
 
   override dispose(): void {
@@ -109,7 +112,7 @@ export class AiReviewViewModel extends Observable<AiReviewViewState> {
     if (!pill?.enabled) return;
     switch (pill.kind) {
       case 'recheck':
-        this.deps.poller.refresh(this.postId);
+        this.deps.poller.refresh(this.postId, this);
         return;
       case 'view':
         this.openSheet('result');
@@ -135,11 +138,13 @@ export class AiReviewViewModel extends Observable<AiReviewViewState> {
   async confirmStart(): Promise<void> {
     if (this.sheetRequest !== 'start' && this.sheetRequest !== 'restart') return;
     this.sheetRequest = null;
+    this.revision += 1;
     await this.requestNow();
   }
 
   dismissSheet(): void {
     this.sheetRequest = null;
+    this.revision += 1;
     this.recompute();
   }
 
@@ -155,16 +160,18 @@ export class AiReviewViewModel extends Observable<AiReviewViewState> {
 
   /** 폴링 창이 끝난 뒤 "AI 상태 다시 확인". */
   onRecheckPress(): void {
-    this.deps.poller.refresh(this.postId);
+    this.deps.poller.refresh(this.postId, this);
   }
 
   openCriteriaDialog(): void {
     this.criteriaDialogOpen = true;
+    this.revision += 1;
     this.recompute();
   }
 
   closeCriteriaDialog(): void {
     this.criteriaDialogOpen = false;
+    this.revision += 1;
     this.recompute();
   }
 
@@ -182,8 +189,8 @@ export class AiReviewViewModel extends Observable<AiReviewViewState> {
   // ---- 내부 ----
 
   private check(): void {
-    if (this.deps.surface === 'home') this.deps.poller.start(this.postId);
-    else this.deps.poller.refresh(this.postId);
+    if (this.deps.surface === 'home') this.deps.poller.start(this.postId, this);
+    else this.deps.poller.refresh(this.postId, this);
   }
 
   private async requestNow(): Promise<void> {
@@ -192,11 +199,12 @@ export class AiReviewViewModel extends Observable<AiReviewViewState> {
       return;
     }
     this.recompute();
-    await this.deps.poller.request(this.postId);
+    await this.deps.poller.request(this.postId, this);
   }
 
   private openSheet(kind: Exclude<SheetRequest, null>): void {
     this.sheetRequest = kind;
+    this.revision += 1;
     this.recompute();
   }
 
@@ -212,6 +220,7 @@ export class AiReviewViewModel extends Observable<AiReviewViewState> {
     if (s.postId !== this.postId || s.phase === 'checking' || s.phase === 'idle') return;
     this.pushPending = false;
     if (s.phase !== 'ready' || !s.review) return;
+    this.revision += 1;
     if (s.review.status === 'COMPLETED') this.sheetRequest = 'result';
     else if (s.review.status === 'FAILED') this.sheetRequest = 'failed';
   }
@@ -222,10 +231,24 @@ export class AiReviewViewModel extends Observable<AiReviewViewState> {
     return this.active && topicDate !== null && topicDate.equals(todayKst(this.deps.clock));
   }
 
+  /** 입력(폴러 상태, 이 ViewModel의 시트·다이얼로그, KST 오늘)이 달라졌을 때만 다시 만든다. */
   private recompute(): void {
-    const next = this.build();
-    if (JSON.stringify(next) === JSON.stringify(this.getSnapshot())) return;
-    this.setState(next);
+    const key = {
+      poller: this.deps.poller.getSnapshot(),
+      revision: this.revision,
+      today: todayKst(this.deps.clock).toString(),
+    };
+    const last = this.lastInputs;
+    if (
+      last &&
+      last.poller === key.poller &&
+      last.revision === key.revision &&
+      last.today === key.today
+    ) {
+      return;
+    }
+    this.lastInputs = key;
+    this.setState(this.build());
   }
 
   private build(): AiReviewViewState {

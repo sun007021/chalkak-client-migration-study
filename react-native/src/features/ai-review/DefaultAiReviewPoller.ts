@@ -50,11 +50,13 @@ export class DefaultAiReviewPoller
   /** 지금 GET/대기 루프가 돌고 있는 단위(끝나면 null). */
   private looping: Run | null = null;
   private runCounter = 0;
-  private readonly authErrors: AuthErrorPolicy;
+  private authErrors: AuthErrorPolicy;
   private readonly intervalMs: number;
   private readonly windowMs: number;
-  /** 이 단위에서 폴링 오류 문구를 이미 보였는가(한 번만). */
-  private pollErrorShown = false;
+  /** 이 오류 에피소드에서 오류 문구를 이미 보였는가(POST 실패 + 동기화 GET 실패도 한 번만). */
+  private errorShown = false;
+  /** 지금 단위를 쓰는 화면들. 소유자가 아닌 화면의 stop은 무시한다(홈과 상세가 폴러 하나를 나눠 쓴다). */
+  private owners = new Set<object>();
 
   constructor(private readonly deps: AiReviewPollerDeps) {
     super(IDLE);
@@ -63,40 +65,63 @@ export class DefaultAiReviewPoller
     this.windowMs = deps.windowMs ?? AI_REVIEW_POLL_WINDOW_MS;
   }
 
-  start(postId: string): void {
+  start(postId: string, owner?: object): void {
     const s = this.getSnapshot();
+    if (this.joinPendingRequest(postId, owner)) return;
     if (s.postId === postId && s.review?.status === 'COMPLETED') {
       // 같은 게시물의 완료 결과는 다시 조회하지 않고 유지한다(REQ-AIR-051).
       this.cancel();
+      this.owners = owner ? new Set([owner]) : new Set();
       return;
     }
-    // 홈 ViewModel과 카드가 같은 게시물로 연달아 불러도 이미 도는 루프를 다시 시작하지 않는다.
-    if (this.looping !== null && this.looping === this.run && s.postId === postId) return;
-    this.begin(postId);
+    // 홈 ViewModel과 카드가 같은 게시물로 연달아 불러도 이미 도는 루프를 다시 시작하지 않는다(소유자만 보탠다).
+    if (this.looping !== null && this.looping === this.run && s.postId === postId) {
+      if (owner) this.owners.add(owner);
+      return;
+    }
+    this.begin(postId, owner);
   }
 
-  refresh(postId: string): void {
-    this.begin(postId);
+  refresh(postId: string, owner?: object): void {
+    if (this.joinPendingRequest(postId, owner)) return;
+    this.begin(postId, owner);
   }
 
-  stop(): void {
+  /**
+   * 소유자의 정지. 지금 단위를 쓰는 다른 화면이 남아 있거나 이미 다른 화면이 넘겨받았으면 무시한다.
+   * 소유자 없이 부르면 무조건 멈춘다.
+   */
+  stop(owner?: object): void {
+    if (owner) {
+      if (!this.owners.delete(owner) || this.owners.size > 0) return;
+    }
+    this.owners.clear();
     this.cancel();
+    this.normalizePhase();
   }
 
   /** UserDataCache: 계정 전환·로그아웃 때 진행 중 요청과 값을 버린다. */
   clearAll(): void {
     this.cancel();
+    this.owners.clear();
+    this.errorShown = false;
+    // 이전 계정에서 보낸 로그인 이동 기록(같은 키 1회 규칙)을 넘기지 않는다.
+    this.authErrors = new AuthErrorPolicy(this.deps.authFlow);
     this.update(IDLE);
   }
 
   override dispose(): void {
+    this.owners.clear();
     this.cancel();
+    this.normalizePhase();
     super.dispose();
   }
 
-  async request(postId: string): Promise<void> {
+  async request(postId: string, owner?: object): Promise<void> {
     if (this.getSnapshot().requesting) return;
     const run = this.newRun();
+    this.owners = owner ? new Set([owner]) : new Set();
+    this.errorShown = false;
     const s = this.getSnapshot();
     this.update({
       ...s,
@@ -110,7 +135,7 @@ export class DefaultAiReviewPoller
       const review = await this.deps.reviews.request(postId, run.controller.signal);
       if (!this.isCurrent(run)) return this.releaseRequesting(run);
       this.update({ ...this.getSnapshot(), requesting: false, phase: 'ready', review });
-      if (review.status === 'PROCESSING') void this.loop(run, postId, sentAt, false);
+      if (review.status === 'PROCESSING') this.launch(run, postId, sentAt, false);
     } catch (error) {
       if (!this.isCurrent(run)) return this.releaseRequesting(run);
       this.update({ ...this.getSnapshot(), requesting: false });
@@ -120,11 +145,23 @@ export class DefaultAiReviewPoller
 
   // ---- 내부 ----
 
-  private begin(postId: string): void {
+  /** 사용자가 보낸 POST가 같은 게시물로 진행 중이면 중단하지 않는다(소유자만 보탠다). 다른 게시물이면 false. */
+  private joinPendingRequest(postId: string, owner?: object): boolean {
+    const s = this.getSnapshot();
+    if (!s.requesting || s.postId !== postId) return false;
+    if (owner) this.owners.add(owner);
+    return true;
+  }
+
+  /** keepErrorFlag: POST 오류 뒤 동기화 GET은 같은 에피소드라 문구 표시 기록과 소유자를 이어 간다. */
+  private begin(postId: string, owner?: object, keepErrorFlag = false): void {
     const run = this.newRun();
     const s = this.getSnapshot();
     const same = s.postId === postId;
-    this.pollErrorShown = false;
+    if (!keepErrorFlag) {
+      this.owners = owner ? new Set([owner]) : new Set();
+      this.errorShown = false;
+    }
     this.update({
       postId,
       phase: 'checking',
@@ -132,7 +169,7 @@ export class DefaultAiReviewPoller
       review: same ? s.review : null,
       stalled: false,
     });
-    void this.loop(run, postId, this.deps.clock.now().getTime(), true);
+    this.launch(run, postId, this.deps.clock.now().getTime(), true);
   }
 
   private newRun(): Run {
@@ -160,6 +197,15 @@ export class DefaultAiReviewPoller
     if (this.run === null || this.run.id < run.id) {
       if (this.getSnapshot().requesting) this.update({ ...this.getSnapshot(), requesting: false });
     }
+  }
+
+  /** 루프를 띄운다. 루프가 예기치 않게 던져도 처리되지 않은 거부로 남기지 않는다. */
+  private launch(run: Run, postId: string, windowStartMs: number, immediate: boolean): void {
+    this.loop(run, postId, windowStartMs, immediate).catch((error: unknown) => {
+      // 예기치 않은 오류(대기 구현의 버그 등): 확인 중 표시에 갇히지 않게 상태만 정리하고 기록한다.
+      console.error('[AiReviewPoller] 폴링 루프 오류', error);
+      if (this.isCurrent(run)) this.settleAfterError();
+    });
   }
 
   private async loop(
@@ -207,8 +253,12 @@ export class DefaultAiReviewPoller
         continue;
       }
       if (!this.isCurrent(run)) return;
-      this.update({ ...this.getSnapshot(), phase: 'ready', review });
-      if (review.status !== 'PROCESSING') return;
+      // 응답이 느려 창이 이미 끝났다면 같은 갱신에서 stalled로 두고 더 기다리지 않는다.
+      const expired =
+        review.status === 'PROCESSING' &&
+        this.deps.clock.now().getTime() - windowStartMs >= this.windowMs;
+      this.update({ ...this.getSnapshot(), phase: 'ready', review, stalled: expired });
+      if (review.status !== 'PROCESSING' || expired) return;
     }
   }
 
@@ -227,15 +277,24 @@ export class DefaultAiReviewPoller
     if (s.review === null) {
       // 처음 확인부터 실패: 다시 확인으로 재시도할 수 있게 둔다.
       this.update({ ...s, phase: 'check-failed' });
-      this.deps.toast.show(message);
+      this.showErrorOnce(message);
       return false;
     }
     this.settleAfterError();
-    if (!this.pollErrorShown) {
-      this.pollErrorShown = true;
-      this.deps.toast.show(message);
-    }
+    this.showErrorOnce(message);
     return s.review.status === 'PROCESSING';
+  }
+
+  private showErrorOnce(message: string): void {
+    if (this.errorShown) return;
+    this.errorShown = true;
+    this.deps.toast.show(message);
+  }
+
+  /** 취소로 멈춘 뒤 확인 중(checking)에 갇히지 않게 한다: 결과가 있으면 ready, 없으면 대상 없음(idle). */
+  private normalizePhase(): void {
+    const s = this.getSnapshot();
+    if (s.phase === 'checking') this.update({ ...s, phase: s.review ? 'ready' : 'idle' });
   }
 
   private settleAfterError(): void {
@@ -262,8 +321,9 @@ export class DefaultAiReviewPoller
       }
     }
     // 연결 오류·5xx·검증 실패: 접수됐을 수 있으니 POST는 다시 보내지 않고 GET으로 동기화한다.
-    this.deps.toast.show(errorMessage(error));
-    this.begin(postId);
+    // 동기화 GET이 또 실패해도 같은 에피소드라 문구는 한 번만 보인다.
+    this.showErrorOnce(errorMessage(error));
+    this.begin(postId, undefined, true);
   }
 
   /** 상태가 실제로 달라졌을 때만 알린다. */
