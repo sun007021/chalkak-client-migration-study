@@ -85,6 +85,14 @@ class AppConstantsTest {
     }
 
     @Test
+    fun `TC-AIR-048 AI review polling is 3 s every and 300 s window like constants json`() {
+        assertEquals(long("AI_REVIEW_POLL_INTERVAL_MS"), AppConstants.AI_REVIEW_POLL_INTERVAL_MS)
+        assertEquals(long("AI_REVIEW_POLL_WINDOW_MS"), AppConstants.AI_REVIEW_POLL_WINDOW_MS)
+        assertEquals(3_000L, AppConstants.AI_REVIEW_POLL_INTERVAL_MS)
+        assertEquals(300_000L, AppConstants.AI_REVIEW_POLL_WINDOW_MS)
+    }
+
+    @Test
     fun `AppConstants 입력 제한과 이미지 정책 값이 constants json과 같다`() {
         assertEquals(int("POST_TITLE_MAX"), AppConstants.POST_TITLE_MAX)
         assertEquals(10, AppConstants.POST_TITLE_MAX)

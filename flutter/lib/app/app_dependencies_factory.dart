@@ -17,9 +17,11 @@ import '../features/auth/domain/session_use_cases.dart';
 import '../features/auth/domain/user_data_cleaner.dart';
 import '../features/boot/data/disabled_update_check.dart';
 import '../features/boot/domain/auth_gate.dart';
-import '../features/boot/domain/home_preloader.dart';
 import '../features/boot/domain/pending_navigation.dart';
 import '../features/boot/domain/update_gate.dart';
+import '../features/home/domain/home_preload.dart';
+import '../features/like/domain/like_data_cleaner.dart';
+import '../features/navigation/main_dependencies_factory.dart';
 import '../features/onboarding/data/api_sign_up_repository.dart';
 import '../features/onboarding/data/url_launcher_external_link_launcher.dart';
 import '../features/onboarding/domain/sign_up_context.dart';
@@ -52,7 +54,13 @@ AppDependencies buildAppDependencies(AppConfig config) {
     gate: updateGate,
     navigate: (_) {},
   );
-  final cleaner = CompositeUserDataCleaner([pendingNavigation]);
+  final main = buildMainDependencies(client);
+  final cleaner = CompositeUserDataCleaner([
+    pendingNavigation,
+    main.preloadCache,
+    LikeDataCleaner(likes: main.likeStore, postEvents: main.postEvents),
+    main.recordCleaner,
+  ]);
   const pushRegistrar = _NoopPushRegistrar();
   final signatureRepository = ApiSignatureRepository(client: client);
   final signatureUploader = ApiSignatureUploader(client: client);
@@ -62,7 +70,12 @@ AppDependencies buildAppDependencies(AppConfig config) {
     analytics: LogAnalyticsTracker(),
     updateGate: updateGate,
     authGate: AuthGate(sessions: sessions),
-    homePreloader: const _NoopHomePreloader(),
+    homePreloader: ApiHomePreloader(
+      home: main.homeRepository,
+      today: main.todayPostRepository,
+      banners: main.bannerRepository,
+      cache: main.preloadCache,
+    ),
     pushRegistrar: pushRegistrar,
     pendingNavigation: pendingNavigation,
     userDataCleaner: cleaner,
@@ -103,14 +116,8 @@ AppDependencies buildAppDependencies(AppConfig config) {
     signatureRenderer: const UiSignatureRenderer(),
     externalLinkLauncher: const UrlLauncherExternalLinkLauncher(),
     legalWebViewBuilder: LegalWebView.build,
+    main: main,
   );
-}
-
-class _NoopHomePreloader implements HomePreloader {
-  const _NoopHomePreloader();
-
-  @override
-  Future<void> preload({required bool guest}) async {}
 }
 
 class _NoopPushRegistrar implements PushRegistrar {

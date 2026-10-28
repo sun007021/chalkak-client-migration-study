@@ -1,4 +1,4 @@
-import { CancelledError, NetworkError, HttpError, InvalidResponseError } from './ApiError';
+import { CancelledError, HttpError, InvalidResponseError } from './ApiError';
 import {
   BASE_URL,
   createNetHarness,
@@ -177,7 +177,7 @@ describe('ApiClient 요청 구성', () => {
           contentType: 'image/webp',
           body: new Uint8Array([1]),
         }),
-      ).rejects.toBeInstanceOf(NetworkError);
+      ).rejects.toBeInstanceOf(InvalidResponseError); // 연결 문제가 아니므로 "네트워크 확인" 안내(NetworkError)가 아니다
       expect(h.transport.requests).toHaveLength(0);
     });
 

@@ -137,3 +137,21 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
   - `toHaveTextContent(문자열)`는 전체 일치다. 다이얼로그처럼 제목·본문이 한 요소에 같이 있으면 `{ exact: false }`를 쓴다.
   - RN 0.88에서 `View`는 함수 컴포넌트 타입이라 `useRef<View>`로는 `measureInWindow`를 못 쓴다. `HostInstance`를 쓴다.
 - **`PostChanges`(삭제·제목 변경)는 전시와 홈(랭킹·이번 주 기록)이 구독한다.** 요청이 진행 중일 때 도착한 변경은 그 응답에도 덧입힌다(제목은 변경 순서 번호로 "요청을 보낸 뒤"인 것만, 삭제는 `isDeleted`로 거른다). 전시의 (날짜, 정렬) 캐시는 최근 20개만 둔다(LRU). **미결**: 기록 탭은 아직 없어 구독하지 않는다(해당 PR에서 `container.postChanges`를 구독시킨다). 홈의 히어로(오늘 기록)는 삭제를 즉시 반영하지 않고 다음 복귀 때 서버 값으로 맞춘다. 전시/홈 복귀 재검증을 "1초 안에 끝난 같은 요청이면 생략"하는 최적화는 시계를 고정하는 기존 테스트(TC-DISP-045 등)와 충돌해 넣지 않았다.
+
+## 가입·사인 (`src/features/onboarding`, `src/features/signature`, `src/data/auth/SignUpRepository`)
+
+- 흐름: `SignUpFlowOwner`가 phase `sign-up`(pending과 함께)에 들어갈 때 `SignUpFlowViewModel`을 만들고 버린다(약관 -> 사인 흐름). 사인 흐름(`SignatureFlowViewModel`)은 가입(`onboarding`)과 설정의 사인 변경(`change`)이 같이 쓰고, `AppContainer.createSignatureChangeFlow(host)`로 만든다(호출한 설정 내비게이션이 소유). 화면(`SignUpRoute`)은 구독만 한다.
+- 사인 PNG: 순수 TS `SoftwareSignatureRasterizer`(RGBA 버퍼 + 이차 곡선 근사 + 둥근 끝 캡슐의 합집합 + `pako` deflate). 네이티브 의존성이 없어 다섯 플랫폼이 같은 알고리즘을 쓰기 쉽다. 일반 사인(획 수십 개)은 jest에서 1초 안쪽이다. 무압축이면 1024x512 RGBA가 2 MiB라 1 MiB 한도를 넘으므로 압축이 필수다.
+- 정규화 식(`fitStrokesToPng`)은 **기존 iOS/Android `SignaturePngEncoder`와 같다**: 점을 캔버스 크기로 나눈 비율로 바꾸고, 박스 한 변이 0.02보다 작으면 0.02로 올리며, 배율 `min((W-2P)/박스폭, (H-2P)/박스높이)`를 비율 좌표에 곱한다. 박스(올린 크기)를 가운데에 두고 점은 박스 왼쪽 위 모서리 기준이라 **한 점이나 직선은 정확히 중앙이 아니다**(원본 동작 그대로). 그리기 영역은 정사각형(`SIGNATURE_CANVAS`)이어야 화면 비율이 유지된다.
+- **사인 정규화는 원본 재현**이다(스펙 문서는 고치지 않았다): 한 점·직선은 정확히 중앙이 아니라 최소 박스(0.02)의 왼쪽/위 변에 놓인다. 플랫폼 간 합의가 필요한 "확인 필요 1"(onboarding-signature.md)로 남아 있다.
+- 약관 URL 판정(`decideDocumentTarget`)은 Hermes의 `URL` 접근자에 기대지 않고 authority를 직접 해석한다. `\`·공백·제어문자, 소문자 `^[a-z0-9-]+(\.[a-z0-9-]+)*$`에 맞지 않는 호스트(IPv6·유니코드·퍼센트)는 reject, userinfo(`@`)·비 443 포트·http는 external이다. 웹뷰 안 이동도 같은 함수로 다시 판정한다(`onShouldStartLoadWithRequest`). `isAllowedTransportUrl`도 같은 호스트 문법을 쓴다.
+- 세션 세대 번호(`SessionStore.generation()`): userId가 바뀌는 저장·삭제에서만 올라간다(같은 계정의 토큰 교체는 아님). `ApiClient`는 Authorization을 붙인 요청의 시작·응답 세대를 비교해 다르면 성공·오류 모두 `CancelledError`로 바꾼다(저장소를 다시 읽지 않는다).
+- 가입이 서버에서 받아들여진 뒤 세션 저장 구간(`committing`)에는 뒤로가기를 막는다. 그 전의 진행 중 요청은 뒤로가기로 취소된다.
+- 웹뷰는 `react-native-webview`(Expo 번들 버전 고정). `jest.setup.ts`가 네이티브 모듈이 없을 때 던지는 import를 mock으로 막는다.
+- 화면 테스트는 `toHaveTextContent('문자열')`이 **전체 일치**라서, 여러 줄 제목·안내(`\n`)는 첫 줄만 testID 요소에 두고 나머지는 다음 요소에 둔다.
+
+## Android OkHttp 자동 재시도 끄기 (`plugins/withOkHttpNoRetry.js`, D-21)
+
+- 이유: Android의 RN `fetch`는 OkHttp를 거치고, OkHttp 기본값 `retryOnConnectionFailure(true)`는 연결 실패 때 `POST` 같은 비멱등 요청도 조용히 다시 보낸다. D-21은 재시도를 `ApiClient` 한 곳에서 멱등 요청만 최대 2회로 제한하므로 prebuild 때 `MainApplication.kt`의 `onCreate`(`super.onCreate()` 직후, `loadReactNative` 전)에 `OkHttpClientProvider.setOkHttpClientFactory { createClientBuilder().retryOnConnectionFailure(false).build() }`를 넣는다. `createClientBuilder()`라서 RN 기본 쿠키 저장소(`ReactCookieJarContainer`)와 타임아웃 0은 유지된다.
+- 마커 주석(`@generated begin chalkak-okhttp-no-retry`)으로 멱등이다. 삽입 위치를 못 찾으면(템플릿 변경) prebuild가 오류로 멈춘다. Java `MainApplication`은 지원하지 않고 오류를 낸다.
+- **E2E 확인 항목(Android)**: 응답을 받기 전에 연결을 끊는 서버로 `POST`(예: `POST /posts`)를 보냈을 때 서버에 요청이 **한 번만** 도착하는지 본다(재전송 없음). 멱등 요청(GET)은 `ApiClient`의 재시도(최대 2회)만 일어나는지도 확인한다.

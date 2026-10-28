@@ -15,6 +15,7 @@ import kr.chalkak.core.data.onboarding.SignatureUploader
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
 import kr.chalkak.core.network.ErrorCode
+import kr.chalkak.core.network.guardedApiCall
 
 data class SignatureChangeUiState(
     val busy: Boolean = false,
@@ -148,6 +149,14 @@ class SignatureCardStateHolder(
     /** Settings tab became visible (every time) or a change finished: GET unless one is already in flight. */
     fun onTabShown() {
         if (isGuest || _state.value.loading) return
+        _state.update { it.copy(loading = true) }
+        job = scope.launch { load() }
+    }
+
+    /** A change succeeded: the GET that is in flight (if any) predates it, so it is cancelled and its answer dropped; GET again. */
+    fun reload() {
+        if (isGuest) return
+        job?.cancel()
         _state.update { it.copy(loading = true) }
         job = scope.launch { load() }
     }
