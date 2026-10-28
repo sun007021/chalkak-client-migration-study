@@ -15,8 +15,20 @@ import type { AppVisibility } from '../core/lifecycle/AppVisibility';
 import { ReactNativeAppVisibility } from '../core/lifecycle/ReactNativeAppVisibility';
 import type { ExternalLinkOpener } from '../core/linking/ExternalLinkOpener';
 import { LinkingExternalLinkOpener } from '../core/linking/LinkingExternalLinkOpener';
-import { NoopPushRegistrar } from '../core/push/NoopPushRegistrar';
+import { DevicePushRegistrar } from '../core/push/DevicePushRegistrar';
+import { AsyncStoragePushPromptFlagStore } from '../core/push/expo/AsyncStoragePushPromptFlagStore';
+import { ExpoNotificationResponseSource } from '../core/push/expo/ExpoNotificationResponseSource';
+import { ExpoPushMessageSource } from '../core/push/expo/ExpoPushMessageSource';
+import { ExpoPushNotificationPresenter } from '../core/push/expo/ExpoPushNotificationPresenter';
+import { ExpoPushPermissionGateway } from '../core/push/expo/ExpoPushPermissionGateway';
+import { ExpoPushTokenProvider } from '../core/push/expo/ExpoPushTokenProvider';
+import type { NotificationResponseSource } from '../core/push/NotificationResponseSource';
+import type { PushMessageSource } from '../core/push/PushMessageSource';
+import type { PushNotificationPresenter } from '../core/push/PushNotificationPresenter';
+import type { PushPermissionGateway } from '../core/push/PushPermissionGateway';
+import type { PushPromptFlagStore } from '../core/push/PushPromptFlagStore';
 import type { PushRegistrar } from '../core/push/PushRegistrar';
+import type { PushTokenProvider } from '../core/push/PushTokenProvider';
 import type { UserDataCache } from '../core/push/UserDataCache';
 import { UserDataCacheRegistry } from '../core/push/UserDataCacheRegistry';
 import { ToastCenter } from '../core/toast/ToastCenter';
@@ -81,6 +93,19 @@ import { UploadSuccessViewModel } from '../features/upload/UploadSuccessViewMode
 import type { UploadSuccessParams } from '../features/upload/UploadNavigator';
 import { NavigationUploadNavigator } from './NavigationUploadNavigator';
 import { NavigationHomeNavigator } from './NavigationHomeNavigator';
+import { NavigationNotificationNavigator } from './NavigationNotificationNavigator';
+import { NavigationPushTapBlocker } from './NavigationPushTapBlocker';
+import { NotificationDetailViewModel } from '../features/notification/NotificationDetailViewModel';
+import { NotificationEvents } from '../features/notification/NotificationEvents';
+import { NotificationInboxViewModel } from '../features/notification/NotificationInboxViewModel';
+import { NotificationTapProcessor } from '../features/notification/NotificationTapProcessor';
+import { AsyncStoragePendingPushStore } from '../features/push/AsyncStoragePendingPushStore';
+import { ForegroundPushHandler } from '../features/push/ForegroundPushHandler';
+import type { PendingPushStore } from '../features/push/PendingPushStore';
+import { PushPermissionCoordinator } from '../features/push/PushPermissionCoordinator';
+import { PushFeature } from '../features/push/PushFeature';
+import { PushTapRouter } from '../features/push/PushTapRouter';
+import type { PushTapBlocker } from '../features/push/PushTapBlocker';
 import { NavigationRecordNavigator } from './NavigationRecordNavigator';
 import { TabReturnHint } from './TabReturnHint';
 import type { RootStackParamList } from './navigation/routes';
@@ -150,7 +175,27 @@ export interface Dependencies {
    * (expo-image-picker, expo-image-manipulator, expo-media-library, expo-file-system)을 만든다. 테스트는 Fake를 넣는다.
    */
   readonly media?: MediaServices;
+  /** 푸시의 네이티브 경계. 없으면 expo-notifications 어댑터를 쓴다(테스트는 Fake를 넣는다). */
+  readonly push: PushPorts;
 }
+
+/** 푸시의 네이티브 경계 묶음(기기 등록용 토큰 공급자는 레지스트라가 이미 가진다). */
+type PushPorts = {
+  readonly permission: PushPermissionGateway;
+  readonly responses: NotificationResponseSource;
+  readonly messages: PushMessageSource;
+  readonly presenter: PushNotificationPresenter;
+  readonly promptFlags: PushPromptFlagStore;
+  readonly pendingStore: PendingPushStore;
+  /** 없으면 내비게이션의 현재 화면(업로드)으로 판단한다. */
+  readonly tapBlocker?: PushTapBlocker;
+};
+
+/** 테스트가 일부만 바꿀 수 있는 의존성. 푸시 포트는 필요한 것만 `push`에 넣고 토큰 공급자는 `pushTokens`다. */
+type ContainerOverrides = Partial<Omit<Dependencies, 'push'>> & {
+  push?: Partial<PushPorts>;
+  pushTokens?: PushTokenProvider;
+};
 
 function isUserDataCache(value: object): value is UserDataCache {
   return typeof (value as Partial<UserDataCache>).clearAll === 'function';
@@ -231,6 +276,14 @@ export class AppContainer {
   private readonly calendarImageRenderer: CalendarImageRenderer;
   private readonly calendarImageSaver: CalendarImageSaver;
   private readonly cacheRegistry = new UserDataCacheRegistry();
+  /** 알림 읽음·소멸을 알림함 화면에 전한다. */
+  readonly notificationEvents = new NotificationEvents();
+  private readonly notificationNavigator = new NavigationNotificationNavigator(
+    this.navigationHandle,
+  );
+  private readonly notificationProcessor: NotificationTapProcessor;
+  private readonly navigationBlocker = new NavigationPushTapBlocker(this.navigationHandle);
+  private readonly pushFeature: PushFeature;
 
   private constructor(dependencies: Dependencies, toastCenter: ToastCenter | null) {
     this.dependencies = dependencies;
@@ -268,6 +321,16 @@ export class AppContainer {
       pushRegistrar: this.pushRegistrar,
       events: this.events,
     });
+    this.notificationProcessor = new NotificationTapProcessor({
+      notifications: new NotificationRepository({ api: this.api }),
+      navigator: this.notificationNavigator,
+      home: () => this.homeOwner.getSnapshot().viewModel,
+      events: this.notificationEvents,
+      sessionStore: this.sessionStore,
+      toast: this.toast,
+      authFlow: this.bootViewModel,
+    });
+    this.pushFeature = this.createPushFeature();
     this.updateDialogViewModel = new UpdateDialogViewModel(dependencies.storeOpener);
     this.loginOwner = new LoginViewModelOwner(this.bootViewModel, () =>
       this.createLoginViewModel(),
@@ -563,6 +626,78 @@ export class AppContainer {
     });
   }
 
+  /** 알림함 라우트(내비게이션)만 부른다. 화면을 열 때마다 만들고 닫을 때 dispose한다. */
+  createNotificationInboxViewModel(): NotificationInboxViewModel {
+    return new NotificationInboxViewModel({
+      notifications: new NotificationRepository({ api: this.api }),
+      processor: this.notificationProcessor,
+      events: this.notificationEvents,
+      toast: this.toast,
+      authFlow: this.bootViewModel,
+      analytics: this.analytics,
+    });
+  }
+
+  /** 알림 상세 라우트(내비게이션)만 부른다. */
+  createNotificationDetailViewModel(
+    notificationId: string,
+    navigator: { close(): void },
+  ): NotificationDetailViewModel {
+    return new NotificationDetailViewModel({
+      notificationId,
+      notifications: new NotificationRepository({ api: this.api }),
+      events: this.notificationEvents,
+      home: () => this.homeOwner.getSnapshot().viewModel,
+      toast: this.toast,
+      authFlow: this.bootViewModel,
+      analytics: this.analytics,
+      navigator: {
+        close: () => navigator.close(),
+        openInbox: () => this.notificationNavigator.openInbox(),
+      },
+    });
+  }
+
+  /**
+   * 푸시 수신 기능을 시작한다(기기 등록 트리거, 권한 요청, 탭 라우팅, 포그라운드 표시). 반환 함수로 해제한다.
+   * 앱 루트의 효과(effect)가 부른다. 기능 객체는 컨테이너당 하나라 StrictMode의 start -> stop -> start에서도
+   * 콜드 스타트 탭을 한 번만 소비한다.
+   */
+  startPush(): () => void {
+    return this.pushFeature.start();
+  }
+
+  /** NavigationContainer의 onReady: 준비 전에 보류된 푸시 탭을 다시 처리하게 한다. */
+  readonly onNavigationReady = (): void => this.navigationBlocker.notifyReady();
+
+  private createPushFeature(): PushFeature {
+    const p = this.dependencies.push;
+    const home = () => this.homeOwner.getSnapshot().viewModel;
+    return new PushFeature([
+      { start: () => this.pushRegistrar.start?.() },
+      new PushPermissionCoordinator({
+        boot: this.bootViewModel,
+        gateway: p.permission,
+        flags: p.promptFlags,
+        toast: this.toast,
+      }),
+      new ForegroundPushHandler({
+        messages: p.messages,
+        permission: p.permission,
+        presenter: p.presenter,
+        home,
+      }),
+      new PushTapRouter({
+        responses: p.responses,
+        boot: this.bootViewModel,
+        sessionStore: this.sessionStore,
+        blocker: p.tapBlocker ?? this.navigationBlocker,
+        store: p.pendingStore,
+        processor: this.notificationProcessor,
+      }),
+    ]);
+  }
+
   /** 웹뷰 라우트(내비게이션)만 부른다. */
   createIssueWebViewModel(url: string): IssueWebViewModel {
     return new IssueWebViewModel({
@@ -586,7 +721,7 @@ export class AppContainer {
   }
 
   /** `config`는 앱 루트가 `readAppConfig()`로 읽어 넘긴다. 나머지는 기본 구현이며 `overrides`로 바꾼다. */
-  static create(config: AppConfig, overrides: Partial<Dependencies> = {}): AppContainer {
+  static create(config: AppConfig, overrides: ContainerOverrides = {}): AppContainer {
     const clock = overrides.clock ?? new SystemClock();
     const logger = new ConsoleNetworkLogger();
     const sessionStore =
@@ -616,9 +751,21 @@ export class AppContainer {
         clock,
         logger,
       });
+    const o = overrides.push ?? {};
+    const pushTokens = overrides.pushTokens ?? new ExpoPushTokenProvider();
     const featureFlags = overrides.featureFlags ?? readFeatureFlags(undefined);
     const appInfo = overrides.appInfo ?? DEFAULT_APP_INFO;
     const visibility = overrides.visibility ?? new ReactNativeAppVisibility();
+    const pushRegistrar =
+      overrides.pushRegistrar ??
+      new DevicePushRegistrar({
+        api,
+        sessionStore,
+        tokenRefresher,
+        tokens: pushTokens,
+        visibility,
+        logger,
+      });
     const toastCenter = overrides.toast
       ? null
       : new ToastCenter({ visibility, durationMs: TOAST_DURATION_MS });
@@ -636,7 +783,16 @@ export class AppContainer {
           overrides.socialLoginClient ??
           selectSocialLoginClient(featureFlags, new KakaoSocialLoginClient(new SeoulKakaoSdk())),
         nonceGenerator: overrides.nonceGenerator ?? new SecureNonceGenerator(getRandomBytes),
-        pushRegistrar: overrides.pushRegistrar ?? new NoopPushRegistrar(),
+        pushRegistrar,
+        push: {
+          permission: o.permission ?? new ExpoPushPermissionGateway(),
+          responses: o.responses ?? new ExpoNotificationResponseSource(),
+          messages: o.messages ?? new ExpoPushMessageSource(),
+          presenter: o.presenter ?? new ExpoPushNotificationPresenter(),
+          promptFlags: o.promptFlags ?? new AsyncStoragePushPromptFlagStore(),
+          pendingStore: o.pendingStore ?? new AsyncStoragePendingPushStore(),
+          tapBlocker: o.tapBlocker,
+        },
         homePreloader: overrides.homePreloader ?? new NoopHomePreloader(),
         updateChecker: overrides.updateChecker ?? createUpdateChecker(appInfo, transport),
         storeOpener: overrides.storeOpener ?? new LinkingStoreOpener(storeUrlFor(appInfo)),

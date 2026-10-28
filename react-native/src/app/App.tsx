@@ -40,9 +40,9 @@ export function App({ configResult, overrides }: AppProps) {
 
 /** 내비게이션 컨테이너와 화면 위 오버레이(토스트). 내비게이션 핸들은 컨테이너(AppContainer)가 소유한다. */
 function AppNavigation() {
-  const { navigationHandle, toastCenter } = useAppContainer();
+  const { navigationHandle, toastCenter, onNavigationReady } = useAppContainer();
   return (
-    <NavigationContainer ref={navigationHandle}>
+    <NavigationContainer ref={navigationHandle} onReady={onNavigationReady}>
       <AppShell />
       <UploadEntryOverlay />
       {toastCenter ? <ToastHost center={toastCenter} /> : null}
@@ -54,6 +54,9 @@ function AppNavigation() {
 function AppShell() {
   const container = useAppContainer();
   const { bootViewModel, updateDialogViewModel } = container;
+
+  // 푸시 수신(기기 등록 트리거, 권한 요청, 탭 라우팅, 포그라운드 표시). 효과의 정리 함수가 모두 해제하므로 StrictMode의 재마운트에도 안전하다.
+  useEffect(() => container.startPush(), [container]);
 
   useEffect(() => {
     void bootViewModel.start();

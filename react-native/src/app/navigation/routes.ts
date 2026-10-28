@@ -24,11 +24,20 @@ export type RootStackParamList = {
     seed?: FeedSeed | null;
     entry?: FeedEntry;
     thumbnailUrl?: string | null;
+    /** 푸시 AI 리뷰 탭: 상세를 열며 AI 피드백 시트를 한 번 자동으로 연다(D-11). AI 리뷰 PR이 해석한다. */
+    openAiSheet?: boolean;
   };
   Notifications: undefined;
+  NotificationDetail: { notificationId: string };
   IssueWeb: { url: string };
   /** 게이트가 고정해 넘긴 주제 날짜(yyyy-MM-dd, REQ-UPL-008). */
   Upload: { topicDate: string };
   /** 업로드 화면을 바꿔 올라온다(뒤로 가도 업로드 화면이 없다, REQ-UPL-064). */
   UploadSuccess: { topicTitle: string; topicDate: string; moderationStatus: TodayModerationStatus };
 };
+
+/**
+ * 작성 중 내용을 보호하려고 푸시 탭 이동을 미루는 화면(REQ-PUSH-031).
+ * TODO(SET·FDBK PR): 피드백 화면 라우트가 생기면 여기에 넣는다(아직 없는 이름은 적지 않는다).
+ */
+export const PUSH_TAP_BLOCKING_ROUTES: readonly (keyof RootStackParamList)[] = ['Upload'];

@@ -20,7 +20,7 @@ type RefreshFixture = {
 
 export const BASE_URL = 'https://api.test/api/v1/';
 
-export function createNetHarness(options: { manualSleeper?: boolean } = {}) {
+export function createNetHarness(options: { manualSleeper?: boolean; maxRetries?: number } = {}) {
   const clock = new FakeClock('2026-10-27T00:00:00.000Z');
   const transport = new FakeTransport();
   const storage = new FakeSecureKeyValueStorage();
@@ -41,6 +41,7 @@ export function createNetHarness(options: { manualSleeper?: boolean } = {}) {
     sleeper,
     clock,
     logger,
+    maxRetries: options.maxRetries,
   });
 
   /** 인증 세션을 저장해 둔다. 기본: access 15분, refresh 30일 남음. */

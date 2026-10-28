@@ -231,6 +231,25 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
   - `FakeCalendarImageSaver`처럼 즉시 끝나는 가짜로는 `await fireEvent.press` 두 번이 "연타"가 아니다(첫 저장이 이미 끝난다). 연타 검증은 저장을 붙잡아 둔다.
   - 기록 흐름 테스트의 기준 시각(10-27)보다 미래인 10-31 사진으로 전시를 열면 전시가 오늘로 맞춰 열린다(전시는 날짜를 오늘 이하로 자른다).
 
+## 알림·푸시 (`src/features/notification`, `src/features/push`, `src/core/push`, `src/data/notification`)
+
+- **구성**: 알림함(`NotificationInboxViewModel`, 마운트 = `onShown`, 언마운트 = `onHidden`)과 상세(`NotificationDetailViewModel`)는 순수 TS ViewModel이다. 알림함 행 탭과 푸시 탭은 같은 `planNotificationTap`(D-11 목적지 표)과 `NotificationTapProcessor`를 지난다(읽음 처리 -> 홈 `onPushReceived` -> 이동). 읽음 API 실패는 네트워크면 안내 토스트 후 이동, 그 밖(404 등)은 `noti.gone` 토스트 + 알림함 새로고침이다. 401은 `AuthErrorPolicy`(키 `notification-read`).
+- **푸시 포트**: `core/push`의 인터페이스(`PushPermissionGateway`, `PushTokenProvider`, `NotificationResponseSource`, `PushMessageSource`, `PushNotificationPresenter`, `PushPromptFlagStore`)를 ViewModel/조정자가 쓰고, 실제 어댑터는 `core/push/expo/`(expo-notifications)에 얇게 둔다(매핑 함수만 테스트). `AppContainer.startPush()`가 `App.tsx`의 `useEffect`에서 불려 등록기·권한 조정자·포그라운드 핸들러·탭 라우터를 시작하고 정리 함수를 돌려준다(StrictMode 안전).
+- **기기 등록**: `DevicePushRegistrar`가 `PUT /push-devices/current {fcmToken}`을 보낸다. 토큰은 JWT에 세션 ID가 있어야 보내고(없으면 한 번 갱신), 같은 (사용자, 토큰)은 다시 보내지 않으며, 세션 세대가 바뀌었으면 성공을 기록하지 않는다. 실패는 reject하지 않고 로그만 남긴다.
+- **탭 처리**: `PushTapRouter`가 부팅 단계로 정한다. 스플래시·업데이트 필요 -> 보류(`PendingPushStore`에 저장), 로그인 -> 폐기, 가입 -> 인증 상태면 보류, 메인 회원 -> 처리(업로드·피드백 화면에서는 `PushTapBlocker`가 막음), 메인 게스트 -> 폐기. 계정이 바뀌면 보류분을 버린다.
+- **확인 필요(백엔드·기획)**
+  1. **iOS 푸시 토큰(미해결, 후속 필요)**: iOS는 지금 **기기 등록을 하지 않는다**. `getDevicePushTokenAsync`는 iOS에서 APNs 토큰을 주는데 서버는 FCM 토큰(`fcmToken`)만 받으므로 APNs 토큰은 보내지 않는다(`PushTokenProvider`가 iOS에서 null). 네이티브 iOS도 `PlaceholderFCMTokenProvider`로 같은 상태다. 후속: 기존 `PushTokenProvider` 이음새 뒤에 `@react-native-firebase/messaging`으로 FCM 토큰을 얻는 구현을 꽂는다(iOS에 `GoogleService-Info.plist`와 APNs 키 필요). `docs/spec`은 고치지 않았다.
+  2. **스펙 충돌 2(권한 대화상자)**: 스펙은 OS 대화상자만 말하는 곳과 iOS 앱 내 사전 안내(`push-permission.*` testid, `noti.perm.title/body`)를 말하는 곳이 있다. OS 대화상자만 구현했고 사전 안내 testid는 쓰지 않았다.
+  3. **스펙 충돌 3(포그라운드 AI 푸시)**: 포그라운드에서 받은 원격 푸시는 OS 배너를 끄고(`setNotificationHandler`) 앱이 직접 로컬 알림으로 보여 주며 AI 푸시도 억제하지 않는다.
+  4. **프롬프트 플래그 저장**: `PushPromptFlagStore`/`PendingPushStore`는 AsyncStorage라 앱 삭제 후 재설치하면 초기화된다(키체인이 아님).
+  5. **포그라운드 로컬 알림 탭**: 앱이 보여 준 로컬 알림에도 `data`를 실어 탭하면 같은 경로로 이동한다.
+  6. **Android 채널**: `moderation_push`(기본 채널, `app.config.ts` 플러그인 `defaultChannel`). 채널 이름/중요도 확정 필요.
+  7. **Firebase 설정**: `GOOGLE_SERVICES_JSON` 환경 변수가 있으면 `android.googleServicesFile`로 쓴다. 실기기 푸시 E2E에는 이 파일(과 iOS APNs 키)이 필요하다.
+  8. **Android 데이터 전용 푸시(실기기 확인 필요)**: 포그라운드에서 `notification` 블록 없이 `data`만 오는 푸시가 `addNotificationReceivedListener`로 오는지, 앱이 직접 표시할 제목·본문이 있는지는 기기에서 확인한다.
+- **내비게이션**: React Navigation 7의 `navigate`는 기본으로 쌓으므로 `openHome`·`openInbox`는 `{ pop: true }`로 스택에 이미 있는 화면까지 되돌아간다(`NavigationNotificationNavigator.integration.test.tsx`가 실제 RootNavigator로 확인). 내비게이션이 준비되기 전의 푸시 탭은 `NavigationPushTapBlocker`가 막아 두었다가 `NavigationContainer`의 `onReady`(`AppContainer.onNavigationReady`)에서 다시 처리한다. 작성 중 화면 목록은 `routes.ts`의 `PUSH_TAP_BLOCKING_ROUTES`이고 피드백 화면은 아직 없어 SET·FDBK PR에서 추가한다(TODO).
+- **시작·정지**: `PushFeature`가 컨테이너당 하나이고 참조 수로 센다(StrictMode의 start -> stop -> start 안전). 콜드 스타트 탭은 컨테이너 수명 동안 한 번만 소비하고, 같은 탭이 응답 리스너로도 오면 알림 요청 식별자로 거른다. 라우터는 세션 첫 `load()` 뒤에 세대를 읽는다(부팅의 첫 load가 세대를 올리므로).
+- **테스트 함정**: 알림 하네스는 `createNetHarness({ maxRetries: 0 })`(`ApiClientDeps.maxRetries`, 기본 `RETRY_MAX`)라 "실패 후 성공" 스크립트가 한 단계씩이다. 재시도 자체는 `ApiClient.retry.test.ts`가 검증한다. `FixtureRouter.set`은 호출 기록을 새로 시작한다. 헤더는 대소문자를 구분하지 않고 `authorizationOf`로 읽는다.
+
 ## AI 피드백 (`src/features/ai-review`, `src/data/ai-review`)
 
 - **구성**: `AiReviewRepository`(GET/POST `/posts/{id}/ai-review`, 디코더가 점수 0~10·status와 result 일치·feedback 비어 있지 않음을 검사해 `InvalidResponseError`) -> `DefaultAiReviewPoller`(앱에 하나, `AppContainer.aiReview`/`aiReviewSession`; 상태 확인·폴링·POST·오류 처리; 화면은 `owner`를 넘겨 자기 폴링만 멈춘다) -> `AiReviewViewModel`(게시물 하나의 알약/카드/시트 표시 상태, 순수 TS) -> `AiReviewSection`(상세 알약)·`AiReviewCard`(홈 카드)·`AiReviewSheets`. `AiReviewHosts`(app)가 ViewModel을 만들고 dispose하며 `FeedScreen.renderAiReview`, `HomeScreen.renderAiCard`로 꽂는다(화면 컴포넌트는 컨테이너를 모른다). 기존 `AiReviewPoller`(start/stop) 계약은 홈이 그대로 쓴다. 폴러는 `UserDataCacheRegistry`에 올라 로그아웃·계정 전환 때 `clearAll`된다.
