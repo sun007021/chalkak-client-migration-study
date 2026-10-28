@@ -1,11 +1,16 @@
+import { t } from '../../copy/ko';
+import { ApiError, InvalidResponseError, NetworkError } from '../../core/net/errors';
 import { ViewModel } from '../../core/state/ViewModel';
 import type { Clock } from '../../core/time/Clock';
+import { MidnightWatcher } from '../../core/time/MidnightWatcher';
+import { kstToday } from '../../core/time/kst';
 import type { DateString } from '../../core/time/kst';
 import type { ToastController } from '../../core/ui/ToastController';
 import type { PostLikeStore } from '../like/PostLikeStore';
 import type { PostChanges } from '../post/PostChanges';
-import type { PostSeed } from '../post/postModels';
+import type { PostChange, PostDetail, PostSeed } from '../post/postModels';
 import type { FeedRepository } from './FeedRepository';
+import { clampTitleInput, titlePayload } from './titleInput';
 
 /** 상세 화면을 닫는 통로(화면이 꽂는다). 삭제 성공·좋아요 404 등 ViewModel이 닫아야 할 때 부른다. */
 export interface FeedNavigator {
@@ -89,6 +94,17 @@ export interface FeedViewModelDeps {
  * - dispose해도 진행 중인 삭제·제목 저장 요청의 결과는 changes에 반영한다(토스트는 ToastController가 보일 때만 띄운다).
  */
 export class FeedViewModel extends ViewModel<FeedState> {
+  private readonly unsubscribeChanges: () => void;
+  private readonly midnight: MidnightWatcher;
+  private closed = false;
+  /** 상세 읽기(load·retry·refresh)마다 올린다. 최신이 아닌 응답은 버린다. */
+  private loadSeq = 0;
+  /** 제목 수정에 성공할 때마다 올린다. 그보다 먼저 시작한 읽기 응답이 수정한 제목을 덮지 않게 한다. */
+  private titleEdits = 0;
+  /** 이 ViewModel이 직접 알린 removed 이벤트는 자기 구독이 다시 받아 닫지 않는다. */
+  private publishing = false;
+  private deleted = false;
+
   constructor(protected readonly deps: FeedViewModelDeps) {
     super({
       view: { kind: 'loading' },
@@ -102,39 +118,59 @@ export class FeedViewModel extends ViewModel<FeedState> {
       titleDialog: { open: false, input: '', saving: false, error: null },
       deleteDialog: { open: false, deleting: false },
     });
+    this.unsubscribeChanges = deps.changes.subscribe((change) => this.onChange(change));
+    this.midnight = new MidnightWatcher({ clock: deps.clock, onDateChanged: () => this.update({}) });
   }
 
   /** 화면이 열릴 때 한 번. 끝나면 이행된다. */
   load(): Promise<void> {
-    throw new Error('not implemented');
+    const { seed } = this.deps;
+    if (seed) {
+      const assumed = this.deps.assumeMine ?? seed.isMine;
+      this.update({ view: { kind: 'content' }, post: FeedViewModel.fromSeed(seed), isMine: assumed });
+    } else {
+      this.update({ view: { kind: 'loading' }, post: null, isMine: this.deps.assumeMine ?? false });
+    }
+    this.midnight.start();
+    return this.read();
   }
 
   /** 오류 화면의 다시 시도(첫 로딩부터). */
   retry(): Promise<void> {
-    throw new Error('not implemented');
+    this.update({ view: { kind: 'loading' }, post: null, confirmed: false });
+    return this.read();
   }
 
   /** 이미 내용이 보이는 상태에서 다시 확인(복귀). 실패하면 내용을 유지하고 토스트만. */
   refresh(): Promise<void> {
-    throw new Error('not implemented');
+    return this.read();
   }
 
   /** 하트 탭. canLike가 아니면 아무 일도 없다. */
-  onLikePress(): Promise<void> {
-    throw new Error('not implemented');
+  async onLikePress(): Promise<void> {
+    const { post, canLike } = this.state;
+    if (!canLike || !post) return;
+    await this.deps.likes.toggle({ id: post.id, isLiked: post.isLiked, likeCount: post.likeCount });
   }
 
   /** 수정 버튼. canEditTitle이 아니면 아무 일도 없다. 현재 제목으로 입력을 채워 다이얼로그를 연다. */
   openTitleEdit(): void {
-    throw new Error('not implemented');
+    this.update({});
+    const { canEditTitle, post } = this.state;
+    if (!canEditTitle || !post) return;
+    this.setState({ titleDialog: { open: true, input: clampTitleInput(post.title ?? ''), saving: false, error: null } });
   }
 
-  setTitleInput(_raw: string): void {
-    throw new Error('not implemented');
+  setTitleInput(raw: string): void {
+    const dialog = this.state.titleDialog;
+    if (!dialog.open || dialog.saving) return;
+    this.setState({ titleDialog: { ...dialog, input: clampTitleInput(raw), error: null } });
   }
 
   cancelTitleEdit(): void {
-    throw new Error('not implemented');
+    const dialog = this.state.titleDialog;
+    if (!dialog.open || dialog.saving) return;
+    this.setState({ titleDialog: { open: false, input: '', saving: false, error: null } });
   }
 
   /**
@@ -143,17 +179,42 @@ export class FeedViewModel extends ViewModel<FeedState> {
    * (400 `feed.edit.error.state`, 403 `feed.edit.error.banned`(재요청 없음), 401 `feed.edit.error.login`, 연결 실패 `common.error.network`, 그 밖 `feed.edit.error.other`).
    * 404: 다이얼로그를 닫고 not-found 화면 + changes에 removed.
    */
-  saveTitle(): Promise<void> {
-    throw new Error('not implemented');
+  async saveTitle(): Promise<void> {
+    this.update({});
+    const dialog = this.state.titleDialog;
+    const { post, canEditTitle } = this.state;
+    if (!dialog.open || dialog.saving || !canEditTitle || !post) return;
+    this.setState({ titleDialog: { ...dialog, saving: true, error: null } });
+    try {
+      const result = await this.deps.repository.updateTitle(post.id, titlePayload(dialog.input));
+      this.titleEdits += 1;
+      if (!this.closed) {
+        const current = this.state.post;
+        this.setState({ titleDialog: { open: false, input: '', saving: false, error: null }, post: current ? { ...current, title: result.title } : current });
+      }
+      this.deps.changes.publish({ type: 'title', postId: post.id, title: result.title });
+      this.deps.toast.show(t('feed.edit.success'));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        if (!this.closed) this.update({ view: { kind: 'not-found' }, post: null, titleDialog: { open: false, input: '', saving: false, error: null } });
+        this.announceRemoved(post.id);
+        return;
+      }
+      if (this.closed) return;
+      this.setState({ titleDialog: { ...this.state.titleDialog, saving: false, error: FeedViewModel.titleError(error) } });
+    }
   }
 
   /** 삭제 버튼. canDelete가 아니면 아무 일도 없다. */
   openDelete(): void {
-    throw new Error('not implemented');
+    this.update({});
+    if (!this.state.canDelete || this.deleted) return;
+    this.setState({ deleteDialog: { open: true, deleting: false } });
   }
 
   cancelDelete(): void {
-    throw new Error('not implemented');
+    if (this.state.deleteDialog.deleting) return;
+    this.setState({ deleteDialog: { open: false, deleting: false } });
   }
 
   /**
@@ -161,11 +222,163 @@ export class FeedViewModel extends ViewModel<FeedState> {
    * 실패: 화면에 머물고 토스트로 알리며 다시 시도할 수 있다(400 `feed.delete.error.state`, 403 `feed.delete.error.forbidden`, 401 `feed.edit.error.login`,
    * 연결 실패 `common.error.network`, 그 밖 `feed.delete.error.other`). 404: not-found 화면 + changes에 removed + `feed.error.not-found` 토스트.
    */
-  confirmDelete(): Promise<void> {
-    throw new Error('not implemented');
+  async confirmDelete(): Promise<void> {
+    const { post, canDelete, deleteDialog } = this.state;
+    if (!deleteDialog.open || deleteDialog.deleting || !canDelete || !post || this.deleted) return;
+    this.setState({ deleteDialog: { open: true, deleting: true } });
+    try {
+      await this.deps.repository.deletePost(post.id);
+    } catch (error) {
+      if (!this.closed) this.setState({ deleteDialog: { open: false, deleting: false } });
+      if (error instanceof ApiError && error.status === 404) {
+        if (!this.closed) this.update({ view: { kind: 'not-found' }, post: null });
+        this.announceRemoved(post.id);
+        this.deps.toast.show(t('feed.error.not-found'));
+        return;
+      }
+      this.deps.toast.show(FeedViewModel.deleteError(error));
+      return;
+    }
+    this.deleted = true;
+    if (!this.closed) this.setState({ deleteDialog: { open: false, deleting: false } });
+    this.announceRemoved(post.id);
+    this.deps.toast.show(t('feed.delete.success'));
+    if (!this.closed) this.deps.navigator.close();
   }
 
   override dispose(): void {
+    this.closed = true;
+    this.loadSeq += 1;
+    this.unsubscribeChanges();
+    this.midnight.stop();
     super.dispose();
+  }
+
+  // ---------------------------------------------------------------- 읽기
+
+  private async read(): Promise<void> {
+    const token = ++this.loadSeq;
+    const stamp = this.deps.likes.beginRead();
+    const titleMark = this.titleEdits;
+    if (this.state.view.kind === 'content') this.setState({ refreshing: true });
+    let detail: PostDetail;
+    try {
+      detail = await this.deps.repository.fetchPost(this.deps.postId);
+    } catch (error) {
+      if (this.closed || token !== this.loadSeq) return;
+      this.onReadFailure(error);
+      return;
+    }
+    const userId = await this.deps.getUserId().catch(() => null);
+    if (this.closed || token !== this.loadSeq) return;
+    const [merged] = this.deps.likes.merge([{ id: detail.id, isLiked: detail.isLiked, likeCount: detail.likeCount }], stamp);
+    const current = this.state.post;
+    this.update({
+      view: { kind: 'content' },
+      confirmed: true,
+      refreshing: false,
+      isMine: this.deps.assumeMine === true || (userId !== null && detail.authorId === userId),
+      post: {
+        id: detail.id,
+        authorId: detail.authorId,
+        originalImageUrl: detail.originalImageUrl,
+        thumbnailImageUrl: detail.thumbnailImageUrl,
+        signatureOriginalImageUrl: detail.signatureOriginalImageUrl,
+        title: titleMark !== this.titleEdits && current ? current.title : detail.title,
+        likeCount: merged?.likeCount ?? detail.likeCount,
+        isLiked: merged?.isLiked ?? detail.isLiked,
+        topicDate: detail.topic.topicDate,
+        topicTitle: detail.topic.title,
+      },
+    });
+  }
+
+  private onReadFailure(error: unknown): void {
+    if (error instanceof ApiError && error.status === 404) {
+      this.update({ view: { kind: 'not-found' }, post: null, refreshing: false });
+      if (this.deps.seed) this.announceRemoved(this.deps.postId);
+      return;
+    }
+    const reason = error instanceof NetworkError ? 'network' : error instanceof InvalidResponseError ? 'invalid' : 'load';
+    if (this.state.view.kind === 'content') {
+      this.setState({ refreshing: false });
+      this.deps.toast.show(reason === 'network' ? t('common.error.network') : reason === 'invalid' ? t('feed.error.invalid') : t('feed.error.load'));
+      return;
+    }
+    this.update({ view: { kind: 'error', reason }, refreshing: false });
+  }
+
+  // ---------------------------------------------------------------- 이벤트·상태
+
+  private onChange(change: PostChange): void {
+    if (change.postId.toLowerCase() !== this.deps.postId.toLowerCase()) return;
+    const post = this.state.post;
+    if (change.type === 'removed') {
+      if (!this.publishing) this.deps.navigator.close();
+      return;
+    }
+    if (!post) return;
+    if (change.type === 'like') this.setState({ post: { ...post, isLiked: change.isLiked, likeCount: change.likeCount } });
+    else this.setState({ post: { ...post, title: change.title } });
+  }
+
+  private announceRemoved(postId: string): void {
+    this.publishing = true;
+    try {
+      this.deps.changes.publish({ type: 'removed', postId });
+    } finally {
+      this.publishing = false;
+    }
+  }
+
+  /** 상태를 바꾸고 파생 값(canLike, canEditTitle, canDelete)을 다시 계산한다. */
+  private update(patch: Partial<FeedState>): void {
+    const view = patch.view ?? this.state.view;
+    const post = patch.post === undefined ? this.state.post : patch.post;
+    const confirmed = view.kind === 'content' && (patch.confirmed ?? this.state.confirmed);
+    const isMine = patch.isMine ?? this.state.isMine;
+    const content = view.kind === 'content';
+    this.setState({
+      ...patch,
+      confirmed,
+      canLike: content && confirmed,
+      canEditTitle: content && confirmed && isMine && post?.topicDate != null && post.topicDate === kstToday(this.deps.clock),
+      canDelete: content && confirmed && isMine,
+    });
+  }
+
+  private static fromSeed(seed: PostSeed): FeedPost {
+    return {
+      id: seed.id,
+      authorId: seed.authorId,
+      originalImageUrl: seed.originalImageUrl,
+      thumbnailImageUrl: seed.thumbnailImageUrl,
+      signatureOriginalImageUrl: seed.signatureOriginalImageUrl ?? null,
+      title: seed.title,
+      likeCount: seed.likeCount,
+      isLiked: seed.isLiked,
+      topicDate: null,
+      topicTitle: null,
+    };
+  }
+
+  private static titleError(error: unknown): string {
+    if (error instanceof NetworkError) return t('common.error.network');
+    if (error instanceof ApiError) {
+      if (error.status === 400) return t('feed.edit.error.state');
+      if (error.status === 403) return t('feed.edit.error.banned');
+      if (error.status === 401) return t('feed.edit.error.login');
+    }
+    return t('feed.edit.error.other');
+  }
+
+  private static deleteError(error: unknown): string {
+    if (error instanceof NetworkError) return t('common.error.network');
+    if (error instanceof ApiError) {
+      if (error.status === 400) return t('feed.delete.error.state');
+      if (error.status === 403) return t('feed.delete.error.forbidden');
+      if (error.status === 401) return t('feed.edit.error.login');
+    }
+    return t('feed.delete.error.other');
   }
 }
