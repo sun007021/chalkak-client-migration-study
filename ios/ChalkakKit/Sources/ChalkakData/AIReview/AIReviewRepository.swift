@@ -106,14 +106,6 @@ private extension AIReviewResult {
     }
 }
 
-private extension KeyedDecodingContainer {
-    /// 키가 없거나 null이면 nil, 값이 있는데 ISO-8601이 아니면 실패.
-    func decodeInstantIfPresent(forKey key: Key) throws -> Date? {
-        guard contains(key), try !decodeNil(forKey: key) else { return nil }
-        return try decodeInstant(forKey: key)
-    }
-}
-
 public protocol AIReviewRepository: Sendable {
     /// `GET /posts/{postId}/ai-review`(session 인증, 본문 없음, 멱등 재시도 D-21).
     /// 실패는 `FeedFailure`(`.aiReviewStatus` 기준 매핑), 계약 위반은 `FeedFailure.invalidResponse`, 취소는 `CancellationError`.
