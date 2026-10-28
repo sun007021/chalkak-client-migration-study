@@ -6,13 +6,14 @@ import '../features/auth/domain/session_use_cases.dart';
 import '../features/auth/domain/user_data_cleaner.dart';
 import '../features/boot/domain/auth_gate.dart';
 import '../features/boot/domain/home_preloader.dart';
-import '../features/boot/domain/pending_navigation.dart';
 import '../features/boot/domain/update_gate.dart';
 import '../features/navigation/main_dependencies.dart';
+import '../features/notification/notification_dependencies.dart';
 import '../features/onboarding/domain/legal_document.dart';
 import '../features/onboarding/domain/sign_up_context.dart';
 import '../features/onboarding/domain/sign_up_use_case.dart';
 import '../features/onboarding/presentation/legal_document_sheet.dart';
+import '../features/settings/settings_dependencies.dart';
 import '../features/signature/domain/change_signature_use_case.dart';
 import '../features/signature/domain/signature_renderer.dart';
 import '../features/signature/domain/signature_repository.dart';
@@ -27,7 +28,6 @@ class AppDependencies {
     required this.authGate,
     required this.homePreloader,
     required this.pushRegistrar,
-    required this.pendingNavigation,
     required this.userDataCleaner,
     required this.loginUseCase,
     required this.enterGuest,
@@ -42,6 +42,8 @@ class AppDependencies {
     required this.externalLinkLauncher,
     required this.legalWebViewBuilder,
     required this.main,
+    required this.notification,
+    required this.settings,
   });
 
   final SessionManager sessions;
@@ -50,7 +52,6 @@ class AppDependencies {
   final AuthGate authGate;
   final HomePreloader homePreloader;
   final PushRegistrar pushRegistrar;
-  final PendingNavigation pendingNavigation;
   final UserDataCleaner userDataCleaner;
   final LoginUseCase loginUseCase;
   final EnterGuestUseCase enterGuest;
@@ -65,4 +66,10 @@ class AppDependencies {
   final ExternalLinkLauncher externalLinkLauncher;
   final LegalWebViewBuilder legalWebViewBuilder;
   final MainDependencies main;
+
+  /// 알림함·푸시(탭 처리, 기기 등록, 수신). [pushRegistrar]는 `notification.registrar`다.
+  final NotificationDependencies notification;
+
+  /// 설정 탭(푸시 수신 설정, 앱 버전)과 피드백.
+  final SettingsDependencies settings;
 }

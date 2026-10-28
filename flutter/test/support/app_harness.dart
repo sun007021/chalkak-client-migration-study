@@ -1,16 +1,22 @@
 import 'package:chalkak/app/app_dependencies.dart';
 import 'package:chalkak/app/chalkak_app.dart';
 import 'package:chalkak/core/auth/session.dart';
+import 'package:chalkak/core/push/notification_permission.dart';
 import 'package:chalkak/features/auth/data/api_auth_repository.dart';
 import 'package:chalkak/features/auth/domain/login_use_case.dart';
 import 'package:chalkak/features/auth/domain/session_use_cases.dart';
 import 'package:chalkak/features/auth/domain/user_data_cleaner.dart';
 import 'package:chalkak/features/boot/domain/auth_gate.dart';
-import 'package:chalkak/features/boot/domain/pending_navigation.dart';
 import 'package:chalkak/features/boot/domain/update_gate.dart';
+import 'package:chalkak/features/feedback/data/api_feedback_repository.dart';
+import 'package:chalkak/features/notification/data/push_platform.dart';
+import 'package:chalkak/features/notification/notification_dependencies.dart';
 import 'package:chalkak/features/onboarding/data/api_sign_up_repository.dart';
 import 'package:chalkak/features/onboarding/domain/sign_up_context.dart';
 import 'package:chalkak/features/onboarding/domain/sign_up_use_case.dart';
+import 'package:chalkak/features/settings/data/api_notification_settings_repository.dart';
+import 'package:chalkak/features/settings/presentation/settings_data_cleaner.dart';
+import 'package:chalkak/features/settings/settings_dependencies.dart';
 import 'package:chalkak/features/signature/data/api_signature_repository.dart';
 import 'package:chalkak/features/signature/data/api_signature_uploader.dart';
 import 'package:chalkak/features/signature/domain/change_signature_use_case.dart';
@@ -20,6 +26,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'auth_fakes.dart';
 import 'fake_analytics_tracker.dart';
 import 'home_fakes.dart';
+import 'notification_fakes.dart';
 import 'onboarding_fakes.dart';
 
 export 'ui_helpers.dart';
@@ -33,12 +40,8 @@ class AppHarness {
       launcher: launcher,
       enabled: updateGateEnabled,
     );
-    pendingNavigation = PendingNavigation(
-      gate: updateGate,
-      navigate: pushNavigations.add,
-    );
     final repository = ApiAuthRepository(client: http.client);
-    final cleaner = CompositeUserDataCleaner([userData, pendingNavigation]);
+    final cleaner = CompositeUserDataCleaner([userData, settingsCleaner]);
     final signatureRepository = ApiSignatureRepository(client: http.client);
     final signatureUploader = ApiSignatureUploader(client: http.client);
     dependencies = AppDependencies(
@@ -48,7 +51,6 @@ class AppHarness {
       authGate: AuthGate(sessions: http.sessions),
       homePreloader: preloader,
       pushRegistrar: push,
-      pendingNavigation: pendingNavigation,
       userDataCleaner: cleaner,
       loginUseCase: LoginUseCase(
         socialLogin: kakao,
@@ -88,6 +90,25 @@ class AppHarness {
       externalLinkLauncher: externalLinks,
       legalWebViewBuilder: fakeLegalWebView,
       main: homeFakes.dependencies,
+      notification: buildNotificationDependencies(
+        repository: notificationRepository,
+        devices: pushDevices,
+        sessions: http.sessions,
+        refresher: FakeSessionRefresher(),
+        platform: const PushPlatform.disabled(),
+        pendingStore: FakePendingPushStore(),
+        promptFlag: FakePermissionFlag(),
+        toast: homeFakes.dependencies.toast,
+      ),
+      settings: SettingsDependencies(
+        notificationSettings: ApiNotificationSettingsRepository(
+          client: http.client,
+        ),
+        feedback: ApiFeedbackRepository(client: http.client),
+        permission: osPermission,
+        dataCleaner: settingsCleaner,
+        appVersion: appVersion,
+      ),
     );
   }
 
@@ -97,15 +118,23 @@ class AppHarness {
   final FakeUpdateLauncher launcher = FakeUpdateLauncher();
   final FakeHomePreloader preloader = FakeHomePreloader();
   final FakePushRegistrar push = FakePushRegistrar();
+  final FakeNotificationRepository notificationRepository =
+      FakeNotificationRepository();
+  final FakePushDeviceRepository pushDevices = FakePushDeviceRepository();
   final FakeUserDataCleaner userData = FakeUserDataCleaner();
+  final SettingsDataCleaner settingsCleaner = SettingsDataCleaner();
+  final FakeNotificationPermission osPermission = FakeNotificationPermission(
+    OsPermissionStatus.granted,
+  );
+
+  /// 설정 탭 "버전정보"에 보이는 값.
+  static const appVersion = '1.1.1';
   final FakeSocialLoginClient kakao = FakeSocialLoginClient();
   final FakeAnalyticsTracker analytics = FakeAnalyticsTracker();
   final SignUpContext signUpContext = SignUpContext();
   final FakeSignatureRenderer renderer = FakeSignatureRenderer();
   final FakeExternalLinkLauncher externalLinks = FakeExternalLinkLauncher();
-  final List<String> pushNavigations = [];
   late final UpdateGate updateGate;
-  late final PendingNavigation pendingNavigation;
   late final AppDependencies dependencies;
 
   Widget get app => ChalkakApp(dependencies: dependencies);

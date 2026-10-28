@@ -11,7 +11,8 @@ const isE2e = process.env.APP_VARIANT === 'e2e';
 // 앨범 읽기는 시스템 선택기(PHPicker / Android 포토 피커)라 권한이 필요 없지만 라이브러리가 키를 요구해 문구를 둔다.
 const PHOTOS_PERMISSION = '앨범에서 사진을 고를 수 있도록 사진 접근을 사용해요.';
 const CAMERA_PERMISSION = '지금 찍은 사진으로 주제에 참여할 수 있도록 카메라를 사용해요.';
-const SAVE_PHOTOS_PERMISSION = '촬영한 사진을 내 앨범에 저장하려고 사진 추가 권한을 사용해요.';
+const SAVE_PHOTOS_PERMISSION =
+  '촬영한 사진과 달력 이미지를 내 앨범에 저장하려고 사진 추가 권한을 사용해요.';
 
 const config: ExpoConfig = {
   name: '찰캌',
@@ -23,10 +24,12 @@ const config: ExpoConfig = {
   ios: { bundleIdentifier: 'com.chalkak.study.rn', supportsTablet: false },
   android: {
     package: 'com.chalkak.study.rn',
-    // 앨범은 시스템 포토 피커라 미디어 읽기 권한이 필요 없다. 라이브러리 매니페스트가 넣는 쓰이지 않는 권한을 지운다.
+    // 앨범(업로드)은 시스템 포토 피커, 기록의 달력 이미지 저장은 쓰기 전용(REQ-REC-038)이라 미디어 읽기 권한은 쓰지 않는다.
+    // 라이브러리 매니페스트가 넣는 쓰이지 않는 권한을 지운다(Play 사진·동영상 권한 정책).
     // CAMERA는 막지 않는다: expo-image-picker 58.0.10의 launchCameraAsync는 ensureCameraPermissionsAreGranted()로 CAMERA 권한을 요구한다.
     blockedPermissions: [
       'android.permission.RECORD_AUDIO',
+      'android.permission.READ_EXTERNAL_STORAGE',
       'android.permission.READ_MEDIA_IMAGES',
       'android.permission.READ_MEDIA_VIDEO',
       'android.permission.READ_MEDIA_AUDIO',
@@ -57,12 +60,13 @@ const config: ExpoConfig = {
         microphonePermission: false,
       },
     ],
+    // 업로드(촬영본 저장)와 기록(달력 이미지 저장)이 함께 쓰는 단 하나의 expo-media-library 항목.
+    // granularPermissions가 빈 배열이라 READ_MEDIA_IMAGES/VIDEO/AUDIO는 매니페스트에 들어가지 않는다(갤러리 저장은 MediaStore 삽입).
     [
       'expo-media-library',
       {
         photosPermission: PHOTOS_PERMISSION,
         savePhotosPermission: SAVE_PHOTOS_PERMISSION,
-        // Android 13+의 세분화 미디어 읽기 권한은 쓰지 않는다(갤러리 저장은 MediaStore 삽입).
         granularPermissions: [],
       },
     ],

@@ -17,15 +17,19 @@ import '../../home/presentation/home_screen.dart';
 import '../../record/domain/record_state.dart';
 import '../../record/domain/record_view_model.dart';
 import '../../record/presentation/record_screen.dart';
+import '../../settings/presentation/settings_screen.dart';
 import '../domain/main_shell_view_model.dart';
 import 'main_shell_navigator.dart';
 import 'navigation_test_ids.dart';
+import 'settings_tab.dart';
 
 /// 메인 화면: 탭 본문 + 하단 바(홈, 전시, 가운데 업로드, 기록, 설정).
 /// - 하단 바 `bottom-bar.root`, 탭 `bottom-bar.tab-*`(선택된 탭만 selected), 업로드 버튼
 ///   `bottom-bar.upload-button`(selected 없음, 접근성 이름 Copy.navTabUploadA11y, 아이콘 "+").
 /// - 탭 본문: 홈은 [HomeScreen](`home.root`), 전시·기록은 각 화면(ViewModel을 받지 못하면 자리표시자),
-///   설정은 자리표시자(`settings.root`)이며 한 번 만든 뒤 탭을 오가도 상태를 유지한다(REQ-NAV-005).
+///   설정은 [SettingsScreen](`settings.root`, [settings]가 없으면 자리표시자)이며 한 번 만든 뒤 탭을 오가도
+///   상태를 유지한다(REQ-NAV-005). 설정 탭이 다시 보일 때마다 `settings.viewModel.onTabShown`을 부른다
+///   (처음 보일 때는 화면이 시작하며 부른다).
 /// - 업로드 게이트 확인 중에는 `upload-entry.loading`을 보인다.
 /// - [HomeViewModel] 이벤트를 [MainShellViewModel]/[MainShellNavigator]로 연결한다:
 ///   OpenUploadGate -> onUploadPressed, OpenRecordTab -> openRecord, OpenDisplayTab ->
@@ -44,6 +48,7 @@ class MainShell extends StatefulWidget {
     required this.aiCardBuilder,
     this.displayFactory,
     this.record,
+    this.settings,
   });
 
   final MainShellViewModel shell;
@@ -59,6 +64,9 @@ class MainShell extends StatefulWidget {
   /// 기록 탭 ViewModel. 소유와 정리는 만든 쪽이 한다. null이면 기록 탭은 자리표시자다.
   /// 탭이 선택될 때와 이동에서 돌아올 때 `enter`, 앱 복귀 때 `onForeground`, 탭을 떠날 때 `onHidden`을 부른다.
   final RecordViewModel? record;
+
+  /// 설정 탭. 소유와 정리는 만든 쪽이 한다. null이면 설정 탭은 자리표시자다.
+  final SettingsTab? settings;
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -115,6 +123,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     if (selected != _selected) {
       final leftRecord = _selected == BottomDestination.record;
       final cameToHome = selected == BottomDestination.home;
+      // 이미 만들어 둔 설정 탭이 다시 보이는 경우(처음에는 화면이 시작하며 불러온다).
+      final reshownSettings =
+          selected == BottomDestination.settings && _visited.contains(selected);
       setState(() {
         _selected = selected;
         _visited.add(selected);
@@ -122,6 +133,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       if (leftRecord) widget.record?.onHidden();
       if (selected == BottomDestination.record) _enterRecord();
       if (cameToHome) unawaited(widget.home.onBecameVisible());
+      if (reshownSettings) {
+        unawaited(widget.settings?.viewModel.onTabShown());
+      }
       if (selected == BottomDestination.display) {
         if (_display == null) {
           _ensureDisplay();
@@ -131,6 +145,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       }
     } else {
       setState(() {});
+      // 이미 전시 탭에 있을 때의 이동(업로드 직후)도 목표를 적용한다.
+      if (selected == BottomDestination.display) _applyDisplayTarget();
     }
   }
 
@@ -177,10 +193,13 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     final target = widget.shell.takeDisplayTarget();
     if (target == null) return;
     unawaited(() async {
+      final sameDate = display.selectedDate == target.date;
       await display.selectDate(target.date);
       await display.selectSort(
         target.popular ? DisplaySort.popular : DisplaySort.recent,
       );
+      // 같은 날짜를 이미 보고 있으면 옮겨도 다시 불러오지 않으므로 직접 재검증한다.
+      if (target.revalidate && sameDate) await display.onReturnedFromFeed();
     }());
   }
 
@@ -302,6 +321,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       child: HomeScreen(
         viewModel: widget.home,
         aiCardBuilder: widget.aiCardBuilder,
+        aiCardVisible:
+            _selected == BottomDestination.home &&
+            (ModalRoute.of(context)?.isCurrent ?? true),
         scrollController: _homeScroll,
       ),
     ),
@@ -323,7 +345,20 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       ),
       null => const _TabPlaceholder('record.root'),
     },
-    BottomDestination.settings => const _TabPlaceholder('settings.root'),
+    BottomDestination.settings => switch (widget.settings) {
+      final settings? => SafeArea(
+        bottom: false,
+        child: SettingsScreen(
+          viewModel: settings.viewModel,
+          documentViewModelFactory: settings.documentViewModelFactory,
+          webViewBuilder: settings.webViewBuilder,
+          onOpenFeedback: settings.onOpenFeedback,
+          onChangeSignature: settings.onChangeSignature,
+          onToast: widget.toast.show,
+        ),
+      ),
+      null => const _TabPlaceholder('settings.root'),
+    },
   };
 }
 

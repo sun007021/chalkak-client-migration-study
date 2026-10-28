@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 개발 빌드용 값. 배포(Release/App Store) 빌드는 production으로 바꿔야 한다. 서명 시 Xcode가 프로비저닝 프로파일 값으로 덮어쓰기도 한다. -->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

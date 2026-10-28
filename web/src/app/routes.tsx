@@ -12,7 +12,12 @@ import { KakaoCallbackScreen, LoginScreen } from '../features/auth/LoginScreen';
 import { resolveAuthGate } from '../features/boot/authGate';
 import type { AuthGateDecision } from '../features/boot/authGate';
 import { BootScreen, SplashView } from '../features/boot/BootScreen';
-import { BottomBarSlotContext, HomePlaceholder, MainShell, TabGate, TabPlaceholder } from '../features/shell/MainShell';
+import { HomeScreen } from '../features/home/HomeScreen';
+import { TermsScreen } from '../features/onboarding/TermsScreen';
+import { SignatureDrawScreen } from '../features/signature/SignatureDrawScreen';
+import { SignaturePreviewScreen } from '../features/signature/SignaturePreviewScreen';
+import { MemberOnly } from '../features/shell/MemberOnly';
+import { BottomBarSlotContext, MainShell, TabGate, TabPlaceholder } from '../features/shell/MainShell';
 import type { TabRouteHandle } from '../features/shell/MainShell';
 import { ContainerProvider } from './AppContext';
 import type { AppContainer } from './container';
@@ -82,7 +87,7 @@ function RootLayout({ container }: { container: AppContainer }): ReactNode {
 /**
  * 앱 라우트 정의. 루트 레이아웃이 Provider(컨테이너, 분석, 토스트 호스트), RouteScreenViewTracker, SessionEvents 구독(→ /login으로 replace 이동)을 둔다.
  * '/': BootScreen(스플래시 → 판정에 따라 /login 또는 /home으로 replace). '/login': LoginScreen. '/login/kakao-callback': KakaoCallbackScreen.
- * '/signup/terms': 자리표시(다음 PR). 탭 4개('/home', '/display', '/record', '/settings'): RequireSession 안 MainShell(하단 바) 레이아웃의 자리표시 화면. '/dev/session': container.devSessionEnabled일 때만 존재.
+ * '/signup/terms', '/signup/signature', '/signup/signature/preview': 가입 흐름. '/settings/signature', '/settings/signature/preview': 회원의 사인 변경(탭 셸 밖). 탭 4개('/home', '/display', '/record', '/settings'): RequireSession 안 MainShell(하단 바) 레이아웃의 자리표시 화면. '/dev/session': container.devSessionEnabled일 때만 존재.
  * 그 밖의 경로는 '/'로 replace.
  */
 export function createAppRoutes(container: AppContainer): RouteObject[] {
@@ -94,11 +99,21 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
         { path: ROUTES.boot, element: <BootScreen /> },
         { path: ROUTES.login, element: <LoginScreen /> },
         { path: ROUTES.kakaoCallback, element: <KakaoCallbackScreen /> },
-        { path: ROUTES.terms, element: <TermsPlaceholder /> },
+        { path: ROUTES.terms, element: <TermsScreen /> },
+        { path: ROUTES.signupSignature, element: <SignatureDrawScreen mode="onboarding" /> },
+        { path: ROUTES.signupSignaturePreview, element: <SignaturePreviewScreen mode="onboarding" /> },
+        {
+          // 사인 변경: 회원만, 탭 셸(하단 바) 밖. 게스트는 설정으로 보낸다.
+          element: <RequireSession container={container}>{(mode) => (mode === 'guest' ? <Navigate to={ROUTES.settings} replace /> : <Outlet />)}</RequireSession>,
+          children: [
+            { path: ROUTES.changeSignature, element: <SignatureDrawScreen mode="change" /> },
+            { path: ROUTES.changeSignaturePreview, element: <SignaturePreviewScreen mode="change" /> },
+          ],
+        },
         {
           element: <RequireSession container={container}>{(mode) => <MainShell mode={mode} />}</RequireSession>,
           children: [
-            { path: ROUTES.home, handle: homeHandle, element: <HomePlaceholder /> },
+            { path: ROUTES.home, handle: homeHandle, element: <HomeScreen /> },
             { path: ROUTES.display, handle: displayHandle, element: <TabPlaceholder tab="display" testId="display.root" /> },
             {
               path: ROUTES.record,
@@ -112,16 +127,20 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
             { path: ROUTES.settings, handle: settingsHandle, element: <TabPlaceholder tab="settings" testId="settings.root" /> },
           ],
         },
+        // 알림함·게시물 상세는 다음 PR의 화면이 대체하는 자리표시(홈 이동 계약 검증용). 탭 셸 밖이라 하단 바가 없고 회원만 들어온다(게스트는 홈으로).
+        {
+          element: <RequireSession container={container}>{(mode) => <MemberOnly mode={mode} action="notification"><Outlet /></MemberOnly>}</RequireSession>,
+          children: [{ path: ROUTES.notifications, element: <div data-testid="notifications.root" /> }],
+        },
+        {
+          element: <RequireSession container={container}>{(mode) => <MemberOnly mode={mode} action="feed"><Outlet /></MemberOnly>}</RequireSession>,
+          children: [{ path: `${ROUTES.feed}/:postId`, element: <div data-testid="feed.root" /> }],
+        },
         ...devSessionRoutes(container),
         { path: '*', element: <Navigate to={ROUTES.boot} replace /> },
       ],
     },
   ];
-}
-
-/** 약관(가입) 화면 자리. 다음 PR(ONB)이 채운다. */
-function TermsPlaceholder(): ReactNode {
-  return <div />;
 }
 
 /** 세션이 없으면(판정 login) /login으로 replace, 있으면 children. 읽는 동안은 스플래시 화면. */

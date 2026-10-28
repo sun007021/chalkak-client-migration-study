@@ -3,6 +3,8 @@
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
+    <!-- Android 13+ 알림 권한(TC-PUSH-009). 첫 인증 진입 때 OS 대화상자로 한 번 요청한다. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:label="chalkak"
         android:requestLegacyExternalStorage="true"
@@ -32,6 +34,14 @@
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <!-- 앱이 꺼져 있거나 백그라운드일 때 FCM이 대신 띄우는 알림의 채널·아이콘(TC-PUSH-072).
+             채널 moderation_push는 앱 시작 때 만들어진다. 전용 단색 아이콘이 생기면 바꾼다. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="moderation_push" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

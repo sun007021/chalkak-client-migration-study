@@ -12,21 +12,26 @@ import '../features/auth/data/default_kakao_sdk_gateway.dart';
 import '../features/auth/data/kakao_social_login_client.dart';
 import '../features/auth/domain/login_use_case.dart';
 import '../features/auth/domain/nonce.dart';
-import '../features/auth/domain/push_registrar.dart';
 import '../features/auth/domain/session_use_cases.dart';
 import '../features/auth/domain/user_data_cleaner.dart';
 import '../features/boot/data/disabled_update_check.dart';
 import '../features/boot/domain/auth_gate.dart';
-import '../features/boot/domain/pending_navigation.dart';
 import '../features/boot/domain/update_gate.dart';
 import '../features/home/domain/home_preload.dart';
 import '../features/like/domain/like_data_cleaner.dart';
 import '../features/navigation/main_dependencies_factory.dart';
+import '../features/notification/data/api_notification_repository.dart';
+import '../features/notification/data/api_push_device_repository.dart';
+import '../features/notification/data/api_session_refresher.dart';
+import '../features/notification/data/push_platform.dart';
+import '../features/notification/data/shared_preferences_push_stores.dart';
+import '../features/notification/notification_dependencies.dart';
 import '../features/onboarding/data/api_sign_up_repository.dart';
 import '../features/onboarding/data/url_launcher_external_link_launcher.dart';
 import '../features/onboarding/domain/sign_up_context.dart';
 import '../features/onboarding/domain/sign_up_use_case.dart';
 import '../features/onboarding/presentation/legal_web_view.dart';
+import '../features/settings/settings_dependencies_factory.dart';
 import '../features/signature/data/api_signature_repository.dart';
 import '../features/signature/data/api_signature_uploader.dart';
 import '../features/signature/data/ui_signature_renderer.dart';
@@ -35,7 +40,11 @@ import 'app_dependencies.dart';
 
 /// 실제 구현으로 [AppDependencies]를 조립한다. 아직 구현이 없는 기능(홈, 푸시)은
 /// 자리표시자를 끼우고 해당 PR이 교체한다.
-AppDependencies buildAppDependencies(AppConfig config) {
+AppDependencies buildAppDependencies(
+  AppConfig config, {
+  PushPlatform push = const PushPlatform.disabled(),
+  String appVersion = '',
+}) {
   final sessions = SessionManager(
     store: SecureTokenStore(
       storage: FlutterSecureKeyValueStore(const FlutterSecureStorage()),
@@ -49,19 +58,33 @@ AppDependencies buildAppDependencies(AppConfig config) {
     launcher: const DisabledUpdateLauncher(),
     enabled: config.forceUpdateCheckEnabled,
   );
-  // 푸시 탭 이동 연결은 PUSH PR에서 라우터와 이어 준다.
-  final pendingNavigation = PendingNavigation(
-    gate: updateGate,
-    navigate: (_) {},
-  );
   final main = buildMainDependencies(client);
+  final notification = buildNotificationDependencies(
+    repository: ApiNotificationRepository(client: client),
+    devices: ApiPushDeviceRepository(client: client),
+    sessions: sessions,
+    refresher: ApiSessionRefresher(client: client),
+    platform: push,
+    pendingStore: SharedPreferencesPendingPushStore(),
+    promptFlag: SharedPreferencesPermissionPromptFlag(),
+    toast: main.toast,
+  );
+  final settings = buildSettingsDependencies(
+    client: client,
+    permission: push.permission,
+    appVersion: appVersion,
+  );
   final cleaner = CompositeUserDataCleaner([
-    pendingNavigation,
+    notification.registrar,
+    notification.coordinator,
+    notification.tapRunner,
     main.preloadCache,
     LikeDataCleaner(likes: main.likeStore, postEvents: main.postEvents),
     main.recordCleaner,
+    main.homeAiReview,
+    settings.dataCleaner,
   ]);
-  const pushRegistrar = _NoopPushRegistrar();
+  final pushRegistrar = notification.registrar;
   final signatureRepository = ApiSignatureRepository(client: client);
   final signatureUploader = ApiSignatureUploader(client: client);
 
@@ -77,7 +100,6 @@ AppDependencies buildAppDependencies(AppConfig config) {
       cache: main.preloadCache,
     ),
     pushRegistrar: pushRegistrar,
-    pendingNavigation: pendingNavigation,
     userDataCleaner: cleaner,
     loginUseCase: LoginUseCase(
       socialLogin: KakaoSocialLoginClient(sdk: DefaultKakaoSdkGateway()),
@@ -117,12 +139,7 @@ AppDependencies buildAppDependencies(AppConfig config) {
     externalLinkLauncher: const UrlLauncherExternalLinkLauncher(),
     legalWebViewBuilder: LegalWebView.build,
     main: main,
+    notification: notification,
+    settings: settings,
   );
-}
-
-class _NoopPushRegistrar implements PushRegistrar {
-  const _NoopPushRegistrar();
-
-  @override
-  Future<void> registerCurrentDevice() async {}
 }

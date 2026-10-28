@@ -20,4 +20,14 @@ describe('app.config 권한', () => {
       ]),
     );
   });
+
+  it('두 기능의 읽기 권한 차단을 합친다(저장 전용 + 시스템 포토 피커)', () => {
+    expect(load().android?.blockedPermissions).toEqual(
+      expect.arrayContaining([
+        'android.permission.READ_EXTERNAL_STORAGE',
+        'android.permission.READ_MEDIA_VISUAL_USER_SELECTED',
+        'android.permission.ACCESS_MEDIA_LOCATION',
+      ]),
+    );
+  });
 });

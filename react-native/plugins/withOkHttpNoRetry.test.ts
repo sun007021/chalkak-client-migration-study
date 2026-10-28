@@ -87,6 +87,10 @@ describe('withOkHttpNoRetry (D-21)', () => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const config = require('../app.config').default;
       expect(config.plugins).toContain('./plugins/withOkHttpNoRetry');
+      expect(config.plugins).not.toContainEqual([
+        '@react-native-seoul/kakao-login',
+        expect.anything(),
+      ]);
       if (prev !== undefined) process.env.KAKAO_NATIVE_APP_KEY = prev;
     });
   });

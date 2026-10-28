@@ -13,6 +13,8 @@
 | 시간 | `package:clock` + 테스트는 `fake_async` | 폴링 3초·300초, 토스트 2.5초, 스플래시 700ms, KST 자정을 실제로 기다리지 않는다 |
 | 보안 저장소 | `flutter_secure_storage` (D-17) | `TokenStore` 인터페이스 뒤에 둔다 |
 | 카카오 | `kakao_flutter_sdk_user` | `SocialLoginClient` 인터페이스 뒤. E2E 빌드는 Fake |
+| 시스템 알림 설정 | `app_settings` | `NotificationPermission.openSystemSettings` 뒤. iOS 앱 설정, Android 앱 알림 설정으로 보낸다(REQ-SET-015) |
+| 앱 버전 | `package_info_plus` | pubspec `version`이 곧 빌드 버전이라 설정의 버전정보와 어긋나지 않는다. `main.dart`가 읽어 `AppDependencies.settings.appVersion`으로 넣는다 |
 
 새 패키지를 추가할 때는 PR 본문에 이유를 적는다.
 
