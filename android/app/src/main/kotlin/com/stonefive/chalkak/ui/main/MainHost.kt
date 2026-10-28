@@ -30,6 +30,8 @@ import com.stonefive.chalkak.ui.issue.IssueWebRoute
 import com.stonefive.chalkak.ui.record.RecordRoute
 import com.stonefive.chalkak.ui.notification.NotificationDetailRoute
 import com.stonefive.chalkak.ui.notification.NotificationRoute
+import com.stonefive.chalkak.ui.settings.LegalWebContent
+import com.stonefive.chalkak.ui.settings.SettingsHolders
 import com.stonefive.chalkak.ui.upload.UploadRoute
 import com.stonefive.chalkak.ui.upload.UploadSuccessScreen
 import com.stonefive.chalkak.viewmodel.SessionHolders
@@ -52,6 +54,8 @@ import kr.chalkak.feature.navigation.AccessMode
 import kr.chalkak.feature.navigation.NavigationController
 import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
+import kr.chalkak.feature.onboarding.SignatureChangeStateHolder
+import kr.chalkak.feature.onboarding.SignaturePadStateHolder
 import kr.chalkak.feature.record.RecordStateHolder
 import kr.chalkak.feature.notification.NotificationDetailStateHolder
 import kr.chalkak.feature.notification.NotificationInboxStateHolder
@@ -60,6 +64,7 @@ import kr.chalkak.feature.notification.PermissionFlowOutcome
 import kr.chalkak.feature.notification.PushNavigationEvent
 import kotlinx.coroutines.flow.Flow
 import com.stonefive.chalkak.ui.home.ActiveHomeUnread
+import kr.chalkak.feature.settings.FeedbackStateHolder
 import kr.chalkak.feature.upload.PhotoUploadStateHolder
 import kr.chalkak.feature.upload.UploadGateEffect
 
@@ -144,6 +149,18 @@ class MainDependencies(
     val notificationPermission: NotificationPermissionFlow? = null,
     /** Re-checks the unread dot of the home holder shown by this host; attached/detached by the host. */
     val homeUnread: ActiveHomeUnread? = null,
+    /** Settings tab holders (A9); null = the settings tab is still the [otherTab] placeholder. Built once per settings composition scope. */
+    val newSettingsHolders: ((scope: CoroutineScope, mode: HomeMode) -> SettingsHolders)? = null,
+    /** Feedback screen holder (A9); a fresh one per opened feedback screen. Null = `feedback.root` placeholder. */
+    val newFeedbackHolder: ((scope: CoroutineScope) -> FeedbackStateHolder)? = null,
+    /** Drawing pad of the change-signature flow (A9, `SignatureMode.Change`, `SignaturePadSpace` canvas); a fresh one per visit. */
+    val newChangeSignaturePad: (() -> SignaturePadStateHolder)? = null,
+    /** Upload + confirm holder of the change-signature preview (A9). */
+    val newSignatureChangeHolder: ((scope: CoroutineScope) -> SignatureChangeStateHolder)? = null,
+    /** Web view slot of the terms / privacy sheet opened from settings (A9). */
+    val legalWeb: LegalWebContent = { _, _, _ -> },
+    /** Switch turned on while the device notification permission is off: opens the app's system notification settings (A9). */
+    val openSystemNotificationSettings: () -> Unit = {},
 )
 
 /**
