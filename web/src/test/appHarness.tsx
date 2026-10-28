@@ -20,6 +20,7 @@ import { MOCK_BASE } from './apiEnv';
 import { NOW, guestSession } from './fixtures';
 import { RecordingLogger } from './RecordingLogger';
 import { SequentialIdGenerator } from './sequentialIds';
+import type { VisibilityObserverFactory } from '../core/ui/VisibilityObserver';
 import { EMPTY_SESSION } from '../core/auth/SessionStore';
 
 export interface Harness {
@@ -40,7 +41,7 @@ export interface Harness {
 }
 
 /** 실제 구현을 엮되 시계·fetch·저장소·카카오·프리로드·분석만 Fake로 둔 앱 컨테이너. */
-export function makeHarness(options: { session?: StoredSession; env?: Partial<AppEnv>; devSession?: boolean; resume?: (url: string) => Promise<{ idToken: string; rawNonce: string }> } = {}): Harness {
+export function makeHarness(options: { session?: StoredSession; env?: Partial<AppEnv>; devSession?: boolean; visibilityObserver?: VisibilityObserverFactory | null; resume?: (url: string) => Promise<{ idToken: string; rawNonce: string }> } = {}): Harness {
   const clock = new FakeClock(NOW);
   const ff = new FakeFetch();
   const store = new FakeSessionStore(options.session ?? EMPTY_SESSION);
@@ -55,6 +56,7 @@ export function makeHarness(options: { session?: StoredSession; env?: Partial<Ap
   const container = createAppContainer({
     env: { VITE_API_BASE_URL: MOCK_BASE, ...options.env },
     devSessionEnabled: options.devSession ?? false,
+    visibilityObserver: options.visibilityObserver === undefined ? null : options.visibilityObserver, // jsdom에는 IntersectionObserver가 없다. 센티넬 테스트만 Fake를 넣는다.
     fetch: ff.fetch,
     clock,
     store,

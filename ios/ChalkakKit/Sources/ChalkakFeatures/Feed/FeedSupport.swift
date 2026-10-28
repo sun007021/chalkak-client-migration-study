@@ -111,6 +111,28 @@ public enum FeedDialogCopy {
 public enum DisplayCopy {
     public static let descLatest = "같은 주제에서 다른 시선을 느껴보세요"
     public static let descArchive = "가장 사람들이 좋아했던 사진들이에요"
+    public static let sortRecent = "최신순"
+    public static let sortPopular = "인기순"
+    public static let sortRandom = "랜덤순"
+    public static let navPrevious = "이전 날짜"
+    public static let navNext = "다음 날짜"
+    public static let pickerTitle = "날짜 선택"
+    public static let retry = "다시 시도"
+    /// 날짜 선택 시트의 확인 버튼 문구(`common.confirm`).
+    public static let pickerConfirm = "확인"
+
+    /// 정렬 탭 문구.
+    public static func sortLabel(_ sort: PostSort) -> String {
+        switch sort {
+        case .recent: sortRecent
+        case .popular: sortPopular
+        case .random: sortRandom
+        }
+    }
+
+    public static func pickerYear(_ year: Int) -> String { "\(year)년" }
+    public static func pickerMonth(_ month: Int) -> String { "\(month)월" }
+    public static func pickerDay(_ day: Int) -> String { "\(day)일" }
 }
 
 // MARK: 상세 진입
