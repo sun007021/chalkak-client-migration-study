@@ -15,6 +15,7 @@ import kr.chalkak.core.common.analytics.AnalyticsTracker
 import kr.chalkak.core.data.settings.FeedbackRepository
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
+import kr.chalkak.core.network.guardedApiCall
 import kr.chalkak.feature.onboarding.FlowError
 
 /**

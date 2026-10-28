@@ -2,6 +2,9 @@
 
 package kr.chalkak.feature.display
 
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
@@ -10,9 +13,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kr.chalkak.core.common.analytics.AnalyticsTracker
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kr.chalkak.core.common.analytics.screenViewSafely
+import kr.chalkak.core.network.JobTracker
 
 /** Holder plumbing shared by display and detail: a bug in a job is reported, never thrown into the scope. */
 class HolderSupportTest {

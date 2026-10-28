@@ -1,5 +1,6 @@
 package kr.chalkak.feature.notification
 
+import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -19,7 +20,7 @@ import kr.chalkak.core.data.notification.NotificationRepository
 import kr.chalkak.core.data.notification.NotificationType
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
-import java.time.Instant
+import kr.chalkak.core.network.guardedApiCall
 
 enum class InboxPhase { Loading, Content, Empty, Error }
 

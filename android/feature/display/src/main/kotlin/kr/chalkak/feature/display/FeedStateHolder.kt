@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import kr.chalkak.core.common.KstCalendar
 import kr.chalkak.core.common.PostTitle
 import kr.chalkak.core.common.analytics.AnalyticsTracker
+import kr.chalkak.core.common.analytics.screenViewSafely
 import kr.chalkak.core.data.post.CurrentUser
 import kr.chalkak.core.data.post.LikeController
 import kr.chalkak.core.data.post.LikeEvent
@@ -23,6 +24,8 @@ import kr.chalkak.core.data.post.PostRepository
 import kr.chalkak.core.data.post.PostSummary
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
+import kr.chalkak.core.network.JobTracker
+import kr.chalkak.core.network.httpStatus
 
 /**
  * Post detail (FEED) incl. title edit, delete and the heart (LIKE). Shares [LikeController] and [PostChanges] with
