@@ -8,10 +8,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import com.stonefive.chalkak.ui.aireview.AiReviewRoute
 import com.stonefive.chalkak.ui.common.RemoteImage
 import com.stonefive.chalkak.ui.components.ScreenGoneEffect
 import kr.chalkak.feature.display.FeedEffect
 import kr.chalkak.feature.aireview.AiReviewStateHolder
+import kr.chalkak.feature.aireview.AiReviewTarget
 import kr.chalkak.feature.display.FeedStateHolder
 
 /**
@@ -77,5 +79,20 @@ fun FeedRoute(
             onToastExpired = holder::onToastShown,
         )
     }
-    FeedScreen(state, callbacks, remoteImage, modifier)
+    if (aiReview == null) {
+        FeedScreen(state, callbacks, remoteImage, modifier)
+        return
+    }
+    val postId = state.content?.postId
+    val topicDate = state.content?.topicDate
+    val target = remember(state.isMine, state.confirmed, postId, topicDate) {
+        if (state.isMine && state.confirmed && postId != null && topicDate != null) AiReviewTarget(postId, topicDate) else null
+    }
+    AiReviewRoute(
+        holder = aiReview,
+        target = target,
+        onLoginRequired = { login() },
+        finishOnLeave = finishOnLeave,
+        layout = { pill, overlay -> FeedScreen(state, callbacks, remoteImage, modifier, aiPill = pill, aiOverlay = overlay) },
+    )
 }

@@ -209,6 +209,10 @@ private fun MainHostContent(
                 val slot = session.feeds.slotFor(navState.stack.lastIndex, route, session.feedSeeds)
                 val holder = rememberStateHolder("feed-$sessionKey-${slot.id}") { scope -> deps.newFeedHolder(scope, slot.entry) }
                 slot.holder = holder
+                val aiHolder = deps.newAiReviewHolder?.let { create ->
+                    rememberStateHolder("ai-$sessionKey-${slot.id}") { scope -> create(scope) }
+                }
+                slot.aiHolder = aiHolder
                 FeedRoute(
                     holder = holder,
                     remoteImage = deps.photo,
@@ -218,6 +222,7 @@ private fun MainHostContent(
                     onLoginRequired = coordinator::onFeedLoginRequired,
                     // Only the top route is composed: a feed under another screen must live on; its entry's removal finishes it.
                     finishOnLeave = false,
+                    aiReview = aiHolder,
                 )
             }
             Route.PhotoUpload -> {

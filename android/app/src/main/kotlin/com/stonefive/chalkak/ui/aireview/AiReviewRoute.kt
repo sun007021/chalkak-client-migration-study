@@ -1,14 +1,24 @@
 package com.stonefive.chalkak.ui.aireview
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import com.stonefive.chalkak.ui.components.ScreenGoneEffect
+import kr.chalkak.feature.aireview.AiReviewEffect
 import kr.chalkak.feature.aireview.AiReviewStateHolder
 import kr.chalkak.feature.aireview.AiReviewTarget
 
 /**
  * Collects [holder] state and draws [AiReviewSection]. Order on enter: `holder.setTarget(target)` first (re-sent whenever [target]
  * changes, also null), THEN `holder.onScreenShown()`. On leave: `onScreenHidden()`, plus `onCleared()` when [finishOnLeave].
- * The `LoginRequired` effect calls [onLoginRequired]. Sheets close on system back.
+ * The `LoginRequired` effect calls [onLoginRequired]. System back closes the criteria dialog first, then an open sheet.
+ * [layout] places the pill and the overlay (see [AiLayout]).
  */
 @Composable
 fun AiReviewRoute(
@@ -17,6 +27,41 @@ fun AiReviewRoute(
     onLoginRequired: () -> Unit,
     modifier: Modifier = Modifier,
     finishOnLeave: Boolean = true,
+    layout: AiLayout = AiStackedLayout,
 ) {
-    // A6 stub: no behaviour yet.
+    val state by holder.state.collectAsState()
+    val login by rememberUpdatedState(onLoginRequired)
+    val latestTarget by rememberUpdatedState(target)
+    LaunchedEffect(holder) {
+        holder.effects.collect { effect ->
+            when (effect) {
+                AiReviewEffect.LoginRequired -> login()
+            }
+        }
+    }
+    // Synchronous, in this order: the target must be known before the screen counts as shown, or the first GET would be skipped.
+    DisposableEffect(holder) {
+        holder.setTarget(latestTarget)
+        holder.onScreenShown()
+        onDispose { }
+    }
+    LaunchedEffect(holder, target) { holder.setTarget(target) }
+    ScreenGoneEffect(holder) {
+        holder.onScreenHidden()
+        if (finishOnLeave) holder.onCleared()
+    }
+    BackHandler(enabled = state.criteriaDialogOpen) { holder.onCriteriaHelpDismissed() }
+    BackHandler(enabled = state.sheet != null && !state.criteriaDialogOpen) { holder.onSheetDismissed() }
+
+    val callbacks = remember(holder) {
+        AiReviewCallbacks(
+            onPillClick = holder::onPillClicked,
+            onStartConfirm = holder::onStartConfirmed,
+            onSheetDismiss = holder::onSheetDismissed,
+            onCriteriaHelpClick = holder::onCriteriaHelpClicked,
+            onCriteriaHelpDismiss = holder::onCriteriaHelpDismissed,
+            onToastExpired = holder::onToastShown,
+        )
+    }
+    AiReviewSection(state, callbacks, modifier, layout)
 }

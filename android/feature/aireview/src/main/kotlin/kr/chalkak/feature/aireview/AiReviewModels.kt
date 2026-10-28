@@ -46,7 +46,7 @@ sealed interface AiSheet {
     }
 }
 
-data class AiCriterionRow(val label: String, val scoreText: String)
+data class AiCriterionRow(val key: String, val label: String, val scoreText: String)
 
 /** One text section of the result sheet; [titleCopyKey] is `ai.result.strength|weakness|suggestion`. */
 data class AiSection(val titleCopyKey: String, val body: String)
@@ -66,7 +66,7 @@ data class AiResultUi(
         fun from(result: AiReviewResult): AiResultUi = AiResultUi(
             summary = result.feedback.summary,
             scoreText = AiScoreFormat.format(result.overallScore),
-            criteria = result.criteria.map { AiCriterionRow(it.label, AiScoreFormat.format(it.score)) },
+            criteria = result.criteria.map { AiCriterionRow(it.key, it.label, AiScoreFormat.format(it.score)) },
             showPerspectiveBadge = result.distinctivePerspective,
             sections = listOf(
                 AiSection("ai.result.strength", result.feedback.strength),

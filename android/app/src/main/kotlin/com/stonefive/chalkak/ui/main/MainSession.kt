@@ -10,6 +10,7 @@ import kotlinx.coroutines.SupervisorJob
 import kr.chalkak.core.data.home.Banner
 import kr.chalkak.core.data.post.PostSort
 import kr.chalkak.core.data.post.PostSummary
+import kr.chalkak.feature.aireview.AiReviewStateHolder
 import kr.chalkak.feature.display.FeedEntry
 import kr.chalkak.feature.display.FeedStateHolder
 import kr.chalkak.feature.navigation.FeedSource
@@ -72,6 +73,9 @@ class DisplayEntry(val seq: Int, val date: LocalDate?, val sort: PostSort?)
 /** One stacked `Route.Feed`: its identity (holder key), the entry it was opened with and the holder once composed. */
 class FeedSlot(val id: Int, val route: Route.Feed, val entry: FeedEntry) {
     var holder: FeedStateHolder? = null
+
+    /** AI feedback holder of this feed (null without an AI area); finished together with [holder]. */
+    var aiHolder: AiReviewStateHolder? = null
 }
 
 /**
@@ -101,5 +105,8 @@ class FeedSlots {
         }
     }
 
-    private fun FeedSlot.finish() = holder?.onCleared()
+    private fun FeedSlot.finish() {
+        holder?.onCleared()
+        aiHolder?.onCleared()
+    }
 }

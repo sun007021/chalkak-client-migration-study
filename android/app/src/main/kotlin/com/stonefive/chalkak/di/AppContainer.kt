@@ -54,6 +54,9 @@ import com.stonefive.chalkak.ui.issue.IssueWebView
 import com.stonefive.chalkak.ui.main.MainDependencies
 import com.stonefive.chalkak.ui.main.UploadEntryGate
 import kr.chalkak.core.common.analytics.AnalyticsTracker
+import kr.chalkak.core.data.aireview.AiReviewRepository
+import kr.chalkak.core.data.aireview.DefaultAiReviewRepository
+import kr.chalkak.feature.aireview.AiReviewStateHolder
 import kr.chalkak.core.data.post.CurrentUser
 import kr.chalkak.core.common.SystemMonotonicClock
 import kr.chalkak.core.data.post.DefaultPostRepository
@@ -182,6 +185,7 @@ class AppContainer(
 
     /** "A post was created" announcements for home, record and the exhibition (REQ-UPL-063). Nothing stored, nothing to reset. */
     val postCreations = PostCreations()
+    val aiReviewRepository: AiReviewRepository by lazy { DefaultAiReviewRepository(apiClient) }
 
     /** Removals and title edits every list must honour; cleared on account change together with [likeController]. */
     val postChanges = PostChanges()
@@ -220,6 +224,10 @@ class AppContainer(
     /** Holder for one post detail. */
     fun newFeedHolder(scope: CoroutineScope, entry: FeedEntry): FeedStateHolder =
         FeedStateHolder(scope, postRepository, likeController, postChanges, currentUser, kstCalendar, platform.analytics, entry)
+
+    /** AI feedback holder for one post detail (one per stacked feed). */
+    fun newAiReviewHolder(scope: CoroutineScope): AiReviewStateHolder =
+        AiReviewStateHolder(scope, aiReviewRepository, currentUser, kstCalendar, SystemMonotonicClock)
 
     /** BootGate state is touched on the main thread only (its contract). Created on first use. */
     private val mainScope: CoroutineScope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
@@ -319,6 +327,7 @@ class AppContainer(
                 )
             },
             uploadPlatform = platform.upload.platform,
+            newAiReviewHolder = ::newAiReviewHolder,
             image = if (loader == null) {
                 { _, _ -> }
             } else {
