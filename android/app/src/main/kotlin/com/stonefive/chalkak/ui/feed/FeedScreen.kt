@@ -100,6 +100,10 @@ fun FeedScreen(
     callbacks: FeedCallbacks,
     remoteImage: RemoteImage,
     modifier: Modifier = Modifier,
+    /** Slot under the like button (the AI pill); inside the scrolling column. */
+    aiPill: @Composable () -> Unit = {},
+    /** Full-screen slot above the content (AI sheets, dialog, toast). */
+    aiOverlay: @Composable () -> Unit = {},
 ) {
     val copy = LocalCopy.current
     val colors = ChalkakTheme.colors
@@ -136,9 +140,10 @@ fun FeedScreen(
                         Spacer(Modifier.height(16.dp))
                         ChalkakButton(copy["common.retry"], callbacks.onRetry, Modifier.testTag("feed.retry-button"))
                     }
-                content != null -> Detail(state, content, callbacks, remoteImage)
+                content != null -> Detail(state, content, callbacks, remoteImage, aiPill)
             }
         }
+        aiOverlay()
         ToastLayer(
             toast = state.toast?.let { ToastUi(it.id, copy[it.copyKey]) },
             onExpired = callbacks.onToastExpired,
@@ -152,7 +157,7 @@ fun FeedScreen(
 }
 
 @Composable
-private fun Detail(state: FeedUiState, content: FeedContent, callbacks: FeedCallbacks, remoteImage: RemoteImage) {
+private fun Detail(state: FeedUiState, content: FeedContent, callbacks: FeedCallbacks, remoteImage: RemoteImage, aiPill: @Composable () -> Unit) {
     val copy = LocalCopy.current
     val colors = ChalkakTheme.colors
     val alt = if (content.title.isNullOrBlank()) copy[content.photoAltCopyKey] else copy.format(content.photoAltCopyKey, "제목" to content.title.orEmpty())
@@ -190,6 +195,7 @@ private fun Detail(state: FeedUiState, content: FeedContent, callbacks: FeedCall
             buttonTag = "feed.like-button",
             countTag = "feed.like-count",
         )
+        aiPill()
     }
 }
 
