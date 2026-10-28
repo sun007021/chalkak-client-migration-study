@@ -1,4 +1,5 @@
 import '../../../core/constants/app_constants.dart';
+import '../../../core/text/code_points.dart';
 
 enum FeedbackValidation {
   /// trim 후 0 code point. 보낼 수 없고 요청도 메시지도 없다.
@@ -17,10 +18,15 @@ enum FeedbackValidation {
 /// - 중간의 개행·연속 공백은 그대로 둔다. 서버로 보내는 내용은 [normalize] 결과다.
 abstract final class FeedbackContent {
   /// 앞뒤 공백만 제거한 값.
-  static String normalize(String raw) => throw UnimplementedError();
+  static String normalize(String raw) => raw.trim();
 
   /// [normalize]한 값의 code point 수(카운터 값).
-  static int length(String raw) => throw UnimplementedError();
+  static int length(String raw) => codePointLength(normalize(raw));
 
-  static FeedbackValidation validate(String raw) => throw UnimplementedError();
+  static FeedbackValidation validate(String raw) {
+    final length = FeedbackContent.length(raw);
+    if (length == 0) return FeedbackValidation.blank;
+    if (length > AppConstants.feedbackMax) return FeedbackValidation.tooLong;
+    return FeedbackValidation.valid;
+  }
 }

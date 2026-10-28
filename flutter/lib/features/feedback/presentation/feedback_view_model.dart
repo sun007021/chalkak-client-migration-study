@@ -1,10 +1,15 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../../core/analytics/analytics_constants.dart';
 import '../../../core/analytics/analytics_tracker.dart';
 import '../../../core/auth/session_manager.dart';
+import '../../../core/copy/ko.g.dart';
+import '../../../core/network/api_error.dart';
 import '../../../core/ui/toast/toast_controller.dart';
+import '../domain/feedback_content.dart';
 import '../domain/feedback_repository.dart';
 
 class FeedbackState {
@@ -78,25 +83,150 @@ class FeedbackViewModel extends ChangeNotifier {
     this.onComposingChanged,
   });
 
-  // ignore: unused_field
   final FeedbackRepository _repository;
-  // ignore: unused_field
   final SessionManager _sessions;
-  // ignore: unused_field
   final ToastSink _toast;
-  // ignore: unused_field
   final AnalyticsTracker _analytics;
 
   /// 피드백 작성 중 여부가 바뀔 때 부른다(푸시 이동 보류 훅).
   final void Function(bool composing)? onComposingChanged;
 
-  FeedbackState get state => throw UnimplementedError();
+  final StreamController<FeedbackEvent> _events =
+      StreamController<FeedbackEvent>.broadcast();
+  final CancelToken _cancelToken = CancelToken();
 
-  Stream<FeedbackEvent> get events => throw UnimplementedError();
+  FeedbackState _state = const FeedbackState();
+  bool _shown = false;
+  bool _disposed = false;
 
-  void onShown() => throw UnimplementedError();
+  FeedbackState get state => _state;
 
-  void onTextChanged(String text) => throw UnimplementedError();
+  Stream<FeedbackEvent> get events => _events.stream;
 
-  Future<void> send() => throw UnimplementedError();
+  void onShown() {
+    if (_disposed || _shown) return;
+    _shown = true;
+    _analytics.logEvent(AnalyticsEvent.screenView(ScreenNames.feedback));
+    onComposingChanged?.call(true);
+  }
+
+  void onTextChanged(String text) {
+    if (_disposed) return;
+    _set(
+      FeedbackState(
+        text: text,
+        count: FeedbackContent.length(text),
+        canSend: _canSend(text, sending: _state.sending),
+        sending: _state.sending,
+      ),
+    );
+  }
+
+  Future<void> send() async {
+    if (_disposed || _state.sending) return;
+    final raw = _state.text;
+    switch (FeedbackContent.validate(raw)) {
+      case FeedbackValidation.blank:
+        return;
+      case FeedbackValidation.tooLong:
+        _set(_with(validationMessage: Copy.fdbkErrorInvalid));
+        return;
+      case FeedbackValidation.valid:
+        break;
+    }
+    // 연타는 여기서 막힌다: 첫 await 전에 전송 중으로 바꾼다.
+    _set(_with(sending: true, canSend: false));
+
+    final sentAs = await _currentUserId();
+    if (_disposed) return;
+    String? failure;
+    var succeeded = false;
+    try {
+      await _repository.send(
+        FeedbackContent.normalize(raw),
+        cancelToken: _cancelToken,
+      );
+      succeeded = true;
+    } on ApiError catch (error) {
+      failure = _messageFor(error);
+    } on Object {
+      failure = Copy.fdbkErrorGeneric;
+    }
+    if (_disposed) return;
+
+    // 보내는 사이 로그아웃·계정 전환이 있었으면 이전 계정의 결과는 버린다.
+    if (await _currentUserId() != sentAs || _disposed) {
+      if (!_disposed)
+        _set(_with(sending: false, canSend: _canSend(_state.text)));
+      return;
+    }
+    if (succeeded) {
+      _set(const FeedbackState());
+      _toast.show(Copy.fdbkSuccess);
+      _events.add(const CloseFeedback());
+      return;
+    }
+    _set(
+      _with(
+        sending: false,
+        canSend: _canSend(_state.text),
+        errorMessage: failure,
+      ),
+    );
+  }
+
+  /// 오류에 대응하는 문구. 문구 없이 끝나는 경우(취소, 401)는 null.
+  /// 401은 `ApiClient`가 갱신·세션 삭제를 마쳤고 로그인 이동은 앱이 맡는다.
+  String? _messageFor(ApiError error) {
+    if (error.isCancelled || error.status == 401) return null;
+    if (error.status == 400) {
+      final message = error.message;
+      return message == null || message.isEmpty
+          ? Copy.fdbkErrorInvalid
+          : message;
+    }
+    if (error.isNetwork) return Copy.commonErrorNetwork;
+    return Copy.fdbkErrorGeneric;
+  }
+
+  Future<String?> _currentUserId() async {
+    try {
+      return (await _sessions.read())?.userId;
+    } on Object {
+      return null;
+    }
+  }
+
+  static bool _canSend(String text, {bool sending = false}) =>
+      !sending && FeedbackContent.length(text) >= 1;
+
+  FeedbackState _with({
+    bool? sending,
+    bool? canSend,
+    String? validationMessage,
+    String? errorMessage,
+  }) => FeedbackState(
+    text: _state.text,
+    count: _state.count,
+    canSend: canSend ?? _state.canSend,
+    sending: sending ?? _state.sending,
+    validationMessage: validationMessage,
+    errorMessage: errorMessage,
+  );
+
+  void _set(FeedbackState next) {
+    if (_disposed) return;
+    _state = next;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _cancelToken.cancel();
+    if (_shown) onComposingChanged?.call(false);
+    unawaited(_events.close());
+    super.dispose();
+  }
 }

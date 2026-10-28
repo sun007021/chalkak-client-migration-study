@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_error.dart';
+import '../../../core/network/api_request.dart';
 import '../domain/notification_settings.dart';
 import '../domain/notification_settings_repository.dart';
 
@@ -9,12 +11,17 @@ class ApiNotificationSettingsRepository
     implements NotificationSettingsRepository {
   ApiNotificationSettingsRepository({required this._client});
 
-  // ignore: unused_field
+  static const _path = '/notification-settings';
+
   final ApiClient _client;
 
   @override
   Future<NotificationSettings> fetch({CancelToken? cancelToken}) {
-    throw UnimplementedError();
+    return _client.request<NotificationSettings>(
+      const ApiRequest.get(_path),
+      decode: _decode,
+      cancelToken: cancelToken,
+    );
   }
 
   @override
@@ -23,6 +30,32 @@ class ApiNotificationSettingsRepository
     bool enabled, {
     CancelToken? cancelToken,
   }) {
-    throw UnimplementedError();
+    // 본문은 바꾼 항목 하나뿐이다(나머지 생략). 204 본문은 읽지 않는다.
+    return _client.requestNoContent(
+      ApiRequest(
+        HttpMethod.patch,
+        _path,
+        body: {setting.wireKey: enabled},
+      ),
+      cancelToken: cancelToken,
+    );
+  }
+
+  /// 세 필드가 모두 Boolean이어야 한다. 아니면 `BodyDecoder`가 invalidResponse로 바꾼다.
+  static NotificationSettings _decode(Object? json) {
+    if (json is! Map) {
+      throw ApiError.invalidResponse();
+    }
+    bool read(PushSetting setting) {
+      final value = json[setting.wireKey];
+      if (value is! bool) throw ApiError.invalidResponse();
+      return value;
+    }
+
+    return NotificationSettings(
+      topic: read(PushSetting.topic),
+      moderation: read(PushSetting.moderation),
+      aiReview: read(PushSetting.aiReview),
+    );
   }
 }
