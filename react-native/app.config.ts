@@ -27,9 +27,18 @@ const config: ExpoConfig = {
     // 강제 업데이트 다이얼로그가 여는 App Store 앱 숫자 id.
     appStoreId: process.env.APP_STORE_ID,
   },
-  plugins: kakaoNativeAppKey
-    ? [['@react-native-seoul/kakao-login', { kakaoAppKey: kakaoNativeAppKey }]]
-    : [],
+  plugins: [
+    // D-21: Android OkHttp의 자동 재시도(비멱등 요청 포함)를 끈다.
+    './plugins/withOkHttpNoRetry',
+    ...(kakaoNativeAppKey
+      ? [
+          ['@react-native-seoul/kakao-login', { kakaoAppKey: kakaoNativeAppKey }] as [
+            string,
+            object,
+          ],
+        ]
+      : []),
+  ],
 };
 
 export default config;
