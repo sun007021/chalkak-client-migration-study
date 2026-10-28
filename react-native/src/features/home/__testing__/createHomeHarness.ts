@@ -11,6 +11,7 @@ import { FakeAiReviewPoller } from '../../ai-review/__testing__/FakeAiReviewPoll
 import type { MainMode } from '../../auth/AuthFlowNavigator';
 import { BannerFeedViewModel } from '../../banner/BannerFeedViewModel';
 import { FakeLikeController } from '../../like/__testing__/FakeLikeController';
+import { FakePostChanges } from '../../post/__testing__/FakePostChanges';
 import { HomeViewModel } from '../HomeViewModel';
 import { FakeHomeNavigator } from './FakeHomeNavigator';
 
@@ -54,6 +55,7 @@ export async function createHomeHarness(options: HomeHarnessOptions = {}) {
     repository: new BannerRepository({ api: net.api }),
   });
   const likes = new FakeLikeController();
+  const changes = new FakePostChanges();
   const aiReview = new FakeAiReviewPoller();
   const visibility = new FakeAppVisibility();
   const navigator = new FakeHomeNavigator();
@@ -67,6 +69,7 @@ export async function createHomeHarness(options: HomeHarnessOptions = {}) {
     notifications: new NotificationRepository({ api: net.api }),
     bannerFeed,
     likes,
+    changes,
     aiReview,
     visibility,
     navigator,
@@ -78,6 +81,7 @@ export async function createHomeHarness(options: HomeHarnessOptions = {}) {
     router,
     bannerFeed,
     likes,
+    changes,
     aiReview,
     visibility,
     navigator,

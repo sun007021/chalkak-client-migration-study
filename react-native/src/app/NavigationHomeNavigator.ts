@@ -2,6 +2,7 @@ import type { NavigationContainerRef } from '@react-navigation/native';
 
 import type { KstDate } from '../core/time/KstDate';
 import type { PostSummary } from '../data/post/PostModels';
+import { toFeedSeed } from '../features/feed/FeedTarget';
 import type { HomeNavigator } from '../features/home/HomeNavigator';
 import type { RootStackParamList } from './navigation/routes';
 
@@ -17,7 +18,14 @@ export class NavigationHomeNavigator implements HomeNavigator {
   }
 
   openPostDetail(target: { postId: string; seed: PostSummary | null }): void {
-    this.go((nav) => nav.navigate('PostDetail', { postId: target.postId }));
+    this.go((nav) =>
+      nav.navigate(
+        'PostDetail',
+        target.seed
+          ? { postId: target.postId, seed: toFeedSeed(target.seed) }
+          : { postId: target.postId },
+      ),
+    );
   }
 
   openNotifications(): void {
