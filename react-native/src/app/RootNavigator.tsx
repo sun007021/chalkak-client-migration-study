@@ -79,13 +79,20 @@ function PostDetailScreenRoute({
   route,
   navigation,
 }: NativeStackScreenProps<RootStackParamList, 'PostDetail'>) {
-  const { postId, seed, entry, thumbnailUrl } = route.params;
+  const { postId, seed, entry, thumbnailUrl, openAiSheet } = route.params;
   // 파라미터가 같은 동안 같은 target 객체를 쓴다(소유자가 ViewModel을 다시 만들지 않게).
   const target = useMemo<FeedTarget>(
     () => ({ postId, entry: entry ?? 'list', seed: seed ?? null, thumbnailUrl }),
     [postId, entry, seed, thumbnailUrl],
   );
-  return <PostDetailRoute target={target} onBack={() => navigation.goBack()} />;
+  return (
+    <PostDetailRoute
+      target={target}
+      onBack={() => navigation.goBack()}
+      openAiSheet={openAiSheet === true}
+      onAiSheetConsumed={() => navigation.setParams({ openAiSheet: undefined })}
+    />
+  );
 }
 
 function IssueWebScreenRoute({
