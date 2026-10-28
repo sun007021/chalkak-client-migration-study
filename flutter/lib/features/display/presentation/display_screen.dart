@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/text/code_points.dart';
 import '../../../core/ui/network_photo.dart';
 import '../../../core/ui/selectable_test_id.dart';
 import '../../../core/ui/test_id.dart';
@@ -502,7 +503,7 @@ class _GridCellState extends State<_GridCell> {
                   children: [
                     Expanded(
                       child: Text(
-                        card.title ?? Copy.feedTitleNone,
+                        PostTitle.display(card.title),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall,
@@ -621,7 +622,7 @@ class _FeaturedCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          card.title ?? Copy.feedTitleNone,
+                          PostTitle.display(card.title),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodyMedium?.copyWith(

@@ -149,33 +149,6 @@ enum TitleSaveResult {
 /// 삭제: [confirmDelete]는 확정 전·내 게시물 아님·삭제 중·이미 삭제됨이면 요청 없이 무시.
 /// 204면 [PostEventBus.publishRemoved] + `Copy.feedDeleteSuccess` 토스트 + [FeedClose]. 화면을
 /// 이탈한 뒤 도착해도 removed는 발행하되 이벤트는 내지 않는다. 실패는 화면에 머문 채 토스트:
-/// 400 `feedDeleteErrorState`, 403 `feedDeleteErrorForbidden`, 404 `feedErrorNotFound`(+removed 발행),
-/// 401 `feedEditErrorLogin`, 연결 실패 `commonErrorNetwork`, 그 밖 `feedDeleteErrorOther`. 실패 뒤 다시 시도할 수 있다.
-/// 게시물 상세 상태(REQ-FEED-001~030, REQ-LIKE-009·011).
-///
-/// 로드
-/// - [load]: 시드가 있으면 즉시 content(미확정)로 보여 주고, 없으면 loading. `GET /posts/{postId}`
-///   응답이 오면 확정(content, isConfirmed)으로 교체한다. 404는 notFound(`Copy.feedErrorNotFound`),
-///   시드가 있었으면 [PostEventBus.publishRemoved]도 한다. 404가 아닌 실패는 시드가 있으면 내용을
-///   유지하고 토스트(연결 실패 `Copy.commonErrorNetwork`, 계약 위반 `Copy.feedErrorInvalid`, 그 밖
-///   `Copy.feedErrorLoad`), 시드가 없으면 error. 화면 이탈(dispose) 뒤 응답은 무시한다.
-/// - 상세 응답은 이미 끝났거나 진행 중인 좋아요·제목 수정 결과를 덮지 않는다
-///   ([LikeStore.reconcile]의 `since`, 제목은 수정 성공 이후 응답이면 수정 값 유지).
-/// - 응답의 `authorId == userId`로 isMine을 다시 판정한다. 시드 값은 응답 전 임시값이다.
-///
-/// 좋아요: [onLikeTapped]는 확정 전이면 무시(`likeEnabled == false`), 게스트는 토스트만, 그 밖은
-/// [LikeStore.toggle]. 값은 [LikeStore]의 최신 값을 따른다. 작성자 본인도 누를 수 있다.
-///
-/// 제목 수정: [saveTitle]은 확정되지 않았거나 내 게시물이 아니거나 topicDate가 KST 오늘이 아니면
-/// (요청 시점에 다시 판정) 요청 없이 ignored, 저장 중이면 ignored. strip한 값(공백뿐이면 null)을
-/// `PUT`으로 보낸다. 성공: 상세·[PostEventBus.publishTitleChanged] 반영 + `Copy.feedEditSuccess` 토스트.
-/// 실패는 [FeedState.titleError]에 400 `feedEditErrorState`, 403 `feedEditErrorBanned`(재전송 없음),
-/// 401 `feedEditErrorLogin`, 연결 실패 `commonErrorNetwork`, 그 밖 `feedEditErrorOther`.
-/// 404는 `feedErrorNotFound` 토스트 + removed 발행 + [FeedClose].
-///
-/// 삭제: [confirmDelete]는 확정 전·내 게시물 아님·삭제 중·이미 삭제됨이면 요청 없이 무시.
-/// 204면 [PostEventBus.publishRemoved] + `Copy.feedDeleteSuccess` 토스트 + [FeedClose]. 화면을
-/// 이탈한 뒤 도착해도 removed는 발행하되 이벤트는 내지 않는다. 실패는 화면에 머문 채 토스트:
 /// 400 `feedDeleteErrorState`, 403 `feedDeleteErrorForbidden`, 404는 게시물이 이미 없으므로 토스트 없이
 /// removed 발행 + [FeedClose](팀 결정, REQ-FEED-029·030), 401 `feedEditErrorLogin`, 연결 실패 `commonErrorNetwork`, 그 밖 `feedDeleteErrorOther`. 실패 뒤 다시 시도할 수 있다.
 class FeedViewModel extends ChangeNotifier {
