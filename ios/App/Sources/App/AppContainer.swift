@@ -58,6 +58,11 @@ final class AIResultInbox {
 final class MainSession {
     let shell: MainShellViewModel
     let home: HomeViewModel
+    /// 설정 탭 ViewModel. 탭을 오가도 값을 유지하려고 세션이 쥐고(세션과 같은 수명), 로그아웃·계정 전환 때 `viewerDidChange()`로 비운다.
+    let settings: SettingsViewModel
+    /// 알림함 행 탭과 푸시 탭이 함께 쓰는 처리기·푸시 탭 게이트.
+    let tapHandler: NotificationTapHandler
+    let push: PushTapCoordinator
     let aiResultInbox = AIResultInbox()
     /// 홈 AI 피드백 카드의 ViewModel. 홈 탭을 떠났다 돌아와도 이어 쓴다(완료 결과를 다시 조회하지 않기 위해, REQ-HOME-037).
     private(set) var homeAI: AIReviewViewModel?
@@ -70,10 +75,72 @@ final class MainSession {
     /// 기록 탭 ViewModel. 처음 열 때 만든다.
     @ObservationIgnored private(set) var record: RecordViewModel?
 
-    init(shell: MainShellViewModel, home: HomeViewModel, container: AppContainer) {
+    /// 설정의 사인 변경 흐름(그리기 → 미리보기). 미리보기 경로(`MainRoute.changeSignaturePreview`)는 값을 싣지 않아 세션이 그리기 결과를 쥔다.
+    private(set) var changeSignatureDrawing: SignatureDrawingViewModel?
+    private(set) var changeSignatureDraft: SignatureDraft?
+    /// 미리보기에서 사인이 거절돼 그리기로 돌아올 때 그리기 화면이 보일 오류.
+    private(set) var changeSignatureNotice: Notice?
+
+    init(
+        shell: MainShellViewModel, home: HomeViewModel, settings: SettingsViewModel,
+        tapHandler: NotificationTapHandler, push: PushTapCoordinator, container: AppContainer
+    ) {
         self.shell = shell
         self.home = home
+        self.settings = settings
+        self.tapHandler = tapHandler
+        self.push = push
         self.container = container
+    }
+
+    /// 푸시 탭을 지금 처리해도 되는지(REQ-PUSH-030~031). 업로드·피드백 작성 화면이 열려 있으면 보류한다.
+    var pushGate: PushGate {
+        if shell.access == .guest { return .guest }
+        for route in shell.path {
+            switch route {
+            case .upload, .feedback: return .blocked
+            case .feed, .notifications, .issue, .changeSignature, .changeSignaturePreview, .notificationDetail: continue
+            }
+        }
+        return .ready
+    }
+
+    func makeNotificationInboxViewModel() -> NotificationInboxViewModel {
+        container.makeNotificationInboxViewModel(tapHandler: tapHandler)
+    }
+
+    func makeNotificationDetailViewModel(notificationId: UUID) -> NotificationDetailViewModel {
+        container.makeNotificationDetailViewModel(notificationId: notificationId, navigator: shell, unread: home)
+    }
+
+    // MARK: 사인 변경 흐름
+
+    /// 사인 카드 "변경하기": 새 그리기 화면으로 시작한다(이전 획·오류는 버린다).
+    func beginSignatureChange() {
+        changeSignatureDrawing = container.makeSignatureDrawingViewModel(kind: .change)
+        changeSignatureDraft = nil
+        changeSignatureNotice = nil
+        shell.openSignatureChange()
+    }
+
+    func showSignatureChangePreview(_ draft: SignatureDraft) {
+        changeSignatureDraft = draft
+        changeSignatureNotice = nil
+        shell.openSignaturePreview()
+    }
+
+    /// 미리보기 "다시 그리기" 또는 거절(`notice`가 있으면 그리기 화면에 보인다): 획을 비우고 그리기로 돌아간다.
+    func returnToSignatureDrawing(notice: Notice?) {
+        changeSignatureDrawing?.resetForRedraw()
+        changeSignatureDraft = nil
+        changeSignatureNotice = notice
+        shell.pop()
+    }
+
+    /// 변경 성공: 그리기·미리보기를 닫고 설정의 사인 카드를 다시 불러온다(D-18: PUT 응답 URL이 아니라 GET 결과).
+    func completeSignatureChange() async {
+        shell.signatureChangeCompleted()
+        await settings.signature.signatureChangeFinished(succeeded: true)
     }
 
     /// 전시 탭 ViewModel(없으면 만든다). 대기 중인 전시 요청이 있으면 그 날짜·정렬로 시작한다(요청은 `applyPendingDisplayRequest`가 비운다).
@@ -141,6 +208,16 @@ final class AppContainer {
     private let photoLibrarySaver = PhotoLibraryImageSaver()
     /// 사진 선택·편집·WebP 준비를 맡는 하나의 처리기. 업로드 화면과 편집기가 같은 원본·미리보기를 본다.
     let photoPipeline = PhotoPipeline()
+    private let notificationRepository: any NotificationRepository
+    private let notificationSettingsRepository: any NotificationSettingsRepository
+    private let feedbackRepository: any FeedbackRepository
+    private let signatureRepository: any SignatureRepository
+    private let appVersion: String
+    private let pushAuthorization = UNPushAuthorizationProvider()
+    private let systemSettingsOpener = SystemSettingsOpener()
+    private let pendingPushStore: UserDefaultsPendingPushStore
+    /// 푸시 사건(OS 진입점)을 현재 메인 세션으로 이어 주는 허브.
+    let pushHub: PushEventHub
 
     init(configuration: AppConfiguration) throws {
         #if DEBUG
@@ -157,11 +234,14 @@ final class AppContainer {
         let authEvents = DeferredAuthEvents()
         let refresher = AuthRefresher(configuration: apiConfiguration, transport: transport, store: sessionStore, clock: clock, events: authEvents)
         let client = APIClient(configuration: apiConfiguration, transport: transport, store: sessionStore, refresher: refresher, clock: clock)
-        let userCaches = CompositeUserCacheClearer([])
+        // 푸시 기기 등록. FCM SDK가 없어 토큰 제공자는 자리표시자다(PushPlatform.swift 참고).
+        let apnsTokens = APNsTokenHolder()
+        let pushRegistrar = PushDeviceRegistrar(client: client, store: sessionStore, refresher: refresher, tokens: PlaceholderFCMTokenProvider())
+        let userCaches = CompositeUserCacheClearer([PushRegistrationSessionClearer(registrar: pushRegistrar)])
         let authRepository = APIAuthRepository(client: client, sessionStore: sessionStore, guestFlags: guestFlags, userCaches: userCaches, clock: clock)
 
         let kakaoReady = KakaoSDKBootstrap.initialize(appKey: configuration.kakaoNativeAppKey)
-        let pushRegistration = NoopPushRegistration()
+        let pushRegistration = PushDeviceRegistration(registrar: pushRegistrar)
 
         let versionGate = ForceUpdateGate(
             enabled: configuration.forceUpdateEnabled,
@@ -182,8 +262,9 @@ final class AppContainer {
         authEvents.bind(AuthEventBridge(launch: launch))
 
         let viewer = KeychainViewerContext(store: sessionStore)
+        let toast = ToastCenter(clock: clock)
         self.launch = launch
-        self.toast = ToastCenter(clock: clock)
+        self.toast = toast
         self.authRepository = authRepository
         self.socialLogin = KakaoLoginFlow(gateway: KakaoSDKGatewayImpl(isConfigured: kakaoReady))
         self.pushRegistration = pushRegistration
@@ -212,6 +293,22 @@ final class AppContainer {
         self.postChangeLedger = PostChangeLedger(viewer: viewer)
         self.postCreationRepository = APIPostCreationRepository(client: client)
         self.recordRepository = APIRecordCalendarRepository(client: client)
+        self.notificationRepository = APINotificationRepository(client: client)
+        self.notificationSettingsRepository = APINotificationSettingsRepository(client: client)
+        self.feedbackRepository = APIFeedbackRepository(client: client)
+        self.signatureRepository = APISignatureRepository(client: client, sessionStore: sessionStore)
+        self.appVersion = configuration.installedVersion
+        let pendingPushStore = UserDefaultsPendingPushStore()
+        self.pendingPushStore = pendingPushStore
+        self.pushHub = PushEventHub(
+            permission: NotificationPermissionCoordinator(
+                platform: UNNotificationPermissionPlatform(), flags: UserDefaultsPermissionRequestedFlag(), toast: toast
+            ),
+            pendingStore: pendingPushStore,
+            registrar: pushRegistrar,
+            apnsTokens: apnsTokens,
+            rootProvider: { [launch] in launch.root }
+        )
     }
 
     /// 로그인 화면이 나타날 때마다 새 ViewModel을 쓴다(완료 상태가 남아 재로그인이 막히지 않도록).
@@ -233,7 +330,51 @@ final class AppContainer {
             access: access, repositories: homeRepositories, clock: clock,
             toast: toast, navigator: shell, ledger: postChangeLedger, screens: screenTracker
         )
-        return MainSession(shell: shell, home: home, container: self)
+        let tapHandler = NotificationTapHandler(repository: notificationRepository, navigator: shell, toast: toast, unread: home)
+        let push = PushTapCoordinator(handler: tapHandler, store: pendingPushStore, unread: home)
+        return MainSession(
+            shell: shell, home: home, settings: makeSettingsViewModel(access: access),
+            tapHandler: tapHandler, push: push, container: self
+        )
+    }
+
+    // MARK: 알림함 · 알림 상세 · 설정 · 피드백
+
+    func makeNotificationInboxViewModel(tapHandler: NotificationTapHandler) -> NotificationInboxViewModel {
+        NotificationInboxViewModel(repository: notificationRepository, tapHandler: tapHandler, toast: toast, clock: clock, screens: screenTracker)
+    }
+
+    func makeNotificationDetailViewModel(
+        notificationId: UUID, navigator: any NotificationNavigating, unread: any UnreadRefreshing
+    ) -> NotificationDetailViewModel {
+        NotificationDetailViewModel(
+            notificationId: notificationId, repository: notificationRepository, toast: toast,
+            unread: unread, navigator: navigator, screens: screenTracker
+        )
+    }
+
+    private func makeSettingsViewModel(access: MainAccess) -> SettingsViewModel {
+        SettingsViewModel(
+            access: access,
+            viewer: viewer,
+            repository: notificationSettingsRepository,
+            signature: SignatureCardViewModel(access: access, repository: signatureRepository),
+            account: AccountSessionViewModel(authRepository: authRepository),
+            permission: pushAuthorization,
+            systemSettings: systemSettingsOpener,
+            externalOpener: externalOpener,
+            toast: toast,
+            screens: screenTracker,
+            appVersion: appVersion
+        )
+    }
+
+    func makeFeedbackViewModel() -> FeedbackViewModel {
+        FeedbackViewModel(repository: feedbackRepository, viewer: viewer, toast: toast, screens: screenTracker)
+    }
+
+    func makeSignatureChangePreviewViewModel(draft: SignatureDraft) -> SignatureChangePreviewViewModel {
+        SignatureChangePreviewViewModel(draft: draft, repository: signatureRepository, screenTracker: screenTracker)
     }
 
     // MARK: 전시 · 게시물 상세 · AI 피드백
