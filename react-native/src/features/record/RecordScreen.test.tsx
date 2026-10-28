@@ -237,6 +237,9 @@ describe('RecordScreen 오류와 저장', () => {
     h.imageSaver.behavior = () => new Promise<void>((resolve) => (release = resolve));
     await fireEvent.press(screen.getByTestId('record.save-image-button'));
     await fireEvent.press(screen.getByTestId('record.save-image-button'));
+    expect(h.imageSaver.saved).toHaveLength(1); // 두 번 눌러도 저장 시작은 1건
+    // 저장이 아직 끝나지 않았다(성공 토스트 없음). 가짜 저장소는 호출 시점에 기록하므로 saved가 아니라 토스트로 본다.
+    expect(h.toast.messages).toEqual([]);
     await act(async () => release());
     expect(h.imageSaver.saved.map((s) => s.fileName)).toEqual(['chalkak-calendar-2026-10.png']);
     expect(h.toast.messages).toEqual([t('record.save.ok')]);

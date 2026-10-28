@@ -197,7 +197,7 @@ describe('RecordViewModel 월 이동', () => {
     expect(h.viewModel.getSnapshot()).toBe(before);
   });
 
-  it('TC-REC-018 연도를 바꾸면 그 해에 기록이 있는 달 중 가장 가까운 달이 선택된다', async () => {
+  it('TC-REC-018 월 선택지가 여러 해에 걸쳐도 목록에 있는 달로만 이동한다', async () => {
     const routes = {
       [MONTHS]: 'record/posts-calendar-months__multi-year',
       [cal(2025, 12)]: emptyMonth(2025, 12),
@@ -205,23 +205,32 @@ describe('RecordViewModel 월 이동', () => {
     };
     const h = await createRecordHarness({ routes });
     await h.viewModel.onShown();
-    await h.viewModel.selectYear(2025);
+    expect(months(h)).toEqual(['2026-10', '2026-09', '2025-12', '2025-03']);
+    await h.viewModel.selectMonth(ym(2025, 12));
     expect(h.viewModel.getSnapshot().month.toString()).toBe('2025-12');
-    await h.viewModel.selectYear(2026);
+    await h.viewModel.selectMonth(ym(2025, 3));
+    expect(h.viewModel.getSnapshot().month.toString()).toBe('2025-03');
+    await h.viewModel.selectMonth(ym(2026, 10));
     expect(h.viewModel.getSnapshot().month.toString()).toBe('2026-10');
   });
 
-  it('TC-REC-018 첫 해·마지막 해 범위를 벗어난 연도는 끝으로 맞춘다', async () => {
-    const routes = {
-      [MONTHS]: 'record/posts-calendar-months__multi-year',
-      [cal(2025, 12)]: emptyMonth(2025, 12),
-    };
-    const h = await createRecordHarness({ routes });
+  it('TC-REC-018 선택지 밖의 달(첫 해 이전·마지막 해 이후·빈 해)은 아무 일도 없다', async () => {
+    const h = await createRecordHarness({
+      routes: { [MONTHS]: 'record/posts-calendar-months__multi-year' },
+    });
     await h.viewModel.onShown();
-    await h.viewModel.selectYear(2030);
-    expect(h.viewModel.getSnapshot().month.toString()).toBe('2026-10');
-    await h.viewModel.selectYear(2020);
-    expect(h.viewModel.getSnapshot().month.toString()).toBe('2025-12');
+    const before = h.viewModel.getSnapshot();
+    const requests = h.transport.requests.length;
+    for (const [year, month] of [
+      [2030, 1],
+      [2020, 12],
+      [2025, 11],
+      [2024, 6],
+    ]) {
+      await h.viewModel.selectMonth(ym(year, month));
+    }
+    expect(h.viewModel.getSnapshot()).toBe(before);
+    expect(h.transport.requests).toHaveLength(requests);
   });
 
   it('TC-REC-019 월 이동 버튼을 연타해도 마지막 선택 달만 표시되고 늦은 응답이 화면을 덮지 않는다', async () => {

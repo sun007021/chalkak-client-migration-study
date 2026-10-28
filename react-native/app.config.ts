@@ -44,7 +44,6 @@ const config: ExpoConfig = {
       'expo-media-library',
       {
         savePhotosPermission: '달력을 이미지로 저장하려면 사진 보관함에 추가할 수 있어야 해요.',
-        photosPermission: '사진 보관함에 접근할 수 있어야 해요.',
         granularPermissions: [],
       },
     ],

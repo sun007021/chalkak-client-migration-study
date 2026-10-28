@@ -65,6 +65,7 @@ import { DefaultPostChanges } from '../features/post/PostChanges';
 import { NavigationDisplayNavigator } from './NavigationDisplayNavigator';
 import { NavigationHomeNavigator } from './NavigationHomeNavigator';
 import { NavigationRecordNavigator } from './NavigationRecordNavigator';
+import { TabReturnHint } from './TabReturnHint';
 import type { RootStackParamList } from './navigation/routes';
 import { LoginViewModel } from '../features/auth/LoginViewModel';
 import { LoginViewModelOwner } from '../features/auth/LoginViewModelOwner';
@@ -179,7 +180,12 @@ export class AppContainer {
   private readonly dependencies: Dependencies;
   private readonly homeNavigator = new NavigationHomeNavigator(this.navigationHandle);
   private readonly displayNavigator = new NavigationDisplayNavigator(this.navigationHandle);
-  private readonly recordNavigator = new NavigationRecordNavigator(this.navigationHandle);
+  /** 기록에서 연 전시 탭이 뒤로 가기에서 기록으로 돌아오게 하는 힌트(MainTabs의 전시 탭이 읽는다). */
+  readonly tabReturnHint = new TabReturnHint();
+  private readonly recordNavigator = new NavigationRecordNavigator(
+    this.navigationHandle,
+    this.tabReturnHint,
+  );
   private readonly calendarImageRenderer: CalendarImageRenderer;
   private readonly calendarImageSaver: CalendarImageSaver;
   private readonly cacheRegistry = new UserDataCacheRegistry();
@@ -247,11 +253,9 @@ export class AppContainer {
       create: (mode) => this.createDisplayViewModel(mode),
       registerCache: (cache) => this.cacheRegistry.register(cache),
     });
-    const defaultRenderer = dependencies.calendarImageRenderer
-      ? null
-      : new ViewShotCalendarImageRenderer();
-    this.calendarCapture = defaultRenderer;
-    this.calendarImageRenderer = dependencies.calendarImageRenderer ?? defaultRenderer!;
+    const calendarImage = resolveCalendarImageRenderer(dependencies.calendarImageRenderer);
+    this.calendarCapture = calendarImage.capture;
+    this.calendarImageRenderer = calendarImage.renderer;
     this.calendarImageSaver =
       dependencies.calendarImageSaver ?? new MediaLibraryCalendarImageSaver();
     this.recordOwner = new RecordViewModelOwner({
@@ -482,6 +486,18 @@ export class AppContainer {
       toastCenter,
     );
   }
+}
+
+/**
+ * 주입된 렌더러가 있으면 그것을(캡처 호스트 없음), 없으면 view-shot 렌더러를 만들고 호스트가 쓸 수 있게 함께 돌려준다.
+ */
+function resolveCalendarImageRenderer(injected: CalendarImageRenderer | undefined): {
+  renderer: CalendarImageRenderer;
+  capture: ViewShotCalendarImageRenderer | null;
+} {
+  if (injected) return { renderer: injected, capture: null };
+  const capture = new ViewShotCalendarImageRenderer();
+  return { renderer: capture, capture };
 }
 
 /** iOS는 iTunes lookup, Android는 Play 즉시 업데이트(네이티브 모듈을 붙이기 전에는 조회 불가 -> 통과). */

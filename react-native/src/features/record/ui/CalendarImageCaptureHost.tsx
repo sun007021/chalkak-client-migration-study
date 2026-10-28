@@ -9,8 +9,8 @@ import type {
 } from '../ViewShotCalendarImageRenderer';
 import { CalendarImageView } from './CalendarImageView';
 
-/** 썸네일 로딩을 기다리는 최대 시간(ms). 넘으면 못 받은 칸은 비워 둔 채 캡처한다. */
-const IMAGE_WAIT_MS = 8000;
+/** 레이아웃과 썸네일 로딩을 기다리는 최대 시간(ms). 넘으면 사진이 빠진 PNG를 저장하지 않고 실패시킨다(record.save.fail). */
+export const IMAGE_WAIT_MS = 8000;
 
 /**
  * 기록 화면 안에 마운트해 두는 캡처 호스트. 렌더러(`ViewShotCalendarImageRenderer`)가 요청을 내놓으면
@@ -18,13 +18,17 @@ const IMAGE_WAIT_MS = 8000;
  */
 export function CalendarImageCaptureHost({
   renderer,
+  imageWaitMs = IMAGE_WAIT_MS,
 }: {
   renderer: ViewShotCalendarImageRenderer;
+  imageWaitMs?: number;
 }) {
   const { request } = useViewModelState(renderer);
   useEffect(() => renderer.attachHost(), [renderer]);
   // 요청마다 새로 마운트해 로딩 카운터·타이머가 요청 사이에 섞이지 않게 한다.
-  return request ? <CaptureSession key={sessionKey(request)} request={request} /> : null;
+  return request ? (
+    <CaptureSession key={sessionKey(request)} request={request} waitMs={imageWaitMs} />
+  ) : null;
 }
 
 const keys = new WeakMap<CaptureRequest, number>();
@@ -39,19 +43,25 @@ function sessionKey(request: CaptureRequest): number {
   return key;
 }
 
-function CaptureSession({ request }: { request: CaptureRequest }) {
+function CaptureSession({ request, waitMs }: { request: CaptureRequest; waitMs: number }) {
   const viewRef = useRef<HostInstance>(null);
   const total = request.input.photos.length;
   const [settled, setSettled] = useState(0);
-  const [timedOut, setTimedOut] = useState(false);
-  const ready = settled >= total || timedOut;
+  const [laidOut, setLaidOut] = useState(false);
+  // 레이아웃이 끝나고 썸네일이 모두 끝나야 캡처한다. 사진이 없는 달도 레이아웃은 기다린다(빈 이미지 방지).
+  const ready = laidOut && settled >= total;
 
   const onPhotoSettled = useCallback(() => setSettled((count) => count + 1), []);
 
   useEffect(() => {
-    const timer = setTimeout(() => setTimedOut(true), IMAGE_WAIT_MS);
+    if (ready) return;
+    // 제때 준비되지 않으면 사진이 빠진 이미지를 저장하지 않고 실패시킨다.
+    const timer = setTimeout(
+      () => request.fail(new Error('calendar view was not ready in time')),
+      waitMs,
+    );
     return () => clearTimeout(timer);
-  }, []);
+  }, [ready, request, waitMs]);
 
   useEffect(() => {
     if (!ready) return;
@@ -78,7 +88,12 @@ function CaptureSession({ request }: { request: CaptureRequest }) {
   // 화면 밖이지만 마운트·레이아웃은 되어 있어야 캡처된다(display:none·opacity 0은 빈 이미지가 된다).
   return (
     <View style={styles.offscreen} pointerEvents="none" accessibilityElementsHidden>
-      <View ref={viewRef} collapsable={false}>
+      <View
+        ref={viewRef}
+        testID="calendar-image.root"
+        collapsable={false}
+        onLayout={() => setLaidOut(true)}
+      >
         <CalendarImageView input={request.input} onPhotoSettled={onPhotoSettled} />
       </View>
     </View>

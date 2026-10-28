@@ -13,6 +13,7 @@ jest.mock('react-native-view-shot', () => ({ captureRef: jest.fn() }));
 
 /** 캡처용 뷰는 화면 밖·접근성 숨김이라 숨은 요소도 찾는다. */
 const HIDDEN = { includeHiddenElements: true };
+const layOut = () => fireEvent(screen.getByTestId('calendar-image.root', HIDDEN), 'layout');
 const pngBase64 = bytesToBase64(fakePng().bytes);
 const photo = (date: string) => ({
   postId: `p-${date}`,
@@ -35,8 +36,15 @@ describe('CalendarImageCaptureHost', () => {
     const renderer = new ViewShotCalendarImageRenderer();
     await render(<CalendarImageCaptureHost renderer={renderer} />);
     let result!: Awaited<ReturnType<typeof renderer.render>>;
+    let pending!: Promise<unknown>;
     await act(async () => {
-      result = await renderer.render(input([]));
+      pending = renderer.render(input([])).then((image) => (result = image));
+    });
+    // 레이아웃이 끝나기 전에는 캡처하지 않는다(빈 이미지 방지).
+    expect(captureRef).not.toHaveBeenCalled();
+    await layOut();
+    await act(async () => {
+      await pending;
     });
     expect(jest.mocked(captureRef).mock.calls[0][1]).toMatchObject({
       format: 'png',
@@ -57,6 +65,8 @@ describe('CalendarImageCaptureHost', () => {
       });
     });
     expect(captureRef).not.toHaveBeenCalled();
+    await layOut();
+    expect(captureRef).not.toHaveBeenCalled();
     await fireEvent(screen.getByTestId('calendar-image.photo-2026-10-20', HIDDEN), 'load');
     await fireEvent(screen.getByTestId('calendar-image.photo-2026-10-27', HIDDEN), 'error');
     await act(async () => {
@@ -71,8 +81,13 @@ describe('CalendarImageCaptureHost', () => {
     const renderer = new ViewShotCalendarImageRenderer();
     await render(<CalendarImageCaptureHost renderer={renderer} />);
     let error: unknown;
+    let pending!: Promise<unknown>;
     await act(async () => {
-      await renderer.render(input([])).catch((e: unknown) => (error = e));
+      pending = renderer.render(input([])).catch((e: unknown) => (error = e));
+    });
+    await layOut();
+    await act(async () => {
+      await pending;
     });
     expect(error).toEqual(new Error('capture failed'));
   });
@@ -82,5 +97,33 @@ describe('CalendarImageCaptureHost', () => {
     const view = await render(<CalendarImageCaptureHost renderer={renderer} />);
     await view.unmount();
     await expect(renderer.render(input([]))).rejects.toThrow('no calendar capture host');
+  });
+
+  it('썸네일이 제때 준비되지 않으면 사진이 빠진 PNG를 만들지 않고 실패한다', async () => {
+    const renderer = new ViewShotCalendarImageRenderer();
+    await render(<CalendarImageCaptureHost renderer={renderer} imageWaitMs={30} />);
+    let error: unknown;
+    let pending!: Promise<unknown>;
+    await act(async () => {
+      pending = renderer.render(input([photo('2026-10-20')])).catch((e: unknown) => (error = e));
+    });
+    await layOut();
+    await act(async () => {
+      await pending;
+    });
+    expect(error).toEqual(new Error('calendar view was not ready in time'));
+    expect(captureRef).not.toHaveBeenCalled();
+    expect(renderer.getSnapshot().request).toBeNull();
+  });
+
+  it('레이아웃이 끝나지 않아도 제한 시간 뒤에는 실패한다', async () => {
+    const renderer = new ViewShotCalendarImageRenderer();
+    await render(<CalendarImageCaptureHost renderer={renderer} imageWaitMs={30} />);
+    let error: unknown;
+    await act(async () => {
+      await renderer.render(input([])).catch((e: unknown) => (error = e));
+    });
+    expect(error).toBeInstanceOf(Error);
+    expect(captureRef).not.toHaveBeenCalled();
   });
 });

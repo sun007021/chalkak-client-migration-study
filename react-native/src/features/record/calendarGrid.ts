@@ -1,6 +1,5 @@
 import { KstDate } from '../../core/time/KstDate';
 import type { YearMonth } from '../../core/time/YearMonth';
-import { RECORD_COPY } from './recordCopy';
 
 export type CalendarGrid = {
   /** 7열 격자의 행 수. */
@@ -24,7 +23,7 @@ export function buildCalendarGrid(month: YearMonth): CalendarGrid {
   return { rows, leadingBlanks, cells, lastDay };
 }
 
-/** 연월 라벨: `2026년 10월`. 문구 키가 shared/copy/ko.json에 없어 형식을 recordCopy.ts에 둔다. */
+/** 연월 라벨 `2026년 10월`(월 0 채움 없음). 문구 키가 shared/copy/ko.json에 없어 형식을 여기에 둔다(README "ko.json 키 필요"). */
 export function formatRecordMonthLabel(month: YearMonth): string {
-  return RECORD_COPY.monthLabel(month);
+  return `${month.year}년 ${month.month}월`;
 }

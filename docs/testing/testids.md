@@ -317,6 +317,7 @@
 | record | 오늘 표시              | `record.today-marker`                | 오늘(KST) 날짜 칸 안에 하나만 존재 (RN 추가)   |
 | record | 오류 메시지            | `record.error-message`               | 오류 상태 안, "기록을 불러오지 못했어요" (RN 추가) |
 | record | 저장용 달력 이미지의 사진 | `calendar-image.photo-{yyyy-mm-dd}` | 화면 밖 캡처용 뷰의 썸네일, 접근성 숨김 (RN 추가) |
+| record | 저장용 달력 이미지 루트 | `calendar-image.root` | 화면 밖 캡처용 뷰, 접근성 숨김 (RN 추가) |
 
 ### 알림함
 

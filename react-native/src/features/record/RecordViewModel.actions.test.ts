@@ -117,4 +117,32 @@ describe('RecordViewModel 달력 이미지 저장', () => {
     expect(h.imageSaver.saved).toHaveLength(1);
     expect(h.toast.messages).toEqual([t('record.save.ok')]);
   });
+
+  it('TC-REC-040 저장 중 화면을 떠나면 결과 토스트를 띄우지 않고 다시 저장할 수 있다 (D-20)', async () => {
+    const h = await createRecordHarness();
+    await h.viewModel.onShown();
+    let release!: () => void;
+    h.imageSaver.behavior = () => new Promise<void>((resolve) => (release = resolve));
+    const pending = h.viewModel.saveImage();
+    await Promise.resolve();
+    h.viewModel.onHidden();
+    expect(h.viewModel.getSnapshot().saving).toBe(false);
+    release();
+    await pending;
+    expect(h.toast.messages).toEqual([]);
+    expect(h.viewModel.getSnapshot().saving).toBe(false);
+  });
+
+  it('TC-REC-040 저장 중 계정이 바뀌면(clearAll) 늦게 끝난 저장의 토스트를 띄우지 않는다', async () => {
+    const h = await createRecordHarness();
+    await h.viewModel.onShown();
+    let rejectRender!: () => void;
+    h.imageRenderer.result = () =>
+      new Promise((_, reject) => (rejectRender = () => reject(new Error('late'))));
+    const pending = h.viewModel.saveImage();
+    h.viewModel.clearAll();
+    rejectRender();
+    await pending;
+    expect(h.toast.messages).toEqual([]);
+  });
 });

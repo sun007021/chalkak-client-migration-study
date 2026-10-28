@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { BackHandler } from 'react-native';
 
 import { FakeAnalyticsTracker } from '../core/analytics/__testing__/FakeAnalyticsTracker';
 import { createNetHarness } from '../core/http/__testing__/createNetHarness';
@@ -58,6 +59,29 @@ async function openRecordTab() {
   await fireEvent.press(screen.getByTestId('bottom-bar.tab-record'));
   return screen.findByTestId('record.calendar-grid');
 }
+
+/** jest(ios)의 BackHandler는 이벤트를 내지 않으므로 등록된 핸들러를 모아 안드로이드처럼 마지막 등록부터 호출한다. */
+function captureBackHandlers() {
+  type Handler = Parameters<typeof BackHandler.addEventListener>[1];
+  const handlers: Handler[] = [];
+  jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, handler) => {
+    handlers.push(handler);
+    return {
+      remove: () => {
+        const index = handlers.indexOf(handler);
+        if (index >= 0) handlers.splice(index, 1);
+      },
+    };
+  });
+  return async () => {
+    for (const handler of [...handlers].reverse()) {
+      if (handler(undefined as never)) break;
+    }
+    await Promise.resolve();
+  };
+}
+
+afterEach(() => jest.restoreAllMocks());
 
 describe('기록 탭 연결', () => {
   it('TC-REC-001 TC-REC-042 기록 탭을 누르면 월 목록과 현재 달 달력을 불러와 보여 주고 screen_view record를 1회 보낸다', async () => {
@@ -128,5 +152,52 @@ describe('기록 탭 연결', () => {
     await fireEvent.press(screen.getByTestId('record.save-image-button'));
     expect(await screen.findByTestId('toast.message')).toHaveTextContent(t('record.save.ok'));
     expect(imageSaver.saved.map((s) => s.fileName)).toEqual(['chalkak-calendar-2026-10.png']);
+  });
+
+  it('REQ-NAV-030 TC-REC-034 기록에서 연 전시에서 뒤로 가면 기록으로 돌아온다', async () => {
+    const pressBack = captureBackHandlers();
+    await renderApp('member');
+    await openRecordTab();
+    await fireEvent.press(screen.getByTestId('record.day-2026-10-20'));
+    await fireEvent.press(screen.getByTestId('record.view-display-button'));
+    expect(await screen.findByTestId('display.date-label')).toBeOnTheScreen();
+    await pressBack();
+    expect(await screen.findByTestId('record.root')).toBeOnTheScreen();
+    expect(screen.getByTestId('bottom-bar.tab-record')).toBeSelected();
+  });
+
+  it('REQ-NAV-026 비홈 탭(설정)에서 뒤로 가면 홈으로 간다', async () => {
+    const pressBack = captureBackHandlers();
+    await renderApp('member');
+    await screen.findByTestId('bottom-bar.root');
+    await fireEvent.press(screen.getByTestId('bottom-bar.tab-settings'));
+    expect(screen.getByTestId('bottom-bar.tab-settings')).toBeSelected();
+    await pressBack();
+    await waitFor(() => expect(screen.getByTestId('bottom-bar.tab-home')).toBeSelected());
+  });
+
+  it('REQ-NAV-026 하단 바로 전시 -> 기록을 눌러도 기록에서 뒤로 가면 홈으로 간다', async () => {
+    const pressBack = captureBackHandlers();
+    await renderApp('member');
+    await screen.findByTestId('bottom-bar.root');
+    await fireEvent.press(screen.getByTestId('bottom-bar.tab-display'));
+    await fireEvent.press(screen.getByTestId('bottom-bar.tab-record'));
+    await screen.findByTestId('record.root');
+    await pressBack();
+    await waitFor(() => expect(screen.getByTestId('bottom-bar.tab-home')).toBeSelected());
+  });
+
+  it('기록에서 전시로 간 뒤 다른 탭을 거쳐 하단 바로 전시에 다시 오면 뒤로 가기는 홈으로 간다(힌트는 이탈 때 지워진다)', async () => {
+    const pressBack = captureBackHandlers();
+    await renderApp('member');
+    await openRecordTab();
+    await fireEvent.press(screen.getByTestId('record.day-2026-10-20'));
+    await fireEvent.press(screen.getByTestId('record.view-display-button'));
+    await screen.findByTestId('display.date-label');
+    await fireEvent.press(screen.getByTestId('bottom-bar.tab-settings'));
+    await fireEvent.press(screen.getByTestId('bottom-bar.tab-display'));
+    await screen.findByTestId('display.date-label');
+    await pressBack();
+    await waitFor(() => expect(screen.getByTestId('bottom-bar.tab-home')).toBeSelected());
   });
 });

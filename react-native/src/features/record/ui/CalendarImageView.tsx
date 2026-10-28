@@ -2,9 +2,8 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { t } from '../../../shared/copy';
 import { colors } from '../../../shared/ui/theme';
-import { buildCalendarGrid } from '../calendarGrid';
+import { buildCalendarGrid, formatRecordMonthLabel } from '../calendarGrid';
 import type { CalendarImageInput } from '../CalendarImage';
-import { RECORD_COPY } from '../recordCopy';
 
 /** 저장용 달력 이미지의 레이아웃(dp). 기기 화면 크기와 무관하게 같은 모양으로 그린다. */
 export const CALENDAR_IMAGE = { width: 360, cell: 48, padding: 12 } as const;
@@ -27,7 +26,7 @@ export function CalendarImageView({ input, onPhotoSettled }: Props) {
   );
   return (
     <View style={styles.root} collapsable={false}>
-      <Text style={styles.title}>{RECORD_COPY.monthLabel(input.month)}</Text>
+      <Text style={styles.title}>{formatRecordMonthLabel(input.month)}</Text>
       <View style={styles.row}>
         {[...t('record.weekday')].map((label, index) => (
           <Text key={index} style={styles.weekday}>

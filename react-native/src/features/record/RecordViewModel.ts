@@ -20,6 +20,7 @@ import type { AuthFlowNavigator, MainMode } from '../auth/AuthFlowNavigator';
 import type { PostChange, PostChanges } from '../post/PostChanges';
 import {
   ImagePermissionDeniedError,
+  isValidRenderedImage,
   type CalendarImageRenderer,
   type CalendarImageSaver,
 } from './CalendarImage';
@@ -40,13 +41,6 @@ export type RecordViewModelDeps = {
   imageRenderer: CalendarImageRenderer;
   imageSaver: CalendarImageSaver;
 };
-
-/** PNG 파일 시그니처(89 50 4E 47 0D 0A 1A 0A). 렌더러가 엉뚱한 바이트를 주면 저장 전에 실패로 본다. */
-const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-
-const isPng = (bytes: Uint8Array): boolean =>
-  bytes.length > PNG_SIGNATURE.length &&
-  PNG_SIGNATURE.every((byte, index) => bytes[index] === byte);
 
 /**
  * 기록 탭 상태. 월별 캐시, 세대 번호로 늦은 응답 폐기, 삭제한 게시물 기억을 맡는다.
@@ -75,6 +69,8 @@ export class RecordViewModel extends Observable<RecordState> implements UserData
   /** 첫 진입에 현재 달로 맞췄는가. 아니면 onShown이 KST 현재 달로 맞춘다. */
   private anchored = false;
   private opening: Promise<void> | null = null;
+  /** 저장 한 번의 식별자. 화면을 떠나거나 계정이 바뀌면 올려, 늦게 끝난 저장이 토스트를 띄우지 못하게 한다. */
+  private saveToken = 0;
   private stopVisibility: (() => void) | null = null;
   private readonly stopChanges: () => void;
 
@@ -119,7 +115,14 @@ export class RecordViewModel extends Observable<RecordState> implements UserData
     this.stopVisibility = null;
     this.opening = null;
     this.invalidate(true);
+    // 진행 중인 저장은 멈출 수 없지만(렌더러·저장소에 취소가 없다) 결과 토스트는 띄우지 않는다(D-20).
+    this.cancelSave();
     if (this.getSnapshot().revalidating) this.patch({ revalidating: false });
+  }
+
+  private cancelSave(): void {
+    this.saveToken += 1;
+    if (this.getSnapshot().saving) this.patch({ saving: false });
   }
 
   /** 기록 탭 재선택: 재검증. */
@@ -163,26 +166,6 @@ export class RecordViewModel extends Observable<RecordState> implements UserData
     return this.move(month);
   }
 
-  /** 연도 선택: 그 해에 기록이 있는 달 중 현재 달과 가장 가까운 달로 간다. 첫 해·마지막 해 밖은 끝으로 맞춘다(TC-REC-018). */
-  selectYear(year: number): Promise<void> {
-    const s = this.getSnapshot();
-    const years = [...new Set(s.availableMonths.map((m) => m.year))];
-    if (years.length === 0) return Promise.resolve();
-    // 선택지에 없는 해(범위 밖·중간에 빈 해)는 가장 가까운 해로 맞춘다. 같은 거리면 최근 해.
-    const nearestYear = years.reduce((best, candidate) => {
-      const diff = Math.abs(candidate - year) - Math.abs(best - year);
-      return diff < 0 || (diff === 0 && candidate > best) ? candidate : best;
-    });
-    const inYear = s.availableMonths.filter((m) => m.year === nearestYear);
-    const target = inYear.reduce((best, candidate) => {
-      const diff =
-        Math.abs(candidate.month - s.currentMonth.month) -
-        Math.abs(best.month - s.currentMonth.month);
-      return diff < 0 || (diff === 0 && candidate.month > best.month) ? candidate : best;
-    });
-    return this.selectMonth(target);
-  }
-
   /** 사진이 있는 날짜만 선택된다. */
   selectDate(date: KstDate): void {
     const s = this.getSnapshot();
@@ -218,35 +201,39 @@ export class RecordViewModel extends Observable<RecordState> implements UserData
   async saveImage(): Promise<void> {
     const s = this.getSnapshot();
     if (s.saving || s.status !== 'content') return;
+    this.saveToken += 1;
+    const token = this.saveToken;
+    const stale = () => token !== this.saveToken;
     this.patch({ saving: true });
+    let message: string;
     try {
       const image = await this.deps.imageRenderer.render({
         month: s.month,
         photos: s.photos,
         today: s.today,
       });
-      if (!isPng(image.bytes) || image.width <= 0 || image.height <= 0) {
-        throw new Error('렌더 결과가 PNG 이미지가 아님');
-      }
+      if (!isValidRenderedImage(image)) throw new Error('렌더 결과가 PNG 이미지가 아님');
       await this.deps.imageSaver.save({
         fileName: `chalkak-calendar-${s.month.toString()}.png`,
         bytes: image.bytes,
       });
-      this.deps.toast.show(t('record.save.ok'));
+      message = t('record.save.ok');
     } catch (error) {
-      this.deps.toast.show(
+      message =
         error instanceof ImagePermissionDeniedError
           ? t('record.save.denied')
-          : t('record.save.fail'),
-      );
-    } finally {
-      this.patch({ saving: false });
+          : t('record.save.fail');
     }
+    // 화면을 떠났거나 계정이 바뀐 뒤에 끝난 저장은 상태도 토스트도 건드리지 않는다.
+    if (stale()) return;
+    this.patch({ saving: false });
+    this.deps.toast.show(message);
   }
 
   /** 계정 전환·로그아웃: 캐시·삭제 기억·선택 날짜·진행 중 요청을 비운다. */
   clearAll(): void {
     this.invalidate(true);
+    this.saveToken += 1;
     this.epoch += 1;
     this.monthsSeq += 1;
     this.cache.clear();
@@ -286,7 +273,8 @@ export class RecordViewModel extends Observable<RecordState> implements UserData
 
   /**
    * 화면 진입·포그라운드 복귀·탭 재선택·다시 시도의 공통 경로: 현재 달을 다시 계산하고 월 목록과 보는 달을 (재)조회한다.
-   * 지정 날짜가 있는데 그 달이 아직 선택지에 없으면 월 목록이 온 뒤에 이동한다.
+   * 지정 날짜가 있는데 그 달이 아직 선택지에 없으면 월 목록이 온 뒤에 이동한다(그동안은 로딩 표시이고, 현재 달을 먼저
+   * 불러 두지 않는다: 달을 두 번 요청하고 화면이 두 번 바뀌는 비용이 커서 현재 동작을 유지한다).
    */
   private enter(): Promise<void> {
     if (!this.isMember) return Promise.resolve();
@@ -345,7 +333,7 @@ export class RecordViewModel extends Observable<RecordState> implements UserData
     const signal = this.controller.signal;
     const cached = this.cache.get(month.toString());
     if (cached) {
-      this.patch({ ...this.contentOf(month, cached), revalidating: true });
+      this.showContent(month, cached, { revalidating: true });
     } else {
       this.patch({
         month,
@@ -371,7 +359,7 @@ export class RecordViewModel extends Observable<RecordState> implements UserData
       // 밀려난 요청의 응답도 캐시에는 남긴다(다시 그 달로 오면 바로 보인다).
       this.cache.set(month.toString(), result.photos);
       if (generation !== this.generation) return;
-      this.patch({ ...this.contentOf(month, result.photos), revalidating: false });
+      this.showContent(month, result.photos, { revalidating: false });
     } catch (error) {
       if (generation !== this.generation || error instanceof CancelledError) return;
       this.onFailure(error);
@@ -402,6 +390,8 @@ export class RecordViewModel extends Observable<RecordState> implements UserData
   private errorKindOf(error: unknown): RecordErrorKind {
     if (error instanceof AuthenticationRequiredError) return 'login-required';
     if (error instanceof HttpError && error.status === 400) return 'invalid-month';
+    // 403(정지, D-08)의 전용 오류 화면은 백엔드 확인 전이라 일반 오류로 둔다. 확정되면 여기에 'forbidden' 분기를 넣는다.
+    if (error instanceof HttpError && error.status === 403) return 'generic';
     return 'generic';
   }
 
@@ -449,7 +439,7 @@ export class RecordViewModel extends Observable<RecordState> implements UserData
     const s = this.getSnapshot();
     if (s.status !== 'content' || !s.photos.some((p) => p.postId === change.postId)) return;
     const raw = this.cache.get(s.month.toString());
-    if (raw) this.patch(this.contentOf(s.month, raw));
+    if (raw) this.showContent(s.month, raw, {});
   }
 
   private isRemoved(postId: string): boolean {
@@ -458,28 +448,33 @@ export class RecordViewModel extends Observable<RecordState> implements UserData
 
   // ---- 상태 조립 ----
 
-  /**
-   * 한 달 응답을 화면 상태로. 삭제한 게시물을 거르고 선택 날짜를 정한다:
-   * 홈이 지정한 날짜(그 날짜에 사진이 있을 때만) > 지금 선택한 날짜(아직 있으면) > 가장 늦은 사진 날짜 > 없음.
-   */
-  private contentOf(
+  /** 한 달 응답을 화면에 올린다. 지정 날짜(requestedDate)는 그 달 응답을 한 번 적용하면 소모한다. */
+  private showContent(
     month: YearMonth,
     raw: readonly RecordPhoto[],
-  ): Pick<RecordState, 'month' | 'status' | 'error' | 'photos' | 'selectedDate'> {
+    extra: Partial<RecordState>,
+  ): void {
     const photos = raw.filter((p) => !this.isRemoved(p.postId));
+    const selectedDate = this.resolveSelection(month, photos);
+    const requested = this.requestedDate;
+    if (requested !== null && YearMonth.from(requested).equals(month)) this.requestedDate = null;
+    this.patch({ month, status: 'content', error: null, photos, selectedDate, ...extra });
+  }
+
+  /**
+   * 선택 날짜를 정한다(부수 효과 없음). 홈이 지정한 날짜(그 날짜에 사진이 있을 때만) > 지금 선택한 날짜(아직 있으면)
+   * > 가장 늦은 사진 날짜 > 없음.
+   */
+  private resolveSelection(month: YearMonth, photos: readonly RecordPhoto[]): KstDate | null {
     const has = (date: KstDate | null): date is KstDate =>
       date !== null && photos.some((p) => p.date.equals(date));
-    let selected: KstDate | null = null;
     const requested = this.requestedDate;
-    if (requested !== null && YearMonth.from(requested).equals(month)) {
-      if (has(requested)) selected = requested;
-      this.requestedDate = null;
+    if (requested !== null && YearMonth.from(requested).equals(month) && has(requested)) {
+      return requested;
     }
-    if (selected === null && has(this.getSnapshot().selectedDate)) {
-      selected = this.getSnapshot().selectedDate;
-    }
-    selected ??= photos.at(-1)?.date ?? null;
-    return { month, status: 'content', error: null, photos, selectedDate: selected };
+    const current = this.getSnapshot().selectedDate;
+    if (has(current)) return current;
+    return photos.at(-1)?.date ?? null;
   }
 
   /** 상태를 바꾸는 유일한 통로: 선택한 사진과 이전·다음 달 가능 여부를 항상 함께 맞춘다. */

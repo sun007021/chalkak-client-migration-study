@@ -1,8 +1,13 @@
 import { base64ToBytes } from '../../core/encoding/base64';
+import type { Sleeper } from '../../core/http/Sleeper';
+import { SystemSleeper } from '../../core/http/SystemSleeper';
 import { Observable } from '../../core/state/Observable';
 import type { CalendarImageInput, CalendarImageRenderer, RenderedImage } from './CalendarImage';
 
 /** 화면 밖에 그려 둔 달력 뷰를 캡처해 달라는 요청 하나. 호스트(CalendarImageCaptureHost)가 처리한다. */
+/** 호스트가 캡처를 끝내길 기다리는 상한(ms). 넘으면 요청을 버리고 실패시킨다. */
+export const CAPTURE_TIMEOUT_MS = 20_000;
+
 export type CaptureRequest = {
   input: CalendarImageInput;
   /** 달력 뷰를 PNG(base64)로 캡처한 결과를 돌려준다. 호스트가 뷰를 그리고 이미지 로딩을 기다린 뒤 부른다. */
@@ -24,7 +29,7 @@ export class ViewShotCalendarImageRenderer
   private hosts = 0;
   private queue: Promise<unknown> = Promise.resolve();
 
-  constructor() {
+  constructor(private readonly sleeper: Sleeper = new SystemSleeper()) {
     super({ request: null });
   }
 
@@ -51,10 +56,16 @@ export class ViewShotCalendarImageRenderer
   private capture(input: CalendarImageInput): Promise<RenderedImage> {
     if (this.hosts === 0) return Promise.reject(new Error('no calendar capture host'));
     return new Promise<RenderedImage>((resolve, reject) => {
-      const finish = () => this.setState({ request: null });
+      const timer = new AbortController();
+      // 이 요청이 아직 현재 요청일 때만 칸을 비운다(시간 초과된 낡은 요청의 늦은 응답이 다음 요청을 지우지 않게).
+      const finish = () => {
+        timer.abort();
+        if (this.getSnapshot().request === request) this.setState({ request: null });
+      };
       const request: CaptureRequest = {
         input,
         succeed: (pngBase64) => {
+          if (timer.signal.aborted) return;
           finish();
           try {
             const bytes = base64ToBytes(pngBase64);
@@ -64,11 +75,17 @@ export class ViewShotCalendarImageRenderer
           }
         },
         fail: (error) => {
+          if (timer.signal.aborted) return;
           finish();
           reject(error);
         },
       };
       this.setState({ request });
+      // 호스트가 멈춰도 저장 대기열이 영영 막히지 않게 상한을 둔다.
+      this.sleeper.sleep(CAPTURE_TIMEOUT_MS, timer.signal).then(
+        () => request.fail(new Error('calendar capture timed out')),
+        () => undefined,
+      );
     });
   }
 }

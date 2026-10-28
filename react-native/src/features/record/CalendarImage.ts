@@ -24,3 +24,15 @@ export class ImagePermissionDeniedError extends Error {}
 export interface CalendarImageSaver {
   save(image: { fileName: string; bytes: Uint8Array }): Promise<void>;
 }
+
+/** PNG 파일 시그니처(89 50 4E 47 0D 0A 1A 0A). 렌더러가 엉뚱한 바이트를 주면 저장 전에 실패로 본다. */
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+export function isPng(bytes: Uint8Array): boolean {
+  return bytes.length > PNG_SIGNATURE.length && PNG_SIGNATURE.every((byte, i) => bytes[i] === byte);
+}
+
+/** 렌더 결과가 저장할 만한 PNG인가(시그니처, 가로·세로 > 0). */
+export function isValidRenderedImage(image: RenderedImage): boolean {
+  return isPng(image.bytes) && image.width > 0 && image.height > 0;
+}

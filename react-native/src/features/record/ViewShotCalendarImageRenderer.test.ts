@@ -2,7 +2,12 @@ import { bytesToBase64 } from '../../core/encoding/base64';
 import { d } from '../../core/time/__testing__/helpers';
 import { YearMonth } from '../../core/time/YearMonth';
 import type { CalendarImageInput } from './CalendarImage';
-import { readPngSize, ViewShotCalendarImageRenderer } from './ViewShotCalendarImageRenderer';
+import { FakeSleeper } from '../../core/http/__testing__/FakeSleeper';
+import {
+  CAPTURE_TIMEOUT_MS,
+  readPngSize,
+  ViewShotCalendarImageRenderer,
+} from './ViewShotCalendarImageRenderer';
 
 const input: CalendarImageInput = {
   month: YearMonth.of(2026, 10),
@@ -86,5 +91,30 @@ describe('ViewShotCalendarImageRenderer', () => {
     detach();
     detach();
     await expect(pending).rejects.toThrow('detached');
+  });
+
+  it('호스트가 응답하지 않으면 20초 뒤 실패하고 요청 칸을 비우며 다음 요청을 처리한다', async () => {
+    const sleeper = new FakeSleeper(true);
+    const renderer = new ViewShotCalendarImageRenderer(sleeper);
+    renderer.attachHost();
+    const first = renderer.render(input);
+    await Promise.resolve();
+    const stale = renderer.getSnapshot().request;
+    expect(sleeper.calls).toEqual([CAPTURE_TIMEOUT_MS]);
+    expect(CAPTURE_TIMEOUT_MS).toBe(20_000);
+    sleeper.release();
+    await expect(first).rejects.toThrow('timed out');
+    expect(renderer.getSnapshot().request).toBeNull();
+
+    const second = renderer.render({ ...input, month: YearMonth.of(2026, 9) });
+    await Promise.resolve();
+    await Promise.resolve();
+    const current = renderer.getSnapshot().request;
+    expect(current?.input.month.toString()).toBe('2026-09');
+    // 시간 초과된 낡은 요청에 늦게 온 결과는 새 요청을 지우지 않는다.
+    stale?.succeed(bytesToBase64(png(1, 1)));
+    expect(renderer.getSnapshot().request).toBe(current);
+    current?.succeed(bytesToBase64(png(2, 2)));
+    await expect(second).resolves.toMatchObject({ width: 2, height: 2 });
   });
 });

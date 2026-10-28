@@ -15,6 +15,9 @@ export function bytesToBase64(bytes: Uint8Array): string {
   return out;
 }
 
+const LOOKUP = new Int8Array(128).fill(-1);
+for (let i = 0; i < ALPHABET.length; i += 1) LOOKUP[ALPHABET.charCodeAt(i)] = i;
+
 /** base64(패딩 있음·없음, 줄바꿈·공백 무시) -> 바이트. 허용하지 않는 문자가 있으면 RangeError. */
 export function base64ToBytes(text: string): Uint8Array {
   const clean = text.replace(/\s+/g, '').replace(/=+$/, '');
@@ -23,9 +26,10 @@ export function base64ToBytes(text: string): Uint8Array {
   let buffer = 0;
   let bits = 0;
   let index = 0;
-  for (const char of clean) {
-    const value = ALPHABET.indexOf(char);
-    if (value < 0) throw new RangeError(`invalid base64 character: ${char}`);
+  for (let i = 0; i < clean.length; i += 1) {
+    const code = clean.charCodeAt(i);
+    const value = code < 128 ? LOOKUP[code] : -1;
+    if (value < 0) throw new RangeError(`invalid base64 character: ${clean[i]}`);
     buffer = (buffer << 6) | value;
     bits += 6;
     if (bits >= 8) {

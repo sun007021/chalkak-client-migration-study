@@ -19,6 +19,8 @@ describe('app.config.ts expo-media-library', () => {
     expect(entry?.[1].savePhotosPermission).toEqual(expect.any(String));
     expect((entry?.[1].savePhotosPermission as string).length).toBeGreaterThan(0);
     expect(entry?.[1].granularPermissions).toEqual([]);
+    // 사진 읽기 설명(NSPhotoLibraryUsageDescription)은 읽기가 필요한 업로드(PR 7)가 합쳐질 때 채운다.
+    expect(entry?.[1]).not.toHaveProperty('photosPermission');
   });
 
   it('저장에 필요 없는 읽기 권한은 매니페스트에서 뺀다', () => {

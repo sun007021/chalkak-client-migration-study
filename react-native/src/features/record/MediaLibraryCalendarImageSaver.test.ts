@@ -71,15 +71,15 @@ describe('MediaLibraryCalendarImageSaver', () => {
     expect(mockCreateAsset).not.toHaveBeenCalled();
   });
 
-  it('Android 10 이상: 권한 없이 Pictures/Chalkak 앨범에 저장한다', async () => {
-    setPlatform('android', 34);
+  it('Android 11(API 30) 이상: 권한 없이 Pictures/Chalkak 앨범에 저장한다', async () => {
+    setPlatform('android', 30);
     await new MediaLibraryCalendarImageSaver().save(image);
     expect(mockGetPermissions).not.toHaveBeenCalled();
     expect(mockCreateAlbum).toHaveBeenCalledWith('Chalkak', [mockFile.uri]);
   });
 
-  it('Android 9 이하: 쓰기 권한을 요청한다', async () => {
-    setPlatform('android', 28);
+  it('Android 10(API 29) 이하: 쓰기 권한을 요청한다', async () => {
+    setPlatform('android', 29);
     mockGetPermissions.mockResolvedValue({ granted: false, canAskAgain: true });
     mockRequestPermissions.mockResolvedValue({ granted: true });
     await new MediaLibraryCalendarImageSaver().save(image);
@@ -93,5 +93,26 @@ describe('MediaLibraryCalendarImageSaver', () => {
     mockCreateAsset.mockRejectedValue(new Error('disk'));
     await expect(new MediaLibraryCalendarImageSaver().save(image)).rejects.toThrow('disk');
     expect(mockFile.delete).toHaveBeenCalled();
+  });
+
+  it('Android 10(API 29): 쓰기 권한이 거부되면 ImagePermissionDeniedError이고 저장하지 않는다', async () => {
+    setPlatform('android', 29);
+    mockGetPermissions.mockResolvedValue({ granted: false, canAskAgain: true });
+    mockRequestPermissions.mockResolvedValue({ granted: false });
+    await expect(new MediaLibraryCalendarImageSaver().save(image)).rejects.toBeInstanceOf(
+      ImagePermissionDeniedError,
+    );
+    expect(mockCreateAlbum).not.toHaveBeenCalled();
+  });
+
+  it('임시 파일을 만들다 실패해도 오류를 그대로 던지고 정리를 시도한다', async () => {
+    setPlatform('ios', '18.0');
+    mockGetPermissions.mockResolvedValue({ granted: true });
+    mockFile.create.mockImplementationOnce(() => {
+      throw new Error('no space');
+    });
+    await expect(new MediaLibraryCalendarImageSaver().save(image)).rejects.toThrow('no space');
+    expect(mockFile.delete).toHaveBeenCalled();
+    expect(mockCreateAsset).not.toHaveBeenCalled();
   });
 });

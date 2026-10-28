@@ -1,7 +1,7 @@
 import { createBottomTabNavigator, type BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useCallback, useEffect } from 'react';
-import { View } from 'react-native';
+import { BackHandler, View } from 'react-native';
 
 import { useViewModelState } from '../core/state/useViewModelState';
 import { KstDate } from '../core/time/KstDate';
@@ -21,8 +21,6 @@ export function MainTabs() {
   return (
     <Tab.Navigator
       tabBar={(props) => <BottomBar {...props} />}
-      // history: 기록에서 연 전시에서 뒤로 가면 기록으로 돌아온다(REQ-NAV-030, TC-REC-034). 기본값(firstRoute)은 홈으로 간다.
-      backBehavior="history"
       screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="Home" component={HomeTab} />
@@ -53,7 +51,7 @@ function HomeTab() {
  * (비우지 않으면 탭에 돌아올 때마다 다시 그 날짜로 열린다). 이미 전시를 보는 중에 전시 탭을 다시 누르면 맨 위로 + 재검증이다.
  */
 function DisplayTab({ route, navigation }: BottomTabScreenProps<TabParamList, 'Display'>) {
-  const { displayOwner, analytics } = useAppContainer();
+  const { displayOwner, analytics, tabReturnHint } = useAppContainer();
   const { viewModel } = useViewModelState(displayOwner);
   const focused = useIsFocused();
   const requestedDate = route.params?.date;
@@ -67,13 +65,36 @@ function DisplayTab({ route, navigation }: BottomTabScreenProps<TabParamList, 'D
     navigation.setParams({ date: undefined, sort: undefined });
   }, [viewModel, requestedDate, requestedSort, navigation]);
 
+  // 기록이 연 전시에서만(힌트가 있을 때) 뒤로 가기가 그 탭으로 돌아간다(REQ-NAV-030). 그 밖에는 기본 백 동작(홈, REQ-NAV-026).
+  // 힌트는 전시 탭을 떠나는 순간 지워 다음에 하단 바로 올 때 영향이 없게 한다.
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        const target = tabReturnHint.get();
+        if (target === null) return false;
+        tabReturnHint.clear();
+        navigation.navigate(target);
+        return true;
+      });
+      return () => {
+        subscription.remove();
+        // 다른 탭으로 옮겨 갔을 때만 지운다. 상세 같은 스택 화면이 위에 덮인 것뿐이면 돌아와서도 기록으로 되돌아가야 한다.
+        const { routes, index } = navigation.getState();
+        if (routes[index]?.name !== 'Display') tabReturnHint.clear();
+      };
+    }, [navigation, tabReturnHint]),
+  );
+
   useEffect(
     () =>
       navigation.addListener('tabPress', () => {
         // 다른 탭에서 올 때도 이 이벤트가 오므로 이미 포커스일 때(재선택)만 처리한다.
-        if (navigation.isFocused() && viewModel) void viewModel.onTabReselected();
+        if (navigation.isFocused() && viewModel) {
+          tabReturnHint.clear();
+          void viewModel.onTabReselected();
+        }
       }),
-    [navigation, viewModel],
+    [navigation, viewModel, tabReturnHint],
   );
 
   if (!viewModel || !focused || requestedDate) return <View style={{ flex: 1 }} />;
