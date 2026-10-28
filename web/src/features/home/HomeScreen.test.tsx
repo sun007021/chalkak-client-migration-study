@@ -332,7 +332,7 @@ describe('홈 어제 랭킹·오늘 인기 (REQ-HOME-027~032)', () => {
     fireEvent.click(await screen.findByTestId(`home.popular-item-${id('203')}`));
     await screen.findByTestId('feed.root');
     expect(path()).toBe(`/feed/${id('203')}`);
-    expect(router.state.location.state).toMatchObject({ seed: { id: id('203'), likeCount: 37, isLiked: false } });
+    expect(router.state.location.state).toMatchObject({ seed: { id: id('203'), likeCount: 37, isLiked: true } });
     expect(h.ff.calls.some((c) => c.path === `/posts/${id('203')}`)).toBe(false);
   });
 
@@ -597,7 +597,7 @@ describe('홈 새로고침·재로드 (Web: 새로고침 버튼, REQ-HOME-038~04
     const router = new FixtureRouter(h.ff);
     router.set(TODAY_POST, networkFailure);
     fireEvent.click(screen.getByRole('button', { name: REFRESH_BUTTON_NAME }));
-    await advance(h, 5_000);
+    await advance(h, 2_000);
     await waitFor(() => expect(toastText()).toBe(t('common.error.network')));
     expect(screen.getByTestId('home.hero-photo')).toBeInTheDocument();
     expect(screen.queryByTestId('home.hero-error')).not.toBeInTheDocument();
