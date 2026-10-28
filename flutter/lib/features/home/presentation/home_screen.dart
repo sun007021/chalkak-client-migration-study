@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/time/kst_date.dart';
 import '../../../core/time/kst_format.dart';
 import '../../../core/ui/test_id.dart';
 import '../../banner/domain/banner_list_controller.dart';
@@ -19,8 +20,10 @@ import 'home_week_section.dart';
 /// 위젯이 단다.
 typedef HomeAiCardBuilder = Widget Function(
   BuildContext context,
-  String postId,
-);
+  String postId, {
+  required KstDate topicDate,
+  required bool visible,
+});
 
 /// 홈 탭 화면. [HomeViewModel.state]를 그리기만 한다. 루트는 `home.root`.
 /// 섹션과 요소는 testids.md 홈 절의 id를 쓰고, 상태 표시 요소는 해당 상태일 때만 트리에 둔다.
@@ -37,11 +40,15 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.viewModel,
     required this.aiCardBuilder,
+    this.aiCardVisible = true,
     this.scrollController,
   });
 
   final HomeViewModel viewModel;
   final HomeAiCardBuilder aiCardBuilder;
+
+  /// 홈 탭이 선택돼 있고 다른 화면에 덮이지 않았는가(AI 카드의 조회·폴링 가시성).
+  final bool aiCardVisible;
 
   /// 셸이 맨 위 스크롤(탭 재선택)을 하려고 넘기는 컨트롤러.
   final ScrollController? scrollController;
@@ -143,7 +150,12 @@ class _HomeScreenState extends State<HomeScreen> {
             if (aiCardPostId != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: widget.aiCardBuilder(context, aiCardPostId),
+                child: widget.aiCardBuilder(
+                  context,
+                  aiCardPostId,
+                  topicDate: state.today,
+                  visible: widget.aiCardVisible,
+                ),
               ),
             HomeWeekSection(
               weekly: state.weekly,
