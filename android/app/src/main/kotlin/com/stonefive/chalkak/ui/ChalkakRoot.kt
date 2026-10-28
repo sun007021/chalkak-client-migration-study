@@ -88,6 +88,8 @@ class SignupDependencies(
  *   The host renders `NavigationController.state` from then on (Login/Terms/OnboardingSignature/OnboardingSignaturePreview/TabRoot).
  * - [signupContext]: filled by the host when login ends in `GoTerms(pending)`, discarded when terms go back.
  * - [mainContent]: the main (home) area; A2 ships [MainPlaceholder] (`home.root`), later PRs replace it.
+ * - [main]: A3. When non-null, every non-auth route (TabRoot and the screens stacked on it) is rendered by `MainHost(nav, main, showToast = session::showToast,
+ *   onExitApp)` instead of [mainContent]; null keeps [mainContent] (A2 tests). STUB (TDD step 1): the field exists but is not used yet.
  * - [signup]: the drawing/preview holders; null leaves the signature routes unreachable (tests that stop at the terms screen).
  * - [authEvents]: `AuthEvent.GoToLogin` (a 401 that survived the refresh) ends the session on the navigation controller too.
  * - [onExitApp]: system back on a root screen.
@@ -103,6 +105,7 @@ class RootDependencies(
     val signup: SignupDependencies? = null,
     val authEvents: Flow<AuthEvent> = emptyFlow(),
     val onExitApp: () -> Unit = {},
+    val main: com.stonefive.chalkak.ui.main.MainDependencies? = null,
 )
 
 /** `home.root` placeholder until the home PR lands. */
