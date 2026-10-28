@@ -39,15 +39,35 @@ final class DeferredAuthEvents: AuthEvents {
     }
 }
 
+/// 메인 화면 한 세션(접근 모드 하나)에 쓰는 ViewModel 묶음. 로그아웃·계정 전환 때 버리고 새로 만든다.
+@MainActor
+final class MainSession {
+    let shell: MainShellViewModel
+    let home: HomeViewModel
+
+    init(shell: MainShellViewModel, home: HomeViewModel) {
+        self.shell = shell
+        self.home = home
+    }
+}
+
 /// 구성 루트. 모든 외부 효과(Keychain, 네트워크, 카카오 SDK)를 프로토콜 구현으로 조립한다.
 @MainActor
 final class AppContainer {
     let launch: AppLaunchViewModel
+    let toast: ToastCenter
+    let externalOpener = SystemExternalURLOpener()
 
     private let authRepository: any AuthRepository
     private let socialLogin: any SocialLoginClient
     private let pushRegistration: any PushRegistrationTrigger
     private let screenTracker: ScreenTracker
+    private let clock: any AppClock
+    private let viewer: any ViewerContext
+    private let homeRepositories: HomeRepositories
+    private let signUpRepository: any SignUpRepository
+    private let postChangeLedger: PostChangeLedger
+    private let signatureEncoder = CoreGraphicsSignatureEncoder()
 
     init(configuration: AppConfiguration) throws {
         #if DEBUG
@@ -88,11 +108,27 @@ final class AppContainer {
         )
         authEvents.bind(AuthEventBridge(launch: launch))
 
+        let viewer = KeychainViewerContext(store: sessionStore)
         self.launch = launch
+        self.toast = ToastCenter(clock: clock)
         self.authRepository = authRepository
         self.socialLogin = KakaoLoginFlow(gateway: KakaoSDKGatewayImpl(isConfigured: kakaoReady))
         self.pushRegistration = pushRegistration
         self.screenTracker = ScreenTracker(tracker: LogAnalyticsTracker())
+        self.clock = clock
+        self.viewer = viewer
+        self.homeRepositories = HomeRepositories(
+            topics: APITopicRepository(client: client),
+            posts: APIPostRepository(client: client, viewer: viewer),
+            today: APITodayPostRepository(client: client),
+            calendar: APICalendarRepository(client: client),
+            banners: APIBannerRepository(client: client),
+            unread: APIUnreadStatusRepository(client: client)
+        )
+        self.signUpRepository = APISignUpRepository(
+            client: client, sessionStore: sessionStore, guestFlags: guestFlags, authRepository: authRepository, clock: clock
+        )
+        self.postChangeLedger = PostChangeLedger(viewer: viewer)
     }
 
     /// 로그인 화면이 나타날 때마다 새 ViewModel을 쓴다(완료 상태가 남아 재로그인이 막히지 않도록).
@@ -103,6 +139,38 @@ final class AppContainer {
             nonceFactory: KakaoNonceFactory(),
             pushRegistration: pushRegistration,
             screenTracker: screenTracker
+        )
+    }
+
+    /// 메인에 들어갈 때마다 새로 만든다(홈 탭 데이터는 로그아웃·계정 전환 뒤 이어 쓰지 않는다).
+    func makeMainSession(access: MainAccess) -> MainSession {
+        let gate = UploadGate(today: homeRepositories.today, viewer: viewer)
+        let shell = MainShellViewModel(access: access, toast: toast, screens: screenTracker, uploadGate: gate)
+        let home = HomeViewModel(
+            access: access, repositories: homeRepositories, clock: clock,
+            toast: toast, navigator: shell, ledger: postChangeLedger, screens: screenTracker
+        )
+        return MainSession(shell: shell, home: home)
+    }
+
+    func makeIssueWebViewModel(url: URL) -> IssueWebViewModel {
+        IssueWebViewModel(url: url, toast: toast, screens: screenTracker)
+    }
+
+    // MARK: 온보딩(약관 → 사인 그리기 → 미리보기)
+
+    func makeTermsViewModel(context: SignUpContext) -> TermsViewModel {
+        TermsViewModel(context: context, externalOpener: externalOpener, screenTracker: screenTracker)
+    }
+
+    func makeSignatureDrawingViewModel(kind: SignatureFlowKind) -> SignatureDrawingViewModel {
+        SignatureDrawingViewModel(kind: kind, canvasSize: SignaturePadMetrics.canvasSize, encoder: signatureEncoder, screenTracker: screenTracker)
+    }
+
+    func makeSignUpPreviewViewModel(context: SignUpContext, draft: SignatureDraft) -> SignUpPreviewViewModel {
+        SignUpPreviewViewModel(
+            context: context, draft: draft, repository: signUpRepository,
+            pushRegistration: pushRegistration, screenTracker: screenTracker
         )
     }
 }
