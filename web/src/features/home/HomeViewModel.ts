@@ -8,6 +8,8 @@ import { kstToday } from '../../core/time/kst';
 import type { DateString } from '../../core/time/kst';
 import type { ToastController } from '../../core/ui/ToastController';
 import type { SessionMode } from '../boot/authGate';
+import type { PostLikeStore } from '../like/PostLikeStore';
+import type { PostChanges } from '../post/PostChanges';
 import type { GuestGate } from '../shell/GuestGate';
 import type { UploadEntry } from '../shell/UploadEntry';
 import type { BannerFeed } from './BannerFeed';
@@ -82,6 +84,10 @@ export interface HomeViewModelDeps {
   guestGate: GuestGate;
   uploadEntry: UploadEntry;
   navigator: HomeNavigator;
+  /** 랭킹·오늘 인기 좋아요(REQ-HOME-033): 전시·상세와 같은 공유 저장소. */
+  likes: PostLikeStore;
+  /** 게시물 변경 이벤트(like·title·removed)를 받아 랭킹·히어로·주간 기록에 반영한다. */
+  changes: PostChanges;
 }
 
 /** 랭킹에 담는 최대 개수(REQ-HOME-027). */
@@ -341,6 +347,15 @@ export class HomeViewModel extends ViewModel<HomeState> {
     if (!seed) return;
     if (!this.deps.guestGate.requireMember(this.deps.mode, 'feed')) return;
     this.deps.navigator.openPostDetail({ postId, seed });
+  }
+
+  /**
+   * 랭킹 사진의 하트(home.ranking-like-button-{id}, home.popular-like-button-{id}). 게스트는 `nav.guest.like` 토스트(요청·상태 변화 없음),
+   * 회원은 likes.toggle(지금 보이는 항목)로 전시·상세와 같은 낙관적 갱신·롤백(REQ-HOME-033). 랭킹 항목의 isLiked·likeCount는 changes의 like 이벤트로 바뀌고,
+   * 랭킹 응답은 likes.beginRead/merge로 보정한다. removed는 랭킹에서 뺀다. 내 히어로 게시물이 removed면 히어로는 empty, 주간 기록 칸은 비운다(TC-HOME-046).
+   */
+  onRankingLikePress(_key: RankingKey, _postId: string): Promise<void> {
+    throw new Error('not implemented');
   }
 
   /** 더 보기 → navigator.openDisplayPopular(해당 섹션 날짜: 어제 또는 오늘). */

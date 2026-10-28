@@ -15,6 +15,8 @@ export const webOnlyCopy = {
   /** 배너를 더 불러오는 중(목록 끝)과 추가 페이지 실패 안내. */
   'home.banner.loading-more': '불러오는 중',
   'home.banner.more-error': '더 불러오지 못했어요',
+  /** 좋아요 버튼의 접근성 이름. {n}은 좋아요 수. 눌림 상태는 aria-pressed로 노출한다(TC-LIKE-034, 임시). */
+  'like.a11y': '좋아요 {n}개',
 } as const;
 
 export type WebOnlyCopyKey = keyof typeof webOnlyCopy;
