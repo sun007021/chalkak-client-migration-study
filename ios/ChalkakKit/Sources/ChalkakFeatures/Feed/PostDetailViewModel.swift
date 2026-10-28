@@ -86,6 +86,12 @@ public final class PostDetailViewModel {
     /// 삭제 버튼 노출: 내 게시물.
     public var canDelete: Bool { isMine }
 
+    /// AI 피드백 대상(상세 응답을 받은 뒤에만 있다: `topic.topicDate`가 있어야 요청 가능 여부를 판정할 수 있다).
+    public var aiReviewTarget: AIReviewTarget? {
+        guard let detail else { return nil }
+        return AIReviewTarget(postId: postId, topicDate: detail.topic.topicDate, isMine: isMine)
+    }
+
     // MARK: 의존성
 
     private let entry: PostDetailEntry
@@ -153,6 +159,12 @@ public final class PostDetailViewModel {
     public func onDisappear() {
         isVisible = false
         work.cancel()
+    }
+
+    /// 오류 화면(`.failed`)의 "다시 시도". 화면 노출 기록(`screen_view`)은 다시 보내지 않는다.
+    public func retry() async {
+        guard case .failed = state else { return }
+        await work.run { [self] in await load() }
     }
 
     private func load() async {

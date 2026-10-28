@@ -104,10 +104,10 @@ struct SettingsPushLoadTests {
         let first = Task { await w.vm.screenAppeared() }
         let started = await EventWait.signal(w.repo.fetchEntered, before: first)
         #expect(started)
-        let second = Task { await w.vm.screenAppeared() }
+        // 두 번째 진입은 조회가 붙잡혀 있는 동안 끝나야 한다(중복 조회가 없으면 기다릴 것이 없다).
+        await w.vm.screenAppeared()
         await hold.open()
         await first.value
-        await second.value
         #expect(await w.repo.fetchCount == 1)
         #expect(w.vm.pushState == .ready)
     }
