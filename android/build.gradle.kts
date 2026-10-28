@@ -1,3 +1,28 @@
+// AGP must sit on the same (root) classpath as the Kotlin Gradle plugin, otherwise the Kotlin plugin and AGP end up in
+// different classloaders and `:app` fails with NoClassDefFoundError: com/android/build/gradle/api/BaseVariant.
+// `alias(libs.plugins.android.application) apply false` would do that, but it also forces AGP to resolve in SDK-less
+// environments (google() is unreachable there), so AGP is put on the classpath here only when :app is included.
+buildscript {
+    val androidSdkPresent = file("local.properties").takeIf { it.exists() }
+        ?.readLines()?.any { it.trim().startsWith("sdk.dir=") } == true || !System.getenv("ANDROID_HOME").isNullOrBlank()
+    if (androidSdkPresent) {
+        // buildscript {} cannot use the version catalog accessors, so read the single version line from it.
+        val agpVersion = file("gradle/libs.versions.toml").readLines()
+            .first { it.trim().startsWith("agp") }.substringAfter("\"").substringBefore("\"")
+        repositories {
+            google {
+                content {
+                    includeGroupByRegex("com\\.android.*")
+                    includeGroupByRegex("com\\.google.*")
+                    includeGroupByRegex("androidx.*")
+                }
+            }
+            mavenCentral()
+        }
+        dependencies { classpath("com.android.tools.build:gradle:$agpVersion") }
+    }
+}
+
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.serialization) apply false
@@ -28,7 +53,7 @@ subprojects {
             inputs.file(rootDir.parentFile.resolve("shared/constants.json")).withPropertyName("sharedConstants")
             testLogging {
                 events("passed", "failed", "skipped")
-                exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.SHORT
+                exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
             }
         }
     }

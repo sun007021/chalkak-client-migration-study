@@ -14,9 +14,12 @@ struct RootView: View {
             if launch.root == .updateRequired {
                 UpdateGateDialog { Task { await launch.updateButtonTapped() } }
             }
+            ToastOverlay(center: container.toast)
         }
         .task { await launch.start() }
         .onChange(of: scenePhase) { _, phase in
+            // 앱이 보이지 않을 때의 토스트 요청은 버린다(D-20).
+            container.toast.setScreenVisible(phase == .active)
             if phase == .active { Task { await launch.recheckVersionGate() } }
         }
     }
@@ -29,7 +32,7 @@ struct RootView: View {
         case .login:
             LoginHost(container: container)
         case .main(let access):
-            MainPlaceholderView(access: access)
+            MainHost(container: container, access: access)
         }
     }
 }
@@ -58,22 +61,6 @@ struct UpdateGateDialog: View {
         ) {
             ChalkakDialogButton(title: AuthCopy.updateButton, identifier: "update-gate.update-button", action: onUpdate)
         }
-    }
-}
-
-/// 메인은 아직 없다(HOME PR). 접근 모드만 표시한다.
-struct MainPlaceholderView: View {
-    let access: MainAccess
-
-    var body: some View {
-        ZStack {
-            ChalkakColor.background.ignoresSafeArea()
-            Text(access == .guest ? "메인 (게스트)" : "메인")
-                .font(ChalkakFont.headline)
-                .foregroundStyle(ChalkakColor.textPrimary)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("main.root")
     }
 }
 

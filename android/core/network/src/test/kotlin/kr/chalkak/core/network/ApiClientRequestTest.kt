@@ -179,7 +179,7 @@ class ApiClientRequestTest {
             h.client.execute(ApiRequest(HttpMethod.GET, "/topics"))
             h.client.execute(ApiRequest(HttpMethod.GET, "/banners"))
             assertEquals(2, h.server.requestCount)
-            assertTrue(h.dispatcher.recorded.all { it.getHeader("Host") == "localhost:${h.server.port}" })
+            assertTrue(h.dispatcher.recorded.all { it.getHeader("Host") == "127.0.0.1:${h.server.port}" })
         }
     }
 
