@@ -6,6 +6,10 @@ import com.stonefive.chalkak.copy.Copy
 import com.stonefive.chalkak.data.KeystoreRecordStorage
 import com.stonefive.chalkak.data.KeystoreSecretCipher
 import com.stonefive.chalkak.data.SecretCipher
+import com.stonefive.chalkak.platform.PlatformAdapters
+import com.stonefive.chalkak.ui.RootDependencies
+import com.stonefive.chalkak.ui.SignupDependencies
+import com.stonefive.chalkak.ui.signature.SignaturePadSpace
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -15,6 +19,21 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kr.chalkak.core.common.Clock
 import kr.chalkak.core.common.SystemClock
+import kr.chalkak.core.data.auth.SecureNonceGenerator
+import kr.chalkak.core.data.onboarding.DefaultSignupRepository
+import kr.chalkak.core.data.onboarding.PresignedSignatureUploader
+import kr.chalkak.core.data.onboarding.SignatureUploader
+import kr.chalkak.core.data.onboarding.SignupRepository
+import kr.chalkak.feature.auth.BootGate
+import kr.chalkak.feature.auth.LoginStateHolder
+import kr.chalkak.feature.navigation.NavigationController
+import kr.chalkak.feature.onboarding.LegalDocumentOpener
+import kr.chalkak.feature.onboarding.SignatureMode
+import kr.chalkak.feature.onboarding.SignaturePadStateHolder
+import kr.chalkak.feature.onboarding.SignupContext
+import kr.chalkak.feature.onboarding.SignupStateHolder
+import kr.chalkak.feature.onboarding.TermsStateHolder
+import java.util.concurrent.atomic.AtomicBoolean
 import kr.chalkak.core.data.auth.AuthRepository
 import kr.chalkak.core.data.auth.DefaultAuthRepository
 import kr.chalkak.core.data.auth.GuestFlagStore
@@ -49,7 +68,9 @@ class AppContainer(
     val clock: Clock,
     secureStorage: SecureRecordStorage,
     val applicationScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-    okHttpBase: OkHttpClient = OkHttpClient(),
+    private val okHttpBase: OkHttpClient = OkHttpClient(),
+    /** Platform ports (Kakao, Play update, browser, PNG encoder, analytics, push). Default: inert stand-ins for JVM tests. */
+    val platform: PlatformAdapters = PlatformAdapters.headless(),
 ) {
     /** `API_BASE_URL` is validated once (REQ-NET-001/002). An invalid value is a build configuration error: fail at start. */
     val apiBaseUrl: ApiBaseUrl = when (val parsed = ApiBaseUrl.parse(apiBaseUrlRaw)) {
@@ -98,9 +119,65 @@ class AppContainer(
         ApiClient(apiBaseUrl, apiOkHttp, sessionStore, refresher, clock, sink)
     }
 
+    private val uploadOkHttp: OkHttpClient by lazy { OkHttpFactory.uploadClient(base = okHttpBase) }
+    val signupRepository: SignupRepository by lazy { DefaultSignupRepository(apiClient, sessionStore, userDataResetter, clock) }
+    val signatureUploader: SignatureUploader by lazy { PresignedSignatureUploader(apiClient, uploadOkHttp) }
+
+    /** Memory-only idToken/rawNonce of the login attempt that ends in the signup flow (D-25). */
+    val signupContext = SignupContext()
+
     val authRepository: AuthRepository by lazy { DefaultAuthRepository(apiClient, sessionStore, userDataResetter, clock) }
     val homeRepository: HomeRepository by lazy { DefaultHomeRepository(apiClient) }
     val bannerRepository: BannerRepository by lazy { DefaultBannerRepository(apiClient) }
+
+    /** BootGate state is touched on the main thread only (its contract). Created on first use. */
+    private val mainScope: CoroutineScope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+
+    val bootGate: BootGate by lazy {
+        BootGate(
+            scope = mainScope,
+            clock = clock,
+            sessionStore = sessionStore,
+            updateChecker = platform.updateChecker,
+            updateLauncher = platform.updateLauncher,
+            preloader = platform.preloader,
+            push = platform.push,
+            resetter = userDataResetter,
+            authEvents = authEventFlow,
+        )
+    }
+
+    private val bootStarted = AtomicBoolean(false)
+
+    /** Starts [bootGate] once per process; an Activity recreated by a configuration change must not boot again. */
+    fun startBoot() {
+        if (bootStarted.compareAndSet(false, true)) bootGate.start()
+    }
+
+    /** Holder factories and ports for `ChalkakRoot`. [onExitApp] is the Activity's finish. */
+    fun newRootDependencies(onExitApp: () -> Unit = {}): RootDependencies {
+        val nonces = SecureNonceGenerator()
+        return RootDependencies(
+            bootGate = bootGate,
+            newNavigation = { mode, initial -> NavigationController(platform.analytics, mode, listOf(initial)) },
+            newLoginHolder = { scope ->
+                LoginStateHolder(scope, platform.socialLogin, nonces, authRepository, guestFlagStore, platform.push, platform.analytics)
+            },
+            newTermsHolder = { TermsStateHolder(signupContext, platform.analytics) },
+            signupContext = signupContext,
+            legalDocumentOpener = LegalDocumentOpener(platform.externalBrowser),
+            signup = SignupDependencies(
+                newPadHolder = {
+                    SignaturePadStateHolder(SignatureMode.Signup, SignaturePadSpace, platform.signatureEncoder, platform.analytics)
+                },
+                newSignupHolder = { scope ->
+                    SignupStateHolder(scope, signupContext, signupRepository, signatureUploader, authRepository, platform.deviceRegistrar)
+                },
+            ),
+            authEvents = authEventFlow,
+            onExitApp = onExitApp,
+        )
+    }
 
     companion object {
         fun create(context: Context, cipher: SecretCipher = KeystoreSecretCipher()): AppContainer = AppContainer(
@@ -108,6 +185,7 @@ class AppContainer(
             apiBaseUrlRaw = BuildConfig.API_BASE_URL,
             clock = SystemClock,
             secureStorage = KeystoreRecordStorage(context, cipher),
+            platform = PlatformAdapters.android(context),
         )
     }
 }
