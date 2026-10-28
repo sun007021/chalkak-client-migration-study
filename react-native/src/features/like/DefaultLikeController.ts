@@ -1,14 +1,10 @@
-import {
-  AuthenticationRequiredError,
-  CancelledError,
-  HttpError,
-  ReauthenticationRequiredError,
-} from '../../core/http/ApiError';
+import { CancelledError, HttpError } from '../../core/http/ApiError';
 import type { UserDataCache } from '../../core/push/UserDataCache';
 import type { ToastPresenter } from '../../core/toast/ToastPresenter';
 import type { LikeApi } from '../../data/like/LikeRepository';
 import { t } from '../../shared/copy';
 import type { AuthFlowNavigator } from '../auth/AuthFlowNavigator';
+import { AuthErrorPolicy } from '../common/AuthErrorPolicy';
 import type { LikeChange, LikeController, LikeSnapshot } from './LikeController';
 
 export type DefaultLikeControllerDeps = {
@@ -49,11 +45,17 @@ const sameSnapshot = (a: LikeSnapshot, b: LikeSnapshot): boolean =>
   a.likeCount === b.likeCount && a.isLiked === b.isLiked;
 
 export class DefaultLikeController implements LikeController, UserDataCache {
+  // 요청이 끝난 항목(idle)도 일부러 지우지 않는다: 목록 요청이 진행되는 동안 끝난 토글을 latestSince(id, since)가
+  // revision으로 찾아 응답에 덧입히기 때문이다. 크기는 세션 동안 누른 게시물 수로 한정되고 clearAll(로그아웃)에서 비워진다.
   private readonly entries = new Map<string, Entry>();
   private readonly listeners = new Set<(change: LikeChange) => void>();
   private counter = 0;
 
-  constructor(private readonly deps: DefaultLikeControllerDeps) {}
+  private readonly authErrors: AuthErrorPolicy;
+
+  constructor(private readonly deps: DefaultLikeControllerDeps) {
+    this.authErrors = new AuthErrorPolicy(deps.authFlow);
+  }
 
   toggle(current: LikeSnapshot): void {
     const existing = this.entries.get(current.postId);
@@ -161,22 +163,18 @@ export class DefaultLikeController implements LikeController, UserDataCache {
     const postId = entry.shown.postId;
     entry.inFlight = false;
     entry.abort = null;
-    if (error instanceof CancelledError) return;
     // 롤백 뒤에는 자동으로 다시 보내지 않는다(LIKE-022). 이후 탭은 새 요청이다.
     entry.intent = entry.base.isLiked;
-    this.setShown(entry, entry.base);
+    if (!sameSnapshot(entry.shown, entry.base)) this.setShown(entry, entry.base);
+    // clearAll의 취소는 위에서 이미 버려진 응답으로 걸러진다. 여기 오는 취소는 롤백만 하고 알리지 않는다.
+    if (error instanceof CancelledError) return;
     if (error instanceof HttpError && error.status === 404) {
       this.entries.delete(postId);
       this.emit({ kind: 'removed', postId });
       this.deps.toast.show(t('like.error.generic'));
     } else if (error instanceof HttpError && error.status === 403 && wasLike) {
       this.deps.toast.show(t('like.error.banned'));
-    } else if (
-      error instanceof ReauthenticationRequiredError ||
-      error instanceof AuthenticationRequiredError
-    ) {
-      this.deps.authFlow.toLogin();
-    } else {
+    } else if (!this.authErrors.handle(error)) {
       this.deps.toast.show(t('like.error.generic'));
     }
   }

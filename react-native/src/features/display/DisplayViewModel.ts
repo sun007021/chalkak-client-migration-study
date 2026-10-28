@@ -11,7 +11,8 @@ import type { PostRepository } from '../../data/post/PostRepository';
 import type { Topic } from '../../data/topic/Topic';
 import type { TopicRepository } from '../../data/topic/TopicRepository';
 import { t } from '../../shared/copy';
-import type { MainMode } from '../auth/AuthFlowNavigator';
+import type { AuthFlowNavigator, MainMode } from '../auth/AuthFlowNavigator';
+import { AuthErrorPolicy } from '../common/AuthErrorPolicy';
 import type { LikeChange, LikeController } from '../like/LikeController';
 import type { PostChange, PostChanges } from '../post/PostChanges';
 import { clampToRange } from './displayDateRange';
@@ -28,6 +29,8 @@ export type DisplayViewModelDeps = {
   changes: PostChanges;
   navigator: DisplayNavigator;
   toast: ToastPresenter;
+  /** 남은 401(AuthenticationRequiredError)일 때 로그인으로 보내는 통로(AuthErrorPolicy). */
+  authFlow: Pick<AuthFlowNavigator, 'toLogin'>;
 };
 
 /** (날짜, 정렬) 하나의 캐시. pages[i]는 i+1번째 페이지다. */
@@ -46,6 +49,9 @@ type Entry = {
  * - reval: 탭 재선택·복귀 재검증.
  */
 type SelectKind = 'nav' | 'sort' | 'reval';
+
+/** (날짜, 정렬) 캐시의 최대 개수. 넘으면 가장 오래 쓰지 않은 것부터 버린다. */
+const CACHE_LIMIT = 20;
 
 const keyOf = (date: KstDate, sort: PostSort): string => `${date.toString()}|${sort}`;
 
@@ -75,11 +81,16 @@ export class DisplayViewModel extends Observable<DisplayState> implements UserDa
   private epoch = 0;
   private controller = new AbortController();
   private pending: { key: string; generation: number; promise: Promise<void> } | null = null;
+  /** 게시물 변경(제목)이 일어난 순서. 요청을 보낸 뒤의 변경만 그 응답에 덧입힌다(좋아요 revision과 같은 방식). */
+  private changeSeq = 0;
+  private readonly titleChanges = new Map<string, { title: string | null; seq: number }>();
+  private readonly authErrors: AuthErrorPolicy;
   private readonly stopLikes: () => void;
   private readonly stopChanges: () => void;
 
   constructor(private readonly deps: DisplayViewModelDeps) {
     super(initialState(todayKst(deps.clock), 'recent', 0));
+    this.authErrors = new AuthErrorPolicy(deps.authFlow);
     this.stopLikes = deps.likes.subscribe((change) => this.onLikeChange(change));
     this.stopChanges = deps.changes.subscribe((change) => this.onPostChange(change));
   }
@@ -156,6 +167,7 @@ export class DisplayViewModel extends Observable<DisplayState> implements UserDa
     if (s.sort === 'random' && entry.seed === null) return;
     const { generation, epoch } = this;
     const since = this.deps.likes.revision();
+    const titleSince = this.changeSeq;
     this.setState((cur) => ({ ...cur, paging: true }));
     try {
       const page = await this.deps.posts.list({
@@ -173,17 +185,17 @@ export class DisplayViewModel extends Observable<DisplayState> implements UserDa
       }
       const next: Entry = {
         ...entry,
-        pages: [...entry.pages, this.mergeLikes(page.posts, since)],
+        pages: [...entry.pages, this.mergeLikes(page.posts, since, titleSince)],
         hasNext: page.hasNext,
       };
-      this.cache.set(key, next);
+      this.cachePut(key, next);
       this.setState((cur) =>
         this.withDerived({ ...cur, ...this.contentOf(next, cur), paging: false }),
       );
     } catch (error) {
       if (generation !== this.generation || epoch !== this.epoch) return;
       this.setState((cur) => ({ ...cur, paging: false }));
-      if (error instanceof CancelledError) return;
+      if (error instanceof CancelledError || this.authErrors.handle(error, generation)) return;
       this.deps.toast.show(this.failureMessage(error));
     }
   }
@@ -232,6 +244,7 @@ export class DisplayViewModel extends Observable<DisplayState> implements UserDa
     this.epoch += 1;
     this.cache.clear();
     this.removedIds.clear();
+    this.titleChanges.clear();
     this.lastGood = null;
     const s = this.getSnapshot();
     this.setState(initialState(todayKst(this.deps.clock), s.preferredSort, s.scrollToTopToken));
@@ -245,6 +258,26 @@ export class DisplayViewModel extends Observable<DisplayState> implements UserDa
   }
 
   // ---- 선택·불러오기 ----
+
+  /** 쓴 항목을 가장 최근으로 올린다. */
+  private cacheGet(key: string): Entry | undefined {
+    const entry = this.cache.get(key);
+    if (entry) {
+      this.cache.delete(key);
+      this.cache.set(key, entry);
+    }
+    return entry;
+  }
+
+  private cachePut(key: string, entry: Entry): void {
+    this.cache.delete(key);
+    this.cache.set(key, entry);
+    while (this.cache.size > CACHE_LIMIT) {
+      const oldest = this.cache.keys().next().value;
+      if (oldest === undefined) break;
+      this.cache.delete(oldest);
+    }
+  }
 
   private rangeOf(today: KstDate) {
     return { min: FIRST_TOPIC_KST_DATE, max: today };
@@ -287,8 +320,9 @@ export class DisplayViewModel extends Observable<DisplayState> implements UserDa
     const generation = this.generation;
     const epoch = this.epoch;
     const since = this.deps.likes.revision();
+    const titleSince = this.changeSeq;
     const signal = this.controller.signal;
-    const entry = this.cache.get(target.key);
+    const entry = this.cacheGet(target.key);
 
     const dateChanged = !date.equals(prev.date);
     const base: DisplayState = {
@@ -330,13 +364,24 @@ export class DisplayViewModel extends Observable<DisplayState> implements UserDa
       );
     }
 
-    const promise = this.load({ generation, epoch, signal, since }, date, target, entry);
+    const promise = this.load(
+      { generation, epoch, signal, since, titleSince },
+      date,
+      target,
+      entry,
+    );
     this.pending = { key: target.key, generation, promise };
     return promise;
   }
 
   private async load(
-    ctx: { generation: number; epoch: number; signal: AbortSignal; since: number },
+    ctx: {
+      generation: number;
+      epoch: number;
+      signal: AbortSignal;
+      since: number;
+      titleSince: number;
+    },
     date: KstDate,
     target: { sort: PostSort; key: string },
     cached: Entry | undefined,
@@ -361,7 +406,7 @@ export class DisplayViewModel extends Observable<DisplayState> implements UserDa
         randomSeed: seed,
         signal: ctx.signal,
       });
-      const fresh = this.mergeLikes(page.posts, ctx.since);
+      const fresh = this.mergeLikes(page.posts, ctx.since, ctx.titleSince);
       const previous = this.cache.get(target.key);
       const newSeed = target.sort === 'random' ? (page.randomSeed ?? previous?.seed ?? null) : null;
       // 첫 페이지만 새로 받았을 때 같은 시드(랜덤)·같은 정렬에서 이미 받은 뒤쪽 페이지는 유지한다(REQ-DISP-027).
@@ -378,11 +423,11 @@ export class DisplayViewModel extends Observable<DisplayState> implements UserDa
       if (stale()) {
         // 늦은 응답은 화면을 덮지 않고 캐시에만 남긴다. 랜덤은 시드가 버려진 뒤일 수 있어 남기지 않는다.
         if (ctx.epoch === this.epoch && target.sort !== 'random' && !this.cache.has(target.key)) {
-          this.cache.set(target.key, entry);
+          this.cachePut(target.key, entry);
         }
         return;
       }
-      this.cache.set(target.key, entry);
+      this.cachePut(target.key, entry);
       // 랜덤이 아닌 정렬로 확정되면 랜덤 시드와 목록을 버린다(REQ-DISP-021).
       if (target.sort !== 'random') {
         for (const key of [...this.cache.keys()])
@@ -407,6 +452,11 @@ export class DisplayViewModel extends Observable<DisplayState> implements UserDa
           }),
         );
         this.lastGood = this.getSnapshot();
+        return;
+      }
+      // 인증 오류는 오류 화면·토스트 없이 정책대로만 처리한다(AuthErrorPolicy).
+      if (this.authErrors.handle(error, ctx.generation)) {
+        this.setState((cur) => this.withDerived({ ...cur, refreshing: false }));
         return;
       }
       this.onFailure(error);
@@ -438,8 +488,18 @@ export class DisplayViewModel extends Observable<DisplayState> implements UserDa
   private onFailure(error: unknown): void {
     const s = this.getSnapshot();
     if (s.status === 'content' || s.status === 'empty') {
-      // 이미 보이는 내용이 있다: 유지하고 토스트만(REQ-DISP-031).
-      this.setState((cur) => this.withDerived({ ...cur, refreshing: false }));
+      // 이미 보이는 내용이 있다: 유지하고 토스트만(REQ-DISP-031). 새로 고르던 정렬·추천은 직전 확정 값으로 되돌린다
+      // (사진은 그대로인데 sort만 바뀌어 있으면 이어 받기가 엉뚱한 캐시를 보기 때문이다).
+      const good = this.lastGood;
+      this.setState((cur) =>
+        this.withDerived({
+          ...cur,
+          ...(good
+            ? { sort: good.sort, preferredSort: good.preferredSort, featured: good.featured }
+            : {}),
+          refreshing: false,
+        }),
+      );
       this.deps.toast.show(this.failureMessage(error));
       return;
     }
@@ -516,11 +576,24 @@ export class DisplayViewModel extends Observable<DisplayState> implements UserDa
 
   // ---- 좋아요·게시물 변경 ----
 
-  /** 요청을 보낸 뒤(`since` 이후)에 끝난 좋아요 값만 응답 위에 덮는다(REQ-LIKE-009). */
-  private mergeLikes(posts: readonly PostSummary[], since: number): PostSummary[] {
+  /**
+   * 요청을 보낸 뒤(`since` 이후)에 끝난 좋아요 값(REQ-LIKE-009)과 그 뒤(`titleSince` 이후)에 바뀐 제목만 응답 위에 덮는다.
+   * 보내기 전에 끝난 변경은 서버 응답이 이미 담고 있으므로 덮지 않는다.
+   */
+  private mergeLikes(
+    posts: readonly PostSummary[],
+    since: number,
+    titleSince: number,
+  ): PostSummary[] {
     return posts.map((post) => {
       const latest = this.deps.likes.latestSince(post.id, since);
-      return latest ? { ...post, likeCount: latest.likeCount, isLiked: latest.isLiked } : post;
+      const withLikes = latest
+        ? { ...post, likeCount: latest.likeCount, isLiked: latest.isLiked }
+        : post;
+      const renamed = this.titleChanges.get(post.id);
+      return renamed && renamed.seq > titleSince
+        ? { ...withLikes, title: renamed.title }
+        : withLikes;
     });
   }
 
@@ -543,6 +616,8 @@ export class DisplayViewModel extends Observable<DisplayState> implements UserDa
       this.patchPosts((p) => (p.id === change.postId ? null : p));
       return;
     }
+    this.changeSeq += 1;
+    this.titleChanges.set(change.postId, { title: change.title, seq: this.changeSeq });
     this.patchPosts((p) => (p.id === change.postId ? { ...p, title: change.title } : p));
   }
 

@@ -6,6 +6,7 @@ import { FixtureRouter, type RouteValue } from '../../../data/__testing__/Fixtur
 import { PostRepository } from '../../../data/post/PostRepository';
 import { TopicRepository } from '../../../data/topic/TopicRepository';
 import type { MainMode } from '../../auth/AuthFlowNavigator';
+import { FakeAuthFlowNavigator } from '../../auth/__testing__/FakeAuthFlowNavigator';
 import { FakeLikeController } from '../../like/__testing__/FakeLikeController';
 import { FakePostChanges } from '../../post/__testing__/FakePostChanges';
 import { DisplayViewModel } from '../DisplayViewModel';
@@ -59,6 +60,7 @@ export async function createDisplayHarness(options: DisplayHarnessOptions = {}) 
   const changes = new FakePostChanges();
   const navigator = new FakeDisplayNavigator();
   const toast = new FakeToastPresenter();
+  const authFlow = new FakeAuthFlowNavigator();
   const viewModel = new DisplayViewModel({
     mode,
     clock: net.clock,
@@ -68,10 +70,11 @@ export async function createDisplayHarness(options: DisplayHarnessOptions = {}) 
     changes,
     navigator,
     toast,
+    authFlow,
   });
   /** 요청이 지금까지 몇 번 나갔나(라우트 키 기준). */
   const callsOf = (key: string) => router.calls(key).length;
-  return { ...net, router, likes, changes, navigator, toast, viewModel, callsOf };
+  return { ...net, router, likes, changes, navigator, toast, authFlow, viewModel, callsOf };
 }
 
 export type DisplayHarness = Awaited<ReturnType<typeof createDisplayHarness>>;

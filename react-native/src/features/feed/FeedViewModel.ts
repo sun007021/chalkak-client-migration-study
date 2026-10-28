@@ -14,6 +14,7 @@ import type { PostDetail } from '../../data/post/PostModels';
 import type { PostRepository } from '../../data/post/PostRepository';
 import { t } from '../../shared/copy';
 import type { AuthFlowNavigator } from '../auth/AuthFlowNavigator';
+import { AuthErrorPolicy } from '../common/AuthErrorPolicy';
 import type { LikeChange, LikeController } from '../like/LikeController';
 import type { PostChanges } from '../post/PostChanges';
 import type { FeedNavigator } from './FeedNavigator';
@@ -47,8 +48,11 @@ export class FeedViewModel extends Observable<FeedState> {
   private deleted = false;
   private stopLikes: (() => void) | null = null;
 
+  private readonly authErrors: AuthErrorPolicy;
+
   constructor(private readonly deps: FeedViewModelDeps) {
     super(initialState(deps));
+    this.authErrors = new AuthErrorPolicy(deps.authFlow);
   }
 
   private get postId(): string {
@@ -272,16 +276,9 @@ export class FeedViewModel extends Observable<FeedState> {
     this.setState((s) => this.compose({ ...s, status: 'error', errorMessage: message }));
   }
 
-  /** 재인증이 필요한 오류면 로그인으로 보내고 true. 오류 화면·토스트는 없다. */
+  /** 인증 오류 정책(AuthErrorPolicy). 처리했으면 true: 오류 화면·토스트는 없다. */
   private sendToLogin(error: unknown): boolean {
-    if (
-      error instanceof ReauthenticationRequiredError ||
-      error instanceof AuthenticationRequiredError
-    ) {
-      this.deps.authFlow.toLogin();
-      return true;
-    }
-    return false;
+    return this.authErrors.handle(error);
   }
 
   // ---- 수정·삭제 실패 ----
@@ -303,12 +300,8 @@ export class FeedViewModel extends Observable<FeedState> {
 
   private titleErrorMessage(error: unknown): string {
     if (error instanceof HttpError) {
-      // 클라이언트 검증을 우회한 400만 서버 문구와 같은 안내로 보인다. 그 밖의 400은 상태 문구다(분기는 표시용 하나뿐).
-      if (error.status === 400) {
-        return error.serverMessage === t('feed.edit.title-too-long')
-          ? t('feed.edit.title-too-long')
-          : t('feed.edit.error.state');
-      }
+      // 400은 서버 문구와 상관없이 모두 상태 안내다(spec §5.2 표·D-02, Android와 동일).
+      if (error.status === 400) return t('feed.edit.error.state');
       if (error.status === 403) return t('feed.edit.error.banned');
       if (error.status === 401) return t('feed.edit.error.login');
     }

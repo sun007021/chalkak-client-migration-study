@@ -92,14 +92,16 @@ describe('FeedViewModel 상세 로드', () => {
     expect(h.transport.requests.map((r) => r.method)).toEqual(['GET', 'POST', 'GET']);
   });
 
-  it('TC-FEED-006 REAUTHENTICATION_REQUIRED면 로그인 화면으로 보낸다', async () => {
+  it('TC-FEED-006 REAUTHENTICATION_REQUIRED면 화면은 아무것도 하지 않는다(session-expired 이벤트가 로그인으로 보낸다)', async () => {
     const h = await createFeedHarness({
       open: { entry: 'mine', postId: OTHER },
       routes: { [GET_OTHER]: unauthorized(), 'POST /auth/refresh': () => reauth() },
     });
     await h.viewModel.onShown();
-    expect(h.authFlow.calls).toEqual(['login']);
+    // [팀장 결정] 홈·전시·피드·좋아요 공통: Reauth는 화면이 toLogin을 부르지 않는다(AuthErrorPolicy).
+    expect(h.authFlow.calls).toEqual([]);
     expect(h.toast.messages).toEqual([]);
+    expect(h.viewModel.getSnapshot().status).not.toBe('error');
   });
 
   it('TC-FEED-005 서버가 401을 주는 직접 진입(refresh 뒤에도 401)은 로그인 화면으로 보낸다', async () => {

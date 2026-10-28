@@ -91,11 +91,15 @@ export interface Dependencies {
   readonly linkOpener: ExternalLinkOpener;
   /** 기본은 화면 위에 그리는 ToastCenter(`container.toastCenter`). 테스트는 Fake를 넣는다. */
   readonly toast: ToastPresenter;
-  /** null이면 컨테이너가 실제 구현(DefaultLikeController)을 만들어 로그아웃 때 비우는 캐시에 올린다. 테스트는 Fake를 넣는다. */
-  readonly likes: LikeController | null;
+  /** 없으면 컨테이너가 실제 구현(DefaultLikeController)을 만든다. 테스트는 Fake를 넣는다. 어느 쪽이든 clearAll이 있으면 로그아웃 때 비우는 캐시에 올린다. */
+  readonly likes?: LikeController;
   readonly aiReview: AiReviewPoller;
   /** 로그아웃·탈퇴·계정 전환 때 비울 사용자별 캐시. 캐시를 가진 기능 PR이 추가한다. */
   readonly userDataCaches: readonly UserDataCache[];
+}
+
+function isUserDataCache(value: object): value is UserDataCache {
+  return typeof (value as Partial<UserDataCache>).clearAll === 'function';
 }
 
 const DEFAULT_APP_INFO: AppInfo = { platform: 'ios', bundleId: '', version: '', appStoreId: null };
@@ -174,6 +178,9 @@ export class AppContainer {
       this.createLoginViewModel(),
     );
     this.likes = dependencies.likes ?? this.createDefaultLikes();
+    if (dependencies.likes && isUserDataCache(dependencies.likes)) {
+      this.cacheRegistry.register(dependencies.likes);
+    }
     this.cacheRegistry.register(this.postChanges);
     this.homeOwner = new HomeViewModelOwner({
       boot: this.bootViewModel,
@@ -210,6 +217,7 @@ export class AppContainer {
       changes: this.postChanges,
       navigator: this.displayNavigator,
       toast: this.toast,
+      authFlow: this.bootViewModel,
     });
   }
 
@@ -242,6 +250,7 @@ export class AppContainer {
       // ISSUE 목록 ViewModel은 홈이 소유한다(홈이 로드·정리·dispose를 시키고 HomeScreen은 홈을 통해서만 받는다).
       bannerFeed: new BannerFeedViewModel({ repository: new BannerRepository({ api }) }),
       likes,
+      changes: this.postChanges,
       aiReview,
       visibility,
       navigator: this.homeNavigator,
@@ -330,7 +339,7 @@ export class AppContainer {
         visibility,
         linkOpener: overrides.linkOpener ?? new LinkingExternalLinkOpener(),
         toast: overrides.toast ?? toastCenter!,
-        likes: overrides.likes ?? null,
+        likes: overrides.likes,
         aiReview: overrides.aiReview ?? new NoopAiReviewPoller(),
       },
       toastCenter,

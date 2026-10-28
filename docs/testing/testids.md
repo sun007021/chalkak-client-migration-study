@@ -217,6 +217,7 @@
 | feed | 화면 루트              | `feed.root`                  |                                               |
 | feed | 뒤로 버튼              | `feed.back-button`           |                                               |
 | feed | 사진                   | `feed.photo`                 | 핀치 줌 대상(최대 4배)                        |
+| feed | 사진 확대 내용         | `feed.photo-content`         | 핀치 변환이 적용되는 내부 뷰 (RN 추가)        |
 | feed | 사인 이미지            | `feed.signature-image`       |                                               |
 | feed | 날짜 라벨              | `feed.date-label`            | "M월 d일의 주제"                              |
 | feed | 제목                   | `feed.title`                 | 제목 없으면 "무제"                            |
@@ -234,6 +235,8 @@
 | feed | AI: 상태 다시 확인     | `feed.ai-recheck-button`     | 폴링 창 종료 뒤                               |
 | feed | AI: 안내 메시지        | `feed.ai-message`            | "AI 피드백을 확인할 수 없는 게시물이에요." 등 |
 | feed | 삭제 확인 다이얼로그   | `feed.delete-dialog`         | "게시물을 삭제하시겠어요?"                    |
+| feed | 삭제 확인 제목         | `feed.delete-title`          | "게시물 삭제" (RN 추가)                       |
+| feed | 삭제 확인 본문         | `feed.delete-body`           | "게시물을 삭제하시겠어요?" (RN 추가)           |
 | feed | 삭제 확인 버튼         | `feed.delete-confirm-button` |                                               |
 | feed | 삭제 취소 버튼         | `feed.delete-cancel-button`  |                                               |
 | feed | 제목 수정 다이얼로그   | `feed.title-dialog`          |                                               |

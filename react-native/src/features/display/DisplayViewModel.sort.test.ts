@@ -48,17 +48,22 @@ describe('DisplayViewModel 정렬', () => {
   it('TC-DISP-012 [가정: REQ-DISP-020대로 캐시를 즉시 보여 준 뒤 재검증한다] 이미 본 (날짜, 정렬)은 캐시를 즉시 보여 준다', async () => {
     const h = await createDisplayHarness();
     await h.viewModel.onShown();
+    const recent = idsOf(h);
     await h.viewModel.selectSort('popular');
     const popular = idsOf(h);
     const gate = gatedRoute(h.router, RECENT, 'display/posts-list__recent-page1');
     const back = h.viewModel.selectSort('recent');
-    // 응답 전인데도 최신순 캐시가 바로 보인다.
+    // 응답 전인데도 처음 본 최신순 캐시가 그대로(같은 ID 배열) 바로 보인다.
+    expect(idsOf(h)).toEqual(recent);
     expect(idsOf(h)).not.toEqual(popular);
-    expect(h.viewModel.getSnapshot().sort).toBe('recent');
+    expect(h.viewModel.getSnapshot()).toMatchObject({ sort: 'recent', refreshing: true });
+    // gatedRoute가 라우트를 교체하면서 호출 기록이 새로 시작된다: 재검증 요청이 응답 전에 이미 1건 나갔다.
+    await flush();
+    expect(h.callsOf(RECENT)).toBe(1);
     gate.release();
     await back;
-    // gatedRoute가 라우트를 교체하면서 호출 기록이 새로 시작되므로, 재검증 요청 1건만 남는다.
     expect(h.callsOf(RECENT)).toBe(1);
+    expect(idsOf(h)).toEqual(recent);
   });
 
   it('TC-DISP-013 지난 날짜는 아카이브로 popular만 쓰고 상위 5개를 추천에 쓴다', async () => {

@@ -85,8 +85,12 @@ export function DeleteDialog({
 }) {
   return (
     <DialogFrame testID="feed.delete-dialog">
-      <Text style={styles.title}>{t('feed.delete.title')}</Text>
-      <Text style={styles.body}>{t('feed.delete.body')}</Text>
+      <Text testID="feed.delete-title" style={styles.title}>
+        {t('feed.delete.title')}
+      </Text>
+      <Text testID="feed.delete-body" style={styles.body}>
+        {t('feed.delete.body')}
+      </Text>
       <View style={styles.actions}>
         <Pressable
           testID="feed.delete-cancel-button"

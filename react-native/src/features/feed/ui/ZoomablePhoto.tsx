@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Animated,
   Image,
@@ -7,18 +7,10 @@ import {
   type GestureResponderEvent,
   type HostInstance,
   type LayoutChangeEvent,
-  type NativeTouchEvent,
 } from 'react-native';
 
 import { colors } from '../../../shared/ui/theme';
-import {
-  clampPan,
-  clampScale,
-  panForFocalPoint,
-  releasedScale,
-  type Point,
-  type Size,
-} from '../photoZoom';
+import { PinchTracker, type Transform } from '../pinchTracker';
 
 type Props = {
   uri: string;
@@ -27,100 +19,89 @@ type Props = {
   children?: ReactNode;
 };
 
-type Gesture = {
-  distance: number;
-  /** 시작 때 두 손가락의 중점(컨테이너 좌표). */
-  focal: Point;
-  scale: number;
-  pan: Point;
-};
-
-const midpoint = (a: NativeTouchEvent, b: NativeTouchEvent): Point => ({
-  x: (a.pageX + b.pageX) / 2,
-  y: (a.pageY + b.pageY) / 2,
-});
-const distance = (a: NativeTouchEvent, b: NativeTouchEvent): number =>
-  Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
+const RETURN_MS = 200;
 
 /**
  * 핀치로 1배~4배 확대하는 사진. 손을 떼면 1배로 돌아오고, 두 손가락 팬은 확대한 범위 안으로 제한된다.
- * 손가락 아래 지점이 고정되도록 확대 중심을 맞춘다(photoZoom의 순수 함수). 한 손가락 터치는 건드리지 않는다.
+ * 손가락 아래 지점이 고정되도록 확대 중심을 맞춘다(계산은 PinchTracker). 한 손가락 터치는 건드리지 않는다.
  * 제스처 라이브러리 없이 View의 터치 이벤트와 Animated(JS 구동)로 구현한다.
  */
 export function ZoomablePhoto({ uri, accessibilityLabel, children }: Props) {
   const [scale] = useState(() => new Animated.Value(1));
   const [translateX] = useState(() => new Animated.Value(0));
   const [translateY] = useState(() => new Animated.Value(0));
-  const container = useRef<Size>({ width: 0, height: 0 });
-  const origin = useRef<Point>({ x: 0, y: 0 });
+  const [tracker] = useState(() => new PinchTracker());
   const host = useRef<HostInstance>(null);
-  const gesture = useRef<Gesture | null>(null);
-  // 현재 변환(손가락을 움직이는 동안 계속 갱신).
-  const current = useRef<{ scale: number; pan: Point }>({ scale: 1, pan: { x: 0, y: 0 } });
+  const returning = useRef<Animated.CompositeAnimation | null>(null);
 
-  const apply = (nextScale: number, pan: Point) => {
-    current.current = { scale: nextScale, pan };
-    scale.setValue(nextScale);
-    translateX.setValue(pan.x);
-    translateY.setValue(pan.y);
+  // 사라질 때 돌아오는 애니메이션이 남아 있지 않게 멈춘다.
+  useEffect(
+    () => () => {
+      returning.current?.stop();
+      returning.current = null;
+    },
+    [],
+  );
+
+  // 터치 좌표는 화면 기준이라 컨테이너의 화면 위치를 재서 컨테이너 좌표로 바꾼다. 측정은 비동기라
+  // 레이아웃 때 미리 재 두고, 터치 시작 때 한 번 더 재서 스크롤 등으로 달라진 위치를 맞춘다.
+  const measureOrigin = () => {
+    host.current?.measureInWindow((x, y) => tracker.originMeasured({ x, y }));
+  };
+
+  /** 지금 화면에 보이는 변환. 돌아오는 애니메이션 중이면 중간 값이고, 그 애니메이션은 여기서 멈춘다. */
+  const stopAndReadDisplayed = (): Transform => {
+    returning.current?.stop();
+    returning.current = null;
+    let displayed: Transform = { scale: 1, pan: { x: 0, y: 0 } };
+    scale.stopAnimation((value) => (displayed = { ...displayed, scale: value }));
+    translateX.stopAnimation(
+      (value) => (displayed = { ...displayed, pan: { ...displayed.pan, x: value } }),
+    );
+    translateY.stopAnimation(
+      (value) => (displayed = { ...displayed, pan: { ...displayed.pan, y: value } }),
+    );
+    return displayed;
   };
 
   const onTouchStart = (event: GestureResponderEvent) => {
     const touches = event.nativeEvent.touches;
     if (touches.length !== 2) return;
-    // 터치 좌표는 화면 기준(pageX/Y)이라 컨테이너의 화면 위치를 한 번 재서 컨테이너 좌표로 바꾼다.
-    host.current?.measureInWindow((x, y) => {
-      origin.current = { x, y };
-    });
-    const mid = midpoint(touches[0], touches[1]);
-    gesture.current = {
-      distance: distance(touches[0], touches[1]),
-      focal: { x: mid.x - origin.current.x, y: mid.y - origin.current.y },
-      scale: current.current.scale,
-      pan: current.current.pan,
-    };
+    measureOrigin();
+    tracker.start(touches[0], touches[1], stopAndReadDisplayed());
   };
 
   const onTouchMove = (event: GestureResponderEvent) => {
-    const start = gesture.current;
     const touches = event.nativeEvent.touches;
-    if (!start || touches.length !== 2 || start.distance <= 0) return;
-    const nextScale = clampScale((start.scale * distance(touches[0], touches[1])) / start.distance);
-    const mid = midpoint(touches[0], touches[1]);
-    const moved = {
-      x: mid.x - origin.current.x - start.focal.x,
-      y: mid.y - origin.current.y - start.focal.y,
-    };
-    const anchored = panForFocalPoint(
-      start.focal,
-      start.scale,
-      nextScale,
-      start.pan,
-      container.current,
-    );
-    apply(
-      nextScale,
-      clampPan({ x: anchored.x + moved.x, y: anchored.y + moved.y }, nextScale, container.current),
-    );
+    if (touches.length !== 2) return;
+    const next = tracker.move(touches[0], touches[1]);
+    if (!next) return;
+    scale.setValue(next.scale);
+    translateX.setValue(next.pan.x);
+    translateY.setValue(next.pan.y);
   };
 
   const onTouchEnd = (event: GestureResponderEvent) => {
-    if (event.nativeEvent.touches.length >= 2 || gesture.current === null) return;
-    gesture.current = null;
+    if (event.nativeEvent.touches.length >= 2 || !tracker.active) return;
+    tracker.end();
     // 손을 떼면 원래 크기로 돌아온다.
-    current.current = { scale: releasedScale(current.current.scale), pan: { x: 0, y: 0 } };
-    Animated.parallel([
-      Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: false }),
-      Animated.timing(translateX, { toValue: 0, duration: 200, useNativeDriver: false }),
-      Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: false }),
-    ]).start();
+    const animation = Animated.parallel([
+      Animated.timing(scale, { toValue: 1, duration: RETURN_MS, useNativeDriver: false }),
+      Animated.timing(translateX, { toValue: 0, duration: RETURN_MS, useNativeDriver: false }),
+      Animated.timing(translateY, { toValue: 0, duration: RETURN_MS, useNativeDriver: false }),
+    ]);
+    returning.current = animation;
+    animation.start(() => {
+      if (returning.current === animation) returning.current = null;
+    });
   };
 
   const onLayout = (event: LayoutChangeEvent) => {
-    container.current = {
+    tracker.setContainer({
       width: event.nativeEvent.layout.width,
       height: event.nativeEvent.layout.height,
-    };
+    });
+    measureOrigin();
   };
 
   return (
@@ -138,6 +119,7 @@ export function ZoomablePhoto({ uri, accessibilityLabel, children }: Props) {
       onTouchCancel={onTouchEnd}
     >
       <Animated.View
+        testID="feed.photo-content"
         style={[styles.fill, { transform: [{ translateX }, { translateY }, { scale }] }]}
       >
         <Image source={{ uri }} style={styles.fill} resizeMode="contain" />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { FeedNavigator } from '../features/feed/FeedNavigator';
 import { FeedScreen } from '../features/feed/FeedScreen';
@@ -16,18 +16,24 @@ export function PostDetailRoute({ target, onBack }: { target: FeedTarget; onBack
 
   useEffect(() => {
     let cancelled = false;
-    void sessionStore.load().then((session) => {
-      if (cancelled) return;
-      // 게스트는 상세에 들어올 수 없지만(D-05) 혹시 와도 내 게시물로 판정되지 않게 빈 값을 둔다.
-      setUserId(session.kind === 'authenticated' ? session.credentials.userId : '');
-    });
+    sessionStore
+      .load()
+      .then((session) =>
+        // 게스트는 상세에 들어올 수 없지만(D-05) 혹시 와도 내 게시물로 판정되지 않게 빈 값을 둔다.
+        session.kind === 'authenticated' ? session.credentials.userId : '',
+      )
+      // 세션을 못 읽어도 화면은 열어야 한다(내 게시물 판정만 포기한다).
+      .catch(() => '')
+      .then((id) => {
+        if (!cancelled) setUserId(id);
+      });
     return () => {
       cancelled = true;
     };
   }, [sessionStore]);
 
   if (userId === null) return null;
-  return <OwnedFeed target={target} userId={userId} onBack={onBack} />;
+  return <OwnedFeed key={target.postId} target={target} userId={userId} onBack={onBack} />;
 }
 
 function OwnedFeed({
@@ -40,6 +46,11 @@ function OwnedFeed({
   onBack: () => void;
 }) {
   const container = useAppContainer();
+  // create는 처음 한 번만 쓰이므로, 나중에 바뀌는 onBack은 ref로 최신 값을 읽는다.
+  const onBackRef = useRef(onBack);
+  useEffect(() => {
+    onBackRef.current = onBack;
+  }, [onBack]);
   const create = useCallback(() => {
     // 닫기 요청이 겹쳐도(삭제 성공 + 좋아요 404 등) 한 번만 이전 화면으로 돌아간다.
     let closed = false;
@@ -47,11 +58,11 @@ function OwnedFeed({
       close: () => {
         if (closed) return;
         closed = true;
-        onBack();
+        onBackRef.current();
       },
     };
     return container.createFeedViewModel(target, userId, navigator);
-  }, [container, target, userId, onBack]);
+  }, [container, target, userId]);
   const viewModel = useOwnedViewModel(create);
   if (!viewModel) return null;
   return <FeedScreen viewModel={viewModel} />;

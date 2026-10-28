@@ -19,7 +19,12 @@ export function RootNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Tabs" component={MainTabs} />
-      <Stack.Screen name="PostDetail" component={PostDetailScreenRoute} />
+      <Stack.Screen
+        name="PostDetail"
+        component={PostDetailScreenRoute}
+        // 상세가 열린 채 다른 게시물로 이동하면 같은 화면을 재사용하지 않고 새 화면을 쌓는다.
+        getId={({ params }) => params.postId}
+      />
       <Stack.Screen name="Notifications" component={NotificationsPlaceholder} />
       <Stack.Screen name="IssueWeb" component={IssueWebScreenRoute} />
       <Stack.Screen name="Upload" component={UploadPlaceholder} />

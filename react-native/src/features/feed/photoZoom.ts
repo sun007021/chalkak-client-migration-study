@@ -9,11 +9,6 @@ export function clampScale(scale: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale));
 }
 
-/** 손을 떼면 돌아갈 배율(항상 1). */
-export function releasedScale(_scale: number): number {
-  return MIN_ZOOM;
-}
-
 // -0이 새어 나가지 않게 0을 더한다.
 const limit = (value: number, bound: number): number =>
   Math.min(bound, Math.max(-bound, value)) + 0;

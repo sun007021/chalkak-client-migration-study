@@ -1,11 +1,4 @@
-import {
-  clampPan,
-  clampScale,
-  MAX_ZOOM,
-  MIN_ZOOM,
-  panForFocalPoint,
-  releasedScale,
-} from './photoZoom';
+import { clampPan, clampScale, MAX_ZOOM, MIN_ZOOM, panForFocalPoint } from './photoZoom';
 
 const CONTAINER = { width: 400, height: 600 };
 const center = { x: 200, y: 300 };
@@ -22,7 +15,6 @@ describe('핀치 줌', () => {
     expect(clampScale(0.4)).toBe(1);
     expect(clampScale(2.5)).toBe(2.5);
     expect(clampScale(9)).toBe(4);
-    expect(releasedScale(3.2)).toBe(1);
   });
 
   it('TC-FEED-047 두 손가락 팬은 확대된 이미지 범위 안으로 제한된다', () => {

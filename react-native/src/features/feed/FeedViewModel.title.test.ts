@@ -122,14 +122,18 @@ describe('FeedViewModel 제목 수정 다이얼로그', () => {
     expect(h.toast.messages).toEqual([]);
   });
 
-  it('TC-FEED-028 [가정: 클라 우회 400도 같은 문구 분기 — 서버 message를 표시] 400 "제목은 10자 이하여야 합니다."는 서버 message를 보이고 입력을 유지한다', async () => {
+  it('TC-FEED-028 400은 서버 message와 상관없이 상태 문구를 보이고, 다이얼로그는 열린 채 입력을 유지한다', async () => {
+    // [팀장 결정: spec §5.2 표·D-02 우선, Android와 동일] 서버 문구("제목은 10자 이하여야 합니다.") 분기는 두지 않는다.
     const h = await openEditor({ [PUT_MINE]: 'feed/posts-title-update__400-title-too-long' });
     h.viewModel.onTitleInput('새 제목');
     await h.viewModel.saveTitle();
+    expect(dialog(h)).not.toBeNull();
     expect(dialog(h)).toMatchObject({
       draft: '새 제목',
-      errorMessage: t('feed.edit.title-too-long'),
+      saving: false,
+      errorMessage: t('feed.edit.error.state'),
     });
+    expect(puts(h)).toHaveLength(1);
   });
 
   it('TC-FEED-029 정지 회원의 403은 정지 문구를 보이고 같은 요청을 다시 보내지 않는다', async () => {

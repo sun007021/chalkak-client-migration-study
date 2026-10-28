@@ -39,13 +39,14 @@ describe('DefaultLikeController + LikeRepository + ApiClient', () => {
     expect(h.toast.messages).toEqual([]);
   });
 
-  it('TC-LIKE-013 재인증 필요면 롤백 뒤 로그인 화면으로 간다', async () => {
+  it('TC-LIKE-013 재인증 필요면 롤백만 한다(로그인 이동은 session-expired 이벤트의 몫이라 화면은 부르지 않는다)', async () => {
     const h = await setup();
     h.transport.script(unauthorized(), reauth());
     h.controller.toggle(start);
     await settle(200);
     expect(h.controller.snapshot(P1)).toEqual(start);
-    expect(h.authFlow.calls).toEqual(['login']);
+    expect(h.authFlow.calls).toEqual([]);
+    expect(h.toast.messages).toEqual([]);
   });
 
   it('TC-LIKE-026 500 두 번 뒤 200이면 토스트 없이 서버 값이 반영된다(0.5초, 1초 대기)', async () => {

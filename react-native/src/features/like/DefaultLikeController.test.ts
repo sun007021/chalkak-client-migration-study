@@ -1,4 +1,10 @@
-import { HttpError, NetworkError, ReauthenticationRequiredError } from '../../core/http/ApiError';
+import {
+  AuthenticationRequiredError,
+  CancelledError,
+  HttpError,
+  NetworkError,
+  ReauthenticationRequiredError,
+} from '../../core/http/ApiError';
 import { t } from '../../shared/copy';
 import { createLikeHarness, P1, P2, settle } from './__testing__/createLikeHarness';
 
@@ -117,13 +123,24 @@ describe('DefaultLikeController 실패와 롤백', () => {
     expect(h.toast.messages).toEqual([]);
   });
 
-  it('TC-LIKE-013 재인증 필요(refresh 실패)면 롤백 뒤 로그인 화면으로 보낸다', async () => {
+  it('TC-LIKE-013 refresh 뒤에도 남은 401이면 롤백 뒤 로그인 화면으로 보낸다', async () => {
+    const h = createLikeHarness();
+    h.controller.toggle(snap(P1, 10, false));
+    h.api.fail(0, new AuthenticationRequiredError('401'));
+    await settle();
+    expect(h.controller.snapshot(P1)).toEqual(snap(P1, 10, false));
+    expect(h.authFlow.calls).toEqual(['login']);
+    expect(h.toast.messages).toEqual([]);
+  });
+
+  it('TC-LIKE-013 재인증 필요(refresh 실패)면 롤백만 하고 로그인 이동·토스트는 없다(session-expired 이벤트의 몫)', async () => {
     const h = createLikeHarness();
     h.controller.toggle(snap(P1, 10, false));
     h.api.fail(0, new ReauthenticationRequiredError('reauth'));
     await settle();
     expect(h.controller.snapshot(P1)).toEqual(snap(P1, 10, false));
-    expect(h.authFlow.calls).toEqual(['login']);
+    expect(h.authFlow.calls).toEqual([]);
+    expect(h.toast.messages).toEqual([]);
   });
 
   it('TC-LIKE-030 서로 다른 두 사진이 연달아 실패하면 같은 문구 토스트가 두 번 요청된다', async () => {
@@ -268,5 +285,20 @@ describe('DefaultLikeController 화면 이탈·계정 전환', () => {
     h.api.succeed(1, { likeCount: 19, isLiked: false });
     await settle();
     expect(h.controller.snapshot(P1)).toEqual(snap(P1, 19, false));
+  });
+});
+
+describe('DefaultLikeController 실패 처리의 예외 경로', () => {
+  it('TC-LIKE-009 clearAll이 아닌 취소(CancelledError)는 토스트 없이 확정 값으로 되돌린다', async () => {
+    const h = createLikeHarness();
+    h.controller.toggle(snap(P1, 10, false));
+    h.api.fail(0, new CancelledError('cancelled'));
+    await settle();
+    expect(h.controller.snapshot(P1)).toEqual(snap(P1, 10, false));
+    expect(h.events.at(-1)).toEqual(updated(P1, 10, false));
+    expect(h.toast.messages).toEqual([]);
+    // 되돌린 뒤의 새 탭은 새 요청이다.
+    h.controller.toggle(snap(P1, 10, false));
+    expect(h.api.calls).toHaveLength(2);
   });
 });
