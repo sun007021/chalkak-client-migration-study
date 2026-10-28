@@ -20,7 +20,7 @@
 | LIKE | [display-feed.md](catalog/display-feed.md) | 35 | 1 | 1 | 32/35 | 33/35 | 34/35 | 34/35 | 0/35 |
 | UPL | [upload-edit.md](catalog/upload-edit.md) | 92 | 3 | 3 | 76/92 | 81/92 | 83/92 | 0/92 | 0/92 |
 | EDIT | [upload-edit.md](catalog/upload-edit.md) | 51 | 4 | 4 | 25/51 | 41/51 | 45/51 | 0/51 | 0/51 |
-| AIR | [ai-review.md](catalog/ai-review.md) | 61 | 2 | 2 | 47/61 | 53/61 | 0/61 | 0/61 | 0/61 |
+| AIR | [ai-review.md](catalog/ai-review.md) | 61 | 2 | 2 | 47/61 | 53/61 | 54/61 | 0/61 | 0/61 |
 | REC | [record.md](catalog/record.md) | 45 | 2 | 2 | 0/45 | 42/45 | 41/45 | 0/45 | 0/45 |
 | NOTI | [notification-push.md](catalog/notification-push.md) | 57 | 2 | 2 | 0/57 | 48/57 | 50/57 | 0/57 | 0/57 |
 | PUSH | [notification-push.md](catalog/notification-push.md) | 77 | 4 | 6 | 0/77 | 67/77 | 67/77 | 0/77 | 0/77 |
