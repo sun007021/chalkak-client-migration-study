@@ -19,8 +19,26 @@ export type PostListPage = {
   currentPage: number;
   pageSize: number;
   hasNext: boolean;
+  /** 랜덤 정렬 응답의 시드. 다른 정렬이거나 서버가 주지 않으면 null(생략). */
+  randomSeed?: string | null;
   posts: readonly PostSummary[];
 };
+
+/** GET /posts/{id}. `isMine`이 없으므로 내 게시물 판정은 authorId로 한다(D-26). */
+export type PostDetail = {
+  id: string;
+  authorId: string;
+  topic: { id: string; title: string; topicDate: KstDate };
+  originalImageUrl: string;
+  thumbnailImageUrl: string | null;
+  signatureOriginalImageUrl: string;
+  title: string | null;
+  likeCount: number;
+  isLiked: boolean;
+};
+
+/** PUT /posts/{id} 응답. */
+export type TitleUpdateResult = { postId: string; title: string | null };
 
 export type PostSort = 'recent' | 'popular' | 'random';
 

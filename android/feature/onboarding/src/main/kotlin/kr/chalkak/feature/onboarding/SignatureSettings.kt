@@ -15,6 +15,7 @@ import kr.chalkak.core.data.onboarding.SignatureUploader
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
 import kr.chalkak.core.network.ErrorCode
+import kr.chalkak.core.network.guardedApiCall
 
 data class SignatureChangeUiState(
     val busy: Boolean = false,

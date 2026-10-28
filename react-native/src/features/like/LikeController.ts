@@ -18,4 +18,8 @@ export interface LikeController {
   /** 컨트롤러가 가진 최신 값(진행 중 낙관 값 포함). 없으면 undefined. */
   snapshot(postId: string): LikeSnapshot | undefined;
   subscribe(listener: (change: LikeChange) => void): () => void;
+  /** 값이 바뀔 때마다 1씩 늘어나는 번호. 목록·상세 요청을 보내기 전에 읽어 둔다(revision 병합, D-04). */
+  revision(): number;
+  /** 요청 시작 시점(`since`) 이후에 바뀐 값만 돌려준다. 늦게 온 응답이 완료된 좋아요를 덮지 않게 할 때 쓴다(REQ-LIKE-009). */
+  latestSince(postId: string, since: number): LikeSnapshot | undefined;
 }

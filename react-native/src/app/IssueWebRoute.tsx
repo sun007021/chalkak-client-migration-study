@@ -1,8 +1,8 @@
-import { useCallback, useState, useSyncExternalStore } from 'react';
+import { useCallback } from 'react';
 
 import { IssueWebScreen } from '../features/banner/IssueWebScreen';
-import type { IssueWebViewModel } from '../features/banner/IssueWebViewModel';
 import { useAppContainer } from './AppContainerContext';
+import { useOwnedViewModel } from './useOwnedViewModel';
 
 /**
  * 배너 웹뷰 화면의 소유자. ViewModel은 화면이 아니라 이 내비게이션 단계(라우트)가 만든다.
@@ -17,30 +17,4 @@ export function IssueWebRoute({ url, onBack }: { url: string; onBack: () => void
   const viewModel = useOwnedViewModel(create);
   if (!viewModel) return null;
   return <IssueWebScreen viewModel={viewModel} onBack={onBack} />;
-}
-
-/** 구독이 시작될 때 만들고 마지막 구독이 풀리면 dispose하는 저장소. 다시 구독하면 새로 만든다. */
-class OwnedViewModelStore {
-  private viewModel: IssueWebViewModel | null = null;
-  private subscribers = 0;
-
-  constructor(private readonly create: () => IssueWebViewModel) {}
-
-  subscribe = (): (() => void) => {
-    this.subscribers += 1;
-    this.viewModel ??= this.create();
-    return () => {
-      this.subscribers -= 1;
-      if (this.subscribers > 0) return;
-      this.viewModel?.dispose();
-      this.viewModel = null;
-    };
-  };
-
-  getSnapshot = (): IssueWebViewModel | null => this.viewModel;
-}
-
-function useOwnedViewModel(create: () => IssueWebViewModel): IssueWebViewModel | null {
-  const [store] = useState(() => new OwnedViewModelStore(create));
-  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
 }

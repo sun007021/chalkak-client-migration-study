@@ -15,6 +15,7 @@ import kr.chalkak.core.data.notification.NotificationRepository
 import kr.chalkak.core.data.notification.NotificationType
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
+import kr.chalkak.core.network.guardedApiCall
 
 enum class DetailPhase { Loading, Content, Gone, Error }
 
