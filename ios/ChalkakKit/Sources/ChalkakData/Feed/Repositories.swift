@@ -28,8 +28,8 @@ public protocol LikeRepository: Sendable {
 
 // MARK: API 구현
 
-/// 네트워크 계층 오류를 `FeedFailure`로 바꾼다. 취소·설정 오류는 그대로 전파한다.
-private func perform<T>(_ operation: FeedOperation, _ body: () async throws -> T) async throws -> T {
+/// 네트워크 계층 오류를 `FeedFailure`로 바꾼다. 취소·설정 오류는 그대로 전파한다(홈 저장소도 같은 변환을 쓴다).
+func perform<T>(_ operation: FeedOperation, _ body: () async throws -> T) async throws -> T {
     do {
         return try await body()
     } catch {
