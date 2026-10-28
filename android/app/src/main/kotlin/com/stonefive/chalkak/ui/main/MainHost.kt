@@ -11,6 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
@@ -30,6 +32,14 @@ import com.stonefive.chalkak.ui.issue.IssueWebRoute
 import com.stonefive.chalkak.ui.record.RecordRoute
 import com.stonefive.chalkak.ui.notification.NotificationDetailRoute
 import com.stonefive.chalkak.ui.notification.NotificationRoute
+import com.stonefive.chalkak.ui.settings.FeedbackRoute
+import com.stonefive.chalkak.ui.settings.LegalWebContent
+import com.stonefive.chalkak.ui.settings.SettingsHolders
+import com.stonefive.chalkak.ui.settings.SettingsRoute
+import com.stonefive.chalkak.ui.signature.ChangeSignaturePreviewRoute
+import com.stonefive.chalkak.ui.signature.SignatureScreen
+import com.stonefive.chalkak.ui.terms.LegalDocLoad
+import com.stonefive.chalkak.ui.terms.LegalDocSheet
 import com.stonefive.chalkak.ui.upload.UploadRoute
 import com.stonefive.chalkak.ui.upload.UploadSuccessScreen
 import com.stonefive.chalkak.viewmodel.SessionHolders
@@ -52,6 +62,13 @@ import kr.chalkak.feature.navigation.AccessMode
 import kr.chalkak.feature.navigation.NavigationController
 import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
+import kr.chalkak.feature.navigation.TermsDocumentKind
+import kr.chalkak.feature.onboarding.SignatureChangeStateHolder
+import kr.chalkak.feature.onboarding.SignatureMode
+import kr.chalkak.feature.onboarding.SignaturePadEffect
+import kr.chalkak.feature.onboarding.SignaturePadStateHolder
+import kr.chalkak.feature.onboarding.LegalDocuments
+import kr.chalkak.feature.onboarding.TermsKind
 import kr.chalkak.feature.record.RecordStateHolder
 import kr.chalkak.feature.notification.NotificationDetailStateHolder
 import kr.chalkak.feature.notification.NotificationInboxStateHolder
@@ -60,6 +77,7 @@ import kr.chalkak.feature.notification.PermissionFlowOutcome
 import kr.chalkak.feature.notification.PushNavigationEvent
 import kotlinx.coroutines.flow.Flow
 import com.stonefive.chalkak.ui.home.ActiveHomeUnread
+import kr.chalkak.feature.settings.FeedbackStateHolder
 import kr.chalkak.feature.upload.PhotoUploadStateHolder
 import kr.chalkak.feature.upload.UploadGateEffect
 
@@ -144,6 +162,18 @@ class MainDependencies(
     val notificationPermission: NotificationPermissionFlow? = null,
     /** Re-checks the unread dot of the home holder shown by this host; attached/detached by the host. */
     val homeUnread: ActiveHomeUnread? = null,
+    /** Settings tab holders (A9); null = the settings tab is still the [otherTab] placeholder. Built once per settings composition scope. */
+    val newSettingsHolders: ((scope: CoroutineScope, mode: HomeMode) -> SettingsHolders)? = null,
+    /** Feedback screen holder (A9); a fresh one per opened feedback screen. Null = `feedback.root` placeholder. */
+    val newFeedbackHolder: ((scope: CoroutineScope) -> FeedbackStateHolder)? = null,
+    /** Drawing pad of the change-signature flow (A9, `SignatureMode.Change`, `SignaturePadSpace` canvas); a fresh one per visit. */
+    val newChangeSignaturePad: (() -> SignaturePadStateHolder)? = null,
+    /** Upload + confirm holder of the change-signature preview (A9). */
+    val newSignatureChangeHolder: ((scope: CoroutineScope) -> SignatureChangeStateHolder)? = null,
+    /** Web view slot of the terms / privacy sheet opened from settings (A9). */
+    val legalWeb: LegalWebContent = { _, _, _ -> },
+    /** Switch turned on while the device notification permission is off: opens the app's system notification settings (A9). */
+    val openSystemNotificationSettings: () -> Unit = {},
 )
 
 /**
@@ -282,6 +312,31 @@ private fun MainHostContent(
                     )
                 }
             }
+            // The terms / privacy sheet is an overlay: the settings route below it stays composed (no reload, no screen_view on close).
+            Route.TabRoot(Tab.Settings), is Route.TermsDocument -> {
+                val mode = navState.accessMode
+                val newHolders = deps.newSettingsHolders
+                if (newHolders == null) {
+                    if (route is Route.TabRoot) deps.otherTab(Tab.Settings, idleSignal)
+                } else {
+                    val holders = rememberStateHolder("settings-$sessionKey-$mode") { scope -> newHolders(scope, mode.toHomeMode()) }
+                    SettingsRoute(
+                        holders = holders,
+                        signatureImage = deps.image,
+                        showToast = { latestToast(it) },
+                        onOpenFeedback = coordinator::onOpenFeedback,
+                        onChangeSignature = coordinator::onOpenChangeSignature,
+                        onShowDocument = coordinator::onShowDocument,
+                        onOpenSystemNotificationSettings = { deps.openSystemNotificationSettings() },
+                        onAccountEnded = coordinator::onAccountEnded,
+                        onLoginRequired = { }, // the 401 also ends the session through AuthEvent.GoToLogin (as for feed)
+                    )
+                    if (route is Route.TermsDocument) {
+                        val kind = if (route.kind == TermsDocumentKind.TermsOfService) TermsKind.Service else TermsKind.Privacy
+                        LegalSheet(kind, session.documentUrl ?: LegalDocuments.url(kind), deps.legalWeb, onClose = coordinator::onSystemBack)
+                    }
+                }
+            }
             is Route.TabRoot -> deps.otherTab(route.tab, idleSignal)
             Route.Notifications -> {
                 val create = deps.newNotificationInboxHolder
@@ -384,7 +439,76 @@ private fun MainHostContent(
                     )
                 }
             }
-            Route.Feedback -> RoutePlaceholder("feedback.root")
+            Route.Feedback -> {
+                val newHolder = deps.newFeedbackHolder
+                if (newHolder == null) {
+                    RoutePlaceholder("feedback.root")
+                } else {
+                    val holder = rememberStateHolder("feedback-$sessionKey-${session.feedbackSerial}") { scope -> newHolder(scope) }
+                    FeedbackRoute(
+                        holder = holder,
+                        showToast = { latestToast(it) },
+                        onClose = coordinator::onSystemBack,
+                        onLoginRequired = { }, // the 401 also ends the session through AuthEvent.GoToLogin (as for feed)
+                    )
+                }
+            }
+            Route.ChangeSignature -> {
+                val newPad = deps.newChangeSignaturePad
+                if (newPad == null) {
+                    RoutePlaceholder("signature.root")
+                } else {
+                    val pad = rememberStateHolder("change-pad-$sessionKey-${session.changeSerial}") { _ -> newPad() }
+                    val padState by pad.state.collectAsState()
+                    LaunchedEffect(pad) {
+                        pad.effects.collect { effect ->
+                            if (effect is SignaturePadEffect.ShowPreview) coordinator.onChangeSignatureDrawn(effect.png)
+                        }
+                    }
+                    SignatureScreen(
+                        mode = SignatureMode.Change,
+                        state = padState,
+                        onUndo = pad::onUndo,
+                        onClear = pad::onClear,
+                        onConfirm = pad::onConfirm,
+                        onBack = coordinator::onSystemBack,
+                        onBeginStroke = pad::beginStroke,
+                        onExtendStroke = pad::extendStroke,
+                        onEndStroke = pad::endStroke,
+                    )
+                }
+            }
+            Route.ChangeSignaturePreview -> {
+                val newPad = deps.newChangeSignaturePad
+                val newChange = deps.newSignatureChangeHolder
+                val png = session.changePng
+                if (newPad == null || newChange == null || png == null) {
+                    LaunchedEffect(Unit) { coordinator.onSystemBack() }
+                } else {
+                    val pad = rememberStateHolder("change-pad-$sessionKey-${session.changeSerial}") { _ -> newPad() }
+                    val holder = rememberStateHolder("change-sign-$sessionKey-${session.changeSerial}-${session.changePreviewSerial}") { scope ->
+                        newChange(scope)
+                    }
+                    val settingsHolders = deps.newSettingsHolders?.let { create ->
+                        val mode = navState.accessMode
+                        rememberStateHolder("settings-$sessionKey-$mode") { scope -> create(scope, mode.toHomeMode()) }
+                    }
+                    // Back, "다시 그리기" and a rejected signature all return to a blank pad; leaving cancels a running change request.
+                    val backToDrawing = {
+                        pad.onRedraw()
+                        coordinator.onSystemBack()
+                    }
+                    BackHandler(onBack = backToDrawing)
+                    ChangeSignaturePreviewRoute(
+                        holder = holder,
+                        png = png,
+                        onDone = { toastKey -> coordinator.onSignatureChanged(toastKey, settingsHolders) },
+                        onBackToLogin = coordinator::onChangeSignatureExpired,
+                        onBackToDrawing = backToDrawing,
+                        onRedraw = backToDrawing,
+                    )
+                }
+            }
             Route.BannerWeb -> {
                 val banner = session.issueBanner
                 if (banner == null) {
@@ -401,6 +525,25 @@ private fun MainHostContent(
             }
             else -> Unit
         }
+    }
+}
+
+/** Terms / privacy document sheet of the settings tab; the web view is composed afresh for every load attempt (retry). */
+@Composable
+private fun LegalSheet(kind: TermsKind, url: String, web: LegalWebContent, onClose: () -> Unit) {
+    val copy = LocalCopy.current
+    var load by remember { mutableStateOf(LegalDocLoad.Loading) }
+    var attempt by remember { mutableIntStateOf(0) }
+    LegalDocSheet(
+        title = copy[if (kind == TermsKind.Service) "onb.terms.doc.title.service" else "onb.terms.doc.title.privacy"],
+        load = load,
+        onClose = onClose,
+        onRetry = {
+            load = LegalDocLoad.Loading
+            attempt++
+        },
+    ) {
+        key(attempt) { web(url, { load = LegalDocLoad.Loaded }, { load = LegalDocLoad.Failed }) }
     }
 }
 

@@ -92,6 +92,21 @@ class MainSession(val scope: CoroutineScope) {
 
     /** What the success screen shows; set when the submit succeeded. */
     var uploadResult: UploadResult? = null
+
+    /** Counts opened feedback screens: each visit gets a fresh holder (empty input, no old error). */
+    var feedbackSerial: Int = 0
+
+    /** Counts opened change-signature visits: each one gets a fresh drawing pad (REQ-SIGN-011). */
+    var changeSerial: Int = 0
+
+    /** Counts previews of the current visit: each preview gets a fresh upload holder (a failed one keeps its error). */
+    var changePreviewSerial: Int = 0
+
+    /** PNG the pad produced for the change-signature preview. */
+    var changePng: ByteArray? = null
+
+    /** Address of the legal document the last settings row asked for; the document sheet loads it. */
+    var documentUrl: String? = null
 }
 
 class DisplayEntry(val seq: Int, val date: LocalDate?, val sort: PostSort?)
