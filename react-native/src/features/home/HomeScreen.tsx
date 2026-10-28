@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import type { KstDate } from '../../core/time/KstDate';
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
 import { colors } from '../../shared/ui/theme';
@@ -25,7 +26,8 @@ import type { HomeViewModel } from './HomeViewModel';
 export type HomeScreenProps = {
   viewModel: HomeViewModel;
   /** AI 피드백 카드 본문. AI 리뷰 PR이 채운다. 홈은 `home.ai-card` 자리만 만든다. */
-  renderAiCard?: (postId: string) => ReactNode;
+  /** topicDate는 카드를 보이는 조건이 되는 오늘(KST) 주제 날짜다. */
+  renderAiCard?: (postId: string, topicDate: KstDate) => ReactNode;
 };
 
 /**
@@ -88,7 +90,7 @@ export function HomeScreen({ viewModel, renderAiCard }: HomeScreenProps) {
           onRetry={() => void viewModel.retryHero()}
         />
         {state.aiCardPostId !== null ? (
-          <View testID="home.ai-card">{renderAiCard?.(state.aiCardPostId)}</View>
+          <View testID="home.ai-card">{renderAiCard?.(state.aiCardPostId, state.todayDate)}</View>
         ) : null}
         <WeeklySection
           weekly={state.weekly}

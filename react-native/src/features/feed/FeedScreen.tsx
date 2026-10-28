@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { formatTopicDateLabel } from '../../core/time/dateFormat';
+import type { KstDate } from '../../core/time/KstDate';
 import { format, t } from '../../shared/copy';
 import { colors, spacing } from '../../shared/ui/theme';
 import { LikeButton } from '../like/LikeButton';
@@ -15,7 +16,13 @@ import type { FeedViewModel } from './FeedViewModel';
  * 게시물 상세 화면. testID는 docs/testing/testids.md의 feed 표를 따른다.
  * 마운트 = onShown, 언마운트 = onHidden. ViewModel을 만들고 버리는 것은 소유자(라우트)다.
  */
-export function FeedScreen({ viewModel }: { viewModel: FeedViewModel }) {
+export type FeedScreenProps = {
+  viewModel: FeedViewModel;
+  /** AI 피드백 알약. 내 게시물이고 상세 응답으로 주제 날짜가 확정된 뒤에만 부른다(AI 피드백 영역이 채운다). */
+  renderAiReview?: (args: { postId: string; topicDate: KstDate }) => ReactNode;
+};
+
+export function FeedScreen({ viewModel, renderAiReview }: FeedScreenProps) {
   const state = useViewModelState(viewModel);
   const insets = useSafeAreaInsets();
   const [failedSignature, setFailedSignature] = useState<string | null>(null);
@@ -106,6 +113,9 @@ export function FeedScreen({ viewModel }: { viewModel: FeedViewModel }) {
                 onPress={() => viewModel.onLikePress()}
               />
             </View>
+            {renderAiReview && state.confirmed && state.isMine && content.topicDate
+              ? renderAiReview({ postId: content.postId, topicDate: content.topicDate })
+              : null}
             <View style={styles.actions}>
               {state.canEditTitle ? (
                 <Pressable
