@@ -48,6 +48,7 @@ import kr.chalkak.feature.navigation.AccessMode
 import kr.chalkak.feature.navigation.NavigationController
 import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
+import kr.chalkak.feature.record.RecordStateHolder
 import kr.chalkak.feature.upload.PhotoUploadStateHolder
 import kr.chalkak.feature.upload.UploadGateEffect
 
@@ -115,6 +116,8 @@ class MainDependencies(
     val newUploadHolder: (scope: CoroutineScope, topicDate: LocalDate) -> PhotoUploadStateHolder,
     val uploadPlatform: UploadPlatform,
     val otherTab: @Composable (tab: Tab, scrollToTop: ScrollToTopSignal) -> Unit = { tab, _ -> TabPlaceholder(tab) },
+    /** Record tab holder (A7); null = the record tab is still the [otherTab] placeholder. */
+    val newRecordHolder: ((scope: CoroutineScope, mode: HomeMode) -> RecordStateHolder)? = null,
 )
 
 /**
