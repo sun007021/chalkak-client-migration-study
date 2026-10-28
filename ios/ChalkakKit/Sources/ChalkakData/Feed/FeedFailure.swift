@@ -22,6 +22,14 @@ public enum FeedOperation: Sendable, Equatable, CaseIterable {
     case aiReviewStatus
     /// `POST /posts/{id}/ai-review` (403은 정지 회원 D-08)
     case aiReviewRequest
+    /// `GET /notifications`
+    case notificationList
+    /// `GET /notifications/{id}`
+    case notificationDetail
+    /// `PATCH /notifications/{id}/read`
+    case notificationRead
+    /// `PUT /push-devices/current`
+    case registerPushDevice
 }
 
 /// 화면이 분기에 쓰는 도메인 오류. `message` 문자열로는 분기하지 않고 `status + FeedOperation`으로만 만든다(D-02).
@@ -75,7 +83,8 @@ public enum FeedFailureMapper {
         switch operation {
         case .like, .updateTitle, .todayPost, .aiReviewRequest: .banned
         case .deletePost: .notOwner
-        case .listPosts, .topic, .postDetail, .unlike, .calendar, .banners, .unreadStatus, .aiReviewStatus: .forbidden
+        case .listPosts, .topic, .postDetail, .unlike, .calendar, .banners, .unreadStatus, .aiReviewStatus,
+             .notificationList, .notificationDetail, .notificationRead, .registerPushDevice: .forbidden
         }
     }
 }
