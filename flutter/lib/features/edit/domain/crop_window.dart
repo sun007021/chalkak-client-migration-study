@@ -23,11 +23,20 @@ class CropWindow {
   final double height;
 
   /// 전체와 [tolerance] 이내로 같은가(REQ-EDIT-004는 1e-3).
-  bool isFull({double tolerance = 1e-3}) => throw UnimplementedError();
+  bool isFull({double tolerance = 1e-3}) =>
+      (centerX - 0.5).abs() <= tolerance &&
+      (centerY - 0.5).abs() <= tolerance &&
+      (width - 1).abs() <= tolerance &&
+      (height - 1).abs() <= tolerance;
 
   @override
-  bool operator ==(Object other) => throw UnimplementedError();
+  bool operator ==(Object other) =>
+      other is CropWindow &&
+      other.centerX == centerX &&
+      other.centerY == centerY &&
+      other.width == width &&
+      other.height == height;
 
   @override
-  int get hashCode => throw UnimplementedError();
+  int get hashCode => Object.hash(centerX, centerY, width, height);
 }

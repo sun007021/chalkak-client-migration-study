@@ -26,18 +26,32 @@ class PhotoEdit {
 
   /// 회전 0, 전체 자르기, 원본 필터, 적용 조정 0이면 편집하지 않은 사진(REQ-EDIT-005).
   /// 업로드 인코더는 이때 편집 재그리기를 건너뛴다(REQ-UPL-028).
-  bool get isIdentity => throw UnimplementedError();
+  bool get isIdentity =>
+      quarterTurns % 4 == 0 &&
+      crop.isFull() &&
+      filter == PhotoFilter.original &&
+      adjustments.isIdentity;
 
   PhotoEdit copyWith({
     int? quarterTurns,
     CropWindow? crop,
     PhotoFilter? filter,
     AdjustmentLayers? adjustments,
-  }) => throw UnimplementedError();
+  }) => PhotoEdit(
+    quarterTurns: quarterTurns ?? this.quarterTurns,
+    crop: crop ?? this.crop,
+    filter: filter ?? this.filter,
+    adjustments: adjustments ?? this.adjustments,
+  );
 
   @override
-  bool operator ==(Object other) => throw UnimplementedError();
+  bool operator ==(Object other) =>
+      other is PhotoEdit &&
+      other.quarterTurns == quarterTurns &&
+      other.crop == crop &&
+      other.filter == filter &&
+      other.adjustments == adjustments;
 
   @override
-  int get hashCode => throw UnimplementedError();
+  int get hashCode => Object.hash(quarterTurns, crop, filter, adjustments);
 }

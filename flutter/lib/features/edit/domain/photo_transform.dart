@@ -12,14 +12,25 @@ abstract final class PhotoTransform {
     double yr, {
     required int sourceWidth,
     required int sourceHeight,
-  }) => throw UnimplementedError();
+  }) {
+    final w = sourceWidth.toDouble();
+    final h = sourceHeight.toDouble();
+    return switch (quarterTurns % 4) {
+      1 => Point(yr, h - xr),
+      2 => Point(w - xr, h - yr),
+      3 => Point(w - yr, xr),
+      _ => Point(xr, yr),
+    };
+  }
 
   /// 90도씩 돌린 사진의 크기(홀수 회전이면 가로세로가 바뀐다).
   static ({int width, int height}) rotatedSize(
     int quarterTurns, {
     required int sourceWidth,
     required int sourceHeight,
-  }) => throw UnimplementedError();
+  }) => quarterTurns.isOdd
+      ? (width: sourceHeight, height: sourceWidth)
+      : (width: sourceWidth, height: sourceHeight);
 
   /// 돌린 사진 위의 사각형(중심 px, 크기 0~1 비율)을 편집값 [CropWindow]로 바꾼다.
   /// 중심은 원본 비율로 변환되고 크기는 돌린 사진 비율 그대로다.
@@ -31,7 +42,21 @@ abstract final class PhotoTransform {
     required double rotatedCenterY,
     required double widthFraction,
     required double heightFraction,
-  }) => throw UnimplementedError();
+  }) {
+    final p = toSource(
+      quarterTurns,
+      rotatedCenterX,
+      rotatedCenterY,
+      sourceWidth: sourceWidth,
+      sourceHeight: sourceHeight,
+    );
+    return CropWindow(
+      centerX: p.x / sourceWidth,
+      centerY: p.y / sourceHeight,
+      width: widthFraction,
+      height: heightFraction,
+    );
+  }
 
   /// 자르기·회전을 마친 결과 크기(px, 반올림).
   static ({int width, int height}) outputSize(
@@ -39,5 +64,15 @@ abstract final class PhotoTransform {
     CropWindow crop, {
     required int sourceWidth,
     required int sourceHeight,
-  }) => throw UnimplementedError();
+  }) {
+    final r = rotatedSize(
+      quarterTurns,
+      sourceWidth: sourceWidth,
+      sourceHeight: sourceHeight,
+    );
+    return (
+      width: (r.width * crop.width).round(),
+      height: (r.height * crop.height).round(),
+    );
+  }
 }
