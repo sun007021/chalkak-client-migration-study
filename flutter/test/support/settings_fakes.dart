@@ -57,6 +57,9 @@ class FakePushPermission implements NotificationPermission {
   /// [request]가 허용으로 끝나는지. 허용이면 [current]도 granted가 된다.
   bool requestResult = true;
 
+  /// 지정하면 [status]가 이 오류를 던진다(플러그인 오류).
+  Object? statusError;
+
   int statusCalls = 0;
   int requestCalls = 0;
   int openSettingsCalls = 0;
@@ -64,6 +67,8 @@ class FakePushPermission implements NotificationPermission {
   @override
   Future<OsPermissionStatus> status() async {
     statusCalls++;
+    final error = statusError;
+    if (error != null) throw error;
     return current;
   }
 

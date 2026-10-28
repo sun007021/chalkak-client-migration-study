@@ -36,6 +36,7 @@ class _Rig {
 }
 
 void main() {
+  _raceTests();
   group('불러오기', () {
     test('TC-SET-017 처음 불러오는 동안은 loading이고 값이 없다', () async {
       final r = _Rig();
@@ -477,4 +478,90 @@ void main() {
 /// 결과를 기다리지 않고 시작만 한다.
 void fireAndForget(Future<void> future) {
   future.ignore();
+}
+
+/// 경합 상황: 화면 이탈, 재조회와 저장의 겹침, 권한 확인 중 계정 전환.
+void _raceTests() {
+  group('경합', () {
+    test('TC-SET-030 권한 확인을 기다리는 사이 화면을 떠나면 저장을 이어 가지 않는다', () async {
+      final r = _Rig();
+      await r.ready(topicOff);
+      r.permission.current = OsPermissionStatus.notDetermined;
+      final turningOn = r.vm.toggle(PushSetting.topic, true);
+      r.vm.cancelPending();
+      await turningOn;
+      expect(r.repo.updateCalls, isEmpty);
+      expect(r.state.values, topicOff);
+    });
+
+    test('TC-SET-031 권한 확인 중 계정이 바뀌면 이전 계정의 켜기는 저장하지 않는다', () async {
+      final r = _Rig();
+      await r.ready(topicOff);
+      r.permission.current = OsPermissionStatus.notDetermined;
+      final turningOn = r.vm.toggle(PushSetting.topic, true);
+      await r.vm.clearAll();
+      await turningOn;
+      expect(r.repo.updateCalls, isEmpty);
+      expect(r.state.status, PushSettingsStatus.idle);
+    });
+
+    test('REQ-SET-012 저장 중 재조회가 끝나도 저장 중인 항목은 화면 값을 유지한다', () async {
+      final r = _Rig();
+      await r.ready();
+      r.holdUpdates();
+      final saving = r.vm.toggle(PushSetting.topic, false);
+      // 서버는 아직 이전 값(topic 켜짐)을 돌려준다.
+      await r.vm.onSettingsTabShown();
+      expect(r.state.values!.topic, isFalse);
+      r.repo.updateCalls.single.complete();
+      await saving;
+      expect(r.state.values!.topic, isFalse);
+    });
+
+    test('TC-SET-033 저장 중 재조회가 실패해도 저장 결과가 오래된 값을 되살리지 않는다', () async {
+      final r = _Rig();
+      await r.ready();
+      r.holdUpdates();
+      final saving = r.vm.toggle(PushSetting.topic, false);
+      r.repo.fetchError = serverError(500);
+      await r.vm.onSettingsTabShown();
+      expect(r.state.status, PushSettingsStatus.loadFailed);
+      r.repo.updateCalls.single.fail(serverError(500));
+      await saving;
+      expect(r.state.values, isNull);
+      expect(r.state.status, PushSettingsStatus.loadFailed);
+    });
+
+    test('TC-SET-017 처음 불러오는 중 화면을 떠나면 아무것도 못 받은 상태로 돌아간다', () async {
+      final r = _Rig();
+      r.repo.holdFetch = true;
+      final loading = r.vm.load();
+      r.vm.cancelPending();
+      await loading;
+      expect(r.state.status, PushSettingsStatus.idle);
+      expect(r.repo.fetchCalls.single.cancelToken!.isCancelled, isTrue);
+      expect(r.toast.messages, isEmpty);
+    });
+
+    test('REQ-SET-018 권한 확인이 던지면 값은 바꾸지 않고 안내 토스트를 띄운다', () async {
+      final r = _Rig();
+      await r.ready(topicOff);
+      r.permission.statusError = StateError('plugin');
+      await r.vm.toggle(PushSetting.topic, true);
+      expect(r.repo.updateCalls, isEmpty);
+      expect(r.state.values, topicOff);
+      expect(r.toast.messages, [Copy.notiPermError]);
+    });
+
+    test('REQ-SET-018 권한 확인 중 같은 항목을 다시 눌러도 권한 요청은 한 번이다', () async {
+      final r = _Rig();
+      await r.ready(aiOff);
+      r.permission.current = OsPermissionStatus.notDetermined;
+      final first = r.vm.toggle(PushSetting.aiReview, true);
+      final second = r.vm.toggle(PushSetting.aiReview, true);
+      await Future.wait([first, second]);
+      expect(r.permission.requestCalls, 1);
+      expect(r.repo.updateCalls, hasLength(1));
+    });
+  });
 }

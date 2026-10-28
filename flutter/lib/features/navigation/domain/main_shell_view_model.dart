@@ -62,14 +62,18 @@ final class NavigateToLogin extends MainShellEvent {
 ///   [UploadEntryGate.enter]. 확인 중([isCheckingUpload])의 연타는 무시해 1회만 호출한다.
 ///   결과: Allowed -> [NavigateToUpload], Blocked -> 토스트, LoginRequired -> [NavigateToLogin].
 ///   선택된 탭 표시와 `bottom_navigation_selected`는 바뀌지 않는다.
+/// - [selfReportedScreens]: 탭 화면이 스스로 `screen_view`를 보내는 탭(설정 ViewModel이 보낸다, TC-SET-052).
+///   이 탭은 이중 전송을 막으려고 여기서 `screen_view`를 보내지 않는다.
 class MainShellViewModel extends ChangeNotifier {
   MainShellViewModel({
     required this._guard,
     required this._analytics,
     required this._uploadGate,
     required this._toast,
+    this.selfReportedScreens = const {},
   });
 
+  final Set<BottomDestination> selfReportedScreens;
   final GuestGuard _guard;
   final AnalyticsTracker _analytics;
   final UploadEntryGate _uploadGate;
@@ -183,6 +187,7 @@ class MainShellViewModel extends ChangeNotifier {
   }
 
   void _logScreen(BottomDestination destination) {
+    if (selfReportedScreens.contains(destination)) return;
     _analytics.logEvent(AnalyticsEvent.screenView(destination.value));
   }
 
