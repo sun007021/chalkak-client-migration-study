@@ -131,6 +131,7 @@ class MainHostNotificationTest {
         tapRow(NotificationRig.AI_COMPLETED)
         rule.awaitTag("ai-result-sheet.root")
         systemBack() // closes the sheet
+        rig.noti.listFixture("notifications__page1") // the inbox reloads silently when it is shown again (holder contract)
         systemBack() // feed -> inbox
         rule.awaitTag("notifications.list")
         tapRow(NotificationRig.APPROVED)

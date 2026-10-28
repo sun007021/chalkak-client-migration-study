@@ -152,7 +152,10 @@ class NotificationRouteTest {
         tag("notifications.list").performScrollToIndex(19)
         rule.waitForIdle()
         assertEquals(listOf(copy[NotiCopyKeys.INBOX_MORE_ERROR]), toasts.toList())
-        tag("notifications.item-${NotificationRig.APPROVED}").assertIsDisplayed()
+        // The list was scrolled to its end before the request failed: the same rows are still there (the first one is scrolled out).
+        val lastRow = kr.chalkak.core.data.notification.testing.NotificationFixtureModels.page("notification/notifications__page1.json").items.last()
+        tag("notifications.item-${lastRow.id}").assertIsDisplayed()
+        count("notifications.error-state").assertCountEquals(0)
     }
 
     @Test

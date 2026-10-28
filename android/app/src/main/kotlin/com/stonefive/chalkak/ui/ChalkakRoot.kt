@@ -166,6 +166,8 @@ private fun RoutedScreens(boot: BootState, deps: RootDependencies, session: Root
         }
     }
     val navState by nav.state.collectAsState()
+    // The push tap queue reads the navigation (top screen, blocking screens) on every screen, the login screen included.
+    LaunchedEffect(navState) { deps.pushTaps?.nav?.update(navState) }
 
     LaunchedEffect(nav) {
         deps.authEvents.collect { event ->
@@ -185,7 +187,7 @@ private fun RoutedScreens(boot: BootState, deps: RootDependencies, session: Root
         Route.OnboardingSignature -> SignatureScreenHost(nav, deps, session)
         Route.OnboardingSignaturePreview -> SignaturePreviewHost(nav, deps, session)
         else -> deps.main?.let { main ->
-            MainHost(nav, main, showToast = session::showToast, onExitApp = deps.onExitApp, sessionKey = session.mainEpoch)
+            MainHost(nav, main, showToast = session::showToast, onExitApp = deps.onExitApp, sessionKey = session.mainEpoch, pushEvents = deps.pushTaps?.queue?.events)
         } ?: deps.mainContent(navState.accessMode)
     }
 }

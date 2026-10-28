@@ -83,6 +83,7 @@ class PlatformAdapters(
                 upload = UploadAdapters.android(app, activity, photoBridge, copy, SystemClock),
                 calendarSaver = AndroidCalendarImageSaver(app),
                 calendarRenderer = { loader -> AndroidCalendarImageRenderer(app, copy, loader) },
+                pushPlatform = PushPlatform.android(app),
             )
         }
 

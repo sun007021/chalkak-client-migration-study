@@ -12,9 +12,15 @@ import kr.chalkak.feature.home.HomeEffect
 import kr.chalkak.feature.navigation.FeedSource
 import kr.chalkak.feature.navigation.NavOutcome
 import kr.chalkak.feature.navigation.NavigationController
+import kr.chalkak.feature.navigation.OpenVia
+import kr.chalkak.feature.navigation.RouteRules
 import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
 import java.time.LocalDate
+import kr.chalkak.feature.notification.NavCommand
+import kr.chalkak.feature.notification.NavMode
+import kr.chalkak.feature.notification.NotificationDestination
+import kr.chalkak.feature.notification.PushNavigationEvent
 import kr.chalkak.feature.upload.UploadCopyKeys
 import kr.chalkak.feature.upload.SuccessInfo
 import kr.chalkak.feature.upload.UploadGateEffect
@@ -151,6 +157,80 @@ class MainCoordinator(
      * `nav.onSessionEnded()` (new session key, signup context discarded). Doing it here as well would end the session twice.
      */
     fun onFeedLoginRequired() = Unit
+
+    // ---- notifications and push taps -------------------------------------------------------------------------------------
+
+    /**
+     * Executes a destination of the notification table (D-11): an inbox row's `Navigate` effect and a queue-released push tap.
+     * [NavMode.Push] adds the screen, [NavMode.ReplaceTop] replaces the same post / notification on top with a fresh one,
+     * [NavMode.AlreadyThere] only runs the side effects of being on home.
+     */
+    fun onNotificationNavigate(command: NavCommand) {
+        when (val destination = command.destination) {
+            is NotificationDestination.Home -> goHome(destination, command.mode)
+            is NotificationDestination.PostDetail -> openPostDetail(destination)
+            is NotificationDestination.NotificationDetail -> {
+                val route = Route.NotificationDetail(destination.notificationId)
+                val replacing = RouteRules.sameDestination(nav.top, route)
+                if (replacing) session.notificationDetailSerial++
+                openFromNotification(route)
+            }
+            NotificationDestination.Inbox -> {
+                val replacing = nav.top == Route.Notifications
+                if (replacing) session.inboxSerial++
+                openFromNotification(Route.Notifications)
+            }
+        }
+    }
+
+    /** What `PushTapQueue` released: the queue decided when, this decides how. */
+    fun onPushEvent(event: PushNavigationEvent) {
+        when (event) {
+            is PushNavigationEvent.Go -> {
+                event.toastCopyKey?.let { showToast(copy[it]) }
+                onNotificationNavigate(event.command)
+            }
+            is PushNavigationEvent.Toast -> showToast(copy[event.copyKey])
+            // The login screen is reached through AuthEvent.GoToLogin (the network layer reports the same 401); nothing to do here.
+            PushNavigationEvent.RequireLogin -> Unit
+        }
+    }
+
+    /** "알림함으로" on a detail that has no inbox below it: the inbox takes the detail's place. */
+    fun onOpenInboxInsteadOfDetail() {
+        if (nav.top is Route.NotificationDetail) nav.onSystemBack()
+        open(Route.Notifications)
+    }
+
+    private fun goHome(destination: NotificationDestination.Home, mode: NavMode) {
+        val home = Route.TabRoot(Tab.Home)
+        val already = mode == NavMode.AlreadyThere || nav.top == home
+        // Pop to home; the home route's own `onShown` refreshes it silently, so only the already-there case asks for a refresh.
+        while (nav.top != home && nav.stack.size > 1 && nav.onSystemBack() is NavOutcome.Navigated) Unit
+        if (destination.scrollToTopAndRefresh) {
+            session.homeScroll.request()
+            if (already) session.homeRefresh.request()
+        }
+    }
+
+    private fun openPostDetail(destination: NotificationDestination.PostDetail) {
+        val route = Route.Feed(destination.postId, FeedSource.ById)
+        if (RouteRules.sameDestination(nav.top, route)) {
+            session.feeds.invalidate(nav.stack.lastIndex)
+            session.feedReplaceSerial++
+        }
+        session.aiSheetOnEntry[destination.postId] = destination.openAiFeedbackSheet
+        val outcome = nav.open(route, OpenVia.Push)
+        if (outcome is NavOutcome.Blocked) {
+            session.aiSheetOnEntry.remove(destination.postId)
+            showToast(copy[outcome.copyKey])
+        }
+    }
+
+    private fun openFromNotification(route: Route) {
+        val outcome = nav.open(route, OpenVia.Push)
+        if (outcome is NavOutcome.Blocked) showToast(copy[outcome.copyKey])
+    }
 
     private fun open(route: Route) {
         val outcome = nav.open(route)
