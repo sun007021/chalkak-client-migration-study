@@ -58,9 +58,7 @@ class AiResultSection {
 /// 점수 표시 형식. 서버 값을 다시 계산하지 않고 소수 첫째 자리로 찍는다
 /// (7.5 -> "7.5", 10 -> "10.0", 0 -> "0.0", 반올림 없음 가정, spec 확인 필요 [추정]).
 abstract final class AiScoreFormat {
-  static String format(double score) {
-    throw UnimplementedError();
-  }
+  static String format(double score) => score.toStringAsFixed(1);
 }
 
 /// 결과 시트가 그리는 값(REQ-AIR-037~040). 표시 순서대로 담는다.
@@ -76,7 +74,27 @@ class AiResultUi {
   /// 서버 결과를 화면 값으로 바꾼다. `criteria`는 응답 순서·개수 그대로(0개도 가능),
   /// `sections`는 좋았던 점, 아쉬운 점, 다음엔 이렇게 순서다.
   factory AiResultUi.from(AiReviewResult result) {
-    throw UnimplementedError();
+    final feedback = result.feedback;
+    return AiResultUi(
+      summary: feedback.summary,
+      scoreText: AiScoreFormat.format(result.overallScore),
+      criteria: [
+        for (final c in result.criteria)
+          AiCriterionRow(
+            label: c.label,
+            scoreText: AiScoreFormat.format(c.score),
+          ),
+      ],
+      showPerspectiveBadge: result.distinctivePerspective,
+      sections: [
+        AiResultSection(title: Copy.aiResultStrength, body: feedback.strength),
+        AiResultSection(title: Copy.aiResultWeakness, body: feedback.weakness),
+        AiResultSection(
+          title: Copy.aiResultSuggestion,
+          body: feedback.suggestion,
+        ),
+      ],
+    );
   }
 
   /// `feedback.summary`(굵은 제목).
@@ -89,9 +107,8 @@ class AiResultUi {
   final List<AiResultSection> sections;
 
   /// "전체 점수 10점 만점에 {X}점"(`ai.result.score-a11y`의 `{X}`를 [scoreText]로 바꾼다).
-  String get scoreA11yLabel {
-    throw UnimplementedError();
-  }
+  String get scoreA11yLabel =>
+      Copy.fill(Copy.aiResultScoreA11y, {'X': scoreText});
 }
 
 /// 열린 시트. 동시에 하나만 열린다.

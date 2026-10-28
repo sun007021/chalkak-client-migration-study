@@ -195,7 +195,7 @@ void main() {
     ) {
       final r = AiRig(authSession: sessionAt());
       r.http.adapter.on('POST', AuthHttpHarness.refreshPath, [reauth()]);
-      r.api.get([fx(aiGet('processing')), fx(aiGet('401-unauthorized'))]);
+      r.api.get([fx(aiGet('processing')), fx(aiPost('401-unauthorized'))]);
       r.show(async, wait: Duration.zero);
       r.pass(async, _sec(60));
       expect(r.toast.messages, [Copy.aiErrorLogin]);

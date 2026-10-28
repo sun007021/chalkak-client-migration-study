@@ -11,7 +11,8 @@ class AiReviewTarget {
     required bool isMine,
     required KstDate? topicDate,
   }) {
-    throw UnimplementedError();
+    if (!isMine || topicDate == null) return null;
+    return AiReviewTarget(postId: postId, topicDate: topicDate);
   }
 
   final String postId;

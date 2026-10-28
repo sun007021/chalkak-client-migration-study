@@ -84,6 +84,8 @@ void main() {
         fx(aiPost('202-processing'), delay: const Duration(seconds: 5)),
       ]);
       r.show(async);
+      // POST가 받아들여졌으니 이후 폴링 GET은 서버 상태대로 PROCESSING이다.
+      r.api.get([fx(aiGet('processing'))]);
       r.session.onPillPressed();
       r.session.onStartConfirmed();
       r.session.onStartConfirmed();
@@ -230,7 +232,7 @@ void main() {
         r.show(async);
         r.api.get([fx(aiGet('processing'))]);
         final getsBefore = r.api.getCalls();
-        r.request(async, wait: const Duration(seconds: 15));
+        r.request(async, wait: const Duration(seconds: 11));
         expect(r.toast.messages, [Copy.aiErrorNetwork]);
         expect(r.api.getCalls(), getsBefore + 1);
         expect(r.state.pill, AiPill.processing);
