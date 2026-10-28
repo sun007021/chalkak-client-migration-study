@@ -7,3 +7,6 @@ interface AnalyticsTracker {
     /** `bottom_navigation_selected {destination: home|display|record|settings}`. */
     fun bottomNavigationSelected(destination: String) {}
 }
+
+/** `screen_view` must never affect the screen (TC-ANL-021). */
+fun AnalyticsTracker.screenViewSafely(name: String) = SafeAnalyticsTracker(this).screenView(name)

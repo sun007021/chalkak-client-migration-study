@@ -83,6 +83,7 @@ void main() {
         'terms',
         'onboarding_signature',
         'onboarding_signature_preview',
+        'home', // 메인 셸이 시작할 때 screen_view home을 보낸다(REQ-NAV).
       ]);
     },
   );

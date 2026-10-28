@@ -425,3 +425,23 @@ describe('AuthRepository 로그아웃 경쟁·응답 모양', () => {
     },
   );
 });
+
+describe('AuthRepository.saveIssuedSession', () => {
+  it('TC-ONB-024 사용자 캐시를 먼저 비우고 토큰의 수명(초)을 받은 시각에 더해 세션을 저장한다', async () => {
+    const h = createAuthHarness();
+    await h.repository.saveIssuedSession('user-9', {
+      accessToken: 'a9',
+      expiresIn: 3600,
+      refreshToken: 'r9',
+      refreshTokenExpiresIn: 86400,
+    });
+    expect(h.cache.clearCalls).toBe(1);
+    const state = await h.sessionStore.load();
+    expect(state).toMatchObject({
+      kind: 'authenticated',
+      credentials: { userId: 'user-9', accessToken: 'a9', refreshToken: 'r9' },
+    });
+    const credentials = (state as { credentials: { accessTokenExpiresAt: Date } }).credentials;
+    expect(credentials.accessTokenExpiresAt.getTime()).toBe(h.clock.now().getTime() + 3600 * 1000);
+  });
+});

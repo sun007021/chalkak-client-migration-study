@@ -7,6 +7,7 @@ import kr.chalkak.core.data.post.PostDetail
 import kr.chalkak.core.data.post.PostRepository
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
+import kr.chalkak.core.network.guardedApiCall
 
 /** `GET /posts/{id}` for the detail screen: checks the answer is the requested post and folds its like value into [LikeController]. */
 internal class FeedDetailSource(

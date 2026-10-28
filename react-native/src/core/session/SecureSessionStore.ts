@@ -90,11 +90,18 @@ function decode(text: string): SessionState {
  */
 export class SecureSessionStore implements SessionStore {
   private queue: Promise<unknown> = Promise.resolve();
+  private currentGeneration = 0;
+  /** 마지막으로 확인한 인증 userId(없거나 게스트면 null). undefined는 아직 모름. */
+  private lastUserId: string | null | undefined = undefined;
 
   constructor(
     private readonly storage: SecureKeyValueStorage,
     private readonly warn: (message: string) => void = () => undefined,
   ) {}
+
+  generation(): number {
+    return this.currentGeneration;
+  }
 
   load(): Promise<SessionState> {
     return this.serialize(async () => (await this.read()).state);
@@ -127,7 +134,10 @@ export class SecureSessionStore implements SessionStore {
   }
 
   clear(): Promise<void> {
-    return this.serialize(() => this.storage.deleteItem(SESSION_STORAGE_KEY));
+    return this.serialize(async () => {
+      await this.storage.deleteItem(SESSION_STORAGE_KEY);
+      this.track(null);
+    });
   }
 
   clearIfCurrent(expected: string): Promise<boolean> {
@@ -137,6 +147,7 @@ export class SecureSessionStore implements SessionStore {
         return false;
       }
       await this.storage.deleteItem(SESSION_STORAGE_KEY);
+      this.track(null);
       return true;
     });
   }
@@ -153,12 +164,20 @@ export class SecureSessionStore implements SessionStore {
       text = await this.storage.getItem(SESSION_STORAGE_KEY);
     } catch {
       await this.discard();
+      this.track(null);
       return { state: NONE, discarded: true };
     }
-    if (text === null) return { state: NONE, discarded: false };
+    if (text === null) {
+      this.track(null);
+      return { state: NONE, discarded: false };
+    }
     const state = decode(text);
-    if (state.kind !== 'none') return { state, discarded: false };
+    if (state.kind !== 'none') {
+      this.track(state.kind === 'authenticated' ? state.credentials.userId : null);
+      return { state, discarded: false };
+    }
     await this.discard();
+    this.track(null);
     return { state: NONE, discarded: true };
   }
 
@@ -176,5 +195,13 @@ export class SecureSessionStore implements SessionStore {
       this.warn(`session value is ${text.length} bytes (> ${SECURE_VALUE_WARN_BYTES})`);
     }
     await this.storage.setItem(SESSION_STORAGE_KEY, text);
+    this.track(state.kind === 'authenticated' ? state.credentials.userId : null);
+  }
+
+  /** 계정(userId)이 바뀔 때만 세대를 올린다. 같은 계정의 토큰 교체는 올리지 않는다. */
+  private track(userId: string | null): void {
+    if (this.lastUserId === userId) return;
+    this.lastUserId = userId;
+    this.currentGeneration += 1;
   }
 }

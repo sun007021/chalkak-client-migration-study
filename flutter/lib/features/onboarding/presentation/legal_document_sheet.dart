@@ -115,6 +115,7 @@ class _LegalDocumentSheetState extends State<LegalDocumentSheet> {
                     OnboardingTestIds.legalDocCloseButton,
                     child: IconButton(
                       icon: const Icon(Icons.close),
+                      tooltip: Copy.commonClose,
                       onPressed: viewModel.onClosePressed,
                     ),
                   ),

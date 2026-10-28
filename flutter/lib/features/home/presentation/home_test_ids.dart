@@ -1,0 +1,60 @@
+/// docs/testing/testids.md 홈 절의 식별자.
+abstract final class HomeTestIds {
+  static const root = 'home.root';
+  static const scroll = 'home.scroll';
+  static const notificationButton = 'home.notification-button';
+  static const notificationUnreadDot = 'home.notification-unread-dot';
+  static const topicDate = 'home.topic-date';
+  static const topicTitle = 'home.topic-title';
+  static const loading = 'home.loading';
+  static const errorState = 'home.error-state';
+  static const retryButton = 'home.retry-button';
+  static const refreshIndicator = 'home.refresh-indicator';
+
+  static const heroLoading = 'home.hero-loading';
+  static const heroNoOpenTopic = 'home.hero-no-open-topic';
+  static const heroEmpty = 'home.hero-empty';
+  static const heroUploadButton = 'home.hero-upload-button';
+  static const heroProcessing = 'home.hero-processing';
+  static const heroPhoto = 'home.hero-photo';
+  static const heroPendingBadge = 'home.hero-pending-badge';
+  static const heroError = 'home.hero-error';
+  static const heroRetryButton = 'home.hero-retry-button';
+
+  static const weekSection = 'home.week-section';
+  static const weekError = 'home.week-error';
+  static String weekDay(String yyyyMmDd) => 'home.week-day-$yyyyMmDd';
+  static String weekPhoto(String yyyyMmDd) => 'home.week-photo-$yyyyMmDd';
+
+  static const rankingSection = 'home.ranking-section';
+  static const rankingMoreLink = 'home.ranking-more-link';
+  static const rankingEmpty = 'home.ranking-empty';
+  static String rankingItem(String postId) => 'home.ranking-item-$postId';
+
+  static const popularSection = 'home.popular-section';
+  static const popularMoreLink = 'home.popular-more-link';
+  static String popularItem(String postId) => 'home.popular-item-$postId';
+
+  // 아래 오류·재시도·빈 상태 id는 아직 testids.md에 없다. RN 스레드가 추가할 이름 규칙에 맞춘 임시 이름이며
+  // testids.md가 확정되면 그 이름으로 맞춘다.
+  static const weekRetryButton = 'home.week-retry-button';
+  static const rankingError = 'home.ranking-error';
+  static const rankingRetryButton = 'home.ranking-retry-button';
+  static const popularEmpty = 'home.popular-empty';
+  static const popularError = 'home.popular-error';
+  static const popularRetryButton = 'home.popular-retry-button';
+  static const issueError = 'home.issue-error';
+  static const issueRetryButton = 'home.issue-retry-button';
+
+  // 스펙(REQ-HOME-024, 033)에 있는 동작이지만 testids.md에 아직 id가 없다. 위와 같은 임시 이름이다.
+  static const weekMoreLink = 'home.week-more-link';
+  static String rankingLikeButton(String postId) =>
+      'home.ranking-like-button-$postId';
+  static String popularLikeButton(String postId) =>
+      'home.popular-like-button-$postId';
+
+  static const aiCard = 'home.ai-card';
+
+  static const issueSection = 'home.issue-section';
+  static String issueItem(String bannerId) => 'home.issue-item-$bannerId';
+}

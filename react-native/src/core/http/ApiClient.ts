@@ -115,7 +115,8 @@ export class ApiClient {
   async uploadToPresignedUrl(request: PresignedPutRequest): Promise<void> {
     if (!isAllowedTransportUrl(request.url)) {
       // https(또는 loopback http)가 아니면 보내기 전에 거부한다. 서버가 준 URL이라도 평문으로 올리지 않는다.
-      throw new NetworkError('insecure upload url');
+      // 서버가 준 값이 규칙에 맞지 않는 것이지 연결 문제가 아니므로 해석 불가 응답으로 본다("네트워크 확인" 안내가 아니라 일반 실패).
+      throw new InvalidResponseError('insecure upload url');
     }
     await this.sendWithRetry({
       method: 'PUT',
@@ -154,6 +155,49 @@ export class ApiClient {
       retryable: isRetryable(request.method, request.path),
       timeoutMs: { connect: HTTP_CONNECT_TIMEOUT_MS, response: HTTP_RESPONSE_TIMEOUT_MS },
     };
+    return this.sendWithSessionCheck(attempt, request, session);
+  }
+
+  /**
+   * 요청을 보내고, Authorization을 붙인 요청이었다면 응답(성공·오류 모두)이 도착했을 때 세션 세대가 같은지 확인한다.
+   * 로그아웃·계정 전환 뒤에 도착한 이전 계정의 결과는 CancelledError로 버려 화면이 반영하지 못하게 한다.
+   * 저장소를 다시 읽지 않고 메모리 세대만 비교한다. 같은 계정의 토큰 갱신은 세대를 올리지 않아 통과한다.
+   * 이 요청 자체의 세션 만료 처리(AuthenticationRequired/ReauthenticationRequired)는 의도된 결과라 그대로 둔다.
+   */
+  private async sendWithSessionCheck(
+    attempt: Attempt,
+    request: ApiRequest,
+    session: Awaited<ReturnType<SessionStore['load']>>,
+  ): Promise<HttpResponse> {
+    const { sessionStore } = this.deps;
+    const guarded = attempt.headers.Authorization !== undefined;
+    const generation = sessionStore.generation();
+    const changed = () => guarded && sessionStore.generation() !== generation;
+    let response: HttpResponse;
+    try {
+      response = await this.sendWithRefresh(attempt, request, session);
+    } catch (error) {
+      if (
+        error instanceof ApiError &&
+        !(error instanceof CancelledError) &&
+        !(error instanceof AuthenticationRequiredError) &&
+        !(error instanceof ReauthenticationRequiredError) &&
+        changed()
+      ) {
+        throw new CancelledError('session changed');
+      }
+      throw error;
+    }
+    if (changed()) throw new CancelledError('session changed');
+    return response;
+  }
+
+  private async sendWithRefresh(
+    attempt: Attempt,
+    request: ApiRequest,
+    session: Awaited<ReturnType<SessionStore['load']>>,
+  ): Promise<HttpResponse> {
+    const { clock } = this.deps;
     try {
       return await this.sendWithRetry(attempt);
     } catch (error) {

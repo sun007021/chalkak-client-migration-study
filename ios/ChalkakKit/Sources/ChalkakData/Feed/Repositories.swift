@@ -28,8 +28,8 @@ public protocol LikeRepository: Sendable {
 
 // MARK: API 구현
 
-/// 네트워크 계층 오류를 `FeedFailure`로 바꾼다. 취소·설정 오류는 그대로 전파한다.
-private func perform<T>(_ operation: FeedOperation, _ body: () async throws -> T) async throws -> T {
+/// 네트워크 계층 오류를 `FeedFailure`로 바꾼다. 취소·설정 오류는 그대로 전파한다(홈 저장소도 같은 변환을 쓴다).
+func perform<T>(_ operation: FeedOperation, _ body: () async throws -> T) async throws -> T {
     do {
         return try await body()
     } catch {
@@ -63,7 +63,7 @@ public struct APIPostRepository: PostRepository {
             .int("pageSize", query.pageSize),
         ]
         if query.sort == .random {
-            if let seed = query.randomSeed, Self.isValidSeed(seed) {
+            if let seed = query.randomSeed, PostListQuery.isValidRandomSeed(seed) {
                 items.append(QueryItem(name: "randomSeed", value: seed))
             } else if query.page >= 2 {
                 // 시드 없는 랜덤 2페이지 이후는 서버가 400이다(F4). 시드를 잃었으면 호출 측이 첫 페이지부터 다시 시작한다.
@@ -90,14 +90,6 @@ public struct APIPostRepository: PostRepository {
     public func delete(id: UUID) async throws {
         let request = HTTPRequest(method: .delete, path: "/posts/\(id.apiString)")
         try await perform(.deletePost) { try await client.sendEmpty(request) }
-    }
-
-    /// `[A-Za-z0-9_-]{1,64}`
-    private static func isValidSeed(_ seed: String) -> Bool {
-        let bytes = seed.utf8
-        return (1...64).contains(bytes.count) && bytes.allSatisfy {
-            ($0 >= 0x30 && $0 <= 0x39) || ($0 >= 0x41 && $0 <= 0x5A) || ($0 >= 0x61 && $0 <= 0x7A) || $0 == 0x5F || $0 == 0x2D
-        }
     }
 
     /// `title` 키는 값이 nil이어도 `null`로 보낸다(키 누락 금지).
