@@ -20,18 +20,18 @@ export const ROUTES = {
 } as const;
 
 /** 전시 탭을 해당 날짜의 인기순으로: `/display?date=2026-10-26&sort=popular`. */
-export function displayPath(_date: string, _sort: 'popular' | 'recent'): string {
-  throw new Error('not implemented');
+export function displayPath(date: string, sort: 'popular' | 'recent'): string {
+  return `${ROUTES.display}?${new URLSearchParams({ date, sort }).toString()}`;
 }
 
 /** 기록 탭. 날짜가 있으면 `/record?date=2026-10-26`, null이면 `/record`. */
-export function recordPath(_date: string | null): string {
-  throw new Error('not implemented');
+export function recordPath(date: string | null): string {
+  return date === null ? ROUTES.record : `${ROUTES.record}?${new URLSearchParams({ date }).toString()}`;
 }
 
 /** 게시물 상세: `/feed/{postId}`(postId는 소문자 UUID 그대로). */
-export function feedPath(_postId: string): string {
-  throw new Error('not implemented');
+export function feedPath(postId: string): string {
+  return `${ROUTES.feed}/${encodeURIComponent(postId)}`;
 }
 
 /**
