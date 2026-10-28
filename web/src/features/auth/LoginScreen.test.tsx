@@ -8,6 +8,7 @@ import { failWith, pending } from '../../test/FakeSocialLoginClient';
 import { networkFailure } from '../../test/fakeFetch';
 import { ME, guestSession, loadFixture, memberSession } from '../../test/fixtures';
 import { EMPTY_SESSION } from '../../core/auth/SessionStore';
+import { outsideHome } from '../../test/homeRequests';
 
 async function openLogin(options: Parameters<typeof makeHarness>[0] = {}) {
   const h = makeHarness(options);
@@ -205,7 +206,7 @@ describe('게스트 둘러보기', () => {
     expect(await screen.findByTestId('home.root')).toHaveAttribute('data-mode', 'guest');
     expect(path()).toBe('/home');
     expect(router.state.historyAction).toBe('REPLACE');
-    expect(h.ff.calls).toHaveLength(0);
+    expect(outsideHome(h.ff)).toHaveLength(0);
     expect(h.social.calls).toBe(0);
     expect(await h.store.read()).toEqual({ userId: null, tokens: null, isGuest: true });
   });
@@ -377,7 +378,7 @@ describe('카카오 콜백 화면 보강', () => {
     expect(await screen.findByTestId('home.root')).toBeInTheDocument();
     expect(path()).toBe('/home');
     expect(h.container.toast.state.toast).toBeNull();
-    expect(h.ff.calls).toHaveLength(0);
+    expect(outsideHome(h.ff)).toHaveLength(0);
   });
 
   it('보관된 시도가 없고 게스트 세션이어도 /home으로 간다', async () => {

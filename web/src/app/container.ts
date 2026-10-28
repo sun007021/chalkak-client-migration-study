@@ -31,6 +31,11 @@ import { SignupDraft } from '../features/auth/SignupDraft';
 import { createKakaoWebLoginClient } from '../features/auth/createKakaoLogin';
 import { LoginViewModel } from '../features/auth/LoginViewModel';
 import type { ResumeKakaoRedirect, SocialLoginClient } from '../features/auth/SocialLoginClient';
+import { BannerFeed } from '../features/home/BannerFeed';
+import { BannerRepository } from '../features/home/BannerRepository';
+import type { HomeNavigator } from '../features/home/HomeNavigator';
+import { HomeRepository } from '../features/home/HomeRepository';
+import { HomeViewModel } from '../features/home/HomeViewModel';
 import { WindowExternalLinkOpener } from '../features/onboarding/ExternalLinkOpener';
 import type { ExternalLinkOpener } from '../features/onboarding/ExternalLinkOpener';
 import { LegalDocumentLauncher } from '../features/onboarding/LegalDocument';
@@ -134,6 +139,9 @@ export interface AppContainer {
   signatureRepository: SignatureRepository;
   /** 설정 사인 카드가 쓸 데이터. 사인 변경 성공 뒤 재조회한다. UserCaches에 등록되어 계정 전환 시 비워진다. */
   signatureCard: SignatureCardController;
+  homeRepository: HomeRepository;
+  /** 공개 API(/banners). 토큰을 붙이지 않는다. */
+  bannerRepository: BannerRepository;
   signupService: SignupService;
   changeSignatureService: ChangeSignatureService;
   /** 개발용 세션 주입 화면(동적 import)이 서비스를 만들 재료. devSessionEnabled가 false면 null. */
@@ -144,6 +152,8 @@ export interface AppContainer {
   /** 메인 셸이 마운트될 때마다 새 ViewModel을 만든다. */
   createMainShellViewModel(mode: SessionMode): MainShellViewModel;
   createTermsViewModel(): TermsViewModel;
+  /** 홈 탭이 마운트될 때마다 새 ViewModel을 만든다. 배너 목록(BannerFeed)도 새로 만들고, 계정 전환 때 UserCaches가 처음 상태로 돌린다. */
+  createHomeViewModel(mode: SessionMode, navigator: HomeNavigator): HomeViewModel;
   /** 빈 패드(1024×512)로 시작한다. */
   createSignatureDrawViewModel(mode: SignatureMode): SignatureDrawViewModel;
   createSignaturePreviewViewModel(mode: SignatureMode, png: Blob): SignaturePreviewViewModel;
@@ -256,6 +266,8 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     blobUrls: options.blobUrls ?? new ObjectUrlFactory(),
     signatureRepository,
     signatureCard,
+    homeRepository: new HomeRepository({ api }),
+    bannerRepository: new BannerRepository({ api }),
     signupService: new SignupService({
       repository: new SignupRepository({ api, clock }),
       uploader: presignedUploader,
@@ -285,6 +297,20 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     },
     createTermsViewModel() {
       return new TermsViewModel({ launcher: new LegalDocumentLauncher({ opener: this.externalLinkOpener }), signupDraft: this.signupDraft });
+    },
+    createHomeViewModel(mode, navigator) {
+      return new HomeViewModel({
+        mode,
+        clock: this.clock,
+        repository: this.homeRepository,
+        banners: new BannerFeed({ repository: this.bannerRepository }),
+        toast: this.toast,
+        guestGate: this.guestGate,
+        uploadEntry: this.uploadEntry,
+        navigator,
+        externalLinkOpener: this.externalLinkOpener,
+        userCaches: this.userCaches,
+      });
     },
     createSignatureDrawViewModel(mode) {
       return new SignatureDrawViewModel({

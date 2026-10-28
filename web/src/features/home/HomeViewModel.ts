@@ -2,6 +2,7 @@ import { t } from '../../copy/ko';
 import { ApiError, NetworkError, SessionChangedError } from '../../core/net/errors';
 import { StaleGuard } from '../../core/state/StaleGuard';
 import { ViewModel } from '../../core/state/ViewModel';
+import type { UserCaches } from '../../core/auth/UserCaches';
 import type { Clock } from '../../core/time/Clock';
 import { kstToday } from '../../core/time/kst';
 import type { DateString } from '../../core/time/kst';
@@ -74,6 +75,8 @@ export interface HomeViewModelDeps {
   navigator: HomeNavigator;
   /** 배너를 새 탭으로 연다(Web, 허용 차이). */
   externalLinkOpener: ExternalLinkOpener;
+  /** 있으면 계정 전환·로그아웃 때 이 ViewModel을 처음 상태로 돌리도록 등록하고 dispose에서 뺀다. */
+  userCaches?: UserCaches;
 }
 
 /** 랭킹에 담는 최대 개수(REQ-HOME-027). */
@@ -139,9 +142,21 @@ export class HomeViewModel extends ViewModel<HomeState> {
   private aiRequestInFlight = false;
   /** 마지막으로 받은 /posts/today. 히어로는 이 값과 이번 주 기록(썸네일)에서 만든다. */
   private today: TodayPost | null = null;
+  private readonly unregisterCache: (() => void) | undefined;
 
   constructor(protected readonly deps: HomeViewModelDeps) {
     super(HomeViewModel.initialState(deps));
+    this.unregisterCache = deps.userCaches?.register({ clear: () => this.resetForAccountChange() });
+  }
+
+  /** ISSUE 배너 목록(화면이 구독한다). */
+  get banners(): BannerFeed {
+    return this.deps.banners;
+  }
+
+  /** 배너 가로 목록에서 마지막으로 보이는 카드의 인덱스가 바뀜(다음 페이지 선읽기). */
+  onBannerLastVisibleIndexChanged(index: number): Promise<void> {
+    return this.deps.banners.onLastVisibleIndexChanged(index);
   }
 
   private static initialState(deps: HomeViewModelDeps): HomeState {
@@ -224,6 +239,7 @@ export class HomeViewModel extends ViewModel<HomeState> {
 
   override dispose(): void {
     this.gone = true;
+    this.unregisterCache?.();
     this.cancelAll();
     this.deps.banners.dispose();
     super.dispose();
@@ -330,7 +346,7 @@ export class HomeViewModel extends ViewModel<HomeState> {
       this.deps.toast.show(t('banner.web.link-unavailable'));
       return;
     }
-    let opened = false;
+    let opened: boolean;
     try {
       opened = this.deps.externalLinkOpener.open(banner.webViewUrl);
     } catch {

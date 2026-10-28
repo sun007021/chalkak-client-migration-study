@@ -181,13 +181,6 @@ export function TabPlaceholder({ tab, testId }: { tab: TabDestination; testId: s
   return <div data-testid={testId} />;
 }
 
-/** 홈 탭 자리표시. data-testid="home.root", 회원/게스트는 data-mode="member|guest". */
-export function HomePlaceholder(): ReactNode {
-  const { mode } = useShellContext();
-  useScreenView('home');
-  return <div data-testid="home.root" data-mode={mode} />;
-}
-
 /**
  * 접근할 수 없는 탭에 URL로 직접 들어오면(게스트의 /record) 화면을 열지 않고 홈으로 replace + 토스트(TC-NAV-016, 임시안).
  * 자식은 통과했을 때만 렌더되므로 차단된 화면은 screen_view도 보내지 않는다. 토스트는 StrictMode의 이중 효과에도 1회다.

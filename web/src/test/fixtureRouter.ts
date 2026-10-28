@@ -30,13 +30,20 @@ const sameQuery = (a: URLSearchParams, b: URLSearchParams): boolean => {
  * 라우트에 없는 요청은 TypeError(예상하지 못한 요청 = 연결 실패)로 거절하고 calls에 남는다.
  */
 export class FixtureRouter {
-  private readonly entries = new Map<string, Entry>();
-  private readonly registered = new Set<string>();
+  /** 같은 FakeFetch에 FixtureRouter를 여러 개 만들어도(openHome의 것과 테스트 본문의 `new FixtureRouter(h.ff)`) 같은 표를 쓴다.
+   * FakeFetch는 먼저 등록한 경로가 우선이라 라우터마다 표를 따로 두면 나중 라우터의 set이 가려진다. */
+  private static readonly tables = new WeakMap<FakeFetch, { entries: Map<string, Entry>; registered: Set<string> }>();
+  private readonly entries: Map<string, Entry>;
+  private readonly registered: Set<string>;
 
   constructor(
     private readonly ff: FakeFetch,
     initial: Record<string, RouteValue> = {},
   ) {
+    const table = FixtureRouter.tables.get(ff) ?? { entries: new Map<string, Entry>(), registered: new Set<string>() };
+    FixtureRouter.tables.set(ff, table);
+    this.entries = table.entries;
+    this.registered = table.registered;
     for (const [key, value] of Object.entries(initial)) this.set(key, value);
   }
 

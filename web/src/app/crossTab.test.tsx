@@ -17,6 +17,7 @@ import { NOW, OTHER_USER, ME, guestSession, loadFixture, memberSession, tokens }
 import { RecordingLogger } from '../test/RecordingLogger';
 import { SequentialIdGenerator } from '../test/sequentialIds';
 import { watchAdded } from '../test/domWatch';
+import { outsideHome } from '../test/homeRequests';
 
 /** 같은 IndexedDB를 쓰는 "브라우저 탭" 하나. 탭마다 컨테이너·시계·fetch·채널 객체가 따로다. */
 function makeTab(idb: IDBFactory, hub: SessionChannelHub) {
@@ -130,7 +131,7 @@ describe('다른 탭의 로그아웃·계정 전환 전파', () => {
     await screen.findByTestId('home.root');
     expect(path()).toBe('/home');
     expect(screen.getByTestId('home.root')).toHaveAttribute('data-mode', 'member');
-    expect(tabB.ff.calls).toHaveLength(0);
+    expect(outsideHome(tabB.ff)).toHaveLength(0);
   });
 
   it('REQ-NAV-022 게스트로 둘러보던 탭 B: 탭 A가 회원으로 로그인하면 회원 홈으로, 이어서 탭 A가 로그아웃하면 로그인으로 간다', async () => {

@@ -12,10 +12,11 @@ import { KakaoCallbackScreen, LoginScreen } from '../features/auth/LoginScreen';
 import { resolveAuthGate } from '../features/boot/authGate';
 import type { AuthGateDecision } from '../features/boot/authGate';
 import { BootScreen, SplashView } from '../features/boot/BootScreen';
+import { HomeScreen } from '../features/home/HomeScreen';
 import { TermsScreen } from '../features/onboarding/TermsScreen';
 import { SignatureDrawScreen } from '../features/signature/SignatureDrawScreen';
 import { SignaturePreviewScreen } from '../features/signature/SignaturePreviewScreen';
-import { BottomBarSlotContext, HomePlaceholder, MainShell, TabGate, TabPlaceholder } from '../features/shell/MainShell';
+import { BottomBarSlotContext, MainShell, TabGate, TabPlaceholder } from '../features/shell/MainShell';
 import type { TabRouteHandle } from '../features/shell/MainShell';
 import { ContainerProvider } from './AppContext';
 import type { AppContainer } from './container';
@@ -111,7 +112,7 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
         {
           element: <RequireSession container={container}>{(mode) => <MainShell mode={mode} />}</RequireSession>,
           children: [
-            { path: ROUTES.home, handle: homeHandle, element: <HomePlaceholder /> },
+            { path: ROUTES.home, handle: homeHandle, element: <HomeScreen /> },
             { path: ROUTES.display, handle: displayHandle, element: <TabPlaceholder tab="display" testId="display.root" /> },
             {
               path: ROUTES.record,

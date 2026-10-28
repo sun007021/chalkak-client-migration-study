@@ -5,6 +5,7 @@ import { watchAdded } from '../../test/domWatch';
 import { guestSession, memberSession } from '../../test/fixtures';
 import { t } from '../../copy/ko';
 import type { TabDestination } from '../../constants';
+import { outsideHome } from '../../test/homeRequests';
 
 const TABS: readonly TabDestination[] = ['home', 'display', 'record', 'settings'];
 const TAB_IDS = {
@@ -147,10 +148,10 @@ describe('새로고침 복원과 URL', () => {
 
   it('REQ-NAV-012 게스트도 홈과 전시 탭을 볼 수 있고 인증 API 호출은 0건이다', async () => {
     const { h, path } = await openMain('guest');
-    expect(screen.getByTestId('home.root')).toHaveAttribute('data-mode', 'guest');
+    expect(await screen.findByTestId('home.root')).toHaveAttribute('data-mode', 'guest');
     await goTo('display', path);
     expect(screen.getByTestId('display.root')).toBeInTheDocument();
-    expect(h.ff.calls).toHaveLength(0);
+    expect(outsideHome(h.ff)).toHaveLength(0);
   });
 
   it('TC-NAV-016 게스트가 /record URL로 직접 들어와도 기록 화면은 열리지 않는다: 홈으로 replace + 토스트 nav.guest.record + 요청 0건 [임시안]', async () => {
@@ -162,7 +163,7 @@ describe('새로고침 복원과 URL', () => {
     expect(router.state.historyAction).toBe('REPLACE');
     expect(record.seen()).toBe(false);
     expect(toastText()).toBe(t('nav.guest.record'));
-    expect(h.ff.calls).toHaveLength(0);
+    expect(outsideHome(h.ff)).toHaveLength(0);
     record.stop();
   });
 
@@ -178,7 +179,7 @@ describe('새로고침 복원과 URL', () => {
       const { path, unmount } = renderApp(h.container, url);
       await screen.findByTestId('home.root');
       expect(path(), url).toBe('/home');
-      expect(h.ff.calls, url).toHaveLength(0);
+      expect(outsideHome(h.ff), url).toHaveLength(0);
       unmount();
     }
   });
@@ -188,7 +189,7 @@ describe('새로고침 복원과 URL', () => {
     const { router } = renderApp(h.container, '/home?postId=11111111-1111-4111-8111-111111111111');
     await screen.findByTestId('home.root');
     expect(router.state.location.pathname).toBe('/home');
-    expect(h.ff.calls).toHaveLength(0);
+    expect(outsideHome(h.ff)).toHaveLength(0);
   });
 });
 
@@ -265,7 +266,7 @@ describe('게스트 제한 (D-05)', () => {
     expect(router.state.location.key).toBe(before);
     expect(selectedTab()).toEqual(['home']);
     expect(screen.queryByTestId('record.root')).not.toBeInTheDocument();
-    expect(h.ff.calls).toHaveLength(0);
+    expect(outsideHome(h.ff)).toHaveLength(0);
   });
 
   it('TC-NAV-016 전시 탭에서 기록 탭을 눌러도 전시에 머문다', async () => {
@@ -297,7 +298,7 @@ describe('게스트 제한 (D-05)', () => {
     expect(toastText()).toBe(t('nav.guest.upload'));
     expect(h.upload.starts).toBe(0);
     expect(h.ff.callsTo('GET /posts/today')).toHaveLength(0);
-    expect(h.ff.calls).toHaveLength(0);
+    expect(outsideHome(h.ff)).toHaveLength(0);
     expect(selectedTab()).toEqual(['home']);
   });
 
