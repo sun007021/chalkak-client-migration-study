@@ -24,12 +24,12 @@ npm run e2e                  # Playwright(E). 빌드 후 preview 서버로 돈�
 
 ```text
 src/
-├── app/            조립(composition root), 라우팅, 전역 Provider (예정: `app/container.ts`)
+├── app/            조립(composition root), 라우팅, 전역 Provider (`app/container.ts`)
 ├── core/
 │   ├── config/     빌드 설정 읽기·검증
 │   ├── net/        ApiClient, HttpTransport, ApiError, 재시도·타임아웃, 401 갱신(AuthCoordinator)
 │   ├── time/       Clock, KST 날짜 계산·표시
-│   ├── auth/       SessionStore 인터페이스, RefreshLock(Web Locks), 세션 저장소 구현(예정, Q-03), SessionManager(예정)
+│   ├── auth/       SessionStore 인터페이스, RefreshLock(Web Locks), `IndexedDbSessionStore`(Q-03), `SessionEvents`, `UserCaches`
 │   ├── ui/         토스트, 공통 상태 화면(loading/empty/error)
 │   ├── analytics/  AnalyticsReporter, 라우트 기반 screen_view
 │   └── state/      ViewModel 기반 클래스, useViewModel 훅
@@ -41,7 +41,7 @@ src/
 ## 규칙(테스트하기 쉬운 코드, strategy §2)
 
 - **화면은 그리기만 한다.** 상태 전이·분기는 `ViewModel`(React 없는 TS 클래스)에 두고 단위 테스트한다. 화면은 `useViewModel(vm)`으로 스냅샷을 구독한다.
-- **의존성은 생성자 주입.** `SessionStore`, `RefreshLock`, `Clock`, `IdGenerator`, `AnalyticsTracker`, `Logger`는 인터페이스이고 테스트는 Fake를 쓴다. `SocialLoginClient`, 이미지 인코더(예정)도 같다. 조립(`ApiBaseUrl` 검증 포함)은 `app/container.ts`(예정) 한 곳에서만 한다.
+- **의존성은 생성자 주입.** `SessionStore`, `RefreshLock`, `Clock`, `IdGenerator`, `AnalyticsTracker`, `Logger`는 인터페이스이고 테스트는 Fake를 쓴다. `SocialLoginClient`, 이미지 인코더(예정)도 같다. 조립(`ApiBaseUrl` 검증 포함)은 `app/container.ts` 한 곳에서만 한다.
 - **시간은 `Clock`으로.** `Date.now()`, `setTimeout`을 직접 부르지 않는다(테스트는 가짜 시계 또는 `vi.useFakeTimers`).
 - **서버 오류는 `errorCode` + HTTP 상태 + 호출 API로만 분기**(D-02). `message`는 표시용.
 - **testID**: 모든 상호작용 요소에 [testids.md](../docs/testing/testids.md)의 `data-testid`. 상태는 `aria-checked`/`aria-selected`/`disabled`로 노출하고, 상태 표시 요소는 숨기지 말고 DOM에서 뺀다.
@@ -53,7 +53,11 @@ src/
 
 ## 화면 추적(분석)
 
-정식 경로는 **라우트 기반**이다. `RouteScreenViewTracker`가 Router 안에서 pathname이 바뀔 때마다 `screen_view`를 보낸다(쿼리·해시만 바뀌면 보내지 않고, 다른 화면에 갔다 돌아오면 다시 보낸다). 라우트가 아닌 화면(시트·모달 등 별도 `screen_name`이 있는 것)만 `useScreenView`를 쓴다. 한 화면에 둘을 같이 쓰면 중복 전송이다.
+두 경로가 서로 겹치지 않게 나눈다.
+
+- **전역 경로 추적**: `RouteScreenViewTracker`가 Router 안에서 pathname이 바뀔 때마다 `screen_view`를 보낸다(쿼리·해시만 바뀌면 보내지 않고, 다른 화면에 갔다 돌아오면 다시 보낸다). **탭이 아닌 화면**(`/login`, `/signup/terms` 등)만 해당하고 `screenNameForPath`가 그 목록이다.
+- **탭 4개(홈·전시·기록·설정)**: 전역 추적에서 뺐다. 보호(RequireSession)와 접근 게이트(`TabGate`, `canEnterTab`)를 통과해 **실제로 그려진 탭 화면**이 `useScreenView(name)`로 보낸다. 그래서 세션 없이 `/display`로 들어오거나 게스트가 `/record`로 들어와 리다이렉트되는 경우에는 그 화면의 `screen_view`가 나가지 않는다.
+- 라우트가 아닌 화면(시트·모달 등 별도 `screen_name`이 있는 것)도 `useScreenView`를 쓴다. 한 화면을 두 경로로 보내면 중복 전송이다.
 
 ## Web에서 다른 점
 
@@ -62,7 +66,8 @@ src/
 | 강제 업데이트 | 게이트 없음 | D-15, REQ-BOOT-013 |
 | 푸시 | 수신·기기 등록 없음. 알림함은 제공 | Q-04, REQ-PUSH-017 |
 | 토큰 보관 | access는 메모리, refresh·userId·만료 시각은 IndexedDB(임시안). XSS 시 refresh token 탈취 위험이 있다 | Q-03, REQ-AUTH-024 |
-| 카카오 로그인 | 서버가 카카오 ID 토큰 aud를 앱 키 하나와만 비교해 웹 키 토큰이 거절될 수 있다. 로그인 코드는 `SocialLoginClient` 뒤에 두고 Fake로 검증 | Q-02 |
+| 카카오 로그인 | 서버가 카카오 ID 토큰 aud를 앱 키 하나와만 비교해 웹 키 토큰이 거절될 수 있다. 로그인 코드는 `SocialLoginClient` 뒤에 두고 Fake로 검증한다. 실제 구현 `KakaoWebLoginClient`는 OIDC 인가 리다이렉트(nonce=SHA-256(rawNonce) hex, state)이고 rawNonce·state는 리다이렉트 사이 `sessionStorage`에 두었다가 콜백에서 1회 쓰고 지운다. 인가 코드→ID 토큰 교환(`KakaoTokenEndpointExchanger`)은 `https://kauth.kakao.com/oauth/token`에 `grant_type=authorization_code, client_id(VITE_KAKAO_CLIENT_ID), redirect_uri, code`를 form POST하며 키가 없으면 `SocialLoginConfigError`다. **브라우저 CORS·서버 aud 수용 여부는 아직 실제로 검증하지 않았다(Q-02, E2E에서 확인).** **개발 서버 E2E는 카카오 로그인 대신 아래 개발용 세션 주입을 쓴다** | Q-02 |
+| 개발용 세션 주입 | 개발 빌드(`import.meta.env.DEV`) 또는 `VITE_ENABLE_DEV_SESSION=true`에서만 `/dev/session` 라우트와 로그인 화면의 우회 버튼이 있다(조건은 `vite.config.ts`의 `define`이 만든 정적 상수 `DEV_SESSION_ENABLED` 하나이고, 꺼진 빌드에서는 화면·서비스가 번들에서 빠진다. `dist`에서 `grep -rE "Dev session|dev-bypass|/dev/session|DevSession"`가 비어야 한다). 개발 서버에서 얻은 refresh token과 userId를 붙여 넣으면 `POST /auth/refresh`로 토큰을 받아 저장하고 홈으로 간다. 프로덕션 빌드에는 라우트가 없다 | Q-02 |
 | 약관 문서 | 새 탭 | D-25 |
 | 네트워크 타임아웃 | fetch는 연결/응답 분리 불가 → 응답 15초(헤더+본문 수신 포함) 하나로 적용. `HTTP_CONNECT_TIMEOUT_MS`는 shared 값과 대조용으로만 둔다 | D-21 |
 | refresh 동시성 | 탭이 여러 개라 메모리 single-flight로는 부족 → Web Locks(`chalkak-auth-refresh`) 안에서 재읽기→refresh→비교 후 쓰기. 미지원이면 탭 안 뮤텍스 | D-17 |

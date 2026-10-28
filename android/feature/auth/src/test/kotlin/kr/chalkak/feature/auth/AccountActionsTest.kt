@@ -185,4 +185,21 @@ class AccountActionsTest {
         assertEquals(1, r.repo.withdrawCalls)
         assertNull(r.state.toastKey)
     }
+
+    @Test
+    fun `a screen left during an earlier attempt does not mute the error toast of a later withdraw attempt`() = runTest {
+        val r = rig()
+        r.repo.withdrawGate = CompletableDeferred()
+        r.repo.withdrawResults.add(ApiResult.Failure(ApiError.Network(NetworkKind.OTHER)))
+        r.confirmWithdraw(); runCurrent()
+        r.actions.onScreenGone(); runCurrent()
+        r.repo.withdrawGate!!.complete(Unit); advanceUntilIdle()
+        assertNull(r.state.toastKey)
+
+        r.repo.withdrawGate = null
+        r.repo.withdrawResults.add(ApiResult.Failure(ApiError.Network(NetworkKind.OTHER)))
+        r.confirmWithdraw(); advanceUntilIdle()
+        assertEquals("auth.withdraw.error", r.state.toastKey)
+        assertFalse(r.state.busy)
+    }
 }

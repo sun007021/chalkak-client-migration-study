@@ -229,6 +229,9 @@ abstract final class Copy {
   /// `boot.update.title`
   static const bootUpdateTitle = '업데이트가 필요해요';
 
+  /// `common.close`
+  static const commonClose = '닫기';
+
   /// `common.confirm`
   static const commonConfirm = '확인';
 

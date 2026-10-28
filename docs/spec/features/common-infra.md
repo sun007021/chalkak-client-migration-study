@@ -221,6 +221,7 @@
 | common.error.config | API 설정을 확인해 주세요. | `API_BASE_URL` 누락·오류. iOS `APIAuthRepository` 문구 |
 | common.retry | 다시 시도 | 오류 화면 버튼. iOS·Android 동일 |
 | common.confirm | 확인 | 알림 대화상자 확인 버튼(iOS 관례) |
+| common.close | 닫기 | 아이콘만 있는 닫기 버튼(약관 문서 시트·웹뷰, 시트 등)의 접근성 라벨·툴팁 |
 
 ## 플랫폼별 허용 차이
 

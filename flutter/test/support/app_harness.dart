@@ -19,6 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'auth_fakes.dart';
 import 'fake_analytics_tracker.dart';
+import 'home_fakes.dart';
 import 'onboarding_fakes.dart';
 
 export 'ui_helpers.dart';
@@ -86,9 +87,11 @@ class AppHarness {
       signatureRenderer: renderer,
       externalLinkLauncher: externalLinks,
       legalWebViewBuilder: fakeLegalWebView,
+      main: homeFakes.dependencies,
     );
   }
 
+  late final HomeFakes homeFakes = HomeFakes(http);
   final AuthHttpHarness http;
   final FakeUpdateChecker updateChecker = FakeUpdateChecker();
   final FakeUpdateLauncher launcher = FakeUpdateLauncher();
