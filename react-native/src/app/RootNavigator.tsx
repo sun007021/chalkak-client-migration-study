@@ -134,7 +134,7 @@ function SignatureChangeScreenRoute({
     container.createSignatureChangeFlow({
       onCompleted: () => {
         navigation.goBack();
-        void container.settingsOwner.getSnapshot().viewModel?.signatureCard.onSignatureChanged();
+        void container.notifySignatureChanged();
       },
       onExit: () => navigation.goBack(),
     }),

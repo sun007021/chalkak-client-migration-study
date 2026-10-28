@@ -15,6 +15,7 @@ async function setup() {
   const toast = new FakeToastPresenter();
   const navigator = { openSignatureChange: jest.fn() };
   const vm = new SignatureCardViewModel({
+    authFlow: { toLogin: jest.fn() },
     repository: new SignatureRepository({ api: net.api }),
     toast,
     navigator,
@@ -95,7 +96,9 @@ describe('SignatureCardViewModel', () => {
     routeFixtures(h.transport, { [GET]: 'signature/users-me-signature__get-internal-error' });
     await h.vm.refresh();
     expect(h.vm.getSnapshot().imageUrl).toBeNull();
-    expect(h.toast.messages).toEqual([t('sign.load.error')]);
+    // 사인이 없는 최초 실패는 카드 안의 오류 상태로만 알린다(토스트 중복 없음, TC-SET-006).
+    expect(h.vm.getSnapshot().loadError).toBe(true);
+    expect(h.toast.messages).toEqual([]);
   });
 
   it('TC-SIGN-040 SIGNATURE_REGISTRATION_REQUIRED면 이미지를 비우고 오류 토스트 없이 변경 진입을 유도한다', async () => {

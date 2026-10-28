@@ -69,14 +69,24 @@ describe('SettingsScreen 회원', () => {
   it('REQ-SET-001 섹션 제목이 앱 설정, 푸시 알림, 계정, 피드백, 정보 및 약관 순서로 보인다', async () => {
     await renderSettings();
     await flush();
-    const text = JSON.stringify(screen.toJSON());
-    const order = [
-      'settings.signature-card',
-      'settings.push-section',
-      'settings.logout-row',
-      'settings.feedback-row',
-      'settings.privacy-row',
-    ].map((id) => text.indexOf(`"testID":"${id}"`));
+    const titles = [
+      t('settings.section.app'),
+      t('settings.section.push'),
+      t('settings.section.account'),
+      t('settings.section.feedback'),
+      t('settings.section.info'),
+    ];
+    const texts: string[] = [];
+    const collect = (node: unknown): void => {
+      if (typeof node === 'string') texts.push(node);
+      else if (Array.isArray(node)) node.forEach(collect);
+      else if (node !== null && typeof node === 'object') {
+        collect((node as { children?: unknown }).children);
+      }
+    };
+    collect(screen.toJSON());
+    // 제목 문구가 행 라벨과 같을 수 있어도 제목끼리의 상대 순서만 본다(제목은 각각 첫 등장 위치).
+    const order = titles.map((title) => texts.indexOf(title));
     expect(order.every((index) => index >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
@@ -212,9 +222,7 @@ describe('SettingsScreen 회원', () => {
     );
     await flush();
     expect(h.analytics.screenNames).toEqual(['settings']);
-    expect(h.visibility.listenerCount).toBe(1);
     await view.unmount();
-    expect(h.visibility.listenerCount).toBe(0);
   });
 });
 

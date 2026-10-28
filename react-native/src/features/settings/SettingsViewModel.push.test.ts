@@ -171,6 +171,8 @@ describe('SettingsViewModel 푸시 토글 저장', () => {
     patch.release();
     await toggling;
     await flush();
+    const [sent] = h.transport.requestsTo('PATCH', '/notification-settings');
+    expect(sent.options.signal?.aborted).toBe(true);
     expect(values(h)?.topic).toBe(true);
     expect(saving(h).topic).toBe(false);
     expect(h.toast.messages).toEqual([]);
@@ -336,30 +338,66 @@ describe('SettingsViewModel 기기 알림 권한', () => {
     h.permission.resultOnRequest = 'denied';
     await h.viewModel.onPushToggle('aiReview');
     expect(h.permission.requestCalls).toBe(1);
+    // 방금 요청 창에서 거부한 사용자를 곧바로 시스템 설정으로 보내지 않는다(이미 denied였을 때만 연다).
+    expect(h.permission.settingsOpened).toBe(0);
     expect(h.router.calls(PATCH_PUSH)).toHaveLength(0);
     expect(values(h)?.aiReview).toBe(false);
     expect(saving(h).aiReview).toBe(false);
   });
 
-  it('REQ-SET-017 포그라운드로 돌아오면 권한 상태를 다시 확인하되 스위치 값은 서버 값 그대로다', async () => {
-    const h = await shown({ permission: 'denied' });
-    const before = h.permission.statusCalls;
-    h.permission.current = 'granted';
-    h.visibility.emit('foreground');
+  it('REQ-SET-018 권한 확인 자체가 실패하면 막지 않고 서버 저장을 진행한다(fail-open)', async () => {
+    const h = await shown({
+      permission: 'undetermined',
+      routes: { [GET_PUSH]: 'settings/notification-settings__get-ai-off' },
+    });
+    h.permission.failRequest = true;
+    await h.viewModel.onPushToggle('aiReview');
+    expect(h.patchBodies()).toEqual([{ aiReviewPushEnabled: true }]);
+    expect(h.permission.settingsOpened).toBe(0);
+  });
+});
+
+describe('SettingsViewModel 푸시 설정 조회와 토글의 경합', () => {
+  it('REQ-SET-018 권한 창이 열려 있는 사이 재조회가 일어나도 스위치가 잠기지 않고 다시 쓸 수 있다', async () => {
+    const h = await shown({
+      permission: 'undetermined',
+      routes: { [GET_PUSH]: 'settings/notification-settings__get-ai-off' },
+    });
+    const gate = deferred<void>();
+    h.permission.requestGate = gate.promise;
+    const toggling = h.viewModel.onPushToggle('aiReview');
     await flush();
-    expect(h.permission.statusCalls).toBeGreaterThan(before);
-    expect(h.viewModel.getSnapshot().devicePermission).toBe('granted');
-    expect(values(h)).toEqual({ topic: true, moderation: true, aiReview: true });
+    expect(saving(h).aiReview).toBe(true);
+
+    await h.viewModel.retryPush();
+    gate.resolve();
+    await toggling;
+    await flush();
+
+    expect(saving(h)).toEqual({ topic: false, moderation: false, aiReview: false });
     expect(h.router.calls(PATCH_PUSH)).toHaveLength(0);
+
+    h.permission.requestGate = null;
+    await h.viewModel.onPushToggle('aiReview');
+    expect(h.patchBodies()).toEqual([{ aiReviewPushEnabled: true }]);
+    expect(values(h)?.aiReview).toBe(true);
   });
 
-  it('REQ-SET-017 백그라운드 전환에서는 확인하지 않고, 화면을 떠나면(onHidden) 구독을 해제한다', async () => {
-    const h = await shown();
-    const before = h.permission.statusCalls;
-    h.visibility.emit('background');
+  it('권한 창이 열려 있는 사이 화면을 떠나면 잠금이 풀리고 늦게 허용돼도 저장하지 않는다', async () => {
+    const h = await shown({
+      permission: 'undetermined',
+      routes: { [GET_PUSH]: 'settings/notification-settings__get-ai-off' },
+    });
+    const gate = deferred<void>();
+    h.permission.requestGate = gate.promise;
+    const toggling = h.viewModel.onPushToggle('aiReview');
     await flush();
-    expect(h.permission.statusCalls).toBe(before);
     h.viewModel.onHidden();
-    expect(h.visibility.listenerCount).toBe(0);
+    expect(saving(h).aiReview).toBe(false);
+    gate.resolve();
+    await toggling;
+    await flush();
+    expect(h.router.calls(PATCH_PUSH)).toHaveLength(0);
+    expect(saving(h).aiReview).toBe(false);
   });
 });

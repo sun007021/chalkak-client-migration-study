@@ -364,9 +364,7 @@ describe('SettingsViewModel 계정 전환과 정리', () => {
   it('dispose는 구독을 정리하고 하위 ViewModel(AccountActions, 사인 카드)도 버린다', async () => {
     const h = await createSettingsHarness();
     await h.viewModel.onShown();
-    expect(h.visibility.listenerCount).toBe(1);
     h.viewModel.dispose();
-    expect(h.visibility.listenerCount).toBe(0);
     // 버려진 AccountActions는 실패를 토스트하지 않는다(화면 이탈 규칙).
     h.router.set('DELETE /users/me', 'auth/users-me__delete-internal-error');
     await h.account.confirmWithdraw();

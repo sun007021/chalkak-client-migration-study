@@ -1,45 +1,30 @@
 import type { AnalyticsTracker } from '../../core/analytics/AnalyticsTracker';
-import { CancelledError } from '../../core/http/ApiError';
-import type { AppVisibility } from '../../core/lifecycle/AppVisibility';
 import type { ExternalLinkOpener } from '../../core/linking/ExternalLinkOpener';
 import type { AppVersionProvider } from '../../core/config/AppVersionProvider';
-import type {
-  PushPermissionGateway,
-  PushPermissionStatus,
-} from '../../core/push/PushPermissionGateway';
+import type { PushPermissionGateway } from '../../core/push/PushPermissionGateway';
 import type { UserDataCache } from '../../core/push/UserDataCache';
 import { Observable } from '../../core/state/Observable';
 import type { ToastPresenter } from '../../core/toast/ToastPresenter';
-import {
-  PUSH_SETTING_KEYS,
-  type NotificationSettings,
-  type NotificationSettingsRepository,
-  type PushSettingKey,
+import type {
+  NotificationSettingsRepository,
+  PushSettingKey,
 } from '../../data/settings/NotificationSettingsRepository';
 import { TERMS_URLS } from '../../shared/constants';
 import { t } from '../../shared/copy';
 import type { AccountActionsViewModel } from '../auth/AccountActionsViewModel';
 import type { AuthFlowNavigator, MainMode } from '../auth/AuthFlowNavigator';
-import { AuthErrorPolicy } from '../common/AuthErrorPolicy';
 import { TermsDocumentViewModel } from '../onboarding/TermsDocumentViewModel';
 import type { TermsKind } from '../onboarding/TermsViewModel';
 import type { SignatureCardViewModel } from '../signature/SignatureCardViewModel';
+import { PushSettingsController, type PushSettingsState } from './PushSettingsController';
 import type { SettingsNavigator } from './SettingsNavigator';
 
-export type PushSettingsState = {
-  /** loading/error에서는 스위치를 쓸 수 없다(값을 지어내지 않는다, REQ-SET-010). */
-  status: 'loading' | 'ready' | 'error';
-  values: NotificationSettings | null;
-  /** 항목별 저장 중. 같은 항목의 추가 입력은 무시하고 다른 항목은 독립이다(REQ-SET-014). */
-  saving: Readonly<Record<PushSettingKey, boolean>>;
-};
+export type { PushSettingsState };
 
 export type SettingsState = {
   mode: MainMode;
   version: string;
   push: PushSettingsState;
-  /** 마지막으로 확인한 기기 알림 권한(스위치 값과 무관, REQ-SET-017). */
-  devicePermission: PushPermissionStatus | null;
   dialog: 'none' | 'logout' | 'withdraw';
   openDocument: TermsKind | null;
 };
@@ -50,7 +35,6 @@ export type SettingsViewModelDeps = {
   signatureCard: SignatureCardViewModel;
   account: AccountActionsViewModel;
   permission: PushPermissionGateway;
-  visibility: AppVisibility;
   appVersion: AppVersionProvider;
   analytics: AnalyticsTracker;
   linkOpener: ExternalLinkOpener;
@@ -59,28 +43,17 @@ export type SettingsViewModelDeps = {
   authFlow: Pick<AuthFlowNavigator, 'toLogin'>;
 };
 
-const NOT_SAVING: Readonly<Record<PushSettingKey, boolean>> = {
-  topic: false,
-  moderation: false,
-  aiReview: false,
-};
-
-type InFlight = { token: number; controller: AbortController; previous: boolean };
-
 /**
  * 설정 탭. 소유자(SettingsViewModelOwner)가 메인 단계 동안 만들고 버리며, 계정 전환 때 비우도록 UserDataCache를 구현한다.
  * 하위 ViewModel(사인 카드, 계정 동작)과 약관 문서 ViewModel은 여기서 버린다.
  *
- * - 푸시 설정: 낙관적 갱신, 항목별 저장 잠금, 실패한 항목만 되돌림. 조회·저장 응답은 세대 번호(계정 전환·이탈)로 거른다.
- * - 화면 이탈(onHidden)은 저장 중인 항목을 조용히 되돌린다(TC-SET-030).
+ * - 푸시 설정: PushSettingsController가 조회·토글·권한 확인·이탈 시 되돌림을 맡고 여기서는 상태를 합성만 한다.
+ * - screen_view는 onShown(탭 마운트)마다 보낸다. 개발 모드 StrictMode의 이중 effect는 한 번 더 보낼 수 있다(홈·전시·기록의
+ *   useFocusEffect와 같은 동작이고 운영 빌드에는 영향이 없다).
  */
 export class SettingsViewModel extends Observable<SettingsState> implements UserDataCache {
-  private readonly authErrors: AuthErrorPolicy;
-  private generation = 0;
-  private loadController: AbortController | null = null;
-  private readonly inFlight = new Map<PushSettingKey, InFlight>();
-  private tokenSeq = 0;
-  private stopVisibility: (() => void) | null = null;
+  private readonly push: PushSettingsController;
+  private stopPush: (() => void) | null = null;
   private documentViewModel: TermsDocumentViewModel | null = null;
   private confirming = false;
   private released = false;
@@ -89,12 +62,23 @@ export class SettingsViewModel extends Observable<SettingsState> implements User
     super({
       mode: deps.mode,
       version: deps.appVersion.getVersion(),
-      push: { status: 'loading', values: null, saving: NOT_SAVING },
-      devicePermission: null,
+      push: {
+        status: 'loading',
+        values: null,
+        saving: { topic: false, moderation: false, aiReview: false },
+      },
       dialog: 'none',
       openDocument: null,
     });
-    this.authErrors = new AuthErrorPolicy(deps.authFlow);
+    this.push = new PushSettingsController({
+      settings: deps.settings,
+      permission: deps.permission,
+      toast: deps.toast,
+      authFlow: deps.authFlow,
+    });
+    this.stopPush = this.push.subscribe(() =>
+      this.setState({ ...this.getSnapshot(), push: this.push.getSnapshot() }),
+    );
   }
 
   get account(): AccountActionsViewModel {
@@ -114,79 +98,21 @@ export class SettingsViewModel extends Observable<SettingsState> implements User
   async onShown(): Promise<void> {
     this.sendScreenView();
     if (this.deps.mode !== 'member' || this.released) return;
-    this.stopVisibility ??= this.deps.visibility.subscribe((state) => {
-      if (state === 'foreground') void this.refreshPermission();
-    });
-    await Promise.all([
-      this.deps.signatureCard.refresh(),
-      this.loadPush(),
-      this.refreshPermission(),
-    ]);
+    await Promise.all([this.deps.signatureCard.refresh(), this.push.load()]);
   }
 
   /** 설정 탭이 안 보인다: 조회를 취소하고, 저장 중인 항목은 조용히 되돌린다. */
   onHidden(): void {
-    this.stopVisibility?.();
-    this.stopVisibility = null;
-    this.generation += 1;
-    this.loadController?.abort();
-    this.loadController = null;
-    const values = this.getSnapshot().push.values;
-    if (this.inFlight.size > 0 && values !== null) {
-      const reverted = { ...values };
-      for (const [key, entry] of this.inFlight) {
-        entry.controller.abort();
-        reverted[key] = entry.previous;
-      }
-      this.inFlight.clear();
-      this.patchPush({ values: reverted, saving: NOT_SAVING });
-    }
+    this.push.suspend();
   }
 
   retryPush(): Promise<void> {
-    return this.deps.mode === 'member' ? this.loadPush() : Promise.resolve();
+    return this.deps.mode === 'member' ? this.push.load() : Promise.resolve();
   }
 
-  /**
-   * 스위치를 눌렀다. 켜려는데 기기 권한이 꺼져 있으면 서버 값을 바꾸지 않고 시스템 설정으로 보낸다(REQ-SET-015).
-   * 미결정이면 권한을 요청하고 허용될 때만 저장한다(REQ-SET-018). 끄는 것은 권한과 무관하다(REQ-SET-016).
-   */
-  async onPushToggle(key: PushSettingKey): Promise<void> {
-    const { push } = this.getSnapshot();
-    if (this.deps.mode !== 'member' || push.status !== 'ready' || push.values === null) return;
-    if (!PUSH_SETTING_KEYS.includes(key) || this.inFlight.has(key)) return;
-    const previous = push.values[key];
-    const target = !previous;
-    const token = ++this.tokenSeq;
-    const generation = this.generation;
-    const controller = new AbortController();
-    this.inFlight.set(key, { token, controller, previous });
-    this.patchPush({ saving: { ...push.saving, [key]: true } });
-
-    if (target && !(await this.allowTurningOn())) {
-      if (this.inFlight.get(key)?.token === token) {
-        this.inFlight.delete(key);
-        this.setSaving(key, false);
-      }
-      return;
-    }
-    if (this.inFlight.get(key)?.token !== token || generation !== this.generation) return;
-
-    this.setValue(key, target);
-    try {
-      await this.deps.settings.update(key, target, controller.signal);
-    } catch (error) {
-      if (this.inFlight.get(key)?.token !== token) return;
-      this.inFlight.delete(key);
-      this.setValue(key, previous);
-      this.setSaving(key, false);
-      if (error instanceof CancelledError || this.authErrors.handle(error, token)) return;
-      this.deps.toast.show(t('settings.push.save-error'));
-      return;
-    }
-    if (this.inFlight.get(key)?.token !== token) return;
-    this.inFlight.delete(key);
-    this.setSaving(key, false);
+  /** 푸시 스위치. 게스트·미로딩은 무시한다. 권한 흐름과 저장은 PushSettingsController가 맡는다. */
+  onPushToggle(key: PushSettingKey): Promise<void> {
+    return this.deps.mode === 'member' ? this.push.toggle(key) : Promise.resolve();
   }
 
   /** "피드백 보내기". 게스트는 화면 없이 토스트만(REQ-FDBK-001). */
@@ -246,24 +172,18 @@ export class SettingsViewModel extends Observable<SettingsState> implements User
 
   /** 로그아웃·탈퇴·계정 전환: 진행 중 요청을 버리고 이전 계정의 값을 지운다. */
   clearAll(): void {
-    this.generation += 1;
-    this.loadController?.abort();
-    this.loadController = null;
-    this.inFlight.forEach((entry) => entry.controller.abort());
-    this.inFlight.clear();
+    this.push.reset();
     this.deps.signatureCard.clearAll();
     this.closeDocument();
-    this.setState({
-      ...this.getSnapshot(),
-      push: { status: 'loading', values: null, saving: NOT_SAVING },
-      devicePermission: null,
-      dialog: 'none',
-    });
+    this.setState({ ...this.getSnapshot(), dialog: 'none' });
   }
 
   override dispose(): void {
     this.released = true;
-    this.onHidden();
+    this.push.suspend();
+    this.stopPush?.();
+    this.stopPush = null;
+    this.push.dispose();
     this.closeDocument();
     this.deps.signatureCard.dispose();
     this.deps.account.dispose();
@@ -276,52 +196,6 @@ export class SettingsViewModel extends Observable<SettingsState> implements User
     } catch {
       // 분석 실패는 화면 동작에 영향을 주지 않는다(REQ-ANL-008).
     }
-  }
-
-  private async loadPush(): Promise<void> {
-    this.loadController?.abort();
-    const controller = new AbortController();
-    this.loadController = controller;
-    const generation = ++this.generation;
-    this.patchPush({ status: 'loading' });
-    try {
-      const values = await this.deps.settings.get(controller.signal);
-      if (generation !== this.generation) return;
-      this.patchPush({ status: 'ready', values });
-    } catch (error) {
-      if (generation !== this.generation || error instanceof CancelledError) return;
-      this.patchPush({ status: 'error', values: null });
-      // 401은 정책/세션 이벤트가 로그인으로 보낸다. 그 밖에는 토스트(REQ-SET-010).
-      if (!this.authErrors.handle(error, generation)) {
-        this.deps.toast.show(t('settings.push.load-error'));
-      }
-    }
-  }
-
-  private async refreshPermission(): Promise<void> {
-    try {
-      const devicePermission = await this.deps.permission.status();
-      if (!this.released) this.setState({ ...this.getSnapshot(), devicePermission });
-    } catch {
-      // 권한을 읽지 못해도 서버 설정 화면은 그대로 쓴다. 스위치를 켤 때 다시 확인한다.
-    }
-  }
-
-  /** 켜기 전 기기 권한 확인. 꺼져 있으면 시스템 설정을 열고 false. */
-  private async allowTurningOn(): Promise<boolean> {
-    const { permission } = this.deps;
-    let status: PushPermissionStatus;
-    try {
-      status = await permission.status();
-      if (status === 'undetermined') status = await permission.request();
-    } catch {
-      // 권한 확인 자체가 실패하면 막지 않고 서버 저장 흐름을 따른다.
-      return true;
-    }
-    if (status === 'denied') {
-      await permission.openSystemSettings().catch(() => undefined);
-    }
-    return status === 'granted';
   }
 
   private openDocument(kind: TermsKind): void {
@@ -341,19 +215,5 @@ export class SettingsViewModel extends Observable<SettingsState> implements User
         this.closeDocument();
       }
     });
-  }
-
-  private patchPush(patch: Partial<PushSettingsState>): void {
-    const state = this.getSnapshot();
-    this.setState({ ...state, push: { ...state.push, ...patch } });
-  }
-
-  private setValue(key: PushSettingKey, value: boolean): void {
-    const { values } = this.getSnapshot().push;
-    if (values !== null) this.patchPush({ values: { ...values, [key]: value } });
-  }
-
-  private setSaving(key: PushSettingKey, saving: boolean): void {
-    this.patchPush({ saving: { ...this.getSnapshot().push.saving, [key]: saving } });
   }
 }

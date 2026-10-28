@@ -6,6 +6,8 @@ export class FakePushPermissionGateway implements PushPermissionGateway {
   /** request()가 돌려줄 결과. */
   resultOnRequest: PushPermissionStatus = 'granted';
   failRequest = false;
+  /** 지정하면 request()가 이 Promise가 풀릴 때까지 기다린다(권한 창이 열려 있는 상태). */
+  requestGate: Promise<void> | null = null;
 
   constructor(public current: PushPermissionStatus = 'undetermined') {}
 
@@ -22,6 +24,7 @@ export class FakePushPermissionGateway implements PushPermissionGateway {
 
   async request(): Promise<PushPermissionStatus> {
     this.requestCalls += 1;
+    if (this.requestGate) await this.requestGate;
     if (this.failRequest) throw new Error('permission request failed');
     this.current = this.resultOnRequest;
     return this.current;

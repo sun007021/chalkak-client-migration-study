@@ -2,6 +2,7 @@ import { FEEDBACK_MAX, FEEDBACK_MIN } from '../../shared/constants';
 
 /** 서버로 보내는 값: 앞뒤 공백만 제거하고 중간 공백은 보존한다(REQ-FDBK-007). 정규화는 하지 않는다. */
 export function trimFeedback(text: string): string {
+  // 스펙은 "앞뒤 공백 제거"만 정한다(REQ-FDBK-003). String.prototype.trim()의 공백 정의(줄바꿈 포함)를 그대로 쓴다.
   return text.trim();
 }
 

@@ -204,7 +204,10 @@ type PushPorts = {
 
 /** 테스트가 일부만 바꿀 수 있는 의존성. 푸시 포트는 필요한 것만 `push`에 넣고 토큰 공급자는 `pushTokens`다. */
 export type ContainerOverrides = Partial<Omit<Dependencies, 'push'>> & {
-  /** 분석 백엔드(Firebase 설정이 있을 때만). 없으면 로그 출력 tracker다(`analytics`를 직접 주면 그것이 우선). */
+  /**
+   * 분석 백엔드. 없으면 로그 출력 tracker다. 아직 운영 백엔드는 연결하지 않았다(Firebase Analytics는 google-services 설정이 필요한 후속).
+   * `analytics`(완성된 tracker)와 함께 주면 어느 쪽을 쓸지 모호하므로 `create`가 던진다.
+   */
   analyticsBackend?: AnalyticsBackend | null;
   push?: Partial<PushPorts>;
   pushTokens?: PushTokenProvider;
@@ -281,6 +284,8 @@ export class AppContainer {
   /** 홈·업로드·피드 등이 함께 쓰는 저장소(요청 경로가 같아 하나만 만든다). */
   private postRepositoryInstance: PostRepository | null = null;
   private topicRepositoryInstance: TopicRepository | null = null;
+  private notificationSettingsRepositoryInstance: NotificationSettingsRepository | null = null;
+  private feedbackRepositoryInstance: FeedbackRepository | null = null;
   private readonly displayNavigator = new NavigationDisplayNavigator(this.navigationHandle);
   /** 기록에서 연 전시 탭이 뒤로 가기에서 기록으로 돌아오게 하는 힌트(MainTabs의 전시 탭이 읽는다). */
   readonly tabReturnHint = new TabReturnHint();
@@ -414,6 +419,21 @@ export class AppContainer {
     return (this.postRepositoryInstance ??= new PostRepository({ api: this.api }));
   }
 
+  private get notificationSettingsRepository(): NotificationSettingsRepository {
+    return (this.notificationSettingsRepositoryInstance ??= new NotificationSettingsRepository({
+      api: this.api,
+    }));
+  }
+
+  private get feedbackRepository(): FeedbackRepository {
+    return (this.feedbackRepositoryInstance ??= new FeedbackRepository({ api: this.api }));
+  }
+
+  /** 사인 변경 흐름이 끝났을 때: 설정 탭이 살아 있으면 사인 카드를 GET으로 다시 조회한다(D-18). 없으면 아무것도 하지 않는다. */
+  async notifySignatureChanged(): Promise<void> {
+    await this.settingsOwner.getSnapshot().viewModel?.signatureCard.onSignatureChanged();
+  }
+
   private get topicRepository(): TopicRepository {
     return (this.topicRepositoryInstance ??= new TopicRepository({ api: this.api }));
   }
@@ -485,7 +505,7 @@ export class AppContainer {
     const toast = this.toast;
     return new SettingsViewModel({
       mode,
-      settings: new NotificationSettingsRepository({ api: this.api }),
+      settings: this.notificationSettingsRepository,
       signatureCard: new SignatureCardViewModel({
         repository: this.signatureRepository,
         toast,
@@ -498,7 +518,6 @@ export class AppContainer {
         toast,
       }),
       permission: this.dependencies.push.permission,
-      visibility: this.dependencies.visibility,
       appVersion: new AppInfoVersionProvider(this.dependencies.appInfo),
       analytics: this.analytics,
       linkOpener: this.linkOpener,
@@ -515,7 +534,7 @@ export class AppContainer {
   createFeedbackViewModel(navigator: FeedbackNavigator): FeedbackViewModel {
     let unregister: (() => void) | null = null;
     const viewModel = new FeedbackViewModel({
-      repository: new FeedbackRepository({ api: this.api }),
+      repository: this.feedbackRepository,
       analytics: this.analytics,
       toast: this.toast,
       navigator,
@@ -789,6 +808,9 @@ export class AppContainer {
 
   /** `config`는 앱 루트가 `readAppConfig()`로 읽어 넘긴다. 나머지는 기본 구현이며 `overrides`로 바꾼다. */
   static create(config: AppConfig, overrides: ContainerOverrides = {}): AppContainer {
+    if (overrides.analytics !== undefined && overrides.analyticsBackend != null) {
+      throw new Error('AppContainer.create: analytics와 analyticsBackend는 함께 줄 수 없다');
+    }
     const clock = overrides.clock ?? new SystemClock();
     const logger = new ConsoleNetworkLogger();
     const sessionStore =

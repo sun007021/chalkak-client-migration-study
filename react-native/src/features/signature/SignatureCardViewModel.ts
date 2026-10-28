@@ -1,11 +1,7 @@
 import type { ToastPresenter } from '../../core/toast/ToastPresenter';
 import { Observable } from '../../core/state/Observable';
 import { t } from '../../shared/copy';
-import {
-  AuthenticationRequiredError,
-  CancelledError,
-  ReauthenticationRequiredError,
-} from '../../core/http/ApiError';
+import { CancelledError } from '../../core/http/ApiError';
 import type { UserDataCache } from '../../core/push/UserDataCache';
 import type { AuthFlowNavigator } from '../auth/AuthFlowNavigator';
 import { AuthErrorPolicy } from '../common/AuthErrorPolicy';
@@ -28,8 +24,8 @@ export type SignatureCardDeps = {
   repository: SignatureRepository;
   toast: ToastPresenter;
   navigator: SignatureChangeNavigator;
-  /** 갱신 뒤에도 남은 401에서 로그인으로 보낸다. 없으면 세션 이벤트에만 맡긴다. */
-  authFlow?: Pick<AuthFlowNavigator, 'toLogin'>;
+  /** 갱신 뒤에도 남은 401에서 로그인으로 보낸다(만료는 세션 이벤트가 처리). */
+  authFlow: Pick<AuthFlowNavigator, 'toLogin'>;
 };
 
 export class SignatureCardViewModel
@@ -40,11 +36,11 @@ export class SignatureCardViewModel
   private released = false;
   /** 조회 한 번의 식별자. 변경 성공·계정 전환이 올려 낡은 응답을 버린다. */
   private generation = 0;
-  private readonly authErrors: AuthErrorPolicy | null;
+  private readonly authErrors: AuthErrorPolicy;
 
   constructor(private readonly deps: SignatureCardDeps) {
     super({ imageUrl: null, loading: false, loadError: false });
-    this.authErrors = deps.authFlow ? new AuthErrorPolicy(deps.authFlow) : null;
+    this.authErrors = new AuthErrorPolicy(deps.authFlow);
   }
 
   override dispose(): void {
@@ -55,7 +51,7 @@ export class SignatureCardViewModel
 
   /**
    * 설정 탭이 보일 때마다 부른다. 조회 중이면 중복 요청하지 않는다.
-   * 실패하면 이미 보이던 사인은 그대로 두고 sign.load.error 토스트. SIGNATURE_REGISTRATION_REQUIRED면 빈 상태(토스트 없음).
+   * 실패하면 이미 보이던 사인은 그대로 두고 sign.load.error 토스트(보이던 사인이 없으면 토스트 없이 loadError 상태). SIGNATURE_REGISTRATION_REQUIRED면 빈 상태(토스트 없음).
    */
   async refresh(): Promise<void> {
     if (this.getSnapshot().loading || this.released) return;
@@ -100,19 +96,14 @@ export class SignatureCardViewModel
       this.abortController = null;
       const state = this.getSnapshot();
       // 취소(로그아웃·계정 전환)와 401은 조용히 넘긴다: 만료는 세션 이벤트가, 남은 401은 정책이 로그인으로 보낸다.
-      if (error instanceof CancelledError || this.handleAuth(error, generation)) {
+      if (error instanceof CancelledError || this.authErrors.handle(error, generation)) {
         this.setState({ ...state, loading: false });
         return;
       }
-      this.setState({ ...state, loading: false, loadError: state.imageUrl === null });
-      this.deps.toast.show(t('sign.load.error'));
+      const firstLoad = state.imageUrl === null;
+      this.setState({ ...state, loading: false, loadError: firstLoad });
+      // 보이던 사인이 없으면 카드 안의 오류 상태(문구 + 다시 불러오기)만 보인다. 토스트는 보이던 사인을 두고 실패했을 때만(TC-SET-005/006).
+      if (!firstLoad) this.deps.toast.show(t('sign.load.error'));
     }
-  }
-
-  private handleAuth(error: unknown, key: number): boolean {
-    if (this.authErrors) return this.authErrors.handle(error, key);
-    return (
-      error instanceof AuthenticationRequiredError || error instanceof ReauthenticationRequiredError
-    );
   }
 }

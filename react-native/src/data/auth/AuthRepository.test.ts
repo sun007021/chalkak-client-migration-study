@@ -311,6 +311,19 @@ describe('AuthRepository.withdraw', () => {
     expect(h.push.resetCalls).toBe(1);
   });
 
+  it('DELETE가 204로 끝난 뒤 사용자 캐시 정리가 던져도 탈퇴 실패로 보고하지 않고 나머지 정리를 이어 간다', async () => {
+    const h = createAuthHarness();
+    await h.signIn();
+    h.cache.failClear = true;
+    h.transport.script(fixtureResponse('auth/users-me__delete-no-content'));
+
+    await expect(h.repository.withdraw()).resolves.toBeUndefined();
+
+    expect(await h.sessionStore.load()).toEqual({ kind: 'none' });
+    expect(h.cache.clearCalls).toBe(1);
+    expect(h.push.resetCalls).toBe(1);
+  });
+
   it.each([
     ['500', () => fixtureResponse('auth/users-me__delete-internal-error')],
     ['네트워크 오류', () => networkFailure()],

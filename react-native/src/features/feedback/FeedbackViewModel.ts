@@ -63,7 +63,11 @@ export class FeedbackViewModel extends Observable<FeedbackState> implements User
   start(): void {
     if (this.started) return;
     this.started = true;
-    this.deps.analytics.screenView('feedback');
+    try {
+      this.deps.analytics.screenView('feedback');
+    } catch {
+      // 분석 실패는 화면 동작에 영향을 주지 않는다(REQ-ANL-008).
+    }
   }
 
   onTextChange(text: string): void {

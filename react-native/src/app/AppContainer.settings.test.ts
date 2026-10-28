@@ -92,6 +92,38 @@ describe('AppContainer 설정·피드백·분석 조립 (PR11)', () => {
     info.mockRestore();
   });
 
+  it('분석 tracker(analytics)와 백엔드(analyticsBackend)를 함께 주면 어느 쪽을 쓸지 모호하므로 만들 때 던진다', async () => {
+    const net = createNetHarness();
+    expect(() =>
+      AppContainer.create(
+        { apiBaseUrl: 'http://localhost:4010/api/v1/' },
+        {
+          clock: net.clock,
+          sessionStore: net.sessionStore,
+          events: net.events,
+          api: net.api,
+          analytics: { screenView: () => undefined, logEvent: () => undefined },
+          analyticsBackend: { logEvent: () => undefined },
+        },
+      ),
+    ).toThrow(/analytics/);
+  });
+
+  it('D-18 notifySignatureChanged가 설정 ViewModel의 사인 카드를 GET으로 다시 조회한다', async () => {
+    const { container, router } = await create();
+    await container.bootViewModel.start();
+    const viewModel = container.settingsOwner.getSnapshot().viewModel!;
+    await viewModel.onShown();
+    const before = router.calls('GET /users/me/signature').length;
+    await container.notifySignatureChanged();
+    expect(router.calls('GET /users/me/signature').length).toBe(before + 1);
+  });
+
+  it('notifySignatureChanged는 설정 ViewModel이 없으면(게스트·로그아웃) 아무것도 하지 않는다', async () => {
+    const { container } = await create();
+    await expect(container.notifySignatureChanged()).resolves.toBeUndefined();
+  });
+
   it('TC-FDBK-001 createFeedbackViewModel이 만든 ViewModel로 전송하면 성공 토스트와 닫기가 동작한다', async () => {
     const { container, toast, router } = await create();
     const navigator = new FakeFeedbackNavigator();

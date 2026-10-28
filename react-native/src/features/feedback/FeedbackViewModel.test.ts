@@ -34,6 +34,16 @@ describe('FeedbackViewModel 화면 진입과 상태', () => {
     ]);
   });
 
+  it('분석 전송이 던져도 화면은 계속 동작한다(REQ-ANL-008)', async () => {
+    const h = await createFeedbackHarness();
+    jest.spyOn(h.analytics, 'screenView').mockImplementation(() => {
+      throw new Error('analytics down');
+    });
+    expect(() => h.viewModel.start()).not.toThrow();
+    h.viewModel.onTextChange('가');
+    expect(h.viewModel.getSnapshot().count).toBe(1);
+  });
+
   it('TC-ANL-018 입력·전송 중 상태가 바뀌어도 screen_view는 다시 나가지 않는다', async () => {
     const h = await createFeedbackHarness();
     h.viewModel.start();
@@ -269,7 +279,12 @@ describe('FeedbackViewModel 실패 처리', () => {
     );
     h.viewModel.onTextChange('내용');
     await h.viewModel.submit();
-    expect(h.posts()).toHaveLength(2); // 401 -> 갱신 -> 1회 재전송
+    const posts = h.posts();
+    expect(posts).toHaveLength(2); // 401 -> 갱신 -> 1회 재전송
+    expect(posts[0].headers.Authorization).toBe('Bearer access-1');
+    expect(posts[1].headers.Authorization).not.toBe('Bearer access-1');
+    expect(posts[1].headers.Authorization).toMatch(/^Bearer /);
+    expect(posts[1].body).toBe(posts[0].body);
     expect(h.router.calls('POST /auth/refresh')).toHaveLength(1);
     expect(h.toast.messages).toEqual([t('fdbk.success')]);
     expect(h.authFlow.calls).toEqual([]);

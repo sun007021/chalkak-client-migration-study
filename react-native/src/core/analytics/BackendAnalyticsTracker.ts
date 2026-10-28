@@ -31,6 +31,13 @@ export class BackendAnalyticsTracker implements AnalyticsTracker {
     private readonly backend: AnalyticsBackend,
     private readonly reportError: (message: string, error: unknown) => void = (message, error) =>
       console.error(`[analytics] ${message}`, error),
+    /** 허용 목록이 거른 이벤트를 알린다. 기본은 개발 중에만 console.warn(운영에서는 조용히 버린다). */
+    private readonly reportRejected: (name: string, params: AnalyticsParams) => void = (
+      name,
+      params,
+    ) => {
+      if (__DEV__) console.warn(`[analytics] 허용 목록 밖이라 보내지 않음: ${name}`, params);
+    },
   ) {}
 
   screenView(screenName: string): void {
@@ -40,7 +47,14 @@ export class BackendAnalyticsTracker implements AnalyticsTracker {
   logEvent(name: string, params: AnalyticsParams = {}): void {
     const sanitize = EVENTS[name];
     const clean = sanitize ? sanitize(params) : null;
-    if (clean === null) return;
+    if (clean === null) {
+      try {
+        this.reportRejected(name, params);
+      } catch {
+        // 개발용 보고가 실패해도 무시한다.
+      }
+      return;
+    }
     try {
       this.backend.logEvent(name, clean);
     } catch (error) {

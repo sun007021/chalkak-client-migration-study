@@ -18,13 +18,32 @@ class FakeBackend implements AnalyticsBackend {
 function setup() {
   const backend = new FakeBackend();
   const reported: { message: string; error: unknown }[] = [];
-  const tracker: AnalyticsTracker = new BackendAnalyticsTracker(backend, (message, error) =>
-    reported.push({ message, error }),
+  const rejected: { name: string; params: unknown }[] = [];
+  const tracker: AnalyticsTracker = new BackendAnalyticsTracker(
+    backend,
+    (message, error) => reported.push({ message, error }),
+    (name, params) => rejected.push({ name, params }),
   );
-  return { backend, reported, tracker };
+  return { backend, reported, rejected, tracker };
 }
 
 describe('BackendAnalyticsTracker', () => {
+  it('허용 목록이 거른 이벤트는 백엔드로 가지 않고 개발용 보고 훅이 받는다', () => {
+    const { backend, rejected, tracker } = setup();
+    tracker.screenView('not_in_allow_list');
+    tracker.logEvent('unknown_event', { a: 1 });
+    tracker.screenView('settings');
+    expect(backend.events).toEqual([{ name: 'screen_view', params: { screen_name: 'settings' } }]);
+    expect(rejected.map((r) => r.name)).toEqual(['screen_view', 'unknown_event']);
+  });
+
+  it('보고 훅이 던져도 화면 동작에 영향이 없다', () => {
+    const tracker = new BackendAnalyticsTracker(new FakeBackend(), undefined, () => {
+      throw new Error('hook');
+    });
+    expect(() => tracker.screenView('not_in_allow_list')).not.toThrow();
+  });
+
   it('TC-ANL-001 화면 코드는 AnalyticsTracker 인터페이스에만 screen_view를 보내고 백엔드가 받는다', () => {
     const { backend, tracker } = setup();
     tracker.screenView('settings');

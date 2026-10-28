@@ -265,11 +265,15 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
 ## 설정·피드백·분석 (`src/features/settings`, `src/features/feedback`, `src/data/settings`, `src/data/feedback`, `src/core/analytics`)
 
 - **구성**: `SettingsViewModel`(순수 TS, `SettingsViewModelOwner`가 `MainPhaseViewModelOwner`로 메인 단계 동안 하나)이 푸시 설정 3종·기기 권한·로그아웃/탈퇴 확인·법률 문서 시트를 맡고, 사인 카드는 `SignatureCardViewModel`(`refresh`/`onSignatureChanged`/`clearAll`, 세대 기반으로 늦은 응답 폐기)이 맡는다. 피드백은 `FeedbackViewModel` + `FeedbackScreen`(라우트 `Feedback`), 사인 변경은 `SignatureChange` 라우트이며 성공하면 `onSignatureChanged()`로 GET을 다시 한다(D-18). 이동은 `NavigationSettingsNavigator`. 피드백 ViewModel은 `cacheRegistry`에 올라 로그아웃 때 비워지고 화면이 닫히면 해제된다.
-- **푸시 권한**: 새 포트를 만들지 않고 `PushPermissionGateway`에 `openSystemSettings()`(expo `Linking.openSettings()`)를 더했다. 푸시 설정 PATCH는 항목 하나씩 보낸다(PATCH 재시도 정책 적용).
-- **분석(D-22)**: 컨테이너의 `AnalyticsTracker` 하나만 쓴다. `AnalyticsBackend`가 주입되면 `BackendAnalyticsTracker`가 같은 트래커를 감싸 화면 이름·하단 탭 목적지·이벤트별 파라미터를 허용 목록으로 걸러 보내고, 알 수 없는 이벤트는 버리며 백엔드 오류는 삼킨다(`reportError`). 백엔드가 없으면 기존 트래커를 그대로 쓴다.
+- **푸시 설정 컨트롤러**: 조회·토글·권한 확인·이탈 시 되돌림은 `PushSettingsController`(순수 TS)가 맡고 `SettingsViewModel`이 합성한다. 요청 번호는 카운터 하나에서 나와 `AuthErrorPolicy` 키가 겹치지 않고, 재조회·화면 이탈·초기화는 진행 중 토글(권한 창이 열린 것 포함)을 모두 취소해 스위치가 잠기지 않는다. 이탈 시 되돌리는 이유는 응답을 보지 못해 서버 반영 여부를 모르기 때문이고, 다음 진입의 조회가 서버 값으로 바로잡는다.
+- **푸시 권한**: 새 포트를 만들지 않고 `PushPermissionGateway`에 `openSystemSettings()`를 더했다(Android는 앱 알림 설정 화면 인텐트, 실패하면 `Linking.openSettings()`; iOS는 `openSettings()`). 켤 때 이미 `denied`였던 경우에만 시스템 설정을 열고, 미결정에서 요청 창을 거부한 직후에는 열지 않고 꺼진 채로 둔다. 권한 확인 자체가 실패하면 막지 않고 저장을 진행한다(fail-open). 포그라운드 복귀 시 권한 재확인(REQ-SET-017)은 화면에 보일 상태가 없어 두지 않았고 토글 시점에 확인한다. 푸시 설정 PATCH는 항목 하나씩 보낸다(PATCH 재시도 정책 적용).
+- **분석(D-22)**: 컨테이너의 `AnalyticsTracker` 하나만 쓴다. `AnalyticsBackend`가 주입되면 `BackendAnalyticsTracker`가 같은 트래커를 감싸 화면 이름·하단 탭 목적지·이벤트별 파라미터를 허용 목록으로 걸러 보내고, 알 수 없는 이벤트는 버리며 백엔드 오류는 삼킨다(`reportError`). 백엔드가 없으면 로그 출력 트래커를 쓴다. **운영 백엔드는 아직 연결하지 않았다**(Firebase Analytics는 google-services 설정이 필요한 후속). `analytics`와 `analyticsBackend`를 함께 주면 `AppContainer.create`가 던진다. 허용 목록이 거른 이벤트는 개발 중에만 `console.warn`으로 알린다.
 - **탈퇴 401**: `AccountActionsViewModel`은 탈퇴가 401 후 `REAUTHENTICATION_REQUIRED`(또는 취소)면 실패 토스트를 띄우지 않는다. 인증 흐름(`AuthErrorPolicy`)이 로그인으로 보낸다.
 - **확인 필요(백엔드·기획)**
   1. **알림 권한 거부 시 동작(모호점 1)**: 기기 권한이 꺼져 있으면 토글을 켜려 할 때 시스템 설정을 여는 쪽으로 구현했다. 거부 상태에서 서버 설정 값을 어떻게 보일지(켜진 채로 둘지) 기획 확인이 필요하다.
   2. **피드백 오류 표시(모호점 3)**: 전송 오류는 토스트가 아니라 화면 안(`feedback.error-message`)에 보인다. 검증 실패는 고정 문구 `fdbk.error.invalid`이고, 서버가 400 `message`를 주어도 고정 문구를 쓴다(서버 문구 노출 여부 확인 필요).
   3. **확인 다이얼로그(모호점 4)**: 로그아웃·탈퇴 요청 중에는 다이얼로그가 열린 채 확인 버튼이 비활성이다. 탈퇴가 `REAUTHENTICATION_REQUIRED`이면 토스트 없이 조용히 닫힌다.
-  4. **사인 카드 오류(모호점 6)**: 사인 GET 실패는 `sign.load.error` 토스트를 유지하고 카드에도 오류 상태와 "다시 시도" 버튼(`settings.signature-retry-button`)을 둔다. 토스트만 둘지 오류 상태만 둘지 확인 필요.
+  4. **사인 카드 오류(모호점 6)**: 사인이 없는 최초 조회 실패는 카드 안의 오류 상태와 "다시 시도" 버튼(`settings.signature-retry-button`)만 보이고 토스트는 없다(TC-SET-006). 보이던 사인을 두고 재조회가 실패하면 사인을 유지하고 `sign.load.error` 토스트만 띄운다(TC-SET-005). 이 구분이 기획 의도인지 확인 필요.
+  5. **피드백 전송 중 이탈**: 전송 중 화면을 닫으면 요청을 abort하고 결과를 버린다(서버에는 이미 반영됐을 수 있다). 이탈 시 중단할지, 끝까지 보내고 조용히 처리할지 기획 확인이 필요하다.
+  6. **피드백 공백 제거**: 스펙은 "앞뒤 공백 제거"만 정한다. JS `trim()`(줄바꿈 포함 공백)을 그대로 쓴다.
+- **StrictMode와 screen_view**: 설정 화면의 `screen_view`는 탭 마운트마다 한 번 보낸다. 개발 모드의 이중 effect는 한 번 더 보낼 수 있고(홈·전시·기록의 `useFocusEffect`와 같음) 운영에는 영향이 없다. 피드백은 소유자가 `start()`로 한 번 보낸다.

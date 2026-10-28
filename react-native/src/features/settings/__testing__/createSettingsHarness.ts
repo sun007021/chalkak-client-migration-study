@@ -1,6 +1,5 @@
 import { FakeAnalyticsTracker } from '../../../core/analytics/__testing__/FakeAnalyticsTracker';
 import { createNetHarness } from '../../../core/http/__testing__/createNetHarness';
-import { FakeAppVisibility } from '../../../core/lifecycle/__testing__/FakeAppVisibility';
 import { FakeExternalLinkOpener } from '../../../core/linking/__testing__/FakeExternalLinkOpener';
 import { FakePushRegistrar } from '../../../core/push/__testing__/FakePushRegistrar';
 import { FakePushPermissionGateway } from '../../../core/push/__testing__/FakePushPermissionGateway';
@@ -62,7 +61,6 @@ export async function createSettingsHarness(options: SettingsHarnessOptions = {}
   const authFlow = new FakeAuthFlowNavigator();
   const navigator = new FakeSettingsNavigator();
   const permission = new FakePushPermissionGateway(options.permission ?? 'granted');
-  const visibility = new FakeAppVisibility();
   const linkOpener = new FakeExternalLinkOpener();
 
   const account = new AccountActionsViewModel({ authRepository, navigator: authFlow, toast });
@@ -78,7 +76,6 @@ export async function createSettingsHarness(options: SettingsHarnessOptions = {}
     signatureCard,
     account,
     permission,
-    visibility,
     appVersion: { getVersion: () => APP_VERSION },
     analytics,
     linkOpener,
@@ -100,7 +97,6 @@ export async function createSettingsHarness(options: SettingsHarnessOptions = {}
     authFlow,
     navigator,
     permission,
-    visibility,
     linkOpener,
     account,
     signatureCard,

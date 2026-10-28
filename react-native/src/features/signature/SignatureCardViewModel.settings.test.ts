@@ -89,6 +89,7 @@ describe('SignatureCardViewModel 설정 탭 재조회 (SET)', () => {
     const h = await setup('signature/users-me-signature__get-internal-error');
     await h.vm.refresh();
     expect(h.vm.getSnapshot()).toEqual({ imageUrl: null, loading: false, loadError: true });
+    expect(h.toast.messages).toEqual([]);
 
     h.router.set(GET, SUCCESS);
     await h.vm.refresh();
