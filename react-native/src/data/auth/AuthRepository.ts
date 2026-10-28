@@ -30,9 +30,12 @@ export class AuthRepository {
   constructor(private readonly deps: AuthRepositoryDeps) {}
 
   /** POST /auth/social-login {provider:"KAKAO", idToken, rawNonce}. LOGIN_SUCCESS면 캐시를 비우고 세션 저장(게스트 플래그 제거). */
-  async socialLoginKakao(input: PendingSignUp, signal?: AbortSignal): Promise<SocialLoginOutcome> {
-    const { api, sessionStore, clock } = this.deps;
-    const response = await api.requestJson(
+  async socialLoginKakao(
+    input: PendingSignUp,
+    signal?: AbortSignal,
+    onAccepted?: () => void,
+  ): Promise<SocialLoginOutcome> {
+    const response = await this.deps.api.requestJson(
       {
         method: 'POST',
         path: '/auth/social-login',
@@ -47,12 +50,22 @@ export class AuthRepository {
         pending: { idToken: input.idToken, rawNonce: input.rawNonce },
       };
     }
+    // 서버가 로그인을 받아 줬다: 이제부터 세션 저장은 취소 대상이 아니다(호출자가 화면 이탈을 막는 데 쓴다).
+    onAccepted?.();
+    await this.saveIssuedSession(response.userId, response);
+    return { kind: 'logged-in', userId: response.userId };
+  }
+
+  /**
+   * 서버가 발급한 토큰(로그인 성공·가입 완료 응답)을 저장한다: 사용자 캐시를 먼저 비우고 세션을 저장하며 게스트 플래그를 지운다.
+   * socialLoginKakao와 SignUpRepository.confirm이 공유한다.
+   */
+  async saveIssuedSession(userId: string, tokens: TokenResponse): Promise<void> {
     // 이전 계정의 캐시가 새 세션에 섞이지 않도록 저장보다 먼저 비운다.
     await this.clearUserData();
-    await sessionStore.saveAuthenticated(
-      credentialsFromTokenResponse(response.userId, response, clock.now()),
+    await this.deps.sessionStore.saveAuthenticated(
+      credentialsFromTokenResponse(userId, tokens, this.deps.clock.now()),
     );
-    return { kind: 'logged-in', userId: response.userId };
   }
 
   /** 서버 호출 없이 인증 자격을 지우고 게스트 플래그를 저장한다. 저장 실패는 throw. */
@@ -134,7 +147,18 @@ function decodeSocialLogin(raw: unknown): SocialLoginResponse {
   const o = raw as Record<string, unknown>;
   if (o.status === 'SIGN_UP_REQUIRED') return { status: 'SIGN_UP_REQUIRED' };
   if (o.status !== 'LOGIN_SUCCESS') throw new Error('unknown status');
-  const { userId, accessToken, refreshToken, expiresIn, refreshTokenExpiresIn } = o;
+  return { status: 'LOGIN_SUCCESS', ...decodeIssuedTokens(raw) };
+}
+
+/** 로그인 성공·가입 완료 응답의 토큰 필드(userId 포함)를 검증한다. 하나라도 빠지면 throw. */
+export function decodeIssuedTokens(raw: unknown): { userId: string } & TokenResponse {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('response is not an object');
+  }
+  const { userId, accessToken, refreshToken, expiresIn, refreshTokenExpiresIn } = raw as Record<
+    string,
+    unknown
+  >;
   if (
     !isNonEmptyString(userId) ||
     !isNonEmptyString(accessToken) ||
@@ -142,16 +166,9 @@ function decodeSocialLogin(raw: unknown): SocialLoginResponse {
     !isPositiveNumber(expiresIn) ||
     !isPositiveNumber(refreshTokenExpiresIn)
   ) {
-    throw new Error('missing login fields');
+    throw new Error('missing token fields');
   }
-  return {
-    status: 'LOGIN_SUCCESS',
-    userId,
-    accessToken,
-    refreshToken,
-    expiresIn,
-    refreshTokenExpiresIn,
-  };
+  return { userId, accessToken, refreshToken, expiresIn, refreshTokenExpiresIn };
 }
 
 const isNonEmptyString = (v: unknown): v is string => typeof v === 'string' && v !== '';
