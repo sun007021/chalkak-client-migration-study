@@ -8,5 +8,11 @@ export const queryOf = (request: HttpRequest): Record<string, string> =>
 export const pathOf = (request: HttpRequest): string =>
   new URL(request.url).pathname.replace(/^\/api\/v1/, '');
 
+/** 헤더 이름은 대소문자를 구분하지 않고 찾는다. */
+export const headerOf = (request: HttpRequest, name: string): string | undefined => {
+  const wanted = name.toLowerCase();
+  return Object.entries(request.headers).find(([key]) => key.toLowerCase() === wanted)?.[1];
+};
+
 export const authorizationOf = (request: HttpRequest): string | undefined =>
-  request.headers.Authorization;
+  headerOf(request, 'authorization');

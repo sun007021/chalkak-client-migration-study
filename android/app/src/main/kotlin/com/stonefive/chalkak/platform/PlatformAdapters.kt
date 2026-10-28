@@ -3,6 +3,8 @@ package com.stonefive.chalkak.platform
 import android.content.Context
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.stonefive.chalkak.BuildConfig
+import com.stonefive.chalkak.copy.Copy
+import kr.chalkak.core.common.SystemClock
 import kr.chalkak.core.common.analytics.AnalyticsTracker
 import kr.chalkak.feature.auth.ConfiguredUpdateChecker
 import kr.chalkak.feature.auth.HomePreloader
@@ -27,6 +29,8 @@ class PlatformAdapters(
     val updateChecker: UpdateChecker,
     val updateLauncher: UpdateLauncher,
     val externalBrowser: ExternalBrowser,
+    /** Banner links opened outside the app (home feature port). */
+    val linkBrowser: kr.chalkak.feature.home.ExternalBrowser,
     val signatureEncoder: SignatureImageEncoder,
     val analytics: AnalyticsTracker,
     val push: PushRegistrar,
@@ -36,12 +40,17 @@ class PlatformAdapters(
     val currentActivity: CurrentActivity = CurrentActivity(),
     /** Result channel of Play's immediate update flow, wired by `MainActivity`. */
     val updateFlowBridge: UpdateFlowBridge = UpdateFlowBridge(),
+    /** Result channel of the Photo Picker / camera, wired by `MainActivity`. */
+    val photoPickBridge: PhotoPickBridge = PhotoPickBridge(),
+    /** Photo upload and editing ports (picker, camera, codec, WebP, temp files, gallery, edit preview). */
+    val upload: UploadAdapters = UploadAdapters.headless(),
 ) {
     companion object {
-        fun android(context: Context): PlatformAdapters {
+        fun android(context: Context, copy: Copy = Copy.load(context)): PlatformAdapters {
             val app = context.applicationContext
             val activity = CurrentActivity()
             val bridge = UpdateFlowBridge()
+            val photoBridge = PhotoPickBridge()
             val playManager = AppUpdateManagerFactory.create(app)
             val socialLogin: SocialLoginClient = when {
                 // Debug builds only: BuildConfig.FAKE_SOCIAL_LOGIN is hard false in release (build.gradle.kts); DEBUG is a second lock.
@@ -53,6 +62,7 @@ class PlatformAdapters(
                 updateChecker = ConfiguredUpdateChecker(BuildConfig.FORCE_UPDATE_CHECK_ENABLED, PlayUpdateChecker(PlayUpdateSourceAdapter(playManager))),
                 updateLauncher = PlayUpdateLauncher(playManager, activity, bridge, StoreOpener(app)),
                 externalBrowser = AndroidExternalBrowser(app),
+                linkBrowser = AndroidLinkBrowser(app),
                 signatureEncoder = AndroidSignatureEncoder(),
                 analytics = LogAnalyticsTracker(),
                 push = NoopPushRegistrar,
@@ -60,6 +70,8 @@ class PlatformAdapters(
                 preloader = ReadyHomePreloader,
                 currentActivity = activity,
                 updateFlowBridge = bridge,
+                photoPickBridge = photoBridge,
+                upload = UploadAdapters.android(app, activity, photoBridge, copy, SystemClock),
             )
         }
 
@@ -68,6 +80,7 @@ class PlatformAdapters(
             updateChecker = { UpdateCheckResult.UpToDate },
             updateLauncher = { UpdateFlowResult.Cancelled },
             externalBrowser = { false },
+            linkBrowser = { kr.chalkak.feature.home.BrowserOpenResult.NoBrowser },
             signatureEncoder = AndroidSignatureEncoder(),
             analytics = object : AnalyticsTracker {
                 override fun screenView(screen: String) = Unit

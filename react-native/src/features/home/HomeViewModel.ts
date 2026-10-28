@@ -590,7 +590,7 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
     }
     if (!this.shown || this.polledPostId === postId) return;
     this.polledPostId = postId;
-    this.deps.aiReview.start(postId);
+    this.deps.aiReview.start(postId, this);
   }
 
   /**
@@ -602,7 +602,7 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
     const mustEnsureStopped = !this.shown;
     if (!startedByHome && !mustEnsureStopped) return;
     this.polledPostId = null;
-    this.deps.aiReview.stop();
+    this.deps.aiReview.stop(this);
   }
 
   // ---- 좋아요 ----

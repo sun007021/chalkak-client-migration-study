@@ -1,0 +1,47 @@
+{
+  "_comment": "D-13 편집 연산 상수. 출처: docs/spec/features/upload-edit.md 부록(Android 소스 기준). 행렬은 행 우선 4x5(결과 R,G,B,A x 입력 R,G,B,A,더하는 값), 색 값 0~255 단위.",
+  "filters": [
+    { "id": "original", "matrix": null },
+    {
+      "id": "mono",
+      "matrix": [
+        0.299, 0.587, 0.114, 0, 0, 0.299, 0.587, 0.114, 0, 0, 0.299, 0.587, 0.114, 0, 0, 0, 0, 0, 1,
+        0
+      ]
+    },
+    {
+      "id": "warm",
+      "matrix": [1.08, 0, 0, 0, 8, 0, 1.02, 0, 0, 4, 0, 0, 0.88, 0, 0, 0, 0, 0, 1, 0]
+    },
+    {
+      "id": "cool",
+      "matrix": [0.9, 0, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 1.1, 0, 10, 0, 0, 0, 1, 0]
+    },
+    {
+      "id": "vintage",
+      "matrix": [
+        0.63, 0.35, 0.09, 0, 18, 0.16, 0.76, 0.08, 0, 14, 0.12, 0.24, 0.51, 0, 10, 0, 0, 0, 1, 0
+      ]
+    },
+    {
+      "id": "vivid",
+      "matrix": [
+        1.2754, -0.2503, -0.0252, 0, 0, -0.0746, 1.0997, -0.0252, 0, 0, -0.0746, -0.2503, 1.3248, 0,
+        0, 0, 0, 0, 1, 0
+      ]
+    }
+  ],
+  "constants": {
+    "exposureEvPerUnit": 1.5,
+    "warmthGain": 0.25,
+    "blackPointRange": 0.3,
+    "shadowsAmount": 0.25,
+    "highlightsAmount": 0.25,
+    "contrastAmount": 0.6,
+    "autoSampleLongEdge": 256,
+    "autoExposureMinEv": -0.5,
+    "autoExposureMaxEv": 1.0,
+    "autoWhiteTarget": 0.96,
+    "minCropFraction": 0.1
+  }
+}

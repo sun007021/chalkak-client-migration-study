@@ -16,6 +16,14 @@ class MainActivity : ComponentActivity() {
         platform.updateFlowBridge.onResult(result.resultCode)
     }
 
+    // The Photo Picker (album) and the system camera report here; both launchers are detached again in onDestroy.
+    private val pickPhoto = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        platform.photoPickBridge.onAlbumResult(uri)
+    }
+    private val takePhoto = registerForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
+        platform.photoPickBridge.onCameraResult(saved)
+    }
+
     private val container get() = (application as ChalkakApplication).container
     private val platform get() = container.platform
 
@@ -24,6 +32,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         platform.currentActivity.set(this)
         platform.updateFlowBridge.launcher = updateFlow
+        platform.photoPickBridge.albumLauncher = pickPhoto
+        platform.photoPickBridge.cameraLauncher = takePhoto
         container.startBoot()
         val deps = container.newRootDependencies(onExitApp = ::finish)
         setContent {
@@ -43,6 +53,8 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         platform.currentActivity.clear(this)
         platform.updateFlowBridge.detach(updateFlow)
+        platform.photoPickBridge.detach(pickPhoto)
+        platform.photoPickBridge.detach(takePhoto)
         super.onDestroy()
     }
 }

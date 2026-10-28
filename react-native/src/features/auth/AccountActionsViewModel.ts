@@ -1,5 +1,5 @@
 import { Observable } from '../../core/state/Observable';
-import { CancelledError } from '../../core/http/ApiError';
+import { CancelledError, ReauthenticationRequiredError } from '../../core/http/ApiError';
 import type { ToastPresenter } from '../../core/toast/ToastPresenter';
 import type { AuthRepository } from '../../data/auth/AuthRepository';
 import { t } from '../../shared/copy';
@@ -49,14 +49,17 @@ export class AccountActionsViewModel extends Observable<AccountActionsState> {
     if (refreshToken !== null) void authRepository.revokeRefreshToken(refreshToken);
   }
 
-  /** 204면 로그인 화면, 실패면 세션 유지 + 토스트 auth.withdraw.error. 화면이 사라진 뒤의 실패는 토스트하지 않는다. */
+  /** 204면 로그인 화면, 실패면 세션 유지 + 토스트 auth.withdraw.error. 화면이 사라진 뒤의 실패와 세션 만료는 토스트하지 않는다. */
   async confirmWithdraw(): Promise<void> {
     if (!this.begin('withdraw')) return;
     try {
       await this.deps.authRepository.withdraw();
     } catch (error) {
       this.end();
-      if (!this.screenGone && !(error instanceof CancelledError)) {
+      // 세션 만료(REAUTHENTICATION_REQUIRED)는 session-expired 이벤트가 로그인으로 보내므로 실패 토스트를 띄우지 않는다.
+      const silent =
+        error instanceof CancelledError || error instanceof ReauthenticationRequiredError;
+      if (!this.screenGone && !silent) {
         this.deps.toast.show(t('auth.withdraw.error'));
       }
       return;

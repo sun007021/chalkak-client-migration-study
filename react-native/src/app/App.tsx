@@ -10,16 +10,17 @@ import { LoginScreen } from '../features/auth/LoginScreen';
 import { ConfigErrorScreen } from '../features/config/ConfigErrorScreen';
 import { RnLegalDocWebView } from '../features/onboarding/RnLegalDocWebView';
 import { SignUpRoute } from '../features/onboarding/SignUpRoute';
-import { AppContainer, type Dependencies } from './AppContainer';
+import { AppContainer, type ContainerOverrides } from './AppContainer';
 import { AppContainerProvider, useAppContainer } from './AppContainerContext';
 import { BootHost } from './BootHost';
 import { RootNavigator } from './RootNavigator';
+import { UploadEntryOverlay } from './UploadEntryOverlay';
 
 type AppProps = {
   /** 앱 루트(`index.ts`)가 `readAppConfig()`로 읽은 결과. 이 컴포넌트는 전역을 읽지 않는다. */
   configResult: AppConfigResult;
   /** 앱 루트가 읽은 기능 플래그·앱 정보, 또는 테스트의 fake를 주입한다. */
-  overrides?: Partial<Dependencies>;
+  overrides?: ContainerOverrides;
 };
 
 export function App({ configResult, overrides }: AppProps) {
@@ -39,10 +40,11 @@ export function App({ configResult, overrides }: AppProps) {
 
 /** 내비게이션 컨테이너와 화면 위 오버레이(토스트). 내비게이션 핸들은 컨테이너(AppContainer)가 소유한다. */
 function AppNavigation() {
-  const { navigationHandle, toastCenter } = useAppContainer();
+  const { navigationHandle, toastCenter, onNavigationReady } = useAppContainer();
   return (
-    <NavigationContainer ref={navigationHandle}>
+    <NavigationContainer ref={navigationHandle} onReady={onNavigationReady}>
       <AppShell />
+      <UploadEntryOverlay />
       {toastCenter ? <ToastHost center={toastCenter} /> : null}
     </NavigationContainer>
   );
@@ -52,6 +54,9 @@ function AppNavigation() {
 function AppShell() {
   const container = useAppContainer();
   const { bootViewModel, updateDialogViewModel } = container;
+
+  // 푸시 수신(기기 등록 트리거, 권한 요청, 탭 라우팅, 포그라운드 표시). 효과의 정리 함수가 모두 해제하므로 StrictMode의 재마운트에도 안전하다.
+  useEffect(() => container.startPush(), [container]);
 
   useEffect(() => {
     void bootViewModel.start();
