@@ -57,6 +57,8 @@ import { DefaultLikeController } from '../features/like/DefaultLikeController';
 import type { LikeController } from '../features/like/LikeController';
 import { DefaultPostChanges } from '../features/post/PostChanges';
 import { NavigationDisplayNavigator } from './NavigationDisplayNavigator';
+import type { MediaServices } from '../features/upload/MediaServices';
+import { NoopLikeController } from '../features/like/NoopLikeController';
 import { NavigationHomeNavigator } from './NavigationHomeNavigator';
 import type { RootStackParamList } from './navigation/routes';
 import { LoginViewModel } from '../features/auth/LoginViewModel';
@@ -113,6 +115,11 @@ export interface Dependencies {
   readonly aiReview: AiReviewPoller;
   /** 로그아웃·탈퇴·계정 전환 때 비울 사용자별 캐시. 캐시를 가진 기능 PR이 추가한다. */
   readonly userDataCaches: readonly UserDataCache[];
+  /**
+   * 업로드·편집의 네이티브 경계(사진 선택기, 이미지 엔진, 갤러리 저장, 파일). 기본 구현은 업로드 PR이 조립한다
+   * (구현 단계에서 필수로 바꾼다). 테스트는 Fake를 넣는다.
+   */
+  readonly media?: MediaServices;
 }
 
 function isUserDataCache(value: object): value is UserDataCache {
