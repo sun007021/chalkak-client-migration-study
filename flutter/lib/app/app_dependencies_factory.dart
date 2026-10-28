@@ -60,6 +60,7 @@ AppDependencies buildAppDependencies(AppConfig config) {
     main.preloadCache,
     LikeDataCleaner(likes: main.likeStore, postEvents: main.postEvents),
     main.recordCleaner,
+    main.homeAiReview,
   ]);
   const pushRegistrar = _NoopPushRegistrar();
   final signatureRepository = ApiSignatureRepository(client: client);

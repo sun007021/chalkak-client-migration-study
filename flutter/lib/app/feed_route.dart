@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/ui/toast/toast_host.dart';
+import '../features/ai_review/domain/ai_review_session.dart';
+import '../features/ai_review/domain/ai_review_target.dart';
+import '../features/ai_review/presentation/ai_review_pill.dart';
 import '../features/feed/domain/feed_target.dart';
 import '../features/feed/presentation/feed_screen.dart';
 import '../features/feed/presentation/feed_view_model.dart';
@@ -39,12 +42,19 @@ class _FeedRouteState extends State<FeedRoute> with WidgetsBindingObserver {
     postEvents: widget.dependencies.main.postEvents,
     userId: widget.userId,
   );
+  // 푸시로 열렸으면 첫 GET이 COMPLETED·FAILED일 때 시트를 한 번 자동으로 연다(REQ-AIR-046).
+  late final AiReviewSession _aiReview = AiReviewSession(
+    repository: widget.dependencies.main.aiReviewRepository,
+    toast: widget.dependencies.main.toast,
+    openSheetOnEntry: widget.target.origin == FeedOrigin.push,
+  );
   StreamSubscription<FeedEvent>? _events;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _viewModel.addListener(_syncAiTarget);
     unawaited(_viewModel.load());
   }
 
@@ -52,6 +62,8 @@ class _FeedRouteState extends State<FeedRoute> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_events?.cancel());
+    _viewModel.removeListener(_syncAiTarget);
+    _aiReview.dispose();
     _viewModel.dispose();
     super.dispose();
   }
@@ -59,6 +71,21 @@ class _FeedRouteState extends State<FeedRoute> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) _viewModel.onResumed();
+  }
+
+  /// 상세가 확정되고 내 게시물일 때만 AI 대상을 정한다(남의 게시물·확정 전은 null).
+  void _syncAiTarget() {
+    final state = _viewModel.state;
+    final content = state.content;
+    _aiReview.setTarget(
+      state.isConfirmed && content != null
+          ? AiReviewTarget.forPost(
+              postId: content.postId,
+              isMine: state.isMine,
+              topicDate: content.topicDate,
+            )
+          : null,
+    );
   }
 
   void _close() => unawaited(Navigator.of(context).maybePop());
@@ -72,6 +99,10 @@ class _FeedRouteState extends State<FeedRoute> with WidgetsBindingObserver {
         viewModel: _viewModel,
         onToast: (message) => toast.show(message.text),
         onClose: _close,
+        aiSlot: AiReviewPill(
+          session: _aiReview,
+          visible: ModalRoute.of(context)?.isCurrent ?? true,
+        ),
       ),
     );
   }
