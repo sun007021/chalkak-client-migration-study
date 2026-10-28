@@ -28,6 +28,7 @@ class SignatureCardState {
     this.status = SignatureCardStatus.idle,
     this.imageUrl,
     this.toast,
+    this.loadFailed = false,
   });
 
   final SignatureCardStatus status;
@@ -37,6 +38,11 @@ class SignatureCardState {
 
   /// 조회 실패 토스트(`sign.load.error`). 같은 문구가 연달아도 id가 다르다.
   final SignatureMessage? toast;
+
+  /// 보여 줄 사인이 없는 채로 조회가 실패했다(TC-SET-006, D-20). 설정 카드가 인라인 오류
+  /// (`Copy.signLoadError`)와 "다시 불러오기"를 보인다. 보이던 사인이 있으면 false(유지, TC-SET-005).
+  /// 다음 조회가 시작되거나 성공하면 false로 돌아간다.
+  final bool loadFailed;
 }
 
 /// 설정 사인 카드의 상태(REQ-SIGN-013~017, TC-SIGN-026, 027, 039, 040). 카드 위젯은 SET PR 몫.
@@ -83,6 +89,16 @@ class SignatureCardViewModel extends ChangeNotifier {
   }
 
   Future<void> onSettingsTabShown() => load();
+
+  /// 사인 변경이 성공해 설정으로 돌아왔다(D-18, TC-SET-009, 011).
+  /// 변경 전에 시작된 조회는 진행 중이어도 결과를 버리고, 새로 `GET`을 보내 그 썸네일(null이면 원본)로
+  /// 바꾼다. 변경 요청의 응답 URL은 쓰지 않는다. 변경이 실패한 경우에는 부르지 않으며 진행 중이던
+  /// 조회는 그대로 반영된다(TC-SET-010).
+  Future<void> onSignatureChanged() => throw UnimplementedError();
+
+  /// 계정 전환·로그아웃 때 보이던 사인과 진행 중 조회를 비운다(idle로). 늦게 도착한 이전 계정의
+  /// 응답은 반영하지 않는다(TC-SET-037).
+  void reset() => throw UnimplementedError();
 
   void _onFailure(ApiError error) {
     if (error.errorCode == ApiErrorCode.signatureRegistrationRequired) {
