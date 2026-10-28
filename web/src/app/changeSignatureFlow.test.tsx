@@ -1,5 +1,6 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { makeHarness, renderApp } from '../test/appHarness';
+import { SETTINGS_BELOW_STATE } from './paths';
 import { loadFixture, memberSession } from '../test/fixtures';
 import { screenViews } from '../test/screenViews';
 import { CARD_GET, CHANGE_CONFIRM, CHANGE_PUT, CHANGE_UPLOADS, fx, routeChange, sequence } from '../test/signatureRoutes';
@@ -12,7 +13,7 @@ async function startFromSettings(options: { strict?: boolean } = {}) {
   const h = makeHarness({ session: memberSession() });
   const view = renderApp(h.container, '/settings', options);
   await screen.findByTestId('settings.root');
-  await act(async () => view.router.navigate('/settings/signature'));
+  await act(async () => view.router.navigate('/settings/signature', { state: SETTINGS_BELOW_STATE }));
   const canvas = await screen.findByTestId('signature.canvas');
   stubCanvasRect(canvas);
   return { h, canvas, ...view };
@@ -109,5 +110,28 @@ describe('사인 변경 전체 흐름 (설정 → 그리기 → 미리보기 →
     expect(h.ff.callsTo(CARD_GET)).toHaveLength(0);
     expect(h.container.signatureCard.state).toEqual({ status: 'idle', imageUrl: null });
     expect(screen.queryByText('사인 반영까지 시간이 좀 걸릴 수 있어요!')).not.toBeInTheDocument();
+  });
+
+  it('딥링크로 그리기가 첫 항목이면(settingsBelow 없음) 끝난 뒤 -2로 나가지 않고 설정으로 replace한다', async () => {
+    const h = makeHarness({ session: memberSession() });
+    const { router, path } = renderApp(h.container, '/settings/signature');
+    const canvas = await screen.findByTestId('signature.canvas');
+    stubCanvasRect(canvas);
+    routeChange(h.ff);
+    await drawAndPreview(canvas);
+    fireEvent.click(screen.getByTestId('signature-preview.confirm-button'));
+    await waitFor(() => expect(path()).toBe('/settings'));
+    expect(router.state.historyAction).toBe('REPLACE');
+    expect(await screen.findByTestId('settings.root')).toBeInTheDocument();
+    expect(screen.queryByTestId('signature-preview.root')).not.toBeInTheDocument();
+  });
+
+  it('딥링크 그리기의 뒤로 버튼은 설정으로 replace한다', async () => {
+    const h = makeHarness({ session: memberSession() });
+    const { router, path } = renderApp(h.container, '/settings/signature');
+    await screen.findByTestId('signature.canvas');
+    fireEvent.click(screen.getByTestId('signature.back-button'));
+    await waitFor(() => expect(path()).toBe('/settings'));
+    expect(router.state.historyAction).toBe('REPLACE');
   });
 });

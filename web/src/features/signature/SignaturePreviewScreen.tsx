@@ -2,13 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router';
 import { useContainer } from '../../app/AppContext';
-import { ROUTES } from '../../app/paths';
+import { ROUTES, isSettingsBelow } from '../../app/paths';
 import { t } from '../../copy/ko';
 import { useScreenView } from '../../core/analytics/useScreenView';
 import { useOwnedViewModel } from '../../core/state/useOwnedViewModel';
 import { useViewModel } from '../../core/state/useViewModel';
 import { LoadingIndicator } from '../../core/ui/StateViews';
 import type { SignatureMode } from './SignatureMode';
+import { planAfterOutcome } from './signatureNavigation';
 import type { SignaturePreviewOutcome, SignaturePreviewViewModel } from './SignaturePreviewViewModel';
 
 /**
@@ -40,8 +41,8 @@ const imageStyle: CSSProperties = { width: '100%', aspectRatio: '2 / 1', objectF
 function SignaturePreviewView({ vm, mode, png }: { vm: SignaturePreviewViewModel; mode: SignatureMode; png: Blob }): ReactNode {
   const container = useContainer();
   const navigate = useNavigate();
-  // 그리기 화면에서 push로 들어왔는지. 변경 모드는 끝날 때 그 두 항목을 백스택에서 걷어 낸다(REQ-SIGN-022).
-  const fromDraw = (useLocation().state as { fromDraw?: boolean } | null)?.fromDraw === true;
+  // 설정이 두 칸 아래에 쌓여 있으면 끝날 때 뒤로 가기로 그리기·미리보기를 걷어 낸다(REQ-SIGN-022).
+  const below = isSettingsBelow(useLocation());
   useScreenView(mode === 'onboarding' ? 'onboarding_signature_preview' : 'change_signature_preview');
   const state = useViewModel(vm);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -54,28 +55,11 @@ function SignaturePreviewView({ vm, mode, png }: { vm: SignaturePreviewViewModel
   }, [container, png]);
 
   const go = (outcome: SignaturePreviewOutcome) => {
-    switch (outcome.kind) {
-      case 'home':
-        container.signatureDraft.clear();
-        navigate(ROUTES.home, { replace: true });
-        break;
-      case 'settings':
-        container.signatureDraft.clear();
-        if (fromDraw) navigate(-2);
-        else navigate(ROUTES.settings, { replace: true });
-        break;
-      case 'draw':
-        container.signatureDraft.clear();
-        if (mode === 'change' && fromDraw) navigate(-1);
-        else navigate(drawPath(mode), { replace: true });
-        break;
-      case 'login':
-        container.signatureDraft.clear();
-        navigate(ROUTES.login, { replace: true });
-        break;
-      default:
-        break;
-    }
+    const plan = planAfterOutcome(mode, outcome, below);
+    if (!plan) return;
+    container.signatureDraft.clear();
+    if (plan.kind === 'back') navigate(-plan.steps);
+    else navigate(plan.to, { replace: true });
   };
   return (
     <div data-testid="signature-preview.root" data-mode={mode} style={{ minHeight: '100dvh', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16, padding: 16 }}>

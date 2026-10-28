@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent, ReactNode } from 'react';
-import { Navigate, useNavigate } from 'react-router';
+import { Navigate, useLocation, useNavigate } from 'react-router';
 import { useContainer } from '../../app/AppContext';
-import { ROUTES } from '../../app/paths';
+import { ROUTES, SETTINGS_BELOW_STATE, isSettingsBelow } from '../../app/paths';
 import { SIGNATURE_PNG_SIZE } from '../../constants';
 import { t } from '../../copy/ko';
 import { useScreenView } from '../../core/analytics/useScreenView';
@@ -12,6 +12,7 @@ import type { SignatureDrawViewModel } from './SignatureDrawViewModel';
 import type { SignatureMode } from './SignatureMode';
 import type { SignaturePad } from './SignaturePad';
 import { clientToPad, smoothPath } from './signatureGeometry';
+import { planDrawBack } from './signatureNavigation';
 
 /**
  * 사인 그리기 화면(onboarding: /signup/signature, change: /settings/signature). data-testid: signature.root(data-mode), signature.title, signature.guide-text,
@@ -66,6 +67,7 @@ function paintStrokes(canvas: HTMLCanvasElement, pad: SignaturePad, strokes: Sig
 
 function SignatureDrawView({ vm, mode }: { vm: SignatureDrawViewModel; mode: SignatureMode }): ReactNode {
   const navigate = useNavigate();
+  const below = isSettingsBelow(useLocation());
   useScreenView(mode === 'onboarding' ? 'onboarding_signature' : 'change_signature');
   const state = useViewModel(vm);
   const pad = vm.pad;
@@ -92,9 +94,13 @@ function SignatureDrawView({ vm, mode }: { vm: SignatureDrawViewModel; mode: Sig
   const endStroke = () => pad.endStroke();
   const submit = () =>
     void vm.submit().then((outcome) => {
-      if (outcome.kind === 'preview') navigate(mode === 'onboarding' ? ROUTES.signupSignaturePreview : ROUTES.changeSignaturePreview, { state: { fromDraw: true } });
+      if (outcome.kind === 'preview') navigate(mode === 'onboarding' ? ROUTES.signupSignaturePreview : ROUTES.changeSignaturePreview, { state: below ? SETTINGS_BELOW_STATE : undefined });
     });
-  const back = () => navigate(mode === 'onboarding' ? ROUTES.terms : ROUTES.settings, { replace: true });
+  const back = () => {
+    const plan = planDrawBack(mode, below);
+    if (plan.kind === 'back') navigate(-plan.steps);
+    else navigate(plan.to, { replace: true });
+  };
   return (
     <div data-testid="signature.root" data-mode={mode} style={{ minHeight: '100dvh', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16, padding: 16 }}>
       <button type="button" data-testid="signature.back-button" style={{ alignSelf: 'flex-start', minHeight: 44 }} onClick={back}>
