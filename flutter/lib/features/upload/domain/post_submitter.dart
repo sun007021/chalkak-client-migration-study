@@ -2,10 +2,13 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 
+import '../../../core/copy/ko.g.dart';
+import '../../../core/network/api_error.dart';
 import '../../home/domain/home_models.dart';
 import '../../home/domain/today_post_repository.dart';
 import 'monotonic_clock.dart';
 import 'post_upload_repository.dart';
+import 'upload_failure_mapper.dart';
 import 'upload_models.dart';
 import 'upload_preparer.dart';
 
@@ -71,5 +74,156 @@ class PostSubmitter {
     required UploadTarget target,
     String? title,
     CancelToken? cancelToken,
-  }) => throw UnimplementedError();
+  }) async {
+    var current = prepared;
+
+    /// 실패 결과를 만든다. 폐기·취소·로그인이면 임시 파일을 지우고 준비물을 돌려주지 않는다.
+    Future<SubmitFailed> fail(UploadFailure failure) async {
+      final discard =
+          failure.discardPrepared || failure.kind != UploadFailureKind.failed;
+      if (discard) {
+        await preparer.discard(current);
+        return SubmitFailed(failure);
+      }
+      return SubmitFailed(failure, retained: current);
+    }
+
+    if (cancelToken?.isCancelled ?? false) {
+      return fail(const UploadFailure.cancelled());
+    }
+
+    // 1. URL 만료 확인
+    try {
+      current = await preparer.refresh(
+        current,
+        source,
+        cancelToken: cancelToken,
+      );
+    } on UploadFailure catch (failure) {
+      return fail(failure);
+    }
+
+    // 2. 파일 크기 검사(정책 maxBytes 초과는 보내지 않는다)
+    if (current.sizeBytes > current.policy.maxBytes) {
+      return fail(
+        const UploadFailure(Copy.uploadErrorPrepare, discardPrepared: true),
+      );
+    }
+
+    // 3. presigned PUT
+    try {
+      final bytes = await current.file.readBytes();
+      await repository.putImage(
+        current.policy,
+        bytes,
+        cancelToken: cancelToken,
+      );
+    } on ApiError catch (error) {
+      if (error.isCancelled) return fail(const UploadFailure.cancelled());
+      if (error.isNetwork) {
+        return fail(const UploadFailure(Copy.uploadErrorNetwork));
+      }
+      // S3 403·5xx, 허용되지 않는 URL: 정책을 버리고 다음 제출은 정책 발급부터.
+      return fail(
+        const UploadFailure(Copy.uploadErrorUpload, discardPrepared: true),
+      );
+    } on Object {
+      // 임시 파일을 읽지 못했다.
+      return fail(
+        const UploadFailure(Copy.uploadErrorPrepare, discardPrepared: true),
+      );
+    }
+    if (cancelToken?.isCancelled ?? false) {
+      return fail(const UploadFailure.cancelled());
+    }
+
+    // 4. POST /posts (자동 재시도 없음)
+    try {
+      final created = await repository.createPost(
+        topicId: target.topicId,
+        uploadId: current.policy.uploadId,
+        title: title,
+        cancelToken: cancelToken,
+      );
+      return _succeeded(current, created.postId, created.moderationStatus);
+    } on ApiError catch (error) {
+      return _onCreateError(error, current, target, cancelToken, fail);
+    } on Object {
+      return fail(const UploadFailure(Copy.uploadErrorCreate));
+    }
+  }
+
+  Future<SubmitOutcome> _onCreateError(
+    ApiError error,
+    PreparedUpload current,
+    UploadTarget target,
+    CancelToken? cancelToken,
+    Future<SubmitFailed> Function(UploadFailure) fail,
+  ) async {
+    if (error.isCancelled) return fail(const UploadFailure.cancelled());
+    // 응답 유실(타임아웃·끊김)과 2xx 계약 위반: 재전송하지 않고 오늘 게시물로 확인한다(D-07).
+    if (error.isNetwork || error.isInvalidResponse) {
+      final today = await _today(cancelToken);
+      if (today is TodayPost && today.isPosted) {
+        return _succeeded(current, today.postId!, today.moderationStatus!);
+      }
+      return fail(
+        UploadFailure(
+          error.isNetwork ? Copy.uploadErrorNetwork : Copy.uploadErrorCreate,
+        ),
+      );
+    }
+    final status = error.status;
+    if (status == 401) return fail(const UploadFailure.loginRequired());
+    if (status == 403) return fail(const UploadFailure(Copy.uploadGateBanned));
+    if (status == 400 || status == 404) {
+      // message가 아니라 오늘 게시물로 판정한다(D-02).
+      final today = await _today(cancelToken);
+      if (today is TodayPost) {
+        if (today.isPosted) {
+          return fail(const UploadFailure(Copy.uploadErrorDuplicate));
+        }
+        if (today.topicDate != target.topicDate) {
+          return fail(const UploadFailure(Copy.uploadErrorTopicChanged));
+        }
+        // 그 밖의 400: 서버 message 그대로, 준비를 처음부터.
+        return fail(
+          UploadFailure(
+            error.message ?? Copy.uploadErrorCreate,
+            discardPrepared: true,
+          ),
+        );
+      }
+      if (today is ApiError) {
+        if (today.isCancelled) return fail(const UploadFailure.cancelled());
+        if (today.status == 404) {
+          return fail(const UploadFailure(Copy.uploadErrorTopicChanged));
+        }
+      }
+      return fail(const UploadFailure(Copy.uploadErrorCreate));
+    }
+    return fail(
+      UploadFailureMapper.fromApi(error, fallback: Copy.uploadErrorCreate),
+    );
+  }
+
+  /// `GET /posts/today`. 실패하면 오류 객체를 돌려준다.
+  Future<Object> _today(CancelToken? cancelToken) async {
+    try {
+      return await todayPost.today(cancelToken: cancelToken);
+    } on ApiError catch (error) {
+      return error;
+    } on Object catch (error) {
+      return error;
+    }
+  }
+
+  Future<SubmitOutcome> _succeeded(
+    PreparedUpload prepared,
+    String postId,
+    ModerationStatus status,
+  ) async {
+    await preparer.discard(prepared);
+    return SubmitSucceeded(postId, status);
+  }
 }
