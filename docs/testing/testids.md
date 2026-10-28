@@ -274,6 +274,7 @@
 | ai-result-sheet | 기준 안내 버튼       | `ai-result-sheet.criteria-info-button` |                                         |
 | ai-result-sheet | 기준 안내 다이얼로그 | `ai-result-sheet.criteria-dialog`      |                                         |
 | ai-result-sheet | 닫기 버튼            | `ai-result-sheet.close-button`         |                                         |
+| ai-result-sheet | 기준 안내 닫기 버튼  | `ai-result-sheet.criteria-close-button` | 기준 안내 다이얼로그 안 (RN 추가)       |
 
 ### AI 피드백 실패 시트
 

@@ -15,6 +15,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.ui.components.ScreenGoneEffect
+import com.stonefive.chalkak.ui.common.RemoteImage
 import kr.chalkak.core.data.post.LikeController
 import kr.chalkak.core.data.post.LikeEvent
 import kr.chalkak.core.data.post.PostChanges

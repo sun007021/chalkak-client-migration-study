@@ -10,6 +10,7 @@ import { HomeScreen } from '../features/home/HomeScreen';
 import { PlaceholderScreen } from '../features/placeholder/PlaceholderScreen';
 import { RecordScreen } from '../features/record/RecordScreen';
 import { CalendarImageCaptureHost } from '../features/record/ui/CalendarImageCaptureHost';
+import { HomeAiCard } from './AiReviewHosts';
 import { useAppContainer } from './AppContainerContext';
 import { BottomBar } from './BottomBar';
 import type { TabParamList } from './navigation/routes';
@@ -42,7 +43,12 @@ function HomeTab() {
   const focused = useIsFocused();
   useFocusEffect(useCallback(() => analytics.screenView('home'), [analytics]));
   if (!viewModel || !focused) return <View style={{ flex: 1 }} />;
-  return <HomeScreen viewModel={viewModel} />;
+  return (
+    <HomeScreen
+      viewModel={viewModel}
+      renderAiCard={(postId, topicDate) => <HomeAiCard postId={postId} topicDate={topicDate} />}
+    />
+  );
 }
 
 /**

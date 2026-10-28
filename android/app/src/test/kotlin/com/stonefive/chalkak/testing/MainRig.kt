@@ -20,7 +20,15 @@ import com.stonefive.chalkak.ui.main.TabPlaceholder
 import com.stonefive.chalkak.ui.main.UploadEntryGate
 import kotlinx.coroutines.CompletableDeferred
 import kr.chalkak.core.data.post.LikeController
+import kr.chalkak.core.common.KstCalendar
+import kr.chalkak.core.common.testing.FakeClock
 import kr.chalkak.core.data.post.PostChanges
+import kr.chalkak.core.data.post.PostSort
+import kr.chalkak.core.data.post.testing.FakeUser
+import kr.chalkak.core.data.post.testing.USER_A_ID
+import kr.chalkak.feature.display.DisplayStateHolder
+import kr.chalkak.feature.display.FeedEntry
+import kr.chalkak.feature.display.FeedStateHolder
 import kr.chalkak.core.data.post.testing.FakeLikeServer
 import kr.chalkak.core.data.post.testing.FakePostRepository
 import kr.chalkak.feature.home.BrowserOpenResult
@@ -72,8 +80,6 @@ class MainRig(val mode: AccessMode = AccessMode.Member) {
     val holderScope = HolderScope()
     val likes = LikeController(holderScope.scope, posts, { mode == AccessMode.Member }, changes)
 
-    /** `ScrollToTopSignal.count` each time the display tab's content was composed with a new value. */
-    val displaySignals = CopyOnWriteArrayList<Int>()
     val otherTabsComposed = CopyOnWriteArrayList<Tab>()
     var exits = 0
     var toast by mutableStateOf<ToastUi?>(null)
@@ -81,7 +87,17 @@ class MainRig(val mode: AccessMode = AccessMode.Member) {
     val shownToasts = CopyOnWriteArrayList<String>()
     val images = RecordingImage()
 
+    /** Display / feed side: fixture-answered post list and detail endpoints, the signed-in user and a fixed KST day. */
+    val user = FakeUser(if (mode == AccessMode.Member) USER_A_ID else null)
+    val postClock = FakeClock()
+    val postAnalytics = RecordingAnalytics()
+
+    /** Every display holder / feed entry the host asked for, in order (a holder per request, not per recomposition). */
+    val displayRequests = CopyOnWriteArrayList<Pair<LocalDate?, PostSort?>>()
+    val feedEntries = CopyOnWriteArrayList<FeedEntry>()
+
     init {
+        posts.autoRespond()
         posts.likeHandler = { put, id -> likeServer.handle(put, id) }
     }
 
@@ -94,9 +110,16 @@ class MainRig(val mode: AccessMode = AccessMode.Member) {
         uploadGate = gate,
         issueOpener = ExternalLinkOpener(browser),
         image = images.slot,
-        otherTab = { tab, signal ->
+        newDisplayHolder = { scope, date, sort ->
+            displayRequests += date to sort
+            DisplayStateHolder(scope, posts, likes, changes, user, KstCalendar(postClock), postAnalytics, date, sort)
+        },
+        newFeedHolder = { scope, entry ->
+            feedEntries += entry
+            FeedStateHolder(scope, posts, likes, changes, user, KstCalendar(postClock), postAnalytics, entry)
+        },
+        otherTab = { tab, _ ->
             otherTabsComposed += tab
-            if (tab == Tab.Display) displaySignals += signal.count
             TabPlaceholder(tab)
         },
     )

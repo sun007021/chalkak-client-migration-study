@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FeedNavigator } from '../features/feed/FeedNavigator';
 import { FeedScreen } from '../features/feed/FeedScreen';
 import type { FeedTarget } from '../features/feed/FeedTarget';
+import { FeedAiReview } from './AiReviewHosts';
 import { useAppContainer } from './AppContainerContext';
 import { useOwnedViewModel } from './useOwnedViewModel';
 
@@ -65,5 +66,12 @@ function OwnedFeed({
   }, [container, target, userId]);
   const viewModel = useOwnedViewModel(create);
   if (!viewModel) return null;
-  return <FeedScreen viewModel={viewModel} />;
+  return (
+    <FeedScreen
+      viewModel={viewModel}
+      renderAiReview={({ postId, topicDate }) => (
+        <FeedAiReview postId={postId} topicDate={topicDate} />
+      )}
+    />
+  );
 }

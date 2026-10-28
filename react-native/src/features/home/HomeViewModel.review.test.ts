@@ -132,3 +132,13 @@ describe('HomeViewModel.retryRanking("popular")', () => {
     expect(h.viewModel.getSnapshot().popular.status).toBe('ready');
   });
 });
+
+describe('HomeViewModel AI 폴러 소유자', () => {
+  it('폴러를 시작하고 멈출 때 자기 자신을 소유자로 넘긴다(상세가 가져간 폴링을 멈추지 않게)', async () => {
+    const h = await createHomeHarness();
+    await h.viewModel.onShown();
+    h.visibility.emit('background');
+    expect(h.aiReview.calls).toEqual([`start:${MY_POST_ID}`, 'stop']);
+    expect(h.aiReview.owners).toEqual([h.viewModel, h.viewModel]);
+  });
+});

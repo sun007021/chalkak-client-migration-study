@@ -55,7 +55,10 @@ import { PostRepository } from '../data/post/PostRepository';
 import { RecordRepository } from '../data/record/RecordRepository';
 import { TopicRepository } from '../data/topic/TopicRepository';
 import type { AiReviewPoller } from '../features/ai-review/AiReviewPoller';
-import { NoopAiReviewPoller } from '../features/ai-review/NoopAiReviewPoller';
+import { AiReviewRepository } from '../data/ai-review/AiReviewRepository';
+import { AiReviewViewModel, type AiReviewTarget } from '../features/ai-review/AiReviewViewModel';
+import { DefaultAiReviewPoller } from '../features/ai-review/DefaultAiReviewPoller';
+import type { AiReviewSession } from '../features/ai-review/AiReviewSession';
 import type { MainMode } from '../features/auth/AuthFlowNavigator';
 import { BannerFeedViewModel } from '../features/banner/BannerFeedViewModel';
 import { IssueWebViewModel } from '../features/banner/IssueWebViewModel';
@@ -158,7 +161,10 @@ export interface Dependencies {
   readonly toast: ToastPresenter;
   /** 없으면 컨테이너가 실제 구현(DefaultLikeController)을 만든다. 테스트는 Fake를 넣는다. 어느 쪽이든 clearAll이 있으면 로그아웃 때 비우는 캐시에 올린다. */
   readonly likes?: LikeController;
-  readonly aiReview: AiReviewPoller;
+  /** 없으면 실제 폴러(DefaultAiReviewPoller)를 만든다. 테스트는 Fake를 넣는다. */
+  readonly aiReview?: AiReviewPoller;
+  /** 알약·카드·시트까지 그리는 폴러(화면용 면 포함). 주면 aiReview도 이것이 된다. 둘 다 없으면 실제 폴러를 만든다. */
+  readonly aiReviewSession?: AiReviewSession;
   /** 기록 탭의 달력 이미지 렌더러·저장소. 없으면 컨테이너가 기본 구현을 쓴다(기록 PR). */
   readonly calendarImageRenderer?: CalendarImageRenderer;
   readonly calendarImageSaver?: CalendarImageSaver;
@@ -228,6 +234,10 @@ export class AppContainer {
   readonly calendarCapture: ViewShotCalendarImageRenderer | null;
   /** 전시·홈·피드가 같이 쓰는 좋아요 저장소(D-04). 기본은 실제 컨트롤러다. */
   readonly likes: LikeController;
+  /** 홈과 상세가 함께 쓰는 AI 피드백 폴러(앱에 하나). */
+  readonly aiReview: AiReviewPoller;
+  /** 알약·카드·시트를 그릴 수 있는 폴러. `aiReview`만 주입한 테스트에서는 null이라 AI 영역을 그리지 않는다. */
+  readonly aiReviewSession: AiReviewSession | null;
   /** 상세에서 일어난 제목 수정·삭제를 전시 등이 따라 반영하게 하는 채널. 계정 전환 때 비운다. */
   readonly postChanges = new DefaultPostChanges();
   /** 게시물이 만들어졌음을 홈(히어로 갱신) 등에 알린다. 표시 PR의 PostChanges와 의미가 달라 별도 채널이다. */
@@ -329,6 +339,16 @@ export class AppContainer {
     this.likes = dependencies.likes ?? this.createDefaultLikes();
     if (dependencies.likes && isUserDataCache(dependencies.likes)) {
       this.cacheRegistry.register(dependencies.likes);
+    }
+    const injectedAiReview = dependencies.aiReviewSession ?? dependencies.aiReview;
+    if (injectedAiReview) {
+      this.aiReview = injectedAiReview;
+      this.aiReviewSession = dependencies.aiReviewSession ?? null;
+      if (isUserDataCache(injectedAiReview)) this.cacheRegistry.register(injectedAiReview);
+    } else {
+      const poller = this.createDefaultAiReview();
+      this.aiReview = poller;
+      this.aiReviewSession = poller;
     }
     this.cacheRegistry.register(this.postChanges);
     this.signatureRepository = new SignatureRepository({ api: this.api });
@@ -466,6 +486,42 @@ export class AppContainer {
     return likes;
   }
 
+  /** 실제 AI 피드백 폴러. 로그아웃·계정 전환 때 폴링과 값을 버리도록 캐시 레지스트리에 올린다. */
+  private createDefaultAiReview(): DefaultAiReviewPoller {
+    const poller = new DefaultAiReviewPoller({
+      reviews: new AiReviewRepository({ api: this.api }),
+      clock: this.clock,
+      sleeper: this.dependencies.sleeper,
+      session: this.sessionStore,
+      toast: this.toast,
+      authFlow: this.bootViewModel,
+    });
+    this.cacheRegistry.register(poller);
+    return poller;
+  }
+
+  /**
+   * AI 피드백 알약(상세)·카드(홈) ViewModel. 화면을 그리는 소유자(React 컴포넌트)만 부르고 버릴 때 dispose한다.
+   * 화면용 폴러(aiReviewSession)가 없으면 호출하지 않는다.
+   */
+  createAiReviewViewModel(params: {
+    target: AiReviewTarget;
+    surface: 'feed' | 'home';
+    entry?: 'normal' | 'push';
+  }): AiReviewViewModel {
+    const poller = this.aiReviewSession;
+    if (!poller) throw new Error('AI 피드백 화면용 폴러가 주입되지 않았습니다');
+    return new AiReviewViewModel({
+      target: params.target,
+      mode: 'member',
+      surface: params.surface,
+      entry: params.entry ?? 'normal',
+      clock: this.clock,
+      poller,
+      visibility: this.dependencies.visibility,
+    });
+  }
+
   /** 소유자(displayOwner)만 부른다. */
   private createDisplayViewModel(mode: MainMode): DisplayViewModel {
     const { clock } = this;
@@ -549,7 +605,8 @@ export class AppContainer {
   /** 소유자(homeOwner)만 부른다. */
   private createHomeViewModel(mode: MainMode): HomeViewModel {
     const { api, clock } = this;
-    const { aiReview, visibility } = this.dependencies;
+    const { aiReview } = this;
+    const { visibility } = this.dependencies;
     const { likes } = this;
     return new HomeViewModel({
       mode,
@@ -749,7 +806,8 @@ export class AppContainer {
         media: overrides.media,
         calendarImageRenderer: overrides.calendarImageRenderer,
         calendarImageSaver: overrides.calendarImageSaver,
-        aiReview: overrides.aiReview ?? new NoopAiReviewPoller(),
+        aiReview: overrides.aiReview,
+        aiReviewSession: overrides.aiReviewSession,
       },
       toastCenter,
     );
