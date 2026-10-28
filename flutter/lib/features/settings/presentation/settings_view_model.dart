@@ -224,8 +224,11 @@ class SettingsViewModel extends ChangeNotifier implements UserDataCleaner {
   @override
   Future<void> clearAll() async {
     _tabLoad = null;
+    _dialog = null;
+    _accountBusy = false;
     await push.clearAll();
     signature.reset();
+    if (!_disposed) notifyListeners();
   }
 
   void _emit(SettingsEvent event) {

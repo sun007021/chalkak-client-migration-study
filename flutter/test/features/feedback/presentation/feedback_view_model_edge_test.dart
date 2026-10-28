@@ -54,4 +54,17 @@ void main() {
     expect(r.state.errorMessage, isNotEmpty);
     expect(r.state.errorMessage, isNot(Copy.fdbkErrorGeneric));
   });
+
+  fakeTest('REQ-FDBK-006 전송 중에는 입력이 바뀌지 않고 실패하면 보낸 내용이 그대로 남는다', (async) {
+    final r = FeedbackRig();
+    r.onPost([fx('feedback/feedbacks__internal-error.json')]);
+    r.vm.onTextChanged('보낸 내용');
+    r.vm.send();
+    r.vm.onTextChanged('전송 중 수정');
+    expect(r.state.text, '보낸 내용');
+    advance(async, const Duration(seconds: 10));
+    expect(r.state.text, '보낸 내용');
+    r.vm.onTextChanged('실패 뒤 수정');
+    expect(r.state.text, '실패 뒤 수정');
+  });
 }

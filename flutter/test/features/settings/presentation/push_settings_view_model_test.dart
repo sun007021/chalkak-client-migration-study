@@ -5,6 +5,8 @@ import 'package:chalkak/features/settings/domain/notification_settings.dart';
 import 'package:chalkak/features/settings/presentation/push_settings_view_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/notification_fakes.dart'
+    show FakeNotificationPermission;
 import '../../../support/settings_fakes.dart';
 
 class _Rig {
@@ -18,7 +20,9 @@ class _Rig {
 
   final FakeNotificationSettingsRepository repo =
       FakeNotificationSettingsRepository();
-  final FakePushPermission permission = FakePushPermission();
+  final FakeNotificationPermission permission = FakeNotificationPermission(
+    OsPermissionStatus.granted,
+  );
   final RecordingToast toast = RecordingToast();
   late final PushSettingsViewModel vm;
 

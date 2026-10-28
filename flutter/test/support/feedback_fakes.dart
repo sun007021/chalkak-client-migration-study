@@ -49,7 +49,7 @@ class FeedbackRig {
     api = ApiFeedbackRepository(client: http.client);
     vm = FeedbackViewModel(
       repository: repository ?? api,
-      sessions: http.sessions,
+      readUserId: () async => (await http.sessions.read())?.userId,
       toast: toast,
       analytics: analytics,
       onComposingChanged: composing.add,

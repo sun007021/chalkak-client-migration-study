@@ -23,6 +23,7 @@ import 'fake_adapter.dart' show FakeResponse;
 import 'fake_analytics_tracker.dart';
 import 'home_fakes.dart' show RecordingToast;
 import 'net_harness.dart' show advance, sessionAt, sessionGuest, v1;
+import 'notification_fakes.dart' show FakeNotificationPermission;
 import 'onboarding_fakes.dart';
 
 export 'home_fakes.dart' show RecordingToast, failing, fx;
@@ -49,42 +50,6 @@ const aiOff = NotificationSettings(
 
 /// 상태 코드만 가진 서버 오류.
 ApiError serverError(int status) => ApiError.fromErrorResponse(status, null);
-
-/// 기기 알림 권한 Fake(앱 전체가 쓰는 [NotificationPermission]). 호출 횟수를 센다.
-class FakePushPermission implements NotificationPermission {
-  OsPermissionStatus current = OsPermissionStatus.granted;
-
-  /// [request]가 허용으로 끝나는지. 허용이면 [current]도 granted가 된다.
-  bool requestResult = true;
-
-  /// 지정하면 [status]가 이 오류를 던진다(플러그인 오류).
-  Object? statusError;
-
-  int statusCalls = 0;
-  int requestCalls = 0;
-  int openSettingsCalls = 0;
-
-  @override
-  Future<OsPermissionStatus> status() async {
-    statusCalls++;
-    final error = statusError;
-    if (error != null) throw error;
-    return current;
-  }
-
-  @override
-  Future<OsPermissionStatus> request() async {
-    requestCalls++;
-    return current = requestResult
-        ? OsPermissionStatus.granted
-        : OsPermissionStatus.denied;
-  }
-
-  @override
-  Future<void> openSystemSettings() async {
-    openSettingsCalls++;
-  }
-}
 
 class PendingFetch {
   PendingFetch(this.cancelToken);
@@ -208,7 +173,9 @@ class SettingsRig {
   final OnboardingHarness h;
   final RecordingToast toast = RecordingToast();
   final FakeAnalyticsTracker analytics = FakeAnalyticsTracker();
-  final FakePushPermission permission = FakePushPermission();
+  final FakeNotificationPermission permission = FakeNotificationPermission(
+    OsPermissionStatus.granted,
+  );
   final FakeAuthRepository auth = FakeAuthRepository();
   final FakeUserDataCleaner otherCleaner = FakeUserDataCleaner();
   final SettingsDataCleaner dataCleaner = SettingsDataCleaner();

@@ -171,17 +171,13 @@ class PushSettingsViewModel extends ChangeNotifier implements UserDataCleaner {
   /// 미결정이면 OS 권한 요청을 띄워 허용될 때만 true(REQ-SET-015, 018). 권한 확인이 실패해도 값은 바꾸지 않는다.
   Future<bool> _allowsTurningOn(int generation) async {
     try {
-      switch (await _permission.status()) {
-        case OsPermissionStatus.granted || OsPermissionStatus.notRequired:
-          return true;
-        case OsPermissionStatus.denied:
-          await _permission.openSystemSettings();
-          return false;
-        case OsPermissionStatus.notDetermined:
-          final result = await _permission.request();
-          return result == OsPermissionStatus.granted ||
-              result == OsPermissionStatus.notRequired;
+      final status = await _permission.status();
+      if (status.allowsDelivery) return true;
+      if (status == OsPermissionStatus.notDetermined) {
+        return (await _permission.request()).allowsDelivery;
       }
+      await _permission.openSystemSettings();
+      return false;
     } on Object {
       if (generation == _generation && !_disposed) {
         _toast.show(Copy.notiPermError);

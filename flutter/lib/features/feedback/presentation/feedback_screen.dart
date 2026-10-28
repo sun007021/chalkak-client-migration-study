@@ -120,6 +120,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
             FeedbackTestIds.input,
             child: TextField(
               controller: _controller,
+              readOnly: state.sending,
               minLines: 6,
               maxLines: 10,
               keyboardType: TextInputType.multiline,

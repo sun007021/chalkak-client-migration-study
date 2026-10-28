@@ -5,12 +5,14 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/analytics/analytics_constants.dart';
 import '../../../core/analytics/analytics_tracker.dart';
-import '../../../core/auth/session_manager.dart';
 import '../../../core/copy/ko.g.dart';
 import '../../../core/network/api_error.dart';
 import '../../../core/ui/toast/toast_controller.dart';
 import '../domain/feedback_content.dart';
 import '../domain/feedback_repository.dart';
+
+/// 지금 로그인한 사용자의 id를 읽는다(없으면 null). 전송 중 로그아웃·계정 전환을 가리는 데 쓴다.
+typedef CurrentUserIdReader = Future<String?> Function();
 
 class FeedbackState {
   const FeedbackState({
@@ -77,14 +79,14 @@ final class CloseFeedback extends FeedbackEvent {
 class FeedbackViewModel extends ChangeNotifier {
   FeedbackViewModel({
     required this._repository,
-    required this._sessions,
+    required this._readUserId,
     required this._toast,
     required this._analytics,
     this.onComposingChanged,
   });
 
   final FeedbackRepository _repository;
-  final SessionManager _sessions;
+  final CurrentUserIdReader _readUserId;
   final ToastSink _toast;
   final AnalyticsTracker _analytics;
 
@@ -111,7 +113,8 @@ class FeedbackViewModel extends ChangeNotifier {
   }
 
   void onTextChanged(String text) {
-    if (_disposed) return;
+    // 전송 중에는 입력을 받지 않는다(화면도 읽기 전용이다).
+    if (_disposed || _state.sending) return;
     _set(
       FeedbackState(
         text: text,
@@ -191,8 +194,10 @@ class FeedbackViewModel extends ChangeNotifier {
   }
 
   Future<String?> _currentUserId() async {
+    // 읽기에 실패하면 null로 본다. 보내기 전후가 모두 실패하면 같은 계정으로 보고 결과를 그대로 반영한다
+    // (읽지 못했다는 이유만으로 성공한 전송의 결과를 버리지 않는다).
     try {
-      return (await _sessions.read())?.userId;
+      return await _readUserId();
     } on Object {
       return null;
     }

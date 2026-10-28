@@ -422,12 +422,24 @@ class FakeNotificationPermission implements NotificationPermission {
 
   OsPermissionStatus current;
   Object? requestError;
+
+  /// 지정하면 [status]가 이 오류를 던진다(플러그인 오류).
+  Object? statusError;
+
+  /// [request]가 허용으로 끝나는지. false면 거부로 끝나고 [current]도 denied가 된다.
+  bool requestResult = true;
+
   int requests = 0;
   int statusCalls = 0;
+  int openSettingsCalls = 0;
+
+  int get requestCalls => requests;
 
   @override
   Future<OsPermissionStatus> status() async {
     statusCalls++;
+    final e = statusError;
+    if (e != null) throw e;
     return current;
   }
 
@@ -436,10 +448,10 @@ class FakeNotificationPermission implements NotificationPermission {
     requests++;
     final e = requestError;
     if (e != null) throw e;
-    return current = OsPermissionStatus.granted;
+    return current = requestResult
+        ? OsPermissionStatus.granted
+        : OsPermissionStatus.denied;
   }
-
-  int openSettingsCalls = 0;
 
   @override
   Future<void> openSystemSettings() async {

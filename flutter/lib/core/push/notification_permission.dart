@@ -6,7 +6,10 @@ enum OsPermissionStatus {
   denied,
 
   /// 런타임 권한이 없는 환경(Android 12 이하). 요청하지 않고 알림은 표시할 수 있다.
-  notRequired,
+  notRequired;
+
+  /// 알림을 표시하거나 켤 수 있는 상태(허용, 또는 런타임 권한이 없는 환경).
+  bool get allowsDelivery => this == granted || this == notRequired;
 }
 
 /// OS 알림 권한 창구(iOS 알림·배지·소리, Android 13+ `POST_NOTIFICATIONS`).

@@ -148,6 +148,17 @@ void main() {
     );
     expect(isEnabled(tester, FeedbackTestIds.submitButton), isFalse);
     expect(fake.calls, 1);
+    expect(
+      tester
+          .widget<TextField>(
+            find.descendant(
+              of: byId(FeedbackTestIds.input),
+              matching: find.byType(TextField),
+            ),
+          )
+          .readOnly,
+      isTrue,
+    );
     fake.gate!.complete();
     await _settle(tester, const Duration(seconds: 1));
   });
