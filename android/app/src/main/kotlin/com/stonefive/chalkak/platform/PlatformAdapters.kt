@@ -23,6 +23,7 @@ import kr.chalkak.feature.auth.UpdateLauncher
 import kr.chalkak.feature.onboarding.DeviceRegistrar
 import kr.chalkak.feature.onboarding.ExternalBrowser
 import kr.chalkak.feature.onboarding.SignatureImageEncoder
+import kr.chalkak.feature.settings.DeviceNotificationSettings
 
 /**
  * Everything platform specific that the screens' holders reach through interfaces. [android] wires the real adapters (Kakao SDK or the
@@ -53,6 +54,8 @@ class PlatformAdapters(
     val calendarRenderer: (ImageLoader?) -> CalendarImageRenderer = { CalendarImageRenderer { _, _ -> ByteArray(0) } },
     /** Push ports (FCM token, POST_NOTIFICATIONS, notification display, stores). */
     val pushPlatform: PushPlatform = PushPlatform.headless(),
+    /** Device notification permission and the jump to the app's system notification settings (settings push switches). */
+    val deviceNotifications: DeviceNotificationSettings = InertDeviceNotificationSettings,
 ) {
     companion object {
         fun android(context: Context, copy: Copy = Copy.load(context)): PlatformAdapters {
@@ -84,6 +87,7 @@ class PlatformAdapters(
                 calendarSaver = AndroidCalendarImageSaver(app),
                 calendarRenderer = { loader -> AndroidCalendarImageRenderer(app, copy, loader) },
                 pushPlatform = PushPlatform.android(app),
+                deviceNotifications = AndroidDeviceNotificationSettings(app),
             )
         }
 

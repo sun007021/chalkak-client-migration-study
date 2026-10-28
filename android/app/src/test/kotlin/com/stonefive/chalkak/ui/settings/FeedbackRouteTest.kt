@@ -107,8 +107,8 @@ class FeedbackRouteTest {
         start()
         type("  가나다  ")
         tag("feedback.counter").assertTextEquals("3/1000")
-        type("👨‍👩‍👧")
-        tag("feedback.counter").assertTextEquals("8/1000")
+        type("👨‍👩‍👧") // inserted at the cursor behind the typed text: "가나다" + two inner spaces + five code points
+        tag("feedback.counter").assertTextEquals("10/1000")
     }
 
     @Test

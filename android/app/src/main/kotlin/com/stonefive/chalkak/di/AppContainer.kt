@@ -122,6 +122,21 @@ import kr.chalkak.core.network.TokenRefresher
 import kr.chalkak.core.data.record.DefaultRecordRepository
 import kr.chalkak.core.data.record.RecordRepository
 import kr.chalkak.feature.record.RecordStateHolder
+import com.stonefive.chalkak.ui.terms.LegalWebView
+import kr.chalkak.core.data.onboarding.DefaultSignatureRepository
+import kr.chalkak.core.data.onboarding.SignatureRepository
+import kr.chalkak.core.data.settings.DefaultFeedbackRepository
+import kr.chalkak.core.data.settings.DefaultNotificationSettingsRepository
+import kr.chalkak.core.data.settings.FeedbackRepository
+import kr.chalkak.core.data.settings.NotificationSettingsRepository
+import kr.chalkak.feature.auth.AccountActions
+import kr.chalkak.feature.auth.HomeMode
+import kr.chalkak.feature.onboarding.SignatureCardStateHolder
+import kr.chalkak.feature.onboarding.SignatureChangeStateHolder
+import kr.chalkak.feature.settings.FeedbackStateHolder
+import kr.chalkak.feature.settings.PushSettingsStateHolder
+import kr.chalkak.feature.settings.SettingsStateHolder
+import com.stonefive.chalkak.ui.settings.SettingsHolders
 import okhttp3.OkHttpClient
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -205,6 +220,9 @@ class AppContainer(
     val homeRepository: HomeRepository by lazy { DefaultHomeRepository(apiClient) }
 
     val recordRepository: RecordRepository by lazy { DefaultRecordRepository(apiClient) }
+    val signatureRepository: SignatureRepository by lazy { DefaultSignatureRepository(apiClient) }
+    val notificationSettingsRepository: NotificationSettingsRepository by lazy { DefaultNotificationSettingsRepository(apiClient) }
+    val feedbackRepository: FeedbackRepository by lazy { DefaultFeedbackRepository(apiClient) }
     val bannerRepository: BannerRepository by lazy { DefaultBannerRepository(apiClient) }
     val postRepository: PostRepository by lazy { DefaultPostRepository(apiClient) }
     val postCreationRepository: PostCreationRepository by lazy { DefaultPostCreationRepository(apiClient) }
@@ -493,8 +511,28 @@ class AppContainer(
                 )
             },
             today = kstCalendar::today,
+            newSettingsHolders = ::newSettingsHolders,
+            // screen_view comes from the navigation controller only (D-22): the holders' own would double it.
+            newFeedbackHolder = { scope -> FeedbackStateHolder(scope, feedbackRepository, NoScreenViews) },
+            newChangeSignaturePad = {
+                SignaturePadStateHolder(SignatureMode.Change, SignaturePadSpace, platform.signatureEncoder, NoScreenViews)
+            },
+            newSignatureChangeHolder = { scope -> SignatureChangeStateHolder(scope, signatureRepository, signatureUploader) },
+            legalWeb = { url, onLoaded, onFailed -> LegalWebView(url, onLoaded, onFailed, Modifier.fillMaxSize()) },
+            openSystemNotificationSettings = { platform.deviceNotifications.openSystemSettings() },
             issueWeb = { url, onNavigate, onLoaded, onFailed -> IssueWebView(url, onNavigate, onLoaded, onFailed, Modifier.fillMaxSize()) },
         )
+    }
+
+    /** The four holders of one settings tab scope (signature card, push switches, account actions, and the tab holder that fans out to them). */
+    private fun newSettingsHolders(scope: CoroutineScope, mode: HomeMode): SettingsHolders {
+        val card = SignatureCardStateHolder(scope, signatureRepository, isGuest = mode == HomeMode.Guest)
+        val push = PushSettingsStateHolder(scope, notificationSettingsRepository, platform.deviceNotifications)
+        val account = AccountActions(scope, authRepository, guestFlagStore)
+        val settings = SettingsStateHolder(
+            scope, mode, card, push, account, NoScreenViews, LegalDocumentOpener(platform.externalBrowser), BuildConfig.VERSION_NAME,
+        )
+        return SettingsHolders(settings, card, push, account)
     }
 
     /** `GET /posts/today` once: the upload screen may open only when today's photo has not been posted yet (REQ-UPL-002/003). */

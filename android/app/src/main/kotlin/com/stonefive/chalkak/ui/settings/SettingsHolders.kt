@@ -1,6 +1,9 @@
 package com.stonefive.chalkak.ui.settings
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import kr.chalkak.feature.auth.AccountActions
 import kr.chalkak.feature.onboarding.SignatureCardStateHolder
 import kr.chalkak.feature.settings.PushSettingsStateHolder
@@ -16,7 +19,14 @@ class SettingsHolders(
     val signatureCard: SignatureCardStateHolder,
     val push: PushSettingsStateHolder,
     val account: AccountActions,
-)
+) {
+    /**
+     * Inline "could not load" state of the signature card and the push section: set by the load-error toast, cleared when a load starts
+     * or data arrives. Kept here (not in the route) so a rotation does not lose it.
+     */
+    var signatureLoadFailed: Boolean by mutableStateOf(false)
+    var pushLoadFailed: Boolean by mutableStateOf(false)
+}
 
 /**
  * Web view slot of the legal document sheet (settings terms / privacy rows): composed afresh for every load attempt, reports its

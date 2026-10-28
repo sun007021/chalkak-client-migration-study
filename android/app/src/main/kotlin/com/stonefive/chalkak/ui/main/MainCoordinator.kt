@@ -16,6 +16,10 @@ import kr.chalkak.feature.navigation.OpenVia
 import kr.chalkak.feature.navigation.RouteRules
 import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
+import kr.chalkak.feature.navigation.TermsDocumentKind
+import kr.chalkak.feature.navigation.AccessMode
+import kr.chalkak.feature.onboarding.TermsKind
+import com.stonefive.chalkak.ui.settings.SettingsHolders
 import java.time.LocalDate
 import kr.chalkak.feature.notification.NavCommand
 import kr.chalkak.feature.notification.NavMode
@@ -232,13 +236,69 @@ class MainCoordinator(
         if (outcome is NavOutcome.Blocked) showToast(copy[outcome.copyKey])
     }
 
-    private fun open(route: Route) {
+    /** Settings "피드백 보내기": a fresh feedback holder for this visit. */
+    fun onOpenFeedback() {
+        if (open(Route.Feedback) is NavOutcome.Navigated) session.feedbackSerial++
+    }
+
+    /** Settings signature card "변경하기": the drawing screen with a blank pad. */
+    fun onOpenChangeSignature() {
+        if (open(Route.ChangeSignature) is NavOutcome.Navigated) {
+            session.changeSerial++
+            session.changePreviewSerial = 0
+            session.changePng = null
+        }
+    }
+
+    /** The pad produced [png]: the preview (a fresh upload holder) opens on top of the drawing screen. */
+    fun onChangeSignatureDrawn(png: ByteArray) {
+        session.changePng = png
+        if (open(Route.ChangeSignaturePreview) is NavOutcome.Navigated) session.changePreviewSerial++
+    }
+
+    /**
+     * Signature changed (REQ-NAV-033): drawing and preview leave the stack, the success toast shows and the settings card re-reads the
+     * signature. [settings] is null only when the settings tab is not wired.
+     */
+    fun onSignatureChanged(toastCopyKey: String, settings: SettingsHolders?) {
+        nav.onSignatureChanged()
+        session.changePng = null
+        showToast(copy[toastCopyKey])
+        settings?.settings?.onSignatureChangeFinished(true)
+    }
+
+    /**
+     * 401 on the signature change that survived the refresh: the login screen with the expiry toast. The network layer reports the same
+     * 401 as `AuthEvent.GoToLogin`, so the session may already be over; the toast shows either way.
+     */
+    fun onChangeSignatureExpired(copyKey: String) {
+        if (nav.top != Route.Login) nav.onSessionEnded()
+        showToast(copy[copyKey])
+    }
+
+    /** Settings terms / privacy row: the document sheet opens over the settings screen (an overlay: no new `screen_view` on close). */
+    fun onShowDocument(kind: TermsKind, url: String) {
+        session.documentUrl = url
+        open(Route.TermsDocument(if (kind == TermsKind.Service) TermsDocumentKind.TermsOfService else TermsDocumentKind.PrivacyPolicy))
+    }
+
+    /**
+     * Logout, withdrawal or the guest's login button finished: the login screen. Skipped when it is already there (the 401 that ends
+     * the session at the same time); members end the session, guests just go to login.
+     */
+    fun onAccountEnded() {
+        if (nav.top == Route.Login) return
+        if (nav.accessMode == AccessMode.Member) nav.onSessionEnded() else nav.onGuestLoginClicked()
+    }
+
+    private fun open(route: Route): NavOutcome {
         val outcome = nav.open(route)
         if (outcome is NavOutcome.Blocked) showToast(copy[outcome.copyKey])
         if (outcome !is NavOutcome.Navigated && outcome !is NavOutcome.Replaced && route is Route.Feed) {
             session.feedSeeds.remove(route.postId)
             session.recordSeeds.remove(route.postId)
         }
+        return outcome
     }
 
     private fun HomePost.toSeed() = PostSummary(
