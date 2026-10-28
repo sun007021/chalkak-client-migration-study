@@ -25,7 +25,7 @@ const TABS: Record<TabRouteName, TabSpec> = {
  * 게스트 차단·토스트·분석 이벤트는 BottomTabPolicy가 정하고(순수 TS, 단위 테스트), 이 컴포넌트는 그 결과대로 이동만 한다.
  */
 export function BottomBar({ state, navigation }: BottomTabBarProps) {
-  const { bootViewModel, analytics, toast } = useAppContainer();
+  const { bootViewModel, analytics, toast, uploadGateOwner } = useAppContainer();
   const { mode } = useViewModelState(bootViewModel);
   const policy = useMemo(
     () => new BottomTabPolicy({ mode, analytics, toast }),
@@ -41,8 +41,8 @@ export function BottomBar({ state, navigation }: BottomTabBarProps) {
   };
 
   const onUploadPress = () => {
-    if (policy.onUploadPress() === 'open-upload')
-      navigation.getParent()?.navigate('Upload' as never);
+    // 게스트는 정책이 토스트로 막고, 회원은 게이트(GET /posts/today 확인)를 지나야 업로드 화면이 열린다.
+    if (policy.onUploadPress() === 'open-upload') uploadGateOwner.press();
   };
 
   const tab = (name: TabRouteName) => {

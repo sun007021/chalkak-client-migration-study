@@ -411,66 +411,71 @@
 
 ### 사진 업로드
 
-| 화면   | 요소                      | testID                                     | 비고                                                                    |
-| ------ | ------------------------- | ------------------------------------------ | ----------------------------------------------------------------------- |
-| upload | 화면 루트                 | `upload.root`                              |                                                                         |
-| upload | 닫기 버튼                 | `upload.close-button`                      |                                                                         |
-| upload | 주제 제목                 | `upload.topic-title`                       | "주제 ‘…’에 맞는 한 장"                                                 |
-| upload | 안내 문구                 | `upload.guide-text`                        | "앨범에서 고르거나 지금 찍어요"                                         |
-| upload | 사진 미리보기             | `upload.photo-preview`                     | 탭하면 재편집                                                           |
-| upload | 앨범 버튼                 | `upload.album-button`                      |                                                                         |
-| upload | 카메라 버튼               | `upload.camera-button`                     | 카메라 없는 기기·웹 데스크톱에서는 존재하지 않음                        |
-| upload | 제목 입력                 | `upload.title-input`                       | 10 code point 상한, 플레이스홀더 "작품 제목은 선택이에요."              |
-| upload | 제목 글자 수              | `upload.title-counter`                     |                                                                         |
-| upload | 전시하기 버튼             | `upload.submit-button`                     | 사진 없거나 준비 중이면 정책에 따라 비활성, 제출 중 "전시 중..." 비활성 |
-| upload | 사진 준비 중 표시         | `upload.preparing-indicator`               | 정책 발급·WebP 인코딩 중                                                |
-| upload | 제출 중 표시              | `upload.submitting-indicator`              |                                                                         |
-| upload | 오류 메시지               | `upload.error-message`                     | 실패 문구                                                               |
-| upload | 카메라 저장 권한 안내     | `upload.camera-permission-dialog`          | iOS "촬영 사진 저장 권한"                                               |
-| upload | 권한 안내: 설정 열기      | `upload.camera-permission-settings-button` |                                                                         |
-| upload | 권한 안내: 저장 없이 촬영 | `upload.camera-permission-shoot-button`    |                                                                         |
-| upload | 권한 안내: 취소           | `upload.camera-permission-cancel-button`   |                                                                         |
+| 화면 | 요소 | testID | 비고 |
+| --- | --- | --- | --- |
+| upload | 화면 루트 | `upload.root` |  |
+| upload | 닫기 버튼 | `upload.close-button` |  |
+| upload | 주제 제목 | `upload.topic-title` | "주제 ‘…’에 맞는 한 장" |
+| upload | 안내 문구 | `upload.guide-text` | "앨범에서 고르거나 지금 찍어요" |
+| upload | 사진 미리보기 | `upload.photo-preview` | 탭하면 재편집 |
+| upload | 앨범 버튼 | `upload.album-button` |  |
+| upload | 카메라 버튼 | `upload.camera-button` | 카메라 없는 기기·웹 데스크톱에서는 존재하지 않음 |
+| upload | 제목 입력 | `upload.title-input` | 10 code point 상한, 플레이스홀더 "작품 제목은 선택이에요." |
+| upload | 제목 글자 수 | `upload.title-counter` |  |
+| upload | 전시하기 버튼 | `upload.submit-button` | 사진 없거나 준비 중이면 정책에 따라 비활성, 제출 중 "전시 중..." 비활성 |
+| upload | 사진 준비 중 표시 | `upload.preparing-indicator` | 정책 발급·WebP 인코딩 중 |
+| upload | 제출 중 표시 | `upload.submitting-indicator` |  |
+| upload | 오류 메시지 | `upload.error-message` | 실패 문구 |
+| upload | 주제 불러오기 오류 | `upload.error-state` | 주제 조회 실패(RN 추가, 공통 상태 요소 이름 규칙) |
+| upload | 주제 다시 시도 버튼 | `upload.retry-button` | 주제만 다시 받는다(RN 추가) |
+| upload | 카메라 저장 권한 안내 | `upload.camera-permission-dialog` | iOS "촬영 사진 저장 권한" |
+| upload | 권한 안내: 설정 열기 | `upload.camera-permission-settings-button` |  |
+| upload | 권한 안내: 저장 없이 촬영 | `upload.camera-permission-shoot-button` |  |
+| upload | 권한 안내: 취소 | `upload.camera-permission-cancel-button` |  |
 
 ### 사진 편집
 
-| 화면       | 요소                 | testID                                   | 비고                                            |
-| ---------- | -------------------- | ---------------------------------------- | ----------------------------------------------- |
-| photo-edit | 화면 루트            | `photo-edit.root`                        |                                                 |
-| photo-edit | 취소 버튼            | `photo-edit.cancel-button`               |                                                 |
-| photo-edit | 완료 버튼            | `photo-edit.done-button`                 |                                                 |
-| photo-edit | 자르기 탭            | `photo-edit.tab-crop`                    | selected 상태 노출                              |
-| photo-edit | 조정 탭              | `photo-edit.tab-adjust`                  | selected 상태 노출                              |
-| photo-edit | 필터 탭              | `photo-edit.tab-filter`                  | selected 상태 노출                              |
-| photo-edit | 미리보기 이미지      | `photo-edit.preview-image`               |                                                 |
-| photo-edit | 자르기 영역          | `photo-edit.crop-area`                   |                                                 |
-| photo-edit | 90도 회전 버튼       | `photo-edit.rotate-button`               |                                                 |
-| photo-edit | 초기화 버튼          | `photo-edit.reset-button`                |                                                 |
-| photo-edit | 비율: 원본           | `photo-edit.ratio-original`              | selected 상태 노출                              |
-| photo-edit | 비율: 자유           | `photo-edit.ratio-free`                  |                                                 |
-| photo-edit | 비율: 1:1            | `photo-edit.ratio-1-1`                   |                                                 |
-| photo-edit | 비율: 4:5            | `photo-edit.ratio-4-5`                   |                                                 |
-| photo-edit | 비율: 5:4            | `photo-edit.ratio-5-4`                   |                                                 |
-| photo-edit | 비율: 3:4            | `photo-edit.ratio-3-4`                   |                                                 |
-| photo-edit | 비율: 4:3            | `photo-edit.ratio-4-3`                   |                                                 |
-| photo-edit | 비율: 9:16           | `photo-edit.ratio-9-16`                  |                                                 |
-| photo-edit | 비율: 16:9           | `photo-edit.ratio-16-9`                  |                                                 |
-| photo-edit | 조정: 노출           | `photo-edit.adjust-exposure-slider`      | 표시값 -100~100                                 |
-| photo-edit | 조정: 대비           | `photo-edit.adjust-contrast-slider`      |                                                 |
-| photo-edit | 조정: 하이라이트     | `photo-edit.adjust-highlights-slider`    |                                                 |
-| photo-edit | 조정: 그림자         | `photo-edit.adjust-shadows-slider`       |                                                 |
-| photo-edit | 조정: 블랙 포인트    | `photo-edit.adjust-black-point-slider`   |                                                 |
-| photo-edit | 조정: 채도           | `photo-edit.adjust-saturation-slider`    |                                                 |
-| photo-edit | 조정: 따뜻함         | `photo-edit.adjust-warmth-slider`        |                                                 |
-| photo-edit | 조정: 자동 보정 토글 | `photo-edit.adjust-auto-toggle`          | checked 상태 노출                               |
-| photo-edit | 조정: 자동 보정 강도 | `photo-edit.adjust-auto-strength-slider` | 0~1                                             |
-| photo-edit | 필터: 원본           | `photo-edit.filter-original`             | selected 상태 노출                              |
-| photo-edit | 필터: 흑백           | `photo-edit.filter-mono`                 |                                                 |
-| photo-edit | 필터: 따뜻하게       | `photo-edit.filter-warm`                 |                                                 |
-| photo-edit | 필터: 차갑게         | `photo-edit.filter-cool`                 |                                                 |
-| photo-edit | 필터: 빈티지         | `photo-edit.filter-vintage`              |                                                 |
-| photo-edit | 필터: 선명하게       | `photo-edit.filter-vivid`                |                                                 |
-| photo-edit | 렌더링 진행          | `photo-edit.rendering-indicator`         | 완료 버튼 후 원본 크기 렌더링 중                |
-| photo-edit | 편집 오류 알림       | `photo-edit.error-dialog`                | "사진을 편집하지 못했어요. 다시 시도해 주세요." |
+| 화면 | 요소 | testID | 비고 |
+| --- | --- | --- | --- |
+| photo-edit | 화면 루트 | `photo-edit.root` |  |
+| photo-edit | 취소 버튼 | `photo-edit.cancel-button` |  |
+| photo-edit | 완료 버튼 | `photo-edit.done-button` |  |
+| photo-edit | 자르기 탭 | `photo-edit.tab-crop` | selected 상태 노출 |
+| photo-edit | 조정 탭 | `photo-edit.tab-adjust` | selected 상태 노출 |
+| photo-edit | 필터 탭 | `photo-edit.tab-filter` | selected 상태 노출 |
+| photo-edit | 미리보기 이미지 | `photo-edit.preview-image` |  |
+| photo-edit | 자르기 영역 | `photo-edit.crop-area` |  |
+| photo-edit | 90도 회전 버튼 | `photo-edit.rotate-button` |  |
+| photo-edit | 초기화 버튼 | `photo-edit.reset-button` |  |
+| photo-edit | 비율: 원본 | `photo-edit.ratio-original` | selected 상태 노출 |
+| photo-edit | 비율: 자유 | `photo-edit.ratio-free` |  |
+| photo-edit | 비율: 1:1 | `photo-edit.ratio-1-1` |  |
+| photo-edit | 비율: 4:5 | `photo-edit.ratio-4-5` |  |
+| photo-edit | 비율: 5:4 | `photo-edit.ratio-5-4` |  |
+| photo-edit | 비율: 3:4 | `photo-edit.ratio-3-4` |  |
+| photo-edit | 비율: 4:3 | `photo-edit.ratio-4-3` |  |
+| photo-edit | 비율: 9:16 | `photo-edit.ratio-9-16` |  |
+| photo-edit | 비율: 16:9 | `photo-edit.ratio-16-9` |  |
+| photo-edit | 조정: 노출 | `photo-edit.adjust-exposure-slider` | 표시값 -100~100 |
+| photo-edit | 조정: 대비 | `photo-edit.adjust-contrast-slider` |  |
+| photo-edit | 조정: 하이라이트 | `photo-edit.adjust-highlights-slider` |  |
+| photo-edit | 조정: 그림자 | `photo-edit.adjust-shadows-slider` |  |
+| photo-edit | 조정: 블랙 포인트 | `photo-edit.adjust-black-point-slider` |  |
+| photo-edit | 조정: 채도 | `photo-edit.adjust-saturation-slider` |  |
+| photo-edit | 조정: 따뜻함 | `photo-edit.adjust-warmth-slider` |  |
+| photo-edit | 조정 항목 선택: 자동·노출·대비·하이라이트·그림자·블랙 포인트·채도·따뜻함 | `photo-edit.adjust-item-{item}` | `{item}`은 auto, exposure, contrast, highlights, shadows, black-point, saturation, warmth. selected 상태 노출(RN 추가) |
+| photo-edit | 조정 초기화 버튼 | `photo-edit.adjust-reset-button` | 자동 강도 0, 직접 값 삭제(RN 추가) |
+| photo-edit | 조정: 자동 보정 토글 | `photo-edit.adjust-auto-toggle` | checked 상태 노출 |
+| photo-edit | 조정: 자동 보정 강도 | `photo-edit.adjust-auto-strength-slider` | 0~1 |
+| photo-edit | 필터: 원본 | `photo-edit.filter-original` | selected 상태 노출 |
+| photo-edit | 필터: 흑백 | `photo-edit.filter-mono` |  |
+| photo-edit | 필터: 따뜻하게 | `photo-edit.filter-warm` |  |
+| photo-edit | 필터: 차갑게 | `photo-edit.filter-cool` |  |
+| photo-edit | 필터: 빈티지 | `photo-edit.filter-vintage` |  |
+| photo-edit | 필터: 선명하게 | `photo-edit.filter-vivid` |  |
+| photo-edit | 렌더링 진행 | `photo-edit.rendering-indicator` | 완료 버튼 후 원본 크기 렌더링 중 |
+| photo-edit | 편집 오류 알림 | `photo-edit.error-dialog` | "사진을 편집하지 못했어요. 다시 시도해 주세요." |
+| photo-edit | 편집 오류 알림: 다시 시도 버튼 | `photo-edit.error-retry-button` | 편집용 이미지 준비를 다시 시도한다(RN 추가) |
 
 ### 업로드 성공
 

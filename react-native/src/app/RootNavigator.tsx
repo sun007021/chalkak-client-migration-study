@@ -3,10 +3,15 @@ import {
   type NativeStackScreenProps,
 } from '@react-navigation/native-stack';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 
+import { KstDate } from '../core/time/KstDate';
 import type { FeedTarget } from '../features/feed/FeedTarget';
 import { PlaceholderScreen } from '../features/placeholder/PlaceholderScreen';
+import { PhotoUploadScreen } from '../features/upload/PhotoUploadScreen';
+import { UploadSuccessScreen } from '../features/upload/UploadSuccessScreen';
+import { useAppContainer } from './AppContainerContext';
+import { useOwnedViewModel } from './useOwnedViewModel';
 import { IssueWebRoute } from './IssueWebRoute';
 import { MainTabs } from './MainTabs';
 import { PostDetailRoute } from './PostDetailRoute';
@@ -27,13 +32,18 @@ export function RootNavigator() {
       />
       <Stack.Screen name="Notifications" component={NotificationsPlaceholder} />
       <Stack.Screen name="IssueWeb" component={IssueWebScreenRoute} />
-      <Stack.Screen name="Upload" component={UploadPlaceholder} />
+      <Stack.Screen name="Upload" component={UploadScreenRoute} />
+      <Stack.Screen
+        name="UploadSuccess"
+        component={UploadSuccessScreenRoute}
+        // 성공 화면은 "확인했어요."로만 나간다(스와이프로 닫으면 기록 확인 흐름이 끊긴다).
+        options={{ gestureEnabled: false }}
+      />
     </Stack.Navigator>
   );
 }
 
 const NotificationsPlaceholder = () => <PlaceholderScreen label="알림함" />;
-const UploadPlaceholder = () => <PlaceholderScreen label="업로드" />;
 
 function PostDetailScreenRoute({
   route,
@@ -53,4 +63,57 @@ function IssueWebScreenRoute({
   navigation,
 }: NativeStackScreenProps<RootStackParamList, 'IssueWeb'>) {
   return <IssueWebRoute url={route.params.url} onBack={() => navigation.goBack()} />;
+}
+
+/**
+ * 업로드 화면 라우트. 화면을 열 때 ViewModel을 만들고 닫을 때 dispose한다(진행 중 작업·임시 파일 정리).
+ * 만들고 버리는 시점은 useOwnedViewModel이 구독(commit)에 맞춰 정하므로 StrictMode의 mount/unmount/mount에도 안전하다.
+ * 주제 날짜는 게이트가 고정한 값만 쓴다: 읽을 수 없으면 오늘로 대신하지 않고 화면을 닫는다(REQ-UPL-008).
+ */
+function UploadScreenRoute({
+  route,
+  navigation,
+}: NativeStackScreenProps<RootStackParamList, 'Upload'>) {
+  const date = KstDate.parse(route.params.topicDate);
+  useCloseWhenInvalid(date === null, navigation);
+  return date ? <UploadScreenBody topicDate={date} /> : null;
+}
+
+function UploadScreenBody({ topicDate }: { topicDate: KstDate }) {
+  const container = useAppContainer();
+  const viewModel = useOwnedViewModel(() => container.createPhotoUploadViewModel(topicDate));
+  return viewModel ? <PhotoUploadScreen viewModel={viewModel} /> : null;
+}
+
+function UploadSuccessScreenRoute({
+  route,
+  navigation,
+}: NativeStackScreenProps<RootStackParamList, 'UploadSuccess'>) {
+  const { topicTitle, topicDate, moderationStatus } = route.params;
+  const date = KstDate.parse(topicDate);
+  useCloseWhenInvalid(date === null, navigation);
+  return date ? (
+    <UploadSuccessBody
+      topicTitle={topicTitle}
+      topicDate={date}
+      moderationStatus={moderationStatus}
+    />
+  ) : null;
+}
+
+function UploadSuccessBody(params: {
+  topicTitle: string;
+  topicDate: KstDate;
+  moderationStatus: RootStackParamList['UploadSuccess']['moderationStatus'];
+}) {
+  const container = useAppContainer();
+  const viewModel = useOwnedViewModel(() => container.createUploadSuccessViewModel(params));
+  return viewModel ? <UploadSuccessScreen viewModel={viewModel} /> : null;
+}
+
+/** 라우트 파라미터가 날짜로 읽히지 않는 비정상 상황: 화면을 닫는다(내비게이터는 항상 yyyy-MM-dd를 싣는다). */
+function useCloseWhenInvalid(invalid: boolean, navigation: { goBack: () => void }): void {
+  useEffect(() => {
+    if (invalid) navigation.goBack();
+  }, [invalid, navigation]);
 }

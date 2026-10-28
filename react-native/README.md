@@ -150,6 +150,53 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
 - 웹뷰는 `react-native-webview`(Expo 번들 버전 고정). `jest.setup.ts`가 네이티브 모듈이 없을 때 던지는 import를 mock으로 막는다.
 - 화면 테스트는 `toHaveTextContent('문자열')`이 **전체 일치**라서, 여러 줄 제목·안내(`\n`)는 첫 줄만 testID 요소에 두고 나머지는 다음 요소에 둔다.
 
+## 업로드·편집 (`src/features/upload`, `src/features/photo-edit`, `src/data/post/PostCreationRepository`, `src/core/media`)
+
+**구조.** `UploadEntryGateOwner`(`AppContainer.uploadGateOwner`)가 메인 단계 동안 `UploadEntryGateViewModel`을 소유하고, 하단 + 버튼(`BottomBar`)과 홈 히어로 버튼(`NavigationHomeNavigator.openUploadGate`)이 **같은 게이트**를 누른다(연타는 한 번, 확인 중 표시는 `UploadEntryOverlay`의 `upload-entry.loading`). 게이트를 지나면 `NavigationUploadNavigator`가 `Upload {topicDate}`를 연다. `Upload`/`UploadSuccess` 라우트는 `useOwnedViewModel`로 ViewModel을 만들고 버린다(StrictMode 안전, 화면을 나가면 진행 중 작업·임시 파일 정리). 성공은 `StackActions.replace`라 뒤로 가도 업로드 화면이 없다. 편집기는 별도 화면이 아니라 `PhotoUploadScreen`이 `viewModel.editor`를 위에 덮어 그린다.
+
+**네이티브 라이브러리(정확한 버전).** `expo-image-picker 58.0.10`(시스템 포토 피커/카메라), `expo-image-manipulator 58.0.15`(방향·축소·회전·자르기·WebP 저장), `expo-media-library 58.0.12`(촬영본 갤러리 저장, iOS 사진 추가 권한), `expo-file-system 58.0.11`(임시 파일 읽기·삭제). 실제 구현은 `core/media/Expo*.ts`와 `features/photo-edit/ExpoImageEngine.ts`, 조립은 `createDefaultMediaServices`다. `AppContainer.media`는 `overrides.media ?? 기본 구현`이고 jest는 전부 Fake를 쓴다(Expo 모듈은 jest에서 호출되지 않는다).
+
+**Skia를 쓰지 않았다.** 색 파이프라인(노출·따뜻함·채도 → 감마 → 톤 곡선 → 필터 행렬)은 순수 TS(`PhotoColorTransform`의 오라클 + 같은 결과를 내는 LUT 버전 `createPixelRunner`, `createRenderJob`)이고, 오라클 테스트가 검증한 같은 식이 업로드 결과를 칠한다. 색이 있는 편집만 `manipulator(기하, 업로드 크기로 축소) → 무손실 PNG(zlib 1) → decodePng(pako) → 칠하기 → encodePng → manipulator`를 거치고, 색이 없는 편집(회전·자르기만, 또는 원본)은 manipulator 한 번으로 끝난다. 중간에 JPEG 같은 손실 압축을 끼우지 않는다. 미리보기도 512px 표본에 같은 함수를 적용한다. **성능**: 칠하기는 업로드 크기(긴 변 4096 이하, REQ-UPL-027)에서 라운드마다 **한 번**이고 품질 사다리는 그 결과를 WebP로만 다시 저장한다(`releaseRound()`가 라운드 끝에 메모리를 놓는다). 64줄마다 이벤트 루프를 양보하며 취소를 확인하고, `encodeWebp`는 한 번에 하나만 돈다. 업로드 크기 한도가 4096이라 12MP를 완전히 피할 수는 없다(축소 후 최대 약 16MP 이하): 실기기에서 시간·메모리가 여전히 문제면 `ExpoImageEngine.paint`만 `@shopify/react-native-skia`(2.14.0, RuntimeShader + 오프스크린 서피스)로 바꾼다. 경계(`ImageEngine`)는 그대로다. `ExpoImageEngine`은 `ImageEngine` 타입이 features에 있어 core가 features를 import하지 못하는 레이어 규칙 때문에 `features/photo-edit`에 둔다.
+
+**편집 상수의 단일 출처는 `src/features/photo-edit/filters.json`이다**(원래 `shared/photo-edit/filters.json`; RN이 `shared/`에 파일을 더하지 않는 규칙에 따라 옮김). 스펙 부록 표와 Android(`FilterMatrices.kt`, `PhotoEditConstants`)를 대조해 **차이가 없었다**(필터 5개 행렬, 노출 1.5 EV, 따뜻함 0.25, 블랙 포인트 0.3, 그림자·하이라이트 0.25, 대비 0.6, 최소 자르기 0.1, 분석 긴 변 256, 자동 노출 −0.5~1.0, 목표 흰색 0.96). 스펙 본문(REQ-EDIT-029, 부록 첫 문단)은 아직 `shared/photo-edit/filters.json`을 가리킨다 — 백엔드/공통 문서에서 정리가 필요하다.
+
+**권한(`app.config.ts`).** iOS: `NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription`(앨범은 PHPicker라 실제로는 필요 없지만 라이브러리가 키를 요구), `NSPhotoLibraryAddUsageDescription`(촬영본 저장). Android: 앨범은 시스템 포토 피커라 `READ_MEDIA_*`·`RECORD_AUDIO`·`ACCESS_MEDIA_LOCATION`을 `blockedPermissions`로 지운다(라이브러리 매니페스트가 넣는 권한이 설치 화면에 남지 않게). **`CAMERA`는 지우지 않는다**: expo-image-picker 58.0.10의 `ImagePickerModule.kt`가 촬영 전에 `ensureCameraPermissionsAreGranted()`로 CAMERA를 요구한다(`plugins/appConfigPermissions.test.ts`가 CAMERA가 `blockedPermissions`에 없음을 검사한다). 카메라 권한을 거부하면 별도 문구(`localCopy.cameraPermissionDenied`)를 보인다. 문구는 스펙에 정해진 카피가 없어 임시 한국어 문구다 — 확정되면 바꾼다.
+
+### ko.json 키 필요
+
+이 PR은 `shared/copy/ko.json`을 고치지 않고 `src/features/upload/localCopy.ts` 상수로 둔다. 키가 생기면 `t()`로 바꾸고 파일을 지운다.
+
+- 앨범 버튼 라벨(`albumButton`), 카메라 버튼 라벨(`cameraButton`), 닫기 접근성 라벨(`closeA11y`)
+- 제목 글자 수 형식(`titleCounter`, `{현재}/{최대}`)
+- 사진 미리보기 접근성 라벨(`previewA11y`)
+- iOS 촬영 저장 권한 안내 본문(`permissionBody`)과 "취소"(`permissionCancel`)
+- 편집기 로딩(`editorLoading`)·렌더링(`editorRendering`) 문구, 오류 알림의 "다시 시도"(`editorErrorRetry`)
+- 업로드 진입 확인 중 접근성 라벨(`gateChecking`)
+
+### 스펙 충돌·미결
+
+- **REQ-UPL-050 vs TC-UPL-070/072(다시 제출).** 스펙은 "PUT 뒤 POST가 실패하면 같은 uploadId로 POST만 다시"인데 테스트는 다시 제출 때 PUT이 1회 이상 나가는 것을 기대한다. 인코딩 바이트를 **메모리**에 두고(임시 파일은 PUT 직후 지움 — TC-UPL-031이 허용하는 범위 밖의 파일을 남기지 않기 위해) 다시 제출할 때 URL이 아직 유효하면(단조 시계, `expiresInSeconds*1000 − 5000`) 같은 URL로 PUT을 다시 하고, 만료됐으면 PUT 없이 같은 uploadId로 POST한다. 어느 쪽이든 uploadId는 같다. 스펙을 "PUT은 멱등이라 다시 해도 된다"로 고치거나 테스트를 바꿔 하나로 정리해야 한다.
+- **생성 404.** 카탈로그(TC-UPL-065)를 따라 `GET /posts/today`로 판정하고 서버 메시지를 보인다. 스펙 표는 일반 생성 오류 문구라고 한다.
+- **S3 PUT 403은 재시도하지 않는다**(REQ-UPL-045, `ApiClient`는 네트워크 오류와 5xx만 재시도). TC-UPL-055의 "3회 시도"는 5xx 케이스로 나누어 고쳤다. PUT 403은 `errorCode === 'FORBIDDEN'`일 때만 이용 정지로 본다.
+- **`PostChanges`에 `created`를 넣지 않았다.** 구독자(홈·전시)가 `deleted`가 아니면 모두 제목 변경으로 읽는다. 별도 `DefaultPostCreationNotifier`로 알리고, 컨테이너가 구독해 홈 ViewModel을 `refresh()`한다(홈은 복귀 때 `onShown`으로도 다시 불러온다). 기록 PR이 같은 채널을 구독하면 된다.
+- 카메라 사용 가능 여부는 동기로 알 수 없어 `ExpoImagePicker.cameraAvailable`은 항상 true다(시뮬레이터에서는 촬영이 실패해 준비 실패 문구가 보인다). 카메라 권한 거부는 양 플랫폼 모두 `CameraPermissionDeniedError`로 던져 권한 안내 문구를 보인다(그 밖의 촬영 실패는 일반 준비 실패 문구).
+- **201 본문이 깨졌을 때의 복구.** 현재는 `GET /posts/today`로 이미 만들어졌는지 확인한다(D-07). 스펙에 정해져 있지 않아 이 동작이 맞는지 백엔드 확인이 필요하다.
+- **PUT 거절 뒤 파일 보관(REQ-UPL-048 vs 다시 인코딩 생략).** 첫 PUT이 거절됐을 때 파일을 남기고 정책만 새로 받는 방식은 "제출이 실패하면 소유한 임시 파일을 삭제한다"(REQ-UPL-048)와 기존 테스트(TC-UPL-055·REQ-UPL-059)와 충돌해 적용하지 않았다. 지금은 파일을 지우고 다음 제출이 처음부터 준비한다. 바꾸려면 REQ-UPL-048 해석 합의가 먼저 필요하다.
+- **정책 한도 확인.** 읽은 바이트가 `policy.maxBytes`를 넘으면 PUT을 보내지 않고 준비 실패 문구를 보인다(REQ-UPL-044). `File.size`를 읽지 못하면 0으로 통과시키지 않고 실패한다.
+
+### 함정
+
+- 편집값은 "원본 기준 중심 + 돌린 사진 기준 크기"(`CropWindow`)다. 화면 자르기 영역(`CropRect`)은 **돌린 사진 기준 비율**이라 `cropRectToWindow`/`windowToCropRect`로만 오간다. 네이티브 자르기와 TS 렌더러가 같은 픽셀 사각형을 쓰도록 `cropPixelRect` 한 곳에서 정수로 푼다.
+- 편집기는 편집값만 확정한다(`onDone(edit)`). 픽셀은 업로드 준비 때 **원본에서 한 번에** 다시 만든다. 편집용 JPEG는 미리보기 전용이다.
+- 자동 보정은 분석 키(회전·자르기)가 같으면 다시 하지 않는다. "완료" 때만 최신 자르기로 한 번 더 분석하고 그동안 `rendering-indicator`가 보인다.
+- `UploadPreparation`은 세대 번호로 늦은 결과를 버리고, URL 만료는 단조 시계로 본다(`SystemMonotonicClock`은 `performance.now()`를 쓰는 유일한 파일 `core/time/Clock.ts`). POST /posts와 복구용 `GET /posts/today`는 취소 신호를 무시한다(화면을 나가도 서버 결과는 확정해 알린다).
+- `useOwnedViewModel`은 구독 시점에 ViewModel을 만들어서 첫 프레임은 null이다. 라우트 컴포넌트는 null이면 아무것도 그리지 않는다.
+- `PhotoEditScreen`은 마운트 때 `status === 'loading'`일 때만 `start()`를 부른다(이미 실패한 편집기를 자동으로 다시 시도하면 TC-EDIT-008 오류 알림이 사라진다).
+- 이 프로젝트의 eslint는 React Compiler 규칙(`react-hooks/refs`, `set-state-in-effect`)을 켜 둔다. 렌더 중 `ref.current`를 읽거나 쓰는 `PanResponder.create(...)`, effect 안의 동기 `setState`는 막힌다. 끌기 제스처는 `onResponder*` 핸들러를 JSX에 직접 쓰고(`CropFrame`의 `Drag`, `RulerSlider`), 비동기 결과는 `{key, value}`로 저장해 현재 키와 맞을 때만 쓴다.
+- `toHaveTextContent(문자열)`는 전체 일치라서, 같은 요소에 다른 텍스트(버튼 등)를 넣으면 실패한다(`photo-edit.error-dialog`와 권한 안내 제목은 텍스트만 가진 요소에 testID를 둔다).
+- `AppContainer.create`는 `overrides`를 키별로 옮겨 담는다. 새 의존성(`media` 등)은 `Dependencies`뿐 아니라 `create`의 객체에도 넣어야 테스트의 Fake가 반영된다.
+- **실기기 확인 필요**: `readBounds`는 manipulator로 한 번 디코드해 크기를 읽는다(EXIF 방향 반영과 메모리), 90도 회전 방향, 색 칠하기 시간, 눈금자·자르기 제스처의 감도, Android 카메라 권한 요청·거부 흐름, iOS Display P3 사진의 색(manipulator 중간 PNG가 sRGB 8비트인지 확인; 16비트·확장 색 공간이면 `decodePng`는 상위 바이트만 취하므로 색이 살짝 달라질 수 있다), 촬영본 HEIC/JPEG 저장 이름.
+
 ## Android OkHttp 자동 재시도 끄기 (`plugins/withOkHttpNoRetry.js`, D-21)
 
 - 이유: Android의 RN `fetch`는 OkHttp를 거치고, OkHttp 기본값 `retryOnConnectionFailure(true)`는 연결 실패 때 `POST` 같은 비멱등 요청도 조용히 다시 보낸다. D-21은 재시도를 `ApiClient` 한 곳에서 멱등 요청만 최대 2회로 제한하므로 prebuild 때 `MainApplication.kt`의 `onCreate`(`super.onCreate()` 직후, `loadReactNative` 전)에 `OkHttpClientProvider.setOkHttpClientFactory { createClientBuilder().retryOnConnectionFailure(false).build() }`를 넣는다. `createClientBuilder()`라서 RN 기본 쿠키 저장소(`ReactCookieJarContainer`)와 타임아웃 0은 유지된다.
@@ -169,7 +216,7 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
 - **달력 이미지 저장**: 인터페이스(`CalendarImageRenderer`/`CalendarImageSaver`)는 ViewModel이 쓰고 실제 어댑터는 `AppContainer`가 고른다(테스트는 `overrides.calendarImageRenderer`/`calendarImageSaver`).
   - 렌더러 `ViewShotCalendarImageRenderer`(`react-native-view-shot` 6.1.1, Expo 번들 버전): 뷰를 갖지 않고 요청을 상태로 내놓는다. 기록 화면과 함께 마운트되는 `CalendarImageCaptureHost`가 화면 밖(`left: -10000`, 접근성 숨김, opacity/display 숨김은 빈 이미지가 되므로 쓰지 않음)에 `CalendarImageView`(고정 360dp 폭)를 그리고, 썸네일 로딩(성공·실패, 최대 8초)이 끝난 뒤 `captureRef`로 PNG base64를 받아 바이트로 푼다(`base64ToBytes`). 호스트가 없으면(기록 화면 밖) 기다리지 않고 실패한다. Expo 권장 방식이 `react-native-view-shot`이라 그대로 썼다(`@shopify/react-native-skia`는 번들 목록에 있지만 과하다).
   - 저장소 `MediaLibraryCalendarImageSaver`(`expo-media-library` 58.0.12 새 API + `expo-file-system` 58.0.11): 캐시에 임시 PNG를 쓰고 `Asset.create`(iOS) / `Album.create('Chalkak', [uri])`(Android, Pictures/Chalkak) 후 지운다. iOS는 `requestPermissionsAsync(true)`(사진 추가 전용), Android 10(API 29) 이하는 같은 호출이 `WRITE_EXTERNAL_STORAGE`를 묻고 11(API 30) 이상은 권한 없이 쓴다(`MEDIASTORE_WRITE_API = 30`). **확인 필요**: REQ-REC-038은 "API 28 이하"인데 이 라이브러리 기준(`requestLegacyExternalStorage`가 켜지는 29 포함)으로 "29 이하"로 두었다. 스펙 문서는 고치지 않았으니 실기기(Android 10)에서 권한 흐름을 확인하고 합의한다. 거부(다시 묻지 않기 포함)는 `ImagePermissionDeniedError`.
-  - `app.config.ts`: `expo-media-library` 플러그인(`savePhotosPermission` = iOS `NSPhotoLibraryAddUsageDescription`, `granularPermissions: []`; `photosPermission`(`NSPhotoLibraryUsageDescription`)은 일부러 넣지 않았다 -> 읽기가 필요한 업로드(PR 7)와 합칠 때 문구를 복원한다)과 `android.blockedPermissions`(`READ_EXTERNAL_STORAGE`, `READ_MEDIA_VISUAL_USER_SELECTED`)로 읽기 권한을 매니페스트에서 뺐다.
+  - `app.config.ts`: `expo-media-library` 플러그인(`savePhotosPermission` = iOS `NSPhotoLibraryAddUsageDescription`, `granularPermissions: []`; `photosPermission`(`NSPhotoLibraryUsageDescription`)은 업로드(PR 7) 병합 때 복원했고 `savePhotosPermission` 문구는 촬영본과 달력 이미지 저장을 함께 말한다. 항목은 하나뿐이다)과 `android.blockedPermissions`(`READ_EXTERNAL_STORAGE`, `READ_MEDIA_VISUAL_USER_SELECTED`)로 읽기 권한을 매니페스트에서 뺐다.
   - **PR 7(업로드)과 합칠 때**: PR 7이 `core/media`(`GallerySaver`, `MediaPermissions`)와 `expo-media-library`를 추가하면 (1) `package.json`/lock의 `expo-media-library`·`expo-file-system` 중복을 번들 버전으로 맞추고, (2) `MediaLibraryCalendarImageSaver`를 `GallerySaver` 위로 얇게 옮기거나 그대로 두며, (3) `app.config.ts`의 플러그인 항목과 `blockedPermissions`를 합친다(업로드가 사진을 읽는다면 `READ_MEDIA_IMAGES`/`granularPermissions: ['photo']`가 필요해 이 PR의 차단 목록과 충돌한다). 어댑터는 `features/record`에 있고 인터페이스(`CalendarImage.ts`) 뒤에 있어 교체 범위가 이 폴더로 한정된다.
 - **저장 중 이탈·시간 상한**: 저장은 렌더러·저장소에 취소가 없어 멈출 수는 없다. 화면을 떠나거나(`onHidden`) 계정이 바뀌면(`clearAll`) 결과 토스트를 띄우지 않고 `saving`을 풀어 다시 저장할 수 있다(D-20). 캡처 호스트는 레이아웃(`onLayout`)과 썸네일 로딩이 8초 안에 끝나지 않으면 사진이 빠진 PNG를 만들지 않고 실패시키고(`record.save.fail`), 렌더러는 호스트가 20초 안에 응답하지 않으면 `Sleeper`로 시간 초과 처리해 대기열을 푼다.
 - **403(정지)**: `RecordViewModel.errorKindOf`에 `forbidden` 분기를 넣을 자리만 두고 지금은 `generic`이다. D-08 정지 안내를 기록에서 어떻게 보일지는 백엔드(기획) 확인이 필요하다.

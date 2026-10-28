@@ -102,6 +102,7 @@ describe('withOkHttpNoRetry (D-21)', () => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const config = require('../app.config').default;
       expect(config.plugins).toContain('./plugins/withOkHttpNoRetry');
+      // 플러그인 개수가 아니라 의도(두 플러그인이 함께 등록됨)를 확인한다: 업로드 PR이 사진 플러그인을 더했다.
       expect(config.plugins).toContainEqual([
         '@react-native-seoul/kakao-login',
         { kakaoAppKey: 'test-key' },
