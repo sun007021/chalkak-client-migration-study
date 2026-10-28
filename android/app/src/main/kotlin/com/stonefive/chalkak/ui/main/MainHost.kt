@@ -26,6 +26,7 @@ import com.stonefive.chalkak.ui.home.HomeRoute
 import com.stonefive.chalkak.platform.PhotoPreview
 import com.stonefive.chalkak.platform.UploadPlatform
 import com.stonefive.chalkak.ui.issue.IssueWebRoute
+import com.stonefive.chalkak.ui.record.RecordRoute
 import com.stonefive.chalkak.ui.upload.UploadRoute
 import com.stonefive.chalkak.ui.upload.UploadSuccessScreen
 import com.stonefive.chalkak.viewmodel.SessionHolders
@@ -48,6 +49,7 @@ import kr.chalkak.feature.navigation.AccessMode
 import kr.chalkak.feature.navigation.NavigationController
 import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
+import kr.chalkak.feature.record.RecordStateHolder
 import kr.chalkak.feature.upload.PhotoUploadStateHolder
 import kr.chalkak.feature.upload.UploadGateEffect
 
@@ -115,6 +117,10 @@ class MainDependencies(
     val newUploadHolder: (scope: CoroutineScope, topicDate: LocalDate) -> PhotoUploadStateHolder,
     val uploadPlatform: UploadPlatform,
     val otherTab: @Composable (tab: Tab, scrollToTop: ScrollToTopSignal) -> Unit = { tab, _ -> TabPlaceholder(tab) },
+    /** Record tab holder (A7); null = the record tab is still the [otherTab] placeholder. */
+    val newRecordHolder: ((scope: CoroutineScope, mode: HomeMode) -> RecordStateHolder)? = null,
+    /** KST today for the record calendar's today marker; always from the injected clock (TC-TIME-029). */
+    val today: () -> LocalDate,
 )
 
 /**
@@ -203,10 +209,31 @@ private fun MainHostContent(
                 )
                 LaunchedEffect(requestedDate) { if (requestedDate != null) nav.consumeDisplayDateRequest() }
             }
+            Route.TabRoot(Tab.Record) -> {
+                val newHolder = deps.newRecordHolder
+                if (newHolder == null) {
+                    deps.otherTab(Tab.Record, idleSignal)
+                } else {
+                    val mode = navState.accessMode
+                    val holder = rememberStateHolder("record-$sessionKey-$mode") { scope -> newHolder(scope, mode.toHomeMode()) }
+                    // Home's week row asks for a day once; the route takes it when it first shows.
+                    val requestedDate = remember(holder) { session.recordRequestedDate.also { session.recordRequestedDate = null } }
+                    RecordRoute(
+                        holder = holder,
+                        image = deps.image,
+                        showToast = { latestToast(it) },
+                        onOpenFeed = coordinator::onRecordOpenFeed,
+                        onOpenDisplay = coordinator::onRecordOpenDisplay,
+                        onLoginRequired = { }, // the 401 also ends the session through AuthEvent.GoToLogin (as for feed)
+                        today = deps.today,
+                        requestedDate = requestedDate,
+                    )
+                }
+            }
             is Route.TabRoot -> deps.otherTab(route.tab, idleSignal)
             Route.Notifications -> RoutePlaceholder("notifications.root")
             is Route.Feed -> {
-                val slot = session.feeds.slotFor(navState.stack.lastIndex, route, session.feedSeeds)
+                val slot = session.feeds.slotFor(navState.stack.lastIndex, route, session.feedSeeds, session.recordSeeds)
                 val holder = rememberStateHolder("feed-$sessionKey-${slot.id}") { scope -> deps.newFeedHolder(scope, slot.entry) }
                 slot.holder = holder
                 val aiHolder = deps.newAiReviewHolder?.let { create ->
