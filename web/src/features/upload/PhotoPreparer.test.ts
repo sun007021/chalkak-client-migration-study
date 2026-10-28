@@ -33,7 +33,7 @@ async function failureOf(promise: Promise<unknown>, h: UploadHarness): Promise<u
 }
 
 describe('PhotoPreparer.inspect (사진 선택 직후 확인)', () => {
-  it('TC-UPL-014 읽을 수 있는 사진이면 보이는 방향의 크기를 돌려주고 디코드한 이미지를 곧바로 놓는다', async () => {
+  it('TC-UPL-089 읽을 수 있는 사진이면 보이는 방향의 크기를 돌려주고 디코드한 이미지를 곧바로 놓는다', async () => {
     const { h, signal } = setup();
     const size = await h.preparer.inspect(imageFile({ width: 3000, height: 4000 }), signal);
     expect(size).toEqual({ width: 3000, height: 4000 });
@@ -41,14 +41,14 @@ describe('PhotoPreparer.inspect (사진 선택 직후 확인)', () => {
     expect(h.decoder.images[0]!.releases).toBe(1);
   });
 
-  it('TC-UPL-047 긴 변이 4096을 넘는 원본은 4096으로 줄여 읽고(비율 유지) 작은 사진은 확대하지 않는다', async () => {
+  it('TC-UPL-034 긴 변이 4096을 넘는 원본은 4096으로 줄여 읽고(비율 유지) 작은 사진은 확대하지 않는다', async () => {
     const { h, signal } = setup();
     expect(await h.preparer.inspect(imageFile({ width: 8000, height: 6000 }), signal)).toEqual({ width: 4096, height: 3072 });
     expect(h.decoder.calls[0]!.maxLongEdge).toBe(4096);
     expect(await h.preparer.inspect(imageFile({ width: 800, height: 600 }), signal)).toEqual({ width: 800, height: 600 });
   });
 
-  it('TC-UPL-028 inspect는 네트워크 요청을 하지 않는다', async () => {
+  it('TC-UPL-023 inspect는 네트워크 요청을 하지 않는다', async () => {
     const { h, signal } = setup();
     await h.preparer.inspect(imageFile(), signal);
     expect(h.ff.calls).toHaveLength(0);
@@ -57,13 +57,13 @@ describe('PhotoPreparer.inspect (사진 선택 직후 확인)', () => {
   it.each([
     ['0바이트 사진', { bytes: 0 }],
     ['손상된 사진', { corrupt: true }],
-  ])('TC-UPL-020 %s 은 PrepareError(prepare)다', async (_name, options) => {
+  ])('TC-UPL-021 %s 은 PrepareError(prepare)다', async (_name, options) => {
     const { h, signal } = setup();
     await expect(h.preparer.inspect(imageFile(options), signal)).rejects.toMatchObject({ name: 'PrepareError', kind: 'prepare' });
     expect(h.ff.calls).toHaveLength(0);
   });
 
-  it('TC-UPL-049 취소하면 AbortError로 거절하고 디코드한 이미지가 남아 있지 않다', async () => {
+  it('TC-UPL-028 취소하면 AbortError로 거절하고 디코드한 이미지가 남아 있지 않다', async () => {
     const { h } = setup();
     const photo = imageFile();
     const gate = h.decoder.hold(photo);
@@ -88,7 +88,7 @@ describe('PhotoPreparer.prepare (정책 발급 + 인코딩, S3 PUT 없음)', () 
     expect(h.compressor.compressCount).toBeGreaterThan(0);
   });
 
-  it('TC-UPL-025 정책 발급이 디코드·인코딩보다 먼저다(정책을 받기 전에는 이미지를 읽지 않는다)', async () => {
+  it('TC-UPL-023 정책 발급이 디코드·인코딩보다 먼저다(정책을 받기 전에는 이미지를 읽지 않는다)', async () => {
     const { h, prepare } = setup();
     // 정책 응답을 잡아 두고 그동안 디코드·압축이 시작되지 않음을 본다.
     const gate = deferred<Response>();
@@ -104,7 +104,7 @@ describe('PhotoPreparer.prepare (정책 발급 + 인코딩, S3 PUT 없음)', () 
     expect(result.state).toBe('fulfilled');
   });
 
-  it('TC-UPL-024 TC-UPL-045 결과는 정책과 maxBytes 이하의 image/webp, 그린 크기를 담는다', async () => {
+  it('TC-UPL-024 TC-UPL-058 결과는 정책과 maxBytes 이하의 image/webp, 그린 크기를 담는다', async () => {
     const { h, prepare } = setup();
     const prepared = await finish(h, prepare(imageFile({ width: 4000, height: 3000 })));
     expect(prepared.policy).toMatchObject({ uploadId: UPLOAD_ID, contentType: 'image/webp', maxBytes: 5_242_880 });
@@ -114,14 +114,14 @@ describe('PhotoPreparer.prepare (정책 발급 + 인코딩, S3 PUT 없음)', () 
     expect(prepared.deadline.isExpired()).toBe(false);
   });
 
-  it('TC-UPL-047 긴 변이 4096을 넘으면 4096으로 줄인 크기로 인코딩한다', async () => {
+  it('TC-UPL-034 긴 변이 4096을 넘으면 4096으로 줄인 크기로 인코딩한다', async () => {
     const { h, prepare } = setup();
     const prepared = await finish(h, prepare(imageFile({ width: 8000, height: 6000 })));
     expect(prepared.size).toEqual({ width: 4096, height: 3072 });
     expect(h.compressor.calls[0]).toMatchObject({ width: 4096, height: 3072, quality: 90 });
   });
 
-  it('TC-UPL-032 TC-UPL-037 정책 maxBytes가 작으면 품질 사다리로 맞춘다(maxBytes 1,000,000)', async () => {
+  it('TC-UPL-037 TC-UPL-058 정책 maxBytes가 작으면 품질 사다리로 맞춘다(maxBytes 1,000,000)', async () => {
     const { h, prepare } = setup({ [POLICY]: 'upload/posts-uploads__issued-small-max' });
     h.compressor.bytesFor = (call) => (call.quality >= 80 ? 1_200_000 : 900_000);
     const prepared = await finish(h, prepare());
@@ -130,7 +130,7 @@ describe('PhotoPreparer.prepare (정책 발급 + 인코딩, S3 PUT 없음)', () 
     expect(h.compressor.attempts().map(([, , q]) => q)).toEqual([90, 80, 60]);
   });
 
-  it('TC-UPL-038 정확히 maxBytes인 결과는 허용한다', async () => {
+  it('TC-UPL-039 정확히 maxBytes인 결과는 허용한다', async () => {
     const { h, prepare } = setup({ [POLICY]: 'upload/posts-uploads__issued-small-max' });
     h.compressor.bytesFor = () => 1_000_000;
     const prepared = await finish(h, prepare());
@@ -138,7 +138,7 @@ describe('PhotoPreparer.prepare (정책 발급 + 인코딩, S3 PUT 없음)', () 
     expect(h.compressor.compressCount).toBe(1);
   });
 
-  it('TC-UPL-039 maxBytes가 32비트를 넘는 정책에서도 한 번에 통과한다', async () => {
+  it('TC-UPL-024 maxBytes가 32비트를 넘는 정책에서도 한 번에 통과한다', async () => {
     const { h, prepare } = setup({ [POLICY]: 'upload/posts-uploads__issued-large-max' });
     h.compressor.bytesFor = () => 6_000_000;
     const prepared = await finish(h, prepare());
@@ -170,14 +170,14 @@ describe('PhotoPreparer.prepare (정책 발급 + 인코딩, S3 PUT 없음)', () 
     expect(h.renderer.calls).toHaveLength(0);
   });
 
-  it('TC-UPL-050 성공해도 디코드한 이미지는 release된다', async () => {
+  it('TC-UPL-031 성공해도 디코드한 이미지는 release된다', async () => {
     const { h, prepare } = setup();
     await finish(h, prepare());
     expect(h.decoder.images).toHaveLength(1);
     expect(h.decoder.images[0]!.releases).toBe(1);
   });
 
-  it('TC-UPL-051 deadline은 정책 응답 시각부터 센다: 인코딩에 100초가 걸려도 정책 수명(300초)은 그 100초가 지난 상태다', async () => {
+  it('TC-UPL-049 TC-UPL-050 deadline은 정책 응답 시각부터 센다: 인코딩에 100초가 걸려도 정책 수명(300초)은 그 100초가 지난 상태다', async () => {
     const { h, prepare } = setup();
     h.compressor.durationMs = 100_000;
     const result = track(prepare());
@@ -230,7 +230,7 @@ describe('PhotoPreparer.prepare 실패 분류', () => {
     expect(h.compressor.compressCount).toBe(0);
   });
 
-  it('TC-UPL-032 정책 contentType이 image/webp가 아니면(image/png) 디코드·인코딩 없이 prepare다', async () => {
+  it('TC-UPL-025 정책 contentType이 image/webp가 아니면(image/png) 디코드·인코딩 없이 prepare다', async () => {
     const { h, prepare } = setup({ [POLICY]: 'upload/posts-uploads__content-type-png' });
     const error = await failureOf(prepare(), h);
     expect((error as PrepareError).kind).toBe('prepare');
@@ -238,7 +238,7 @@ describe('PhotoPreparer.prepare 실패 분류', () => {
     expect(h.compressor.compressCount).toBe(0);
   });
 
-  it('TC-UPL-020 손상된 사진은 prepare이고 이미지가 남지 않는다', async () => {
+  it('TC-UPL-021 손상된 사진은 prepare이고 이미지가 남지 않는다', async () => {
     const { h, prepare } = setup();
     const error = await failureOf(prepare(imageFile({ corrupt: true })), h);
     expect((error as PrepareError).kind).toBe('prepare');
@@ -271,7 +271,7 @@ describe('PhotoPreparer.prepare 실패 분류', () => {
     expect(h.decoder.images.every((image) => image.released)).toBe(true);
   });
 
-  it('TC-UPL-043 편집 렌더링이 실패해도 prepare이고 디코드한 이미지는 놓는다', async () => {
+  it('TC-UPL-029 편집 렌더링이 실패해도 prepare이고 디코드한 이미지는 놓는다', async () => {
     const { h, prepare } = setup();
     h.renderer.fail = new Error('render failed');
     const error = await failureOf(prepare(imageFile(), EDITED), h);
@@ -280,7 +280,7 @@ describe('PhotoPreparer.prepare 실패 분류', () => {
     expect(h.decoder.images.every((image) => image.released)).toBe(true);
   });
 
-  it('TC-UPL-049 취소하면 AbortError(PrepareError가 아님)로 거절하고 이미지를 놓으며 더 압축하지 않는다', async () => {
+  it('TC-UPL-046 취소하면 AbortError(PrepareError가 아님)로 거절하고 이미지를 놓으며 더 압축하지 않는다', async () => {
     const { h } = setup();
     const controller = new AbortController();
     const gate = h.compressor.hold();
@@ -297,7 +297,7 @@ describe('PhotoPreparer.prepare 실패 분류', () => {
     expect(h.decoder.images.every((image) => image.released)).toBe(true);
   });
 
-  it('TC-UPL-049 정책 발급 중 취소하면 AbortError다', async () => {
+  it('TC-UPL-031 정책 발급 중 취소하면 AbortError다', async () => {
     const { h } = setup();
     const controller = new AbortController();
     const gate = deferred<Response>();
@@ -320,7 +320,7 @@ describe('PhotoPreparer.ensureFresh (제출 직전 정책 수명 확인)', () =>
   }
   const fresh = (h: UploadHarness, p: PreparedUpload, input: { photo: Blob; edit: PhotoEdit }) => h.preparer.ensureFresh(p, input, new AbortController().signal);
 
-  it('TC-UPL-041 발급 후 5분 안(294.999초)이면 같은 준비물을 그대로 돌려주고 요청하지 않는다', async () => {
+  it('TC-UPL-049 발급 후 5분 안(294.999초)이면 같은 준비물을 그대로 돌려주고 요청하지 않는다', async () => {
     const { h } = setup({ [POLICY]: SECOND_POLICY });
     const { value, input } = await prepared(h);
     await h.clock.advance(294_999);
@@ -330,7 +330,7 @@ describe('PhotoPreparer.ensureFresh (제출 직전 정책 수명 확인)', () =>
     expect(h.ff.calls.length).toBe(before);
   });
 
-  it('TC-UPL-041 TC-UPL-052 정확히 295초(300초 - 5초)면 만료로 보고 새 정책(새 uploadId)을 발급한다', async () => {
+  it('TC-UPL-050 정확히 295초(300초 - 5초)면 만료로 보고 새 정책(새 uploadId)을 발급한다', async () => {
     const { h } = setup({ [POLICY]: SECOND_POLICY });
     const { value, input } = await prepared(h);
     await h.clock.advance(295_000);
@@ -340,14 +340,14 @@ describe('PhotoPreparer.ensureFresh (제출 직전 정책 수명 확인)', () =>
     expect(result.deadline.isExpired()).toBe(false);
   });
 
-  it('TC-UPL-041 기기 시각(벽시계)을 앞당겨도 단조 시계 기준이라 만료되지 않는다', async () => {
+  it('TC-UPL-051 기기 시각(벽시계)을 앞당겨도 단조 시계 기준이라 만료되지 않는다', async () => {
     const { h } = setup({ [POLICY]: SECOND_POLICY });
     const { value, input } = await prepared(h);
     h.clock.setWallClock(h.clock.nowMs() + 3_600_000);
     expect(await finish(h, fresh(h, value, input))).toBe(value);
   });
 
-  it('TC-UPL-042 새 maxBytes가 파일 이상이면 파일을 다시 만들지 않고 재사용한다(새 정책의 uploadId·deadline만 바뀐다)', async () => {
+  it('TC-UPL-052 새 maxBytes가 파일 이상이면 파일을 다시 만들지 않고 재사용한다(새 정책의 uploadId·deadline만 바뀐다)', async () => {
     const { h } = setup({ [POLICY]: SECOND_POLICY });
     const { value, input } = await prepared(h);
     const decodes = h.decoder.decodeCount;
@@ -360,7 +360,7 @@ describe('PhotoPreparer.ensureFresh (제출 직전 정책 수명 확인)', () =>
     expect(h.compressor.compressCount).toBe(compresses);
   });
 
-  it('TC-UPL-042 새 maxBytes가 파일보다 작으면 원본·편집값으로 디코드 → 인코딩을 다시 한다', async () => {
+  it('TC-UPL-052 새 maxBytes가 파일보다 작으면 원본·편집값으로 디코드 → 인코딩을 다시 한다', async () => {
     const { h } = setup({ [POLICY]: ['upload/posts-uploads__issued', 'upload/posts-uploads__issued-small-max'] });
     h.compressor.bytesFor = (_call, index) => (index === 0 ? 2_000_000 : 900_000);
     const photo = imageFile();
@@ -378,7 +378,7 @@ describe('PhotoPreparer.ensureFresh (제출 직전 정책 수명 확인)', () =>
     expect(h.decoder.images.every((image) => image.released)).toBe(true);
   });
 
-  it('TC-UPL-041 새 정책의 contentType이 image/webp가 아니면 prepare다', async () => {
+  it('TC-UPL-053 새 정책의 contentType이 image/webp가 아니면 prepare다', async () => {
     const { h } = setup({ [POLICY]: ['upload/posts-uploads__issued', 'upload/posts-uploads__content-type-png'] });
     const { value, input } = await prepared(h);
     await h.clock.advance(295_000);
@@ -386,7 +386,7 @@ describe('PhotoPreparer.ensureFresh (제출 직전 정책 수명 확인)', () =>
     expect((error as PrepareError).kind).toBe('prepare');
   });
 
-  it('TC-UPL-041 새 정책 발급이 403이면 forbidden이다', async () => {
+  it('TC-UPL-027 새 정책 발급이 403이면 forbidden이다', async () => {
     const { h } = setup({ [POLICY]: ['upload/posts-uploads__issued', 'upload/posts-uploads__403-banned'] });
     const { value, input } = await prepared(h);
     await h.clock.advance(295_000);

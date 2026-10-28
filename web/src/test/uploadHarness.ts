@@ -1,3 +1,4 @@
+import type { StoredSession } from '../core/auth/SessionStore';
 import { PresignedUploader } from '../core/net/PresignedUploader';
 import { ToastController } from '../core/ui/ToastController';
 import type { SessionMode } from '../features/boot/authGate';
@@ -17,10 +18,10 @@ import { FakeImageDecoder, imageFile } from './FakeImageDecoder';
 import type { FakeImageOptions } from './FakeImageDecoder';
 import { FakeUploadNavigator } from './FakeUploadNavigator';
 import { FakeWebpCompressor } from './FakeWebpCompressor';
-import { FixtureRouter } from './fixtureRouter';
+import { FixtureRouter, resolveRoute } from './fixtureRouter';
 import type { RouteValue } from './fixtureRouter';
-import { guestSession, memberSession } from './fixtures';
-import { finish } from './homeHarness';
+import type { RecordedRequest } from './fakeFetch';
+import { guestSession, loadFixture, memberSession } from './fixtures';
 import { SequentialIdGenerator } from './sequentialIds';
 import { recordToasts } from './toastLog';
 
@@ -58,6 +59,8 @@ export async function settleMore(): Promise<void> {
 }
 
 export interface UploadHarnessOptions {
+  /** 저장된 세션. 기본 회원(액세스 토큰 15분). 토큰 만료 시나리오에서 accessTokenExpiresAt를 짧게 준다. */
+  session?: StoredSession;
   /** ISO 시각. 기본 FIXTURE_NOW(KST 2026-10-27 12:00). */
   now?: string;
   topicDate?: string;
@@ -67,7 +70,7 @@ export interface UploadHarnessOptions {
 
 /** UploadViewModel 단위 테스트용: 실제 Repository·PhotoPreparer·PresignedUploader를 FakeFetch(FixtureRouter) 위에 엮고 이미지 포트만 Fake로 둔다. */
 export function createUploadHarness(options: UploadHarnessOptions = {}) {
-  const env = makeApiEnv(memberSession());
+  const env = makeApiEnv(options.session ?? memberSession());
   if (options.now) env.clock.setWallClock(Date.parse(options.now));
   const router = new FixtureRouter(env.ff, { ...UPLOAD_ROUTES, ...options.routes });
   const api = env.client();
@@ -105,7 +108,9 @@ export async function openUpload(h: UploadHarness): Promise<void> {
 /** 사진을 고른다(편집기가 없으면 곧바로 확정되어 준비가 시작된다). 디코드 확인이 끝날 때까지 기다리고 백그라운드 준비는 기다리지 않는다. */
 export async function pickPhoto(h: UploadHarness, options: FakeImageOptions = {}): Promise<File> {
   const file = imageFile(options);
-  await finish(h, h.vm.selectPhoto(file));
+  const selecting = h.vm.selectPhoto(file);
+  await settleMore();
+  await selecting; // 시계를 움직이지 않는다: 정책 발급 시각(단조 시계)을 테스트가 정확히 알 수 있어야 한다
   return file;
 }
 
@@ -155,3 +160,11 @@ export const hangingServer =
     await clock.sleep(16_000);
     return new Response(null, { status: 200 });
   };
+
+/** 만료되지 않은 새 토큰(Bearer fixture-access-token-2)이 있을 때만 inner를 돌려주고 아니면 401 UNAUTHORIZED. 액세스 토큰 만료 시나리오용 서버. */
+export const requireFreshToken =
+  (inner: RouteValue): ((req: RecordedRequest, index: number) => Response | Promise<Response>) =>
+  (req, index) =>
+    req.headers['authorization'] === 'Bearer fixture-access-token-2'
+      ? resolveRoute(inner, req, index)
+      : loadFixture('upload/posts-uploads__401-unauthorized.json').toResponse();
