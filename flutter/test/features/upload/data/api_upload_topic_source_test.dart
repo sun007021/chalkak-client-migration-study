@@ -24,7 +24,8 @@ void main() {
 
   fakeTest('TC-UPL-087 요청 날짜는 기기 시간대와 무관한 KST yyyy-MM-dd이다', (async) {
     final r = UploadRig();
-    resolve(async, r.topics.topicOn(const KstDate(2026, 1, 5)));
+    // 이 날짜의 주제 응답은 스크립트하지 않았으므로 결과(404)는 보지 않고 요청 날짜만 확인한다.
+    start(async, r.topics.topicOn(const KstDate(2026, 1, 5)));
     expect(r.home.topicDatesRequested, ['2026-01-05']);
   });
 

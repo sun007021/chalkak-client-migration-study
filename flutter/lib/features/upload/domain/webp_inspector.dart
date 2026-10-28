@@ -18,19 +18,57 @@ class WebpInfo {
   final List<String> chunkTypes;
 
   /// 첫 이미지 청크: `VP8 ` 또는 `VP8L`. 없으면 null.
-  String? get imageChunk => throw UnimplementedError();
+  String? get imageChunk {
+    for (final type in chunkTypes) {
+      if (type == 'VP8 ' || type == 'VP8L') return type;
+    }
+    return null;
+  }
 
   /// `ANIM`/`ANMF` 청크가 있는가(움직이는 이미지).
-  bool get isAnimated => throw UnimplementedError();
+  bool get isAnimated =>
+      chunkTypes.contains('ANIM') || chunkTypes.contains('ANMF');
 
   /// `EXIF`/`XMP `/`ICCP` 청크가 있는가.
-  bool get hasMetadata => throw UnimplementedError();
+  bool get hasMetadata =>
+      chunkTypes.contains('EXIF') ||
+      chunkTypes.contains('XMP ') ||
+      chunkTypes.contains('ICCP');
 
   /// RIFF/WEBP 컨테이너이고 크기 필드가 맞으며 정지 이미지 청크가 있고 메타데이터·애니메이션이 없다.
-  bool get isUploadable => throw UnimplementedError();
+  bool get isUploadable =>
+      isRiffWebp &&
+      riffSizeMatches &&
+      imageChunk != null &&
+      !hasMetadata &&
+      !isAnimated;
 }
 
 abstract final class WebpInspector {
   /// 잘린 바이트나 WebP가 아닌 입력도 예외 없이 [WebpInfo.isRiffWebp]가 false인 값으로 돌려준다.
-  static WebpInfo inspect(Uint8List bytes) => throw UnimplementedError();
+  static WebpInfo inspect(Uint8List bytes) {
+    const none = WebpInfo(
+      isRiffWebp: false,
+      riffSizeMatches: false,
+      chunkTypes: [],
+    );
+    if (bytes.length < 12) return none;
+    String tag(int offset) => String.fromCharCodes(bytes, offset, offset + 4);
+    if (tag(0) != 'RIFF' || tag(8) != 'WEBP') return none;
+
+    final data = ByteData.sublistView(bytes);
+    final riffSize = data.getUint32(4, Endian.little);
+    final chunks = <String>[];
+    var offset = 12;
+    while (offset + 8 <= bytes.length) {
+      chunks.add(tag(offset));
+      final size = data.getUint32(offset + 4, Endian.little);
+      offset += 8 + size + (size & 1);
+    }
+    return WebpInfo(
+      isRiffWebp: true,
+      riffSizeMatches: riffSize == bytes.length - 8,
+      chunkTypes: chunks,
+    );
+  }
 }

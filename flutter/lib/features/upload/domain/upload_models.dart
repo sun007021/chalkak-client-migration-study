@@ -1,3 +1,4 @@
+import '../../../core/constants/app_constants.dart';
 import '../../../core/time/kst_date.dart';
 import '../../edit/domain/photo_edit.dart';
 import '../../home/domain/home_models.dart';
@@ -20,7 +21,8 @@ class UploadPolicy {
   final int maxBytes;
 
   /// `contentType == image/webp`인가(REQ-UPL-026).
-  bool get isWebp => throw UnimplementedError();
+  bool get isWebp =>
+      contentType.trim().toLowerCase() == AppConstants.postImageContentType;
 }
 
 /// 정책 발급과 WebP 인코딩이 끝난 제출 준비물.
@@ -47,7 +49,10 @@ class PreparedUpload {
 
   /// 정책을 받은 뒤 `expiresInSeconds - 5초`(UPLOAD_URL_SAFETY_MARGIN)가 지났으면 true.
   /// 정확히 경계(295.000초)도 만료로 본다(REQ-UPL-041).
-  bool isExpiredAt(Duration monotonicNow) => throw UnimplementedError();
+  bool isExpiredAt(Duration monotonicNow) =>
+      monotonicNow - issuedAt >=
+      Duration(seconds: policy.expiresInSeconds) -
+          AppConstants.uploadUrlSafetyMargin;
 }
 
 /// `POST /posts` 201 응답. `moderationStatus`는 VALIDATING 또는 PENDING만 받는다(REQ-UPL-046).

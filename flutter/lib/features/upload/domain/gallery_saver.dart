@@ -9,5 +9,12 @@ abstract interface class GallerySaver {
 /// 촬영본 저장 파일명 규칙: `chalkak-photo-<시각>.jpg`(REQ-UPL-014, TC-UPL-016).
 abstract final class CaptureFileName {
   /// [now]는 `clock.now()`. 같은 시각이면 같은 이름이다.
-  static String next(DateTime now) => throw UnimplementedError();
+  static String next(DateTime now) {
+    String two(int v) => v.toString().padLeft(2, '0');
+    final date =
+        '${now.year.toString().padLeft(4, '0')}${two(now.month)}'
+        '${two(now.day)}';
+    final time = '${two(now.hour)}${two(now.minute)}${two(now.second)}';
+    return 'chalkak-photo-$date-$time.jpg';
+  }
 }

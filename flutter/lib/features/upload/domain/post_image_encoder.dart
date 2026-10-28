@@ -1,7 +1,9 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../../edit/domain/image_codec.dart';
 import '../../edit/domain/photo_edit.dart';
 import '../../edit/domain/photo_edit_renderer.dart';
@@ -81,5 +83,75 @@ class PostImageEncoder {
     required PhotoEdit edit,
     required int maxBytes,
     CancelToken? cancelToken,
-  }) => throw UnimplementedError();
+  }) async {
+    void checkCancelled() {
+      if (cancelToken?.isCancelled ?? false) {
+        throw const PhotoEncodeException(PhotoEncodeFailure.cancelled);
+      }
+    }
+
+    checkCancelled();
+    RgbaImage base;
+    try {
+      // 크기만 읽고, 긴 변이 4096 이하가 되는 크기로 바로 디코드한다.
+      final bounds = await decoder.readBounds(source);
+      final target = _fit(
+        bounds.width,
+        bounds.height,
+        AppConstants.postImageMaxLongEdge,
+      );
+      checkCancelled();
+      base = await decoder.decode(source, width: target.$1, height: target.$2);
+    } on ImageDecodeException catch (e) {
+      throw PhotoEncodeException(
+        e.unsupported
+            ? PhotoEncodeFailure.unsupported
+            : PhotoEncodeFailure.unreadable,
+      );
+    }
+    checkCancelled();
+    // 편집은 한 번만 그리고, 손실 압축도 한 번만 거친다(중간 JPEG 없음).
+    if (!edit.isIdentity) base = await renderer.render(base, edit);
+    checkCancelled();
+
+    var width = base.width;
+    var height = base.height;
+    final rounds = AppConstants.webpShrinkMaxAttempts + 1;
+    for (var round = 0; round < rounds; round++) {
+      if (round > 0) {
+        width = math.max(1, (width * AppConstants.webpShrinkFactor).round());
+        height = math.max(1, (height * AppConstants.webpShrinkFactor).round());
+      }
+      RgbaImage image = base;
+      if (round > 0) {
+        image = await scaler.scale(base, width: width, height: height);
+        checkCancelled();
+      }
+      for (final quality in AppConstants.webpQualityLadder) {
+        checkCancelled();
+        final bytes = await compressor.compress(image, quality: quality);
+        checkCancelled();
+        if (bytes.length <= maxBytes) {
+          return EncodedPhoto(
+            bytes: bytes,
+            width: image.width,
+            height: image.height,
+            quality: quality,
+          );
+        }
+      }
+    }
+    throw const PhotoEncodeException(PhotoEncodeFailure.sizeLimitExceeded);
+  }
+
+  /// 긴 변이 [limit] 이하가 되도록 가로세로 비율을 지키며 줄인다(확대하지 않는다).
+  static (int, int) _fit(int width, int height, int limit) {
+    final longEdge = math.max(width, height);
+    if (longEdge <= limit) return (width, height);
+    final scale = limit / longEdge;
+    return (
+      math.max(1, (width * scale).round()),
+      math.max(1, (height * scale).round()),
+    );
+  }
 }
