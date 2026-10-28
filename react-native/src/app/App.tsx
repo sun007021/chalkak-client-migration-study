@@ -8,7 +8,8 @@ import { useViewModelState } from '../core/state/useViewModelState';
 import { ToastHost } from '../core/toast/ToastHost';
 import { LoginScreen } from '../features/auth/LoginScreen';
 import { ConfigErrorScreen } from '../features/config/ConfigErrorScreen';
-import { PlaceholderScreen } from '../features/placeholder/PlaceholderScreen';
+import { RnLegalDocWebView } from '../features/onboarding/RnLegalDocWebView';
+import { SignUpRoute } from '../features/onboarding/SignUpRoute';
 import { AppContainer, type Dependencies } from './AppContainer';
 import { AppContainerProvider, useAppContainer } from './AppContainerContext';
 import { BootHost } from './BootHost';
@@ -70,7 +71,7 @@ function AppShell() {
       updateDialogViewModel={updateDialogViewModel}
       login={<LoginRoute />}
       main={<RootNavigator />}
-      signUp={<PlaceholderScreen />}
+      signUp={<SignUpFlowRoute />}
     />
   );
 }
@@ -80,4 +81,11 @@ function LoginRoute() {
   const { loginOwner } = useAppContainer();
   const { viewModel } = useViewModelState(loginOwner);
   return viewModel ? <LoginScreen viewModel={viewModel} /> : null;
+}
+
+/** 가입 흐름 ViewModel은 소유자(signUpFlowOwner)가 phase에 맞춰 만들고 버린다. */
+function SignUpFlowRoute() {
+  const { signUpFlowOwner } = useAppContainer();
+  const { flow } = useViewModelState(signUpFlowOwner);
+  return flow ? <SignUpRoute flow={flow} WebView={RnLegalDocWebView} /> : null;
 }

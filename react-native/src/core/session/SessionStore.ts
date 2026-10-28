@@ -13,6 +13,12 @@ export type SessionState =
 export type RefreshedTokens = Omit<SessionCredentials, 'userId'>;
 
 export interface SessionStore {
+  /**
+   * 메모리 세대 번호(저장소를 읽지 않는다). 저장·삭제·게스트 전환으로 userId가 바뀔 때만 올라간다.
+   * 같은 userId의 토큰 교체(replaceTokensIfCurrent)에서는 올라가지 않는다.
+   * 요청 시작과 응답 도착 때 비교해 그 사이 계정이 바뀌었는지 판단한다.
+   */
+  generation(): number;
   load(): Promise<SessionState>;
   /**
    * load와 같되, 읽기 예외·손상 값 때문에 저장된 세션을 버렸는지 함께 알려준다(`discarded`).
