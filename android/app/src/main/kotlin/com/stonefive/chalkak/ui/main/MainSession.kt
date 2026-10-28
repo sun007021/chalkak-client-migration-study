@@ -64,6 +64,26 @@ class MainSession(val scope: CoroutineScope) {
 
     val feeds = FeedSlots()
 
+    /**
+     * "Open the AI sheet on entry" by post id, set right before a push or an inbox row opens that post's detail and taken (once) when
+     * the feed route first shows. A side table because the route itself (`Route.Feed`) is the navigation module's and has no such flag.
+     */
+    val aiSheetOnEntry = HashMap<String, Boolean>()
+
+    /** "Refresh the home screen" requests (push on the visible home); the home route acts on a change. */
+    val homeRefresh = ScrollToTopSignal()
+    var homeRefreshHandled: Int = 0
+
+    /**
+     * Bumped when a push replaces the feed that is on top by an equal route: the navigation state does not change (an equal `NavState`
+     * is not re-published), so the feed route reads this to recompose and take its fresh slot.
+     */
+    var feedReplaceSerial: Int by mutableStateOf(0)
+
+    /** Bumped when a push replaces the notification detail / inbox that is on top: the screen gets a fresh holder and loads again. */
+    var notificationDetailSerial: Int by mutableStateOf(0)
+    var inboxSerial: Int by mutableStateOf(0)
+
     /** `topicDate` the upload gate opened the upload screen for (pinned for the whole visit, REQ-UPL-008). */
     var uploadTopicDate: LocalDate? = null
 
@@ -79,6 +99,9 @@ class DisplayEntry(val seq: Int, val date: LocalDate?, val sort: PostSort?)
 /** One stacked `Route.Feed`: its identity (holder key), the entry it was opened with and the holder once composed. */
 class FeedSlot(val id: Int, val route: Route.Feed, val entry: FeedEntry) {
     var holder: FeedStateHolder? = null
+
+    /** `openSheetOnEntry` of this feed's AI holder; decided when the slot first shows (null before). */
+    var openAiSheet: Boolean? = null
 
     /** AI feedback holder of this feed (null without an AI area); finished together with [holder]. */
     var aiHolder: AiReviewStateHolder? = null
@@ -111,6 +134,11 @@ class FeedSlots {
             else -> FeedEntry.FromPush(route.postId)
         }
         return FeedSlot(nextId++, route, entry).also { slots[index] = it }
+    }
+
+    /** Forgets the slot at [index] (its holders are finished): the next [slotFor] there builds a fresh one even for an equal route. */
+    fun invalidate(index: Int) {
+        slots.remove(index)?.finish()
     }
 
     /** Finishes the holders of feed entries that are no longer in [stack] (popped, replaced, session ended). */

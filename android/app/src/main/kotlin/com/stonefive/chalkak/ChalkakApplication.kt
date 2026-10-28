@@ -10,5 +10,6 @@ class ChalkakApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer.create(this)
+        container.appForeground.register(this)
     }
 }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -27,6 +28,8 @@ import com.stonefive.chalkak.platform.PhotoPreview
 import com.stonefive.chalkak.platform.UploadPlatform
 import com.stonefive.chalkak.ui.issue.IssueWebRoute
 import com.stonefive.chalkak.ui.record.RecordRoute
+import com.stonefive.chalkak.ui.notification.NotificationDetailRoute
+import com.stonefive.chalkak.ui.notification.NotificationRoute
 import com.stonefive.chalkak.ui.upload.UploadRoute
 import com.stonefive.chalkak.ui.upload.UploadSuccessScreen
 import com.stonefive.chalkak.viewmodel.SessionHolders
@@ -50,6 +53,13 @@ import kr.chalkak.feature.navigation.NavigationController
 import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
 import kr.chalkak.feature.record.RecordStateHolder
+import kr.chalkak.feature.notification.NotificationDetailStateHolder
+import kr.chalkak.feature.notification.NotificationInboxStateHolder
+import kr.chalkak.feature.notification.NotificationPermissionFlow
+import kr.chalkak.feature.notification.PermissionFlowOutcome
+import kr.chalkak.feature.notification.PushNavigationEvent
+import kotlinx.coroutines.flow.Flow
+import com.stonefive.chalkak.ui.home.ActiveHomeUnread
 import kr.chalkak.feature.upload.PhotoUploadStateHolder
 import kr.chalkak.feature.upload.UploadGateEffect
 
@@ -121,6 +131,19 @@ class MainDependencies(
     val newRecordHolder: ((scope: CoroutineScope, mode: HomeMode) -> RecordStateHolder)? = null,
     /** KST today for the record calendar's today marker; always from the injected clock (TC-TIME-029). */
     val today: () -> LocalDate,
+    /** Inbox list holder, built once per opened inbox screen; null = presence-only placeholder (`notifications.root`). */
+    val newNotificationInboxHolder: ((scope: CoroutineScope) -> NotificationInboxStateHolder)? = null,
+    /** Notification detail holder, built once per opened detail screen; null = presence-only placeholder. */
+    val newNotificationDetailHolder: ((scope: CoroutineScope) -> NotificationDetailStateHolder)? = null,
+    /**
+     * AI feedback holder with the push entry flag (`openSheetOnEntry`); takes precedence over [newAiReviewHolder] when non-null.
+     * The flag is true only for the feed that a push or an inbox row opened with `PostDetail(openAiFeedbackSheet = true)`.
+     */
+    val newAiReviewHolderOnEntry: ((scope: CoroutineScope, openSheetOnEntry: Boolean) -> AiReviewStateHolder)? = null,
+    /** Asked once each time an authenticated home opens (`onMainEntered`); null = no OS permission prompt. */
+    val notificationPermission: NotificationPermissionFlow? = null,
+    /** Re-checks the unread dot of the home holder shown by this host; attached/detached by the host. */
+    val homeUnread: ActiveHomeUnread? = null,
 )
 
 /**
@@ -139,11 +162,13 @@ fun MainHost(
     onExitApp: () -> Unit,
     modifier: Modifier = Modifier,
     sessionKey: Int = 0,
+    /** Push taps the queue released (`PushTapQueue.events`); the host navigates. Null = no push taps. */
+    pushEvents: Flow<PushNavigationEvent>? = null,
 ) {
     val activity = LocalActivity.current
     // The holders of a finished session are cleared with it (not kept in the Activity's store until the Activity dies).
     SessionHolders(sessionKey, isChangingConfigurations = { activity?.isChangingConfigurations == true }) {
-        MainHostContent(nav, deps, showToast, onExitApp, modifier, sessionKey)
+        MainHostContent(nav, deps, showToast, onExitApp, modifier, sessionKey, pushEvents)
     }
 }
 
@@ -155,6 +180,7 @@ private fun MainHostContent(
     onExitApp: () -> Unit,
     modifier: Modifier,
     sessionKey: Int,
+    pushEvents: Flow<PushNavigationEvent>?,
 ) {
     val copy = LocalCopy.current
     val navState by nav.state.collectAsState()
@@ -165,6 +191,20 @@ private fun MainHostContent(
         MainCoordinator(nav, deps, session, copy, showToast = { latestToast(it) }, exitApp = { latestExit() })
     }
     LaunchedEffect(navState.stack) { session.feeds.retain(navState.stack) }
+    // Taps the queue released (also those released before this host composed: the channel buffers them). The queue decides when.
+    val latestPushEvents by rememberUpdatedState(pushEvents)
+    val hasPushEvents = pushEvents != null
+    LaunchedEffect(hasPushEvents, coordinator) {
+        if (hasPushEvents) latestPushEvents?.collect { coordinator.onPushEvent(it) }
+    }
+    // The home holder lives as long as the host, so a push keeps refreshing the unread dot while the inbox covers home.
+    val homeMode = navState.accessMode
+    val homeHolder = rememberStateHolder("home-$sessionKey-$homeMode") { scope -> deps.newHomeHolder(scope, homeMode.toHomeMode()) }
+    val homeUnread = deps.homeUnread
+    DisposableEffect(homeHolder, homeUnread) {
+        homeUnread?.attach(homeHolder)
+        onDispose { homeUnread?.detach(homeHolder) }
+    }
     val homeList = rememberLazyListState()
     val idleSignal = remember { ScrollToTopSignal() }
 
@@ -180,8 +220,20 @@ private fun MainHostContent(
     MainShell(navState, onTabClick = coordinator::onTabClick, onUploadClick = coordinator::onUploadClick, modifier = modifier) { route ->
         when (route) {
             Route.TabRoot(Tab.Home) -> {
-                val mode = navState.accessMode
-                val holder = rememberStateHolder("home-$sessionKey-$mode") { scope -> deps.newHomeHolder(scope, mode.toHomeMode()) }
+                val holder = homeHolder
+                // Authenticated main opened (again): the OS permission is asked once per install; the flow itself skips guests.
+                val permissionFlow = deps.notificationPermission
+                LaunchedEffect(permissionFlow, homeMode) {
+                    val outcome = permissionFlow?.onMainEntered(homeMode.toHomeMode())
+                    if (outcome is PermissionFlowOutcome.Failed) latestToast(copy[outcome.toastCopyKey])
+                }
+                val refreshCount = session.homeRefresh.count
+                LaunchedEffect(refreshCount) {
+                    if (refreshCount != session.homeRefreshHandled) {
+                        session.homeRefreshHandled = refreshCount
+                        holder.onPullToRefresh()
+                    }
+                }
                 HomeRoute(
                     holder = holder,
                     likes = deps.likes,
@@ -231,12 +283,35 @@ private fun MainHostContent(
                 }
             }
             is Route.TabRoot -> deps.otherTab(route.tab, idleSignal)
-            Route.Notifications -> RoutePlaceholder("notifications.root")
+            Route.Notifications -> {
+                val create = deps.newNotificationInboxHolder
+                if (create == null) {
+                    RoutePlaceholder("notifications.root")
+                } else {
+                    val holder = rememberStateHolder("inbox-$sessionKey-${session.inboxSerial}") { scope -> create(scope) }
+                    NotificationRoute(
+                        holder = holder,
+                        image = deps.image,
+                        showToast = { latestToast(it) },
+                        onNavigate = coordinator::onNotificationNavigate,
+                        onRequireLogin = {}, // AuthEvent.GoToLogin ends the session.
+                        onBack = coordinator::onSystemBack,
+                    )
+                }
+            }
             is Route.Feed -> {
+                @Suppress("UNUSED_VARIABLE")
+                val replaced = session.feedReplaceSerial // read only: a pushed replacement of this very route recomposes the feed
                 val slot = session.feeds.slotFor(navState.stack.lastIndex, route, session.feedSeeds, session.recordSeeds)
                 val holder = rememberStateHolder("feed-$sessionKey-${slot.id}") { scope -> deps.newFeedHolder(scope, slot.entry) }
                 slot.holder = holder
-                val aiHolder = deps.newAiReviewHolder?.let { create ->
+                val aiFactory: ((CoroutineScope) -> AiReviewStateHolder)? = deps.newAiReviewHolderOnEntry?.let { create ->
+                    // The push / inbox flag is taken once per feed slot (REQ-AIR-046/047); any other way into the feed has none.
+                    val openSheet = slot.openAiSheet ?: (session.aiSheetOnEntry.remove(route.postId) == true).also { slot.openAiSheet = it }
+                    val factory: (CoroutineScope) -> AiReviewStateHolder = { scope -> create(scope, openSheet) }
+                    factory
+                } ?: deps.newAiReviewHolder
+                val aiHolder = aiFactory?.let { create ->
                     rememberStateHolder("ai-$sessionKey-${slot.id}") { scope -> create(scope) }
                 }
                 slot.aiHolder = aiHolder
@@ -287,7 +362,28 @@ private fun MainHostContent(
                     )
                 }
             }
-            is Route.NotificationDetail -> RoutePlaceholder("notification-detail.root")
+            is Route.NotificationDetail -> {
+                val create = deps.newNotificationDetailHolder
+                if (create == null) {
+                    RoutePlaceholder("notification-detail.root")
+                } else {
+                    val holder = rememberStateHolder("notification-detail-$sessionKey-${route.notificationId}-${session.notificationDetailSerial}") { scope ->
+                        create(scope)
+                    }
+                    NotificationDetailRoute(
+                        holder = holder,
+                        notificationId = route.notificationId,
+                        inboxIsBelow = navState.stack.dropLast(1).contains(Route.Notifications),
+                        image = deps.image,
+                        showToast = { latestToast(it) },
+                        onClose = coordinator::onSystemBack,
+                        onOpenInbox = coordinator::onOpenInboxInsteadOfDetail,
+                        // The inbox reloads silently whenever it is shown again, which is when it is next seen.
+                        onInvalidateInbox = {},
+                        onRequireLogin = {}, // AuthEvent.GoToLogin ends the session.
+                    )
+                }
+            }
             Route.Feedback -> RoutePlaceholder("feedback.root")
             Route.BannerWeb -> {
                 val banner = session.issueBanner

@@ -57,6 +57,8 @@ app/src/main/kotlin/com/stonefive/chalkak/
   viewmodel/              StateHolderViewModel, rememberStateHolder
 app/src/kakaoOn/kotlin/.../platform/KakaoSdkFactory.kt    실제 Kakao SDK 어댑터 (-PkakaoNativeAppKey 있을 때만 컴파일)
 app/src/kakaoOff/kotlin/.../platform/KakaoSdkFactory.kt   SDK 없는 빌드의 대체(UnconfiguredKakaoSdk → 로그인은 `auth.login.error.config`)
+app/src/fcmOn/kotlin/.../platform/                         FCM 어댑터(FcmTokens, ChalkakMessagingService; -PfcmProjectId 있을 때만 컴파일)
+app/src/fcmOff/kotlin/.../platform/FcmTokens.kt            Firebase 없는 빌드의 대체(토큰 없음 → 기기 등록은 건너뜀)
 ```
 
 화면(`ui/**`)은 상태를 갖지 않는다. 상태와 로직은 `:feature:*` holder가 갖고, 화면은 `StateFlow`를 그리고 이벤트를 holder로 넘긴다. 예외는 문서 시트처럼 순수 표시 상태(열림, 로드 시도 번호)뿐이다. 화면을 떠날 때 holder 작업을 취소하는 `onScreenGone()`은 `ScreenGoneEffect`로 부른다. 화면 회전(Activity 재생성) 중에는 호출하지 않아 진행 중인 로그인·가입이 이어진다.
@@ -96,12 +98,17 @@ Activity 참조 규칙: 어댑터는 Activity를 직접 쥐지 않는다. `Curre
 | --- | --- | --- |
 | `apiBaseUrl` | debug `http://10.0.2.2:4010`, release `https://chalkak-dev.pysun.kr` | `BuildConfig.API_BASE_URL`(서버 origin만, 앱이 `/api/v1`을 붙인다) |
 | `kakaoNativeAppKey` | 없음 | 있으면 `src/kakaoOn`을 컴파일하고 `com.kakao.sdk:v2-user`를 의존성에 넣고, `settings.gradle.kts`가 Kakao Maven 저장소(`devrepo.kakao.com`)를 추가한다. `BuildConfig.KAKAO_NATIVE_APP_KEY`와 매니페스트 `AuthCodeHandlerActivity`의 scheme `kakao<키>`에 들어간다. 없으면 `src/kakaoOff`가 컴파일되고 `AuthCodeHandlerActivity` 항목은 `enabled=false` |
+| `fcmProjectId` (+ `fcmApplicationId`, `fcmApiKey`, `fcmSenderId`) | 없음 | 있으면 `src/fcmOn`을 컴파일하고 Firebase BoM·`firebase-messaging`을 넣는다. Firebase는 google-services 플러그인·`google-services.json` 없이 `BuildConfig.FCM_*` 값으로 `FirebaseOptions`를 직접 만들어 초기화한다(값은 저장소에 두지 않는다). 없으면 `src/fcmOff`(토큰 없음)이고 매니페스트의 `ChalkakMessagingService`는 `enabled=false` |
 | `fakeSocialLogin` | `false` | `true`이면 debug 빌드의 로그인이 SDK 없이 픽스처 idToken을 돌려준다(E2E용). release에서는 무시된다 |
 | `forceUpdateCheck` | `false` | `FORCE_UPDATE_CHECK_ENABLED`. 켜야 Play In-App Update 조회가 실제로 돈다(D-15, REQ-BOOT-014) |
 
 ### 소스셋: kakaoOn / kakaoOff
 
 Kakao 저장소는 일부 샌드박스에서 막혀 있어서, SDK가 없어도 `:app`이 빌드·테스트되도록 `KakaoSdkFactory`를 두 소스셋으로 나눴다. `app/build.gradle.kts`가 `kakaoNativeAppKey` 유무로 한쪽만 `variant.sources.kotlin`에 추가한다. 둘은 같은 이름·시그니처(`KakaoSdkFactory.create(context, nativeAppKey, activity)`)를 가져야 한다. 기본 빌드는 kakaoOn을 컴파일하지 않으므로 CI가 `./gradlew :app:compileDebugKotlin -PkakaoNativeAppKey=ci-dummy`로 따로 컴파일한다(`.github/workflows/android.yml`).
+
+### 소스셋: fcmOn / fcmOff
+
+kakaoOn/kakaoOff와 같은 방식이다. 두 소스셋의 `FcmTokens.create(context)`는 같은 시그니처여야 하고, CI는 `-PfcmProjectId=ci-dummy ...`로 fcmOn을 따로 컴파일한다.
 
 ### E2E 빌드 (mock 서버 + 가짜 로그인)
 
