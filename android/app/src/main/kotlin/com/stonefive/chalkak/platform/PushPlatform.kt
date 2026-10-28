@@ -35,7 +35,7 @@ import kr.chalkak.feature.notification.ShownNotification
  * [currentToken] is null and [refreshed] never emits.
  */
 interface PushTokenSource : FcmTokenSource {
-    /** FCM `onNewToken`: hot, no replay. */
+    /** FCM `onNewToken`: hot; the latest token may be replayed to a late collector (registration de-duplicates). */
     val refreshed: Flow<String>
 }
 

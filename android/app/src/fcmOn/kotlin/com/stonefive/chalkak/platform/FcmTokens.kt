@@ -16,7 +16,9 @@ import kotlin.coroutines.resume
  * Firebase is initialised by hand from BuildConfig values: no google-services plugin and no google-services.json in the repo.
  */
 object FcmTokens {
-    private val refreshedFlow = MutableSharedFlow<String>(extraBufferCapacity = 16)
+    // replay = 1: the service may deliver a token right after starting the runtime, before its collector subscribed (the
+    // registration coordinator de-duplicates by (user, token), so a repeated delivery is harmless).
+    private val refreshedFlow = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 16)
 
     fun create(context: Context): PushTokenSource {
         val app = context.applicationContext
