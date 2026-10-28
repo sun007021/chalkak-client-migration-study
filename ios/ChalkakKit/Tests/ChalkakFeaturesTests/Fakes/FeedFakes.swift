@@ -95,6 +95,7 @@ actor Counter {
         value += 1
         return value
     }
+    func current() -> Int { value }
 }
 
 /// `PostChangeLedger`가 알린 변경을 모은다.
