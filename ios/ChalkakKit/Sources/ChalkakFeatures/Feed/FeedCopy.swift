@@ -43,6 +43,9 @@ public enum FeedCopy {
         case .postDetail: detailMessage(failure)
         case .like, .unlike: failure == .banned ? likeBanned : (failure == .unauthorized ? nil : likeGeneric)
         case .listPosts, .topic: listMessage(failure)
+        // 홈 전용 호출의 문구는 `HomeCopy`가 정한다.
+        case .todayPost, .calendar, .banners, .unreadStatus: nil
+        case .aiReviewStatus, .aiReviewRequest: nil // AI 피드백 문구는 AIReviewCopy가 고른다
         }
     }
 

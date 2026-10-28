@@ -11,4 +11,12 @@ export class NoopLikeController implements LikeController {
   subscribe(_listener: (change: LikeChange) => void): () => void {
     return () => {};
   }
+
+  revision(): number {
+    return 0;
+  }
+
+  latestSince(_postId: string, _since: number): LikeSnapshot | undefined {
+    return undefined;
+  }
 }

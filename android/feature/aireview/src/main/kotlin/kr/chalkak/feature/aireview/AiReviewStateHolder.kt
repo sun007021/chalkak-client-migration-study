@@ -18,6 +18,7 @@ import kr.chalkak.core.data.aireview.AiReviewRepository
 import kr.chalkak.core.data.aireview.AiReviewStatus
 import kr.chalkak.core.data.post.CurrentUser
 import kr.chalkak.core.network.ApiResult
+import kr.chalkak.core.network.guardedApiCall
 
 /**
  * AI feedback pill + sheets + polling for ONE post at a time. It does not know the feed or the home screen: the host

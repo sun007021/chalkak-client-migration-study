@@ -1,5 +1,6 @@
 package kr.chalkak.feature.display
 
+import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.Channel
@@ -12,6 +13,7 @@ import kotlinx.coroutines.launch
 import kr.chalkak.core.common.DateFormats
 import kr.chalkak.core.common.KstCalendar
 import kr.chalkak.core.common.analytics.AnalyticsTracker
+import kr.chalkak.core.common.analytics.screenViewSafely
 import kr.chalkak.core.data.post.CurrentUser
 import kr.chalkak.core.data.post.LikeController
 import kr.chalkak.core.data.post.LikeEvent
@@ -21,7 +23,7 @@ import kr.chalkak.core.data.post.PostSort
 import kr.chalkak.core.data.post.PostSummary
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
-import java.time.LocalDate
+import kr.chalkak.core.network.JobTracker
 
 /** Archive carousel size (REQ-DISP-018). */
 private const val FEATURED_PHOTO_COUNT = 5

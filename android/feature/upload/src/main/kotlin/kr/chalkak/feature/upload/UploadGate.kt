@@ -1,5 +1,6 @@
 package kr.chalkak.feature.upload
 
+import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -13,7 +14,8 @@ import kr.chalkak.core.data.home.TodayPost
 import kr.chalkak.core.data.post.CurrentUser
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
-import java.time.LocalDate
+import kr.chalkak.core.network.JobTracker
+import kr.chalkak.core.network.guardedApiCall
 
 data class UploadGateUiState(val checking: Boolean = false)
 
@@ -41,7 +43,7 @@ class UploadGateStateHolder(
 ) {
     private val _state = MutableStateFlow(UploadGateUiState())
     private val _effects = Channel<UploadGateEffect>(Channel.UNLIMITED)
-    private val jobs = UploadJobs(scope) { emitToast(UploadCopyKeys.GATE_CHECK_FAILED) }
+    private val jobs = JobTracker(scope) { emitToast(UploadCopyKeys.GATE_CHECK_FAILED) }
     private var check: Job? = null
     private var toastCounter = 0L
 

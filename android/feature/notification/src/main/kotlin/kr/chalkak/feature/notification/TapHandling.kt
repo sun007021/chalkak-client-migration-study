@@ -10,9 +10,10 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kr.chalkak.core.network.ApiResult
 import kr.chalkak.core.data.auth.UserDataResetter
 import kr.chalkak.core.data.notification.NotificationRepository
+import kr.chalkak.core.network.ApiResult
+import kr.chalkak.core.network.guardedApiCall
 
 sealed interface TapOutcome {
     /**

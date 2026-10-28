@@ -1,17 +1,19 @@
 package kr.chalkak.feature.record
 
+import java.time.YearMonth
 import kotlinx.coroutines.Job
 import kr.chalkak.core.data.record.RecordPost
 import kr.chalkak.core.data.record.RecordRepository
 import kr.chalkak.core.network.ApiResult
-import java.time.YearMonth
+import kr.chalkak.core.network.JobTracker
+import kr.chalkak.core.network.guardedApiCall
 
 /**
  * Month list and calendar requests of the record holder. A request for the month that is already being asked is not sent
  * twice; a superseded answer (see [RecordCore.navigation] / [RecordCore.epoch]) is dropped.
  */
 internal class RecordLoader(
-    private val jobs: RecordJobs,
+    private val jobs: JobTracker,
     private val core: RecordCore,
     private val repository: RecordRepository,
 ) {

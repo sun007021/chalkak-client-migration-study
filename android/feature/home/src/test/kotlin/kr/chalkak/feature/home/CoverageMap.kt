@@ -20,7 +20,7 @@ package kr.chalkak.feature.home
  *   Contract (D): BANR-031 (dev-server schema diff)
  *   Owned elsewhere: HOME-055 (image download dedupe) -> app image loader; HOME-044 cache wipe of other features -> UserDataResetter participants;
  *                    HOME-014 refresh single-flight itself -> core:network (here only the repository-level resend is asserted)
- *   Not covered, no TC: REQ-HOME-033 like toggle (LikeToggler port is declared, wiring and TC land with the LIKE/display PR),
+ *   Not covered, no TC: REQ-HOME-033 like toggle: the LikeToggler port is wired to the shared LikeController (LikeControllerTogglerTest, TC-LIKE-005); list merge and failure toasts are not wired yet,
  *                       REQ-HOME-017 inconsistent today bodies, REQ-HOME-044 push-driven scroll-to-top
  */
 internal object CoverageMap

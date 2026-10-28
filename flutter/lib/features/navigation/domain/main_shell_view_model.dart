@@ -19,9 +19,16 @@ class RecordTarget {
 
 /// 전시 탭이 열릴 때 보여 줄 날짜와 정렬(홈 랭킹 더보기).
 class DisplayTarget {
-  const DisplayTarget({required this.date, required this.popular});
+  const DisplayTarget({
+    required this.date,
+    required this.popular,
+    this.revalidate = false,
+  });
   final KstDate date;
   final bool popular;
+
+  /// 이미 그 날짜를 보고 있어도 목록을 다시 불러온다(업로드 직후 REQ-UPL-063).
+  final bool revalidate;
 }
 
 sealed class MainShellEvent {
@@ -150,8 +157,16 @@ class MainShellViewModel extends ChangeNotifier {
   }
 
   /// 홈에서 전시 탭으로(랭킹 더보기). [displayTarget]에 둔다.
-  void openDisplay({required KstDate date, required bool popular}) {
-    _displayTarget = DisplayTarget(date: date, popular: popular);
+  void openDisplay({
+    required KstDate date,
+    required bool popular,
+    bool revalidate = false,
+  }) {
+    _displayTarget = DisplayTarget(
+      date: date,
+      popular: popular,
+      revalidate: revalidate,
+    );
     selectTab(BottomDestination.display);
   }
 

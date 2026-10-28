@@ -27,8 +27,27 @@ function pathFor(outcome: LoginOutcome): string | null {
  */
 export function LoginScreen(): ReactNode {
   const container = useContainer();
-  const create = useCallback(() => container.createLoginViewModel(), [container]);
+  const [checked, setChecked] = useState(false);
+  const create = useCallback(() => (checked ? container.createLoginViewModel() : null), [container, checked]);
   const vm = useOwnedViewModel(create);
+  // 로그인 화면에 들어오면 가입 중이던 idToken·rawNonce를 폐기한다(가입 흐름을 벗어난 것). 이미 회원 세션이 있으면(가입 완료 뒤 뒤로 가기 등) 홈으로 보낸다.
+  const navigate = useNavigate();
+  useEffect(() => {
+    container.signupDraft.clear();
+    let active = true;
+    const proceed = (member: boolean) => {
+      if (!active) return;
+      if (member) navigate(ROUTES.home, { replace: true });
+      else setChecked(true);
+    };
+    void container.store.read().then(
+      (session) => proceed(session.tokens !== null && !session.isGuest),
+      () => proceed(false),
+    );
+    return () => {
+      active = false;
+    };
+  }, [container, navigate]);
   return vm ? <LoginView vm={vm} /> : null;
 }
 

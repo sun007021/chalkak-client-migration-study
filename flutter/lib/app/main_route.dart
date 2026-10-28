@@ -17,6 +17,7 @@ import '../features/navigation/presentation/main_shell_navigator.dart';
 import 'app_dependencies.dart';
 import 'app_routes.dart';
 import 'feed_route.dart';
+import 'upload_route.dart';
 
 /// `/main`: 세션이 게스트인지 읽은 뒤 [MainShell]을 만든다.
 /// ViewModel(홈, 셸, 배너 목록)은 이 위젯이 만들고 화면이 사라질 때 함께 정리한다.
@@ -34,6 +35,7 @@ class _MainRouteHostState extends State<MainRouteHost> {
   late final _RouterNavigator _navigator = _RouterNavigator(
     context,
     widget.dependencies,
+    onUploaded: _onUploaded,
   );
   StreamSubscription<like.ToastMessage>? _likeToasts;
   bool _disposed = false;
@@ -68,6 +70,16 @@ class _MainRouteHostState extends State<MainRouteHost> {
     );
   }
 
+  /// 업로드 성공 뒤: 전시 탭의 해당 날짜로 가고, 홈은 오늘 사진 상태를, 기록은 달력을 다시 불러온다
+  /// (REQ-UPL-063). 홈은 `refresh`, 기록은 `enter`를 쓴다.
+  void _onUploaded(KstDate date) {
+    final parts = _parts;
+    if (_disposed || parts == null) return;
+    parts.shell.openDisplay(date: date, popular: false, revalidate: true);
+    unawaited(parts.home.refresh());
+    unawaited(parts.record.enter());
+  }
+
   @override
   void dispose() {
     _disposed = true;
@@ -95,13 +107,20 @@ class _MainRouteHostState extends State<MainRouteHost> {
   }
 }
 
-/// 셸의 이동 요청을 라우터/네비게이터로 보낸다. 알림함·업로드 화면은 해당 PR이 추가하기 전까지
+/// 셸의 이동 요청을 라우터/네비게이터로 보낸다. 알림함은 해당 PR이 추가하기 전까지
 /// 이동하지 않고 바로 끝난다.
 class _RouterNavigator implements MainShellNavigator {
-  _RouterNavigator(this._context, this._dependencies);
+  _RouterNavigator(
+    this._context,
+    this._dependencies, {
+    required this.onUploaded,
+  });
 
   final BuildContext _context;
   final AppDependencies _dependencies;
+
+  /// 업로드를 마치고 "확인했어요."를 누르면 전시 탭 이동과 재검증을 맡는다.
+  final void Function(KstDate date) onUploaded;
 
   @override
   Future<void> openNotifications() => Future<void>.value();
@@ -141,7 +160,28 @@ class _RouterNavigator implements MainShellNavigator {
   }
 
   @override
-  Future<void> openUpload(KstDate topicDate) => Future<void>.value();
+  Future<void> openUpload(KstDate topicDate) async {
+    if (!_context.mounted) return;
+    UploadExit? exit;
+    await Navigator.of(_context).push<void>(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (context) => UploadRoute(
+          dependencies: _dependencies,
+          topicDate: topicDate,
+          onExit: (value) => exit = value,
+        ),
+      ),
+    );
+    switch (exit) {
+      case UploadExitToDisplay(:final date):
+        onUploaded(date);
+      case UploadExitToLogin():
+        goToLogin();
+      case null:
+        break;
+    }
+  }
 
   @override
   Future<void> openBanner(BannerItem item) async {

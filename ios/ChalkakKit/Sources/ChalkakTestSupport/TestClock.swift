@@ -26,7 +26,8 @@ public final class TestClock: AppClock {
         var uptime: Duration
         var nextID = 0
         var sleepers: [Int: Sleeper] = [:]
-        var sleeperWaiters: [(target: Int, continuation: CheckedContinuation<Void, Never>)] = []
+        var sleeperWaiters: [(id: Int, target: Int, continuation: CheckedContinuation<Void, Never>)] = []
+        var nextWaiterID = 0
         var sleepMode: SleepMode
         var recordedSleeps: [Duration] = []
     }
@@ -102,14 +103,27 @@ public final class TestClock: AppClock {
     }
 
     /// sleeper가 `count`개 이상 등록될 때까지 기다린다. sleep이 등록될 때 깨우므로 실시간·양보 횟수에 기대지 않는다.
+    /// 기다리는 중 취소(테스트 시간 초과 등)되면 깨어나므로, 일어나지 않을 sleep을 기다려도 멈춰 있지 않고 이어지는 단언이 실패로 끝난다.
     public func waitUntilSleeperCount(atLeast count: Int) async {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            let satisfied = state.withLock { s -> Bool in
-                if s.sleepers.count >= count { return true }
-                s.sleeperWaiters.append((count, continuation))
-                return false
+        let id = state.withLock { s -> Int in
+            s.nextWaiterID += 1
+            return s.nextWaiterID
+        }
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                let satisfied = state.withLock { s -> Bool in
+                    if Task.isCancelled || s.sleepers.count >= count { return true }
+                    s.sleeperWaiters.append((id, count, continuation))
+                    return false
+                }
+                if satisfied { continuation.resume() }
             }
-            if satisfied { continuation.resume() }
+        } onCancel: {
+            let waiter = state.withLock { s -> CheckedContinuation<Void, Never>? in
+                guard let index = s.sleeperWaiters.firstIndex(where: { $0.id == id }) else { return nil }
+                return s.sleeperWaiters.remove(at: index).continuation
+            }
+            waiter?.resume()
         }
     }
 
