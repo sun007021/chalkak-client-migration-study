@@ -10,6 +10,14 @@ public enum FeedOperation: Sendable, Equatable, CaseIterable {
     case deletePost
     case like
     case unlike
+    /// `GET /posts/today`. 403은 정지 회원(D-08, `FeedFailure.banned`)이다.
+    case todayPost
+    /// `GET /posts/calendar`
+    case calendar
+    /// `GET /banners` (비로그인 호출이라 401도 갱신하지 않는다)
+    case banners
+    /// `GET /notifications/unread-status`
+    case unreadStatus
 }
 
 /// 화면이 분기에 쓰는 도메인 오류. `message` 문자열로는 분기하지 않고 `status + FeedOperation`으로만 만든다(D-02).
@@ -61,9 +69,9 @@ public enum FeedFailureMapper {
     /// 같은 403이라도 호출에 따라 뜻이 다르다(D-08): 등록·제목 수정은 정지 회원, 삭제는 남의 게시물.
     private static func forbidden(for operation: FeedOperation) -> FeedFailure {
         switch operation {
-        case .like, .updateTitle: .banned
+        case .like, .updateTitle, .todayPost: .banned
         case .deletePost: .notOwner
-        case .listPosts, .topic, .postDetail, .unlike: .forbidden
+        case .listPosts, .topic, .postDetail, .unlike, .calendar, .banners, .unreadStatus: .forbidden
         }
     }
 }
