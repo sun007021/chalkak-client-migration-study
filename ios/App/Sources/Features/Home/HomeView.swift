@@ -6,6 +6,10 @@ import ChalkakFeatures
 /// 홈 탭. `HomeViewModel` 상태를 그리기만 한다(문구·분기·정책은 ViewModel/Copy).
 struct HomeView: View {
     let viewModel: HomeViewModel
+    let container: AppContainer
+    let session: MainSession
+    /// 홈이 쌓임 화면에 가려지지 않았는가(AI 카드 조회·폴링 판단).
+    let isActive: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -14,6 +18,7 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 28) {
                     topicHeader
                     HomeHeroCard(viewModel: viewModel)
+                    HomeAICardSlot(container: container, session: session, isActive: isActive)
                     HomeWeekSection(viewModel: viewModel)
                     HomeRankingSection(
                         viewModel: viewModel, section: .ranking, title: HomeCopy.rankingYesterdayTitle,

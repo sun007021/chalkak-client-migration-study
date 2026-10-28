@@ -44,7 +44,12 @@ struct MainView: View {
                     if shell.isBottomBarVisible {
                         ChalkakBottomBar(
                             selectedTab: shell.selectedTab,
-                            onSelect: { tab in _ = shell.selectTab(tab) },
+                            onSelect: { tab in
+                                // 전시 탭을 다시 누르면 맨 위로 + 재검증(REQ-DISP-029).
+                                if shell.selectTab(tab) == .reselected, tab == .display {
+                                    Task { await session.display?.tabReselected() }
+                                }
+                            },
                             onUpload: { Task { await shell.startUpload() } }
                         )
                     }
@@ -77,15 +82,20 @@ struct MainView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await session.home.appBecameActive() } }
         }
+        // 푸시·알림의 "AI 결과 열기" 요청을 받아 게시물 상세가 가져가게 둔다.
+        .onChange(of: shell.aiResultRequest) { _, request in
+            guard request != nil, let request = shell.consumeAIResultRequest() else { return }
+            session.aiResultInbox.add(request.postId)
+        }
     }
 
     @ViewBuilder
     private func tabContent(_ tab: MainTab) -> some View {
         switch tab {
         case .home:
-            HomeView(viewModel: session.home)
+            HomeView(viewModel: session.home, container: container, session: session, isActive: session.shell.path.isEmpty)
         case .display:
-            PlaceholderView(title: NavCopy.label(for: .display), identifier: "display")
+            DisplayHost(container: container, session: session)
         case .record:
             PlaceholderView(title: NavCopy.label(for: .record), identifier: "record")
         case .settings:
@@ -100,10 +110,12 @@ struct MainView: View {
         switch route {
         case .issue(let url):
             IssueWebScreen(container: container, url: url, onBack: { shell.pop() })
-        case .feed:
-            PlaceholderView(title: AnalyticsScreen.feed.rawValue, identifier: "feed", onBack: { shell.pop() })
+        case .feed(let entry):
+            FeedScreen(container: container, session: session, entry: entry)
         case .notifications:
             PlaceholderView(title: AnalyticsScreen.notifications.rawValue, identifier: "notifications", onBack: { shell.pop() })
+        case .notificationDetail:
+            PlaceholderView(title: AnalyticsScreen.notificationDetail.rawValue, identifier: "notification-detail", onBack: { shell.pop() })
         case .feedback:
             PlaceholderView(title: AnalyticsScreen.feedback.rawValue, identifier: "feedback", onBack: { shell.pop() })
         case .upload:

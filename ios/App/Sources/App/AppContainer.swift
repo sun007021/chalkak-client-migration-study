@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import Synchronization
 import ChalkakCore
 import ChalkakNetwork
@@ -39,15 +40,67 @@ final class DeferredAuthEvents: AuthEvents {
     }
 }
 
+/// 푸시·알림이 만든 "AI 결과 열기" 요청을 게시물 상세가 받을 때까지 보관한다.
+/// 메인 셸이 요청을 내주면(`consumeAIResultRequest`) 여기에 넣고, 상세 화면이 AI 대상을 만들 때 한 번만 꺼내 간다.
+@MainActor
+final class AIResultInbox {
+    private var postIds: Set<UUID> = []
+
+    func add(_ postId: UUID) { postIds.insert(postId) }
+
+    /// 그 게시물의 요청이 있으면 지우고 true.
+    func take(_ postId: UUID) -> Bool { postIds.remove(postId) != nil }
+}
+
 /// 메인 화면 한 세션(접근 모드 하나)에 쓰는 ViewModel 묶음. 로그아웃·계정 전환 때 버리고 새로 만든다.
 @MainActor
+@Observable
 final class MainSession {
     let shell: MainShellViewModel
     let home: HomeViewModel
+    let aiResultInbox = AIResultInbox()
+    /// 홈 AI 피드백 카드의 ViewModel. 홈 탭을 떠났다 돌아와도 이어 쓴다(완료 결과를 다시 조회하지 않기 위해, REQ-HOME-037).
+    private(set) var homeAI: AIReviewViewModel?
 
-    init(shell: MainShellViewModel, home: HomeViewModel) {
+    private unowned let container: AppContainer
+    /// 전시 탭 ViewModel. 탭을 오갈 때 캐시·정렬을 유지하려고 세션이 쥔다(처음 열 때 만든다).
+    @ObservationIgnored private(set) var display: DisplayViewModel?
+    /// 전시 ViewModel을 만들 때 시드로 쓴 요청 id(같은 요청을 다시 적용하지 않는다).
+    @ObservationIgnored private var displaySeedRequestID: Int?
+
+    init(shell: MainShellViewModel, home: HomeViewModel, container: AppContainer) {
         self.shell = shell
         self.home = home
+        self.container = container
+    }
+
+    /// 전시 탭 ViewModel(없으면 만든다). 대기 중인 전시 요청이 있으면 그 날짜·정렬로 시작한다(요청은 `applyPendingDisplayRequest`가 비운다).
+    func displayViewModel() -> DisplayViewModel {
+        if let display { return display }
+        let request = shell.displayRequest
+        let viewModel = container.makeDisplayViewModel(initialDate: request?.date, initialSort: request?.sort)
+        display = viewModel
+        displaySeedRequestID = request?.id
+        return viewModel
+    }
+
+    /// 전시 요청(홈 "더 보기" 등)을 소비해 이미 만들어진 전시에 적용한다. ViewModel이 요청으로 시작했으면 다시 적용하지 않는다.
+    func applyPendingDisplayRequest() async {
+        guard let request = shell.consumeDisplayRequest() else { return }
+        guard request.id != displaySeedRequestID, let display else { return }
+        await display.select(date: request.date)
+        await display.selectSort(request.sort)
+    }
+
+    /// 홈 카드 대상 게시물이 바뀔 때마다 부른다. 처음이면 만들고, 이후에는 `show`로 대상만 바꾼다.
+    func updateHomeAI(postId: UUID?) {
+        guard let postId else { return }
+        let target = container.homeAITarget(postId: postId)
+        if let homeAI {
+            homeAI.show(target)
+        } else {
+            homeAI = container.makeAIReviewViewModel(target: target, surface: .home, opensSheetOnFirstResult: false)
+        }
     }
 }
 
@@ -65,6 +118,11 @@ final class AppContainer {
     private let clock: any AppClock
     private let viewer: any ViewerContext
     private let homeRepositories: HomeRepositories
+    private let topicRepository: any TopicRepository
+    private let postRepository: any PostRepository
+    private let aiReviewRepository: any AIReviewRepository
+    private let likeEvents: LikeEventBroadcaster
+    private let likeCoordinator: LikeCoordinator
     private let signUpRepository: any SignUpRepository
     private let postChangeLedger: PostChangeLedger
     private let signatureEncoder = CoreGraphicsSignatureEncoder()
@@ -117,9 +175,17 @@ final class AppContainer {
         self.screenTracker = ScreenTracker(tracker: LogAnalyticsTracker())
         self.clock = clock
         self.viewer = viewer
+        let topicRepository = APITopicRepository(client: client)
+        let postRepository = APIPostRepository(client: client, viewer: viewer)
+        let likeEvents = LikeEventBroadcaster()
+        self.topicRepository = topicRepository
+        self.postRepository = postRepository
+        self.aiReviewRepository = APIAIReviewRepository(client: client)
+        self.likeEvents = likeEvents
+        self.likeCoordinator = LikeCoordinator(repository: APILikeRepository(client: client), viewer: viewer, sink: likeEvents)
         self.homeRepositories = HomeRepositories(
-            topics: APITopicRepository(client: client),
-            posts: APIPostRepository(client: client, viewer: viewer),
+            topics: topicRepository,
+            posts: postRepository,
             today: APITodayPostRepository(client: client),
             calendar: APICalendarRepository(client: client),
             banners: APIBannerRepository(client: client),
@@ -150,7 +216,38 @@ final class AppContainer {
             access: access, repositories: homeRepositories, clock: clock,
             toast: toast, navigator: shell, ledger: postChangeLedger, screens: screenTracker
         )
-        return MainSession(shell: shell, home: home)
+        return MainSession(shell: shell, home: home, container: self)
+    }
+
+    // MARK: 전시 · 게시물 상세 · AI 피드백
+
+    func makeDisplayViewModel(initialDate: KSTDate?, initialSort: PostSort?) -> DisplayViewModel {
+        DisplayViewModel(
+            topics: topicRepository, posts: postRepository,
+            likes: likeCoordinator, likeEvents: likeEvents, ledger: postChangeLedger,
+            viewer: viewer, clock: clock, screenTracker: screenTracker,
+            initialDate: initialDate, initialSort: initialSort
+        )
+    }
+
+    func makePostDetailViewModel(entry: PostDetailEntry) -> PostDetailViewModel {
+        PostDetailViewModel(
+            entry: entry, posts: postRepository,
+            likes: likeCoordinator, likeEvents: likeEvents, ledger: postChangeLedger,
+            viewer: viewer, clock: clock, screenTracker: screenTracker
+        )
+    }
+
+    func makeAIReviewViewModel(target: AIReviewTarget, surface: AIReviewViewModel.Surface, opensSheetOnFirstResult: Bool) -> AIReviewViewModel {
+        AIReviewViewModel(
+            target: target, surface: surface, repository: aiReviewRepository,
+            viewer: viewer, clock: clock, opensSheetOnFirstResult: opensSheetOnFirstResult
+        )
+    }
+
+    /// 홈 카드 대상: 카드는 오늘 승인된 내 사진일 때만 있으므로(`aiCardPostId`) 주제 날짜는 KST 오늘, 내 게시물이다.
+    func homeAITarget(postId: UUID) -> AIReviewTarget {
+        AIReviewTarget(postId: postId, topicDate: KST.date(of: clock.now), isMine: true)
     }
 
     func makeIssueWebViewModel(url: URL) -> IssueWebViewModel {
