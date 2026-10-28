@@ -468,6 +468,7 @@
 | photo-edit | 필터: 선명하게 | `photo-edit.filter-vivid` |  |
 | photo-edit | 렌더링 진행 | `photo-edit.rendering-indicator` | 완료 버튼 후 원본 크기 렌더링 중 |
 | photo-edit | 편집 오류 알림 | `photo-edit.error-dialog` | "사진을 편집하지 못했어요. 다시 시도해 주세요." |
+| photo-edit | 편집 오류 알림: 다시 시도 버튼 | `photo-edit.error-retry-button` | 편집용 이미지 준비를 다시 시도한다(RN 추가) |
 
 ### 업로드 성공
 

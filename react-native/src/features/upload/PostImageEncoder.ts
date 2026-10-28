@@ -1,6 +1,15 @@
+import { CancelledError } from '../../core/http/ApiError';
+import {
+  POST_IMAGE_MAX_LONG_EDGE,
+  WEBP_DOWNSCALE_FACTOR,
+  WEBP_DOWNSCALE_MAX_ATTEMPTS,
+  WEBP_QUALITY_LADDER,
+} from '../../shared/constants';
 import type { LocalFiles } from '../../core/media/LocalFiles';
 import type { EncodedImage, ImageEngine } from '../photo-edit/ImageEngine';
-import type { PhotoEdit } from '../photo-edit/PhotoEdit';
+import { isIdentityEdit, type PhotoEdit } from '../photo-edit/PhotoEdit';
+import { limitLongEdge } from '../photo-edit/PhotoEditTransform';
+import { SizeLimitExceededError } from './UploadErrors';
 
 export type PostImageEncoderDeps = {
   engine: Pick<ImageEngine, 'readBounds' | 'encodeWebp'>;
@@ -21,13 +30,39 @@ export type EncodeInput = {
  * 성공하지 못한 시도의 임시 파일은 바로 지우고, 취소되면 진행 중이던 결과도 지운다.
  */
 export class PostImageEncoder {
-  constructor(private readonly deps: PostImageEncoderDeps) {
-    void this.deps;
-  }
+  constructor(private readonly deps: PostImageEncoderDeps) {}
 
-  encode(input: EncodeInput, signal?: AbortSignal): Promise<EncodedImage> {
-    void input;
-    void signal;
-    throw new Error('not implemented');
+  async encode(input: EncodeInput, signal?: AbortSignal): Promise<EncodedImage> {
+    const { engine, files } = this.deps;
+    throwIfAborted(signal);
+    const sourceSize = await engine.readBounds(input.sourceUri, signal);
+    throwIfAborted(signal);
+    // 편집하지 않은 사진은 다시 그리지 않고 그대로 인코딩한다(REQ-UPL-028).
+    const edit = isIdentityEdit(input.edit) ? null : input.edit;
+    let targetSize = limitLongEdge(sourceSize, POST_IMAGE_MAX_LONG_EDGE);
+
+    for (let round = 0; round <= WEBP_DOWNSCALE_MAX_ATTEMPTS; round += 1) {
+      for (const quality of WEBP_QUALITY_LADDER) {
+        const encoded = await engine.encodeWebp(
+          { sourceUri: input.sourceUri, sourceSize, targetSize, edit, quality },
+          signal,
+        );
+        if (signal?.aborted) {
+          await files.delete(encoded.uri);
+          throw new CancelledError('aborted');
+        }
+        if (encoded.byteLength <= input.maxBytes) return encoded;
+        await files.delete(encoded.uri);
+      }
+      targetSize = {
+        width: Math.max(1, Math.round(targetSize.width * WEBP_DOWNSCALE_FACTOR)),
+        height: Math.max(1, Math.round(targetSize.height * WEBP_DOWNSCALE_FACTOR)),
+      };
+    }
+    throw new SizeLimitExceededError();
   }
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new CancelledError('aborted');
 }

@@ -6,15 +6,24 @@ import { toFeedSeed } from '../features/feed/FeedTarget';
 import type { HomeNavigator } from '../features/home/HomeNavigator';
 import type { RootStackParamList } from './navigation/routes';
 
+/** 하단 + 버튼과 같은 업로드 진입 게이트를 누른다. */
+export interface UploadGateOpener {
+  open(): void;
+}
+
 /** 내비게이션이 아직 준비되지 않았을 때(콜드 스타트 직후)의 이동 요청은 버린다. */
 type NavigationRef = Pick<NavigationContainerRef<RootStackParamList>, 'isReady' | 'navigate'>;
 
 /** HomeNavigator를 React Navigation으로 구현한다. 아직 화면이 없는 목적지는 placeholder 화면으로 간다. */
 export class NavigationHomeNavigator implements HomeNavigator {
-  constructor(private readonly navigation: NavigationRef) {}
+  constructor(
+    private readonly navigation: NavigationRef,
+    private readonly uploadGate: UploadGateOpener,
+  ) {}
 
+  /** 업로드 화면으로 곧바로 가지 않는다: 게이트(GET /posts/today 확인)를 지난 뒤 UploadNavigator가 연다(D-14). */
   openUploadGate(): void {
-    this.go((nav) => nav.navigate('Upload'));
+    this.uploadGate.open();
   }
 
   openPostDetail(target: { postId: string; seed: PostSummary | null }): void {

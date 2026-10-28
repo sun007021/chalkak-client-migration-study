@@ -135,16 +135,16 @@ describe('UploadEntryGateViewModel', () => {
     },
   );
 
-  it.each([
-    'upload/posts-today__invalid-not-posted-with-post',
-    'home/posts-today__not-posted-after-reject',
-  ])('TC-UPL-008 계약 위반(%s)은 일반 확인 실패 문구다', async (fixture) => {
-    // [가정: not-posted-after-reject는 isPosted=true + REJECTED 조합이라 계약 위반으로 본다 - 카탈로그 TC-UPL-008]
-    const h = await setup({ [TODAY]: fixture });
-    await h.viewModel.press();
-    expect(h.toast.messages).toEqual([t('upload.gate.check-failed')]);
-    expect(h.navigator.calls).toEqual([]);
-  });
+  it.each(['upload/posts-today__invalid-not-posted-with-post'])(
+    'TC-UPL-008 계약 위반(%s)은 일반 확인 실패 문구다',
+    async (fixture) => {
+      // not-posted-after-reject는 정상 응답(isPosted=false, TC-HOME-010)이라 계약 위반이 아니다. REJECTED 조합은 아래 별도 테스트가 다룬다.
+      const h = await setup({ [TODAY]: fixture });
+      await h.viewModel.press();
+      expect(h.toast.messages).toEqual([t('upload.gate.check-failed')]);
+      expect(h.navigator.calls).toEqual([]);
+    },
+  );
 
   it('TC-UPL-008 isPosted=true인데 moderationStatus가 REJECTED인 응답은 계약 위반이다', async () => {
     const h = await setup({

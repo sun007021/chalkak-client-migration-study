@@ -3,7 +3,7 @@ import {
   networkFailure,
   timeoutFailure,
 } from '../../core/http/__testing__/FakeTransport';
-import { reauth, unauthorized } from '../../core/http/__testing__/createNetHarness';
+import { reauth, refreshOk, unauthorized } from '../../core/http/__testing__/createNetHarness';
 import { fixtureResponse } from '../../core/http/__testing__/loadFixture';
 import type { RouteValue } from '../../data/__testing__/FixtureRouter';
 import { t } from '../../shared/copy';
@@ -209,7 +209,7 @@ describe('PhotoUploadViewModel - 제출', () => {
   });
 
   it('TC-UPL-066 401 갱신 뒤에도 401이면 로그인 화면으로 가고 사진·제목 입력이 유지된다', async () => {
-    const h = await setup({ [CREATE]: unauthorized() });
+    const h = await setup({ [CREATE]: unauthorized(), 'POST /auth/refresh': refreshOk() });
     h.viewModel.setTitle('가을');
     await h.viewModel.submit();
     expect(h.authFlow.calls).toEqual(['login']);

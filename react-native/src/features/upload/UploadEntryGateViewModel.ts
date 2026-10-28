@@ -1,3 +1,6 @@
+import { CancelledError, HttpError } from '../../core/http/ApiError';
+import { t } from '../../shared/copy';
+import { AuthErrorPolicy } from '../common/AuthErrorPolicy';
 import type { AnalyticsTracker } from '../../core/analytics/AnalyticsTracker';
 import { Observable } from '../../core/state/Observable';
 import type { ToastPresenter } from '../../core/toast/ToastPresenter';
@@ -24,20 +27,46 @@ export type UploadEntryGateDeps = {
  * 확인 중 연타는 무시한다. 통과하면 응답 topicDate로 업로드 화면을 연다. 화면을 벗어나면(dispose) 대기 중 요청을 취소한다.
  */
 export class UploadEntryGateViewModel extends Observable<UploadEntryGateState> {
+  private readonly abort = new AbortController();
+  private readonly auth: AuthErrorPolicy;
+  private gone = false;
+
   constructor(private readonly deps: UploadEntryGateDeps) {
-    super(initialGateState());
-    void this.deps;
+    super({ checking: false });
+    this.auth = new AuthErrorPolicy(deps.authFlow);
   }
 
-  press(): Promise<void> {
-    throw new Error('not implemented');
+  async press(): Promise<void> {
+    const { mode, posts, toast, navigator } = this.deps;
+    if (this.gone || this.getSnapshot().checking) return;
+    if (mode === 'guest') {
+      toast.show(t('upload.gate.login-required'));
+      return;
+    }
+    this.setState({ checking: true });
+    try {
+      const today = await posts.getToday(this.abort.signal);
+      if (this.gone) return;
+      if (today.isPosted) toast.show(t('upload.gate.already-posted'));
+      else navigator.openUpload({ topicDate: today.topicDate });
+    } catch (error) {
+      if (this.gone || error instanceof CancelledError) return;
+      if (this.auth.handle(error, {})) return;
+      toast.show(this.messageFor(error));
+    } finally {
+      if (!this.gone) this.setState({ checking: false });
+    }
+  }
+
+  private messageFor(error: unknown): string {
+    if (error instanceof HttpError && error.status === 404) return t('upload.gate.no-open-topic');
+    if (error instanceof HttpError && error.status === 403) return t('upload.gate.banned');
+    return t('upload.gate.check-failed');
   }
 
   override dispose(): void {
-    throw new Error('not implemented');
+    this.gone = true;
+    this.abort.abort();
+    super.dispose();
   }
-}
-
-function initialGateState(): UploadEntryGateState {
-  throw new Error('not implemented');
 }

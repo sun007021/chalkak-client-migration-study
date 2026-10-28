@@ -165,7 +165,7 @@ describe('파이프라인 순서와 필터', () => {
     },
   );
 
-  it('TC-EDIT-036 상수가 shared/photo-edit/filters.json과 같다', () => {
+  it('TC-EDIT-036 상수가 filters.json과 같다', () => {
     expect(photoEditConstants()).toEqual(loadFiltersFile().constants);
   });
 

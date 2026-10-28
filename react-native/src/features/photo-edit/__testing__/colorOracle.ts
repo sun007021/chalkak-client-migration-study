@@ -5,17 +5,7 @@ import type { Rgba } from '../PhotoColorTransform';
 
 // 테스트 전용 독립 기준 구현: docs/spec/features/upload-edit.md 부록의 식을 그대로 옮겼다(구현 코드를 재사용하지 않는다).
 
-const FILTERS_JSON = join(
-  __dirname,
-  '..',
-  '..',
-  '..',
-  '..',
-  '..',
-  'shared',
-  'photo-edit',
-  'filters.json',
-);
+const FILTERS_JSON = join(__dirname, '..', 'filters.json');
 
 export type FiltersFile = {
   filters: { id: PhotoFilter; matrix: number[] | null }[];

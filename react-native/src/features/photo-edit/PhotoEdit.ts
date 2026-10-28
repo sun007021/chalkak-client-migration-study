@@ -71,17 +71,43 @@ export function identityEdit(): PhotoEdit {
   };
 }
 
+/** 자르기가 전체와 1e-3 이내로 같으면 true(REQ-EDIT-004). */
+export function isFullCrop(crop: CropWindow, tolerance = 1e-3): boolean {
+  return (
+    Math.abs(crop.centerX - FULL_CROP.centerX) <= tolerance &&
+    Math.abs(crop.centerY - FULL_CROP.centerY) <= tolerance &&
+    Math.abs(crop.width - FULL_CROP.width) <= tolerance &&
+    Math.abs(crop.height - FULL_CROP.height) <= tolerance
+  );
+}
+
 /** 회전 0, 전체 자르기(1e-3 이내), 원본 필터, 적용되는 조정 값이 모두 0이면 true(REQ-EDIT-005). */
 export function isIdentityEdit(edit: PhotoEdit): boolean {
-  void edit;
-  throw new Error('not implemented');
+  if (edit.quarterTurns !== 0 || edit.filter !== 'original' || !isFullCrop(edit.crop)) return false;
+  const { auto, autoStrength, user } = edit.adjustments;
+  return ADJUST_ITEMS.every((item) => {
+    const value = user[item] ?? auto[item] * autoStrength;
+    return Math.abs(value) < 1e-9;
+  });
 }
 
 /** 두 편집값이 같은지(같은 편집값으로 확정하면 다시 준비하지 않는다, REQ-UPL-035). 깊은 비교. */
 export function editsEqual(a: PhotoEdit, b: PhotoEdit): boolean {
-  void a;
-  void b;
-  throw new Error('not implemented');
+  if (a.quarterTurns !== b.quarterTurns || a.filter !== b.filter) return false;
+  if (
+    a.crop.centerX !== b.crop.centerX ||
+    a.crop.centerY !== b.crop.centerY ||
+    a.crop.width !== b.crop.width ||
+    a.crop.height !== b.crop.height
+  ) {
+    return false;
+  }
+  if (a.adjustments.autoStrength !== b.adjustments.autoStrength) return false;
+  return ADJUST_ITEMS.every(
+    (item) =>
+      a.adjustments.auto[item] === b.adjustments.auto[item] &&
+      a.adjustments.user[item] === b.adjustments.user[item],
+  );
 }
 
 export type { Size };

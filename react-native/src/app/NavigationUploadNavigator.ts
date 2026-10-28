@@ -1,4 +1,4 @@
-import type { NavigationContainerRef } from '@react-navigation/native';
+import { StackActions, type NavigationContainerRef } from '@react-navigation/native';
 
 import type { KstDate } from '../core/time/KstDate';
 import type { UploadNavigator, UploadSuccessParams } from '../features/upload/UploadNavigator';
@@ -13,29 +13,38 @@ type NavigationRef = Pick<
 /**
  * UploadNavigator를 React Navigation으로 구현한다.
  * 라우트 이름은 `Upload`(params `{topicDate: 'yyyy-MM-dd'}`)와 `UploadSuccess`(params `{topicTitle, topicDate, moderationStatus}`)다.
- * routes.ts의 RootStackParamList에 `UploadSuccess`를 추가하고 `Upload`의 params를 바꾸는 것은 구현 단계의 일이다.
+ * 성공 화면은 업로드 화면을 **바꿔서**(replace) 올리므로 뒤로 가도 업로드 화면으로 돌아오지 않는다.
  */
 export class NavigationUploadNavigator implements UploadNavigator {
-  constructor(private readonly navigation: NavigationRef) {
-    void this.navigation;
-  }
+  constructor(private readonly navigation: NavigationRef) {}
 
   openUpload(entry: { topicDate: KstDate }): void {
-    void entry;
-    throw new Error('not implemented');
+    this.go((nav) => nav.navigate('Upload', { topicDate: entry.topicDate.toString() }));
   }
 
   showSuccess(params: UploadSuccessParams): void {
-    void params;
-    throw new Error('not implemented');
+    this.go((nav) =>
+      nav.dispatch(
+        StackActions.replace('UploadSuccess', {
+          topicTitle: params.topicTitle,
+          topicDate: params.topicDate.toString(),
+          moderationStatus: params.moderationStatus,
+        }),
+      ),
+    );
   }
 
   close(): void {
-    throw new Error('not implemented');
+    this.go((nav) => nav.goBack());
   }
 
   openDisplay(topicDate: KstDate): void {
-    void topicDate;
-    throw new Error('not implemented');
+    this.go((nav) =>
+      nav.navigate('Tabs', { screen: 'Display', params: { date: topicDate.toString() } }),
+    );
+  }
+
+  private go(action: (navigation: NavigationRef) => void): void {
+    if (this.navigation.isReady()) action(this.navigation);
   }
 }

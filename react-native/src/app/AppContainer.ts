@@ -57,8 +57,20 @@ import { DefaultLikeController } from '../features/like/DefaultLikeController';
 import type { LikeController } from '../features/like/LikeController';
 import { DefaultPostChanges } from '../features/post/PostChanges';
 import { NavigationDisplayNavigator } from './NavigationDisplayNavigator';
+import { PostCreationRepository } from '../data/post/PostCreationRepository';
+import { PhotoEditViewModel } from '../features/photo-edit/PhotoEditViewModel';
+import { createDefaultMediaServices } from '../features/upload/createDefaultMediaServices';
+import { DefaultPostCreationNotifier } from '../features/upload/DefaultPostCreationNotifier';
 import type { MediaServices } from '../features/upload/MediaServices';
-import { NoopLikeController } from '../features/like/NoopLikeController';
+import { PhotoUploadViewModel } from '../features/upload/PhotoUploadViewModel';
+import { PostImageEncoder } from '../features/upload/PostImageEncoder';
+import { UploadEntryGateOwner } from '../features/upload/UploadEntryGateOwner';
+import { UploadEntryGateViewModel } from '../features/upload/UploadEntryGateViewModel';
+import { UploadPreparation } from '../features/upload/UploadPreparation';
+import { UploadSubmitter } from '../features/upload/UploadSubmitter';
+import { UploadSuccessViewModel } from '../features/upload/UploadSuccessViewModel';
+import type { UploadSuccessParams } from '../features/upload/UploadNavigator';
+import { NavigationUploadNavigator } from './NavigationUploadNavigator';
 import { NavigationHomeNavigator } from './NavigationHomeNavigator';
 import type { RootStackParamList } from './navigation/routes';
 import { LoginViewModel } from '../features/auth/LoginViewModel';
@@ -85,6 +97,7 @@ import { ExpoSecureKeyValueStorage } from '../core/session/ExpoSecureKeyValueSto
 import { SecureSessionStore } from '../core/session/SecureSessionStore';
 import type { SessionStore } from '../core/session/SessionStore';
 import { type Clock, SystemClock } from '../core/time/Clock';
+import type { KstDate } from '../core/time/KstDate';
 import { TOAST_DURATION_MS } from '../shared/constants';
 
 /** 컨테이너가 조립하는 의존성 전체. 새 의존성은 여기에 추가한다. */
@@ -116,8 +129,8 @@ export interface Dependencies {
   /** 로그아웃·탈퇴·계정 전환 때 비울 사용자별 캐시. 캐시를 가진 기능 PR이 추가한다. */
   readonly userDataCaches: readonly UserDataCache[];
   /**
-   * 업로드·편집의 네이티브 경계(사진 선택기, 이미지 엔진, 갤러리 저장, 파일). 기본 구현은 업로드 PR이 조립한다
-   * (구현 단계에서 필수로 바꾼다). 테스트는 Fake를 넣는다.
+   * 업로드·편집의 네이티브 경계(사진 선택기, 이미지 엔진, 갤러리 저장, 파일). 없으면 컨테이너가 실제 구현
+   * (expo-image-picker, expo-image-manipulator, expo-media-library, expo-file-system)을 만든다. 테스트는 Fake를 넣는다.
    */
   readonly media?: MediaServices;
 }
@@ -154,6 +167,10 @@ export class AppContainer {
   readonly likes: LikeController;
   /** 상세에서 일어난 제목 수정·삭제를 전시 등이 따라 반영하게 하는 채널. 계정 전환 때 비운다. */
   readonly postChanges = new DefaultPostChanges();
+  /** 게시물이 만들어졌음을 홈(히어로 갱신) 등에 알린다. 표시 PR의 PostChanges와 의미가 달라 별도 채널이다. */
+  readonly postCreationNotifier = new DefaultPostCreationNotifier();
+  /** 업로드 진입 게이트(하단 + 버튼, 홈 히어로 버튼)의 소유자. 확인 중 표시(upload-entry.loading)는 이것을 구독한다. */
+  readonly uploadGateOwner: UploadEntryGateOwner;
   /** phase가 login인 동안 로그인 ViewModel을 만들고 버린다. 화면은 이것을 구독해 받는다. */
   readonly loginOwner: LoginViewModelOwner;
   /** phase가 sign-up인 동안 가입 흐름(약관 -> 사인 -> 미리보기) ViewModel을 만들고 버린다. */
@@ -167,7 +184,12 @@ export class AppContainer {
   private readonly nonceGenerator: NonceGenerator;
   private readonly pushRegistrar: PushRegistrar;
   private readonly dependencies: Dependencies;
-  private readonly homeNavigator = new NavigationHomeNavigator(this.navigationHandle);
+  /** 홈 히어로 버튼은 업로드 화면으로 곧바로 가지 않고 하단 + 버튼과 같은 게이트를 누른다. */
+  private readonly homeNavigator = new NavigationHomeNavigator(this.navigationHandle, {
+    open: () => this.uploadGateOwner.press(),
+  });
+  private readonly uploadNavigator = new NavigationUploadNavigator(this.navigationHandle);
+  private mediaServices: MediaServices | null;
   private readonly displayNavigator = new NavigationDisplayNavigator(this.navigationHandle);
   private readonly cacheRegistry = new UserDataCacheRegistry();
 
@@ -211,6 +233,7 @@ export class AppContainer {
     this.loginOwner = new LoginViewModelOwner(this.bootViewModel, () =>
       this.createLoginViewModel(),
     );
+    this.mediaServices = dependencies.media ?? null;
     this.likes = dependencies.likes ?? this.createDefaultLikes();
     if (dependencies.likes && isUserDataCache(dependencies.likes)) {
       this.cacheRegistry.register(dependencies.likes);
@@ -233,6 +256,75 @@ export class AppContainer {
       boot: this.bootViewModel,
       create: (mode) => this.createDisplayViewModel(mode),
       registerCache: (cache) => this.cacheRegistry.register(cache),
+    });
+    this.uploadGateOwner = new UploadEntryGateOwner({
+      boot: this.bootViewModel,
+      create: (mode) => this.createUploadGate(mode),
+    });
+    // 업로드가 끝나면 홈이 히어로(작성 상태)와 이번 주 기록을 다시 불러온다.
+    this.postCreationNotifier.subscribe(() => {
+      void this.homeOwner.getSnapshot().viewModel?.refresh();
+    });
+  }
+
+  /** 네이티브 경계. 처음 필요할 때 실제 구현을 만든다(Fake를 넣은 테스트는 만들지 않는다). */
+  get media(): MediaServices {
+    this.mediaServices ??= createDefaultMediaServices(this.dependencies.appInfo.platform);
+    return this.mediaServices;
+  }
+
+  /** 소유자(uploadGateOwner)만 부른다. */
+  private createUploadGate(mode: MainMode): UploadEntryGateViewModel {
+    return new UploadEntryGateViewModel({
+      mode,
+      posts: new PostRepository({ api: this.api }),
+      toast: this.toast,
+      authFlow: this.bootViewModel,
+      navigator: this.uploadNavigator,
+      analytics: this.analytics,
+    });
+  }
+
+  /** 업로드 라우트(내비게이션)만 부른다. 화면을 열 때마다 만들고 닫을 때 dispose한다(진행 중 작업과 임시 파일 정리). */
+  createPhotoUploadViewModel(topicDate: KstDate): PhotoUploadViewModel {
+    const { api, media } = this;
+    const repository = new PostCreationRepository({ api });
+    const preparation = new UploadPreparation({
+      repository,
+      encoder: new PostImageEncoder({ engine: media.engine, files: media.files }),
+      files: media.files,
+      monotonic: media.monotonic,
+    });
+    return new PhotoUploadViewModel({
+      entry: { topicDate },
+      clock: this.clock,
+      platform: media.platform,
+      topics: new TopicRepository({ api }),
+      picker: media.picker,
+      gallery: media.gallery,
+      permissions: media.permissions,
+      engine: media.engine,
+      preparation,
+      submitter: new UploadSubmitter({
+        repository,
+        posts: new PostRepository({ api }),
+        preparation,
+      }),
+      createEditor: (request) => new PhotoEditViewModel({ engine: media.engine, ...request }),
+      toast: this.toast,
+      analytics: this.analytics,
+      navigator: this.uploadNavigator,
+      notifier: this.postCreationNotifier,
+      authFlow: this.bootViewModel,
+    });
+  }
+
+  /** 성공 라우트(내비게이션)만 부른다. */
+  createUploadSuccessViewModel(params: UploadSuccessParams): UploadSuccessViewModel {
+    return new UploadSuccessViewModel({
+      params,
+      analytics: this.analytics,
+      navigator: this.uploadNavigator,
     });
   }
 
@@ -434,6 +526,7 @@ export class AppContainer {
         sleeper,
         signatureRasterizer: overrides.signatureRasterizer ?? new SoftwareSignatureRasterizer(),
         likes: overrides.likes,
+        media: overrides.media,
         aiReview: overrides.aiReview ?? new NoopAiReviewPoller(),
       },
       toastCenter,

@@ -1,0 +1,126 @@
+import { deflate } from 'pako';
+
+import { encodePng } from '../signature/encodePng';
+import { ImageDecodeError } from './ImageErrors';
+import { decodePng } from './PngDecoder';
+
+function crc(bytes: Uint8Array): number {
+  let c = 0xffffffff;
+  for (const b of bytes) {
+    c ^= b;
+    for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  }
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function chunk(type: string, data: Uint8Array): Uint8Array {
+  const out = new Uint8Array(12 + data.length);
+  const view = new DataView(out.buffer);
+  view.setUint32(0, data.length);
+  for (let i = 0; i < 4; i += 1) out[4 + i] = type.charCodeAt(i);
+  out.set(data, 8);
+  view.setUint32(8 + data.length, crc(out.subarray(4, 8 + data.length)));
+  return out;
+}
+
+/** 필터를 직접 고른 PNG. rows는 필터 바이트를 포함한 원시 행. */
+function pngOf(
+  width: number,
+  height: number,
+  colorType: number,
+  raw: number[],
+  extra: Uint8Array[] = [],
+  depth = 8,
+): Uint8Array {
+  const header = new Uint8Array(13);
+  const view = new DataView(header.buffer);
+  view.setUint32(0, width);
+  view.setUint32(4, height);
+  header[8] = depth;
+  header[9] = colorType;
+  const parts = [
+    Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', header),
+    ...extra,
+    chunk('IDAT', deflate(Uint8Array.from(raw))),
+    chunk('IEND', new Uint8Array(0)),
+  ];
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.length;
+  }
+  return out;
+}
+
+describe('decodePng', () => {
+  it('encodePng로 만든 RGBA를 그대로 되돌린다', () => {
+    const rgba = new Uint8Array(3 * 2 * 4).map((_, i) => (i * 37) % 256);
+    const image = decodePng(encodePng(rgba, 3, 2));
+    expect(image.width).toBe(3);
+    expect(image.height).toBe(2);
+    expect(Array.from(image.data)).toEqual(Array.from(rgba));
+  });
+
+  it('필터 Sub·Up·Average·Paeth를 되돌린다(회색 3x5)', () => {
+    // 원본 행(회색): 10 20 30 / 15 25 35 / 12 22 32 / 40 50 60 / 41 52 63
+    const raw = [
+      1,
+      10,
+      10,
+      10, // Sub: 10, 20, 30
+      2,
+      5,
+      5,
+      5, // Up: 15, 25, 35
+      3,
+      5,
+      2,
+      1, // Average
+      4,
+      28,
+      28,
+      28, // Paeth
+      0,
+      41,
+      52,
+      63,
+    ];
+    const image = decodePng(pngOf(3, 5, 0, raw));
+    const gray = Array.from({ length: 15 }, (_, i) => image.data[i * 4]);
+    // 첫 두 행은 계산한 그대로
+    expect(gray.slice(0, 6)).toEqual([10, 20, 30, 15, 25, 35]);
+    // 평균: [5+floor((0+15)/2)=12, 2+floor((12+25)/2)=20, 1+floor((20+35)/2)=28]
+    expect(gray.slice(6, 9)).toEqual([12, 20, 28]);
+    // Paeth: [28+12=40, 28+40=68, 28+68=96]
+    expect(gray.slice(9, 12)).toEqual([40, 68, 96]);
+    expect(image.data[3]).toBe(255);
+  });
+
+  it('RGB는 알파 255로, 회색+알파·팔레트(tRNS)도 RGBA로 푼다', () => {
+    const rgb = decodePng(pngOf(1, 1, 2, [0, 1, 2, 3]));
+    expect(Array.from(rgb.data)).toEqual([1, 2, 3, 255]);
+    const ga = decodePng(pngOf(1, 1, 4, [0, 9, 128]));
+    expect(Array.from(ga.data)).toEqual([9, 9, 9, 128]);
+    const palette = decodePng(
+      pngOf(
+        2,
+        1,
+        3,
+        [0, 0, 1],
+        [
+          chunk('PLTE', Uint8Array.from([255, 0, 0, 0, 255, 0])),
+          chunk('tRNS', Uint8Array.from([200])),
+        ],
+      ),
+    );
+    expect(Array.from(palette.data)).toEqual([255, 0, 0, 200, 0, 255, 0, 255]);
+  });
+
+  it('PNG가 아니거나 지원하지 않는 형식이면 ImageDecodeError다', () => {
+    expect(() => decodePng(Uint8Array.from([1, 2, 3]))).toThrow(ImageDecodeError);
+    expect(() => decodePng(pngOf(1, 1, 2, [0, 0, 0, 0], [], 16))).toThrow(ImageDecodeError);
+    expect(() => decodePng(pngOf(2, 2, 6, [0, 1, 2, 3, 4]))).toThrow(ImageDecodeError);
+  });
+});

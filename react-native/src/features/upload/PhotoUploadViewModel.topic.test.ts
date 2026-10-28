@@ -1,4 +1,4 @@
-import { reauth, unauthorized } from '../../core/http/__testing__/createNetHarness';
+import { reauth, refreshOk, unauthorized } from '../../core/http/__testing__/createNetHarness';
 import { networkFailure } from '../../core/http/__testing__/FakeTransport';
 import type { RouteValue } from '../../data/__testing__/FixtureRouter';
 import { t } from '../../shared/copy';
@@ -77,7 +77,10 @@ describe('PhotoUploadViewModel - 주제', () => {
     expect(expired.authFlow.calls).toEqual([]);
     expect(expired.emitted).toHaveLength(1);
 
-    const stillUnauthorized = await setup({ [TOPICS]: unauthorized() });
+    const stillUnauthorized = await setup({
+      [TOPICS]: unauthorized(),
+      'POST /auth/refresh': refreshOk(),
+    });
     await stillUnauthorized.viewModel.start();
     expect(stillUnauthorized.authFlow.calls).toEqual(['login']);
   });

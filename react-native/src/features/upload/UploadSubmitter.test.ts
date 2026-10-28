@@ -173,17 +173,19 @@ describe('UploadSubmitter - 정책·PUT 실패', () => {
     expect(h.files.existing).toEqual([]);
   });
 
-  it('TC-UPL-055 S3 403은 업로드 실패 문구이고 멱등 PUT은 0.5초·1초로 2회 다시 보낸다', async () => {
+  it('TC-UPL-055 S3 403(서명 불일치)은 업로드 실패 문구이고 다시 보내지 않는다(자동 재시도는 네트워크 오류·5xx만, REQ-UPL-045)', async () => {
     const h = await setup({ [PUT_1]: 'upload/s3-put__403-signature-mismatch' });
     await expect(submit(h)).resolves.toEqual(failed(t('upload.error.upload')));
-    expect(countOf(h, PUT_1)).toBe(3);
-    expect(h.sleeper.calls).toEqual([500, 1000]);
+    expect(countOf(h, PUT_1)).toBe(1);
+    expect(h.sleeper.calls).toEqual([]);
     expect(countOf(h, CREATE)).toBe(0);
   });
 
-  it('TC-UPL-055 S3 5xx도 업로드 실패 문구다', async () => {
+  it('TC-UPL-055 S3 5xx도 업로드 실패 문구이고 멱등 PUT은 0.5초·1초로 2회 다시 보낸다', async () => {
     const h = await setup({ [PUT_1]: 'upload/s3-put__500-server-error' });
     await expect(submit(h)).resolves.toEqual(failed(t('upload.error.upload')));
+    expect(countOf(h, PUT_1)).toBe(3);
+    expect(h.sleeper.calls).toEqual([500, 1000]);
   });
 
   it('TC-UPL-055 PUT 연결 실패는 네트워크 문구다', async () => {
