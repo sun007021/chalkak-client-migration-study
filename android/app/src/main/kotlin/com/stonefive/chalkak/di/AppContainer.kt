@@ -9,8 +9,10 @@ import com.stonefive.chalkak.data.SecretCipher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kr.chalkak.core.common.Clock
 import kr.chalkak.core.common.SystemClock
 import kr.chalkak.core.data.auth.AuthRepository
@@ -59,24 +61,39 @@ class AppContainer(
     val sessionStore: SessionStore get() = persistentSessionStore
     val guestFlagStore: GuestFlagStore get() = persistentSessionStore
 
-    private val authEvents = MutableSharedFlow<AuthEvent>(extraBufferCapacity = 8)
+    // A Channel, not a SharedFlow: an event emitted before the navigation shell starts collecting (cold start refresh
+    // failure) must be buffered, not dropped. Single consumer.
+    private val authEvents = Channel<AuthEvent>(Channel.BUFFERED)
 
-    /** `AuthEvent.GoToLogin` etc.; the navigation shell collects this. */
-    val authEventFlow: SharedFlow<AuthEvent> get() = authEvents
+    /** `AuthEvent.GoToLogin` etc.; the navigation shell collects this (one collector). */
+    val authEventFlow: Flow<AuthEvent> = authEvents.receiveAsFlow()
 
     /** Screens register what must be dropped on account change (caches, unread state, ...). Run in registration order. */
     private val resetters = CopyOnWriteArrayList<UserDataResetter>()
     fun registerUserDataResetter(resetter: UserDataResetter) {
-        resetters.add(resetter)
+        resetters.addIfAbsent(resetter)
     }
 
-    val userDataResetter: UserDataResetter = UserDataResetter { resetters.forEach { it.resetAll() } }
+    /** Every registered resetter runs even if an earlier one throws (stale data of the previous account must not survive); the first failure is rethrown. */
+    val userDataResetter: UserDataResetter = UserDataResetter {
+        var failure: Exception? = null
+        for (resetter in resetters) {
+            try {
+                resetter.resetAll()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (failure == null) failure = e else failure.addSuppressed(e)
+            }
+        }
+        failure?.let { throw it }
+    }
 
     private val apiOkHttp: OkHttpClient by lazy { OkHttpFactory.apiClient(base = okHttpBase) }
     private val authFreeOkHttp: OkHttpClient by lazy { OkHttpFactory.apiClient(base = okHttpBase) }
 
     val apiClient: ApiClient by lazy {
-        val sink = AuthEventSink { authEvents.tryEmit(it) }
+        val sink = AuthEventSink { authEvents.trySend(it) }
         val refresher = TokenRefresher(sessionStore, HttpRefreshApi(apiBaseUrl, authFreeOkHttp), clock, applicationScope, sink)
         ApiClient(apiBaseUrl, apiOkHttp, sessionStore, refresher, clock, sink)
     }

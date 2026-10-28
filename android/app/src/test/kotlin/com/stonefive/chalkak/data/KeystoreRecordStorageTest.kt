@@ -69,6 +69,27 @@ class KeystoreRecordStorageTest {
     }
 
     @Test
+    fun `corrupted or truncated blobs throw on load and wipe recovers`() = runBlocking {
+        val prefs = context.getSharedPreferences(KeystoreRecordStorage.FILE, 0)
+        for (garbage in listOf("not base64 !!", android.util.Base64.encodeToString(ByteArray(5), android.util.Base64.NO_WRAP))) {
+            prefs.edit().putString("record", garbage).commit()
+            assertFailsWith<Exception> { storage.load() }
+            storage.wipe()
+            assertEquals(SessionRecord(), storage.load())
+        }
+    }
+
+    @Test
+    fun `a tampered ciphertext fails authentication`(): Unit = runBlocking {
+        storage.save(record)
+        val prefs = context.getSharedPreferences(KeystoreRecordStorage.FILE, 0)
+        val bytes = android.util.Base64.decode(prefs.getString("record", null), android.util.Base64.NO_WRAP)
+        bytes[bytes.size - 1] = (bytes.last().toInt() xor 1).toByte()
+        prefs.edit().putString("record", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)).commit()
+        assertFailsWith<Exception> { storage.load() }
+    }
+
+    @Test
     fun `works as the backing of PersistentSessionStore including guest flag`() = runBlocking {
         val store = PersistentSessionStore(storage)
         val session = Session("u-1", "a", Instant.parse("2026-10-01T00:00:00Z"), "r", Instant.parse("2026-11-01T00:00:00Z"))

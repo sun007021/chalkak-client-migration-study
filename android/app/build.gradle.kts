@@ -78,6 +78,10 @@ android {
         unitTests {
             // Robolectric needs merged resources/assets/manifest.
             isIncludeAndroidResources = true
+            all {
+                // BuildConfigTest pins the default API_BASE_URL only when -PapiBaseUrl did not replace it.
+                if (apiBaseUrlOverride != null) it.systemProperty("apiBaseUrlOverridden", "true")
+            }
         }
     }
 }

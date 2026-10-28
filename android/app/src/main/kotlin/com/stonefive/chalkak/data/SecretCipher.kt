@@ -28,6 +28,8 @@ class KeystoreSecretCipher(private val alias: String = DEFAULT_ALIAS) : SecretCi
         return cipher.doFinal(sealed, IV_BYTES, sealed.size - IV_BYTES)
     }
 
+    // Synchronized: two first-use callers must not both generate a key under the same alias (the loser's ciphertext would be undecryptable).
+    @Synchronized
     private fun key(): SecretKey {
         val store = KeyStore.getInstance(PROVIDER).apply { load(null) }
         (store.getKey(alias, null) as? SecretKey)?.let { return it }
