@@ -18,13 +18,17 @@ public enum FeedOperation: Sendable, Equatable, CaseIterable {
     case banners
     /// `GET /notifications/unread-status`
     case unreadStatus
+    /// `GET /posts/{id}/ai-review`
+    case aiReviewStatus
+    /// `POST /posts/{id}/ai-review` (403은 정지 회원 D-08)
+    case aiReviewRequest
 }
 
 /// 화면이 분기에 쓰는 도메인 오류. `message` 문자열로는 분기하지 않고 `status + FeedOperation`으로만 만든다(D-02).
 public enum FeedFailure: Error, Sendable, Equatable {
     /// 404 (삭제·비공개·미승인 게시물, 주제 없음)
     case notFound
-    /// 403: 정지 회원이 좋아요 등록·제목 수정을 시도함(D-08)
+    /// 403: 정지 회원이 좋아요 등록·제목 수정·AI 피드백 요청을 시도함(D-08)
     case banned
     /// 403: 삭제 API. 남의 게시물(정지 회원도 삭제는 허용이라 정지 문구가 아니다)
     case notOwner
@@ -66,12 +70,12 @@ public enum FeedFailureMapper {
         }
     }
 
-    /// 같은 403이라도 호출에 따라 뜻이 다르다(D-08): 등록·제목 수정은 정지 회원, 삭제는 남의 게시물.
+    /// 같은 403이라도 호출에 따라 뜻이 다르다(D-08): 등록·제목 수정·AI 피드백 요청은 정지 회원(AI 조회는 정지 회원도 허용이라 일반 forbidden), 삭제는 남의 게시물.
     private static func forbidden(for operation: FeedOperation) -> FeedFailure {
         switch operation {
-        case .like, .updateTitle, .todayPost: .banned
+        case .like, .updateTitle, .todayPost, .aiReviewRequest: .banned
         case .deletePost: .notOwner
-        case .listPosts, .topic, .postDetail, .unlike, .calendar, .banners, .unreadStatus: .forbidden
+        case .listPosts, .topic, .postDetail, .unlike, .calendar, .banners, .unreadStatus, .aiReviewStatus: .forbidden
         }
     }
 }

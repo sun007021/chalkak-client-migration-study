@@ -1,13 +1,7 @@
 import type { AppVisibility } from '../../core/lifecycle/AppVisibility';
 import type { UserDataCache } from '../../core/push/UserDataCache';
 import { Observable } from '../../core/state/Observable';
-import {
-  AuthenticationRequiredError,
-  CancelledError,
-  HttpError,
-  NetworkError,
-  ReauthenticationRequiredError,
-} from '../../core/http/ApiError';
+import { CancelledError, HttpError, NetworkError } from '../../core/http/ApiError';
 import type { ToastPresenter } from '../../core/toast/ToastPresenter';
 import type { Clock } from '../../core/time/Clock';
 import type { KstDate } from '../../core/time/KstDate';
@@ -20,8 +14,10 @@ import type { TopicRepository } from '../../data/topic/TopicRepository';
 import { format, t } from '../../shared/copy';
 import type { AiReviewPoller } from '../ai-review/AiReviewPoller';
 import type { AuthFlowNavigator, MainMode } from '../auth/AuthFlowNavigator';
+import { AuthErrorPolicy } from '../common/AuthErrorPolicy';
 import type { BannerFeedViewModel } from '../banner/BannerFeedViewModel';
 import type { LikeChange, LikeController } from '../like/LikeController';
+import type { PostChange, PostChanges } from '../post/PostChanges';
 import type { HomeNavigator } from './HomeNavigator';
 import type { HeroState, HomeState, RankingKey, RankingSection } from './HomeState';
 
@@ -35,6 +31,8 @@ export type HomeViewModelDeps = {
   /** ISSUE 섹션의 목록·페이징. 홈이 로드·새로고침·정리를 같이 시킨다. */
   bannerFeed: BannerFeedViewModel;
   likes: LikeController;
+  /** 상세에서 일어난 삭제·제목 수정을 랭킹·이번 주 기록에 반영하는 채널. */
+  changes: PostChanges;
   aiReview: AiReviewPoller;
   visibility: AppVisibility;
   navigator: HomeNavigator;
@@ -61,7 +59,7 @@ type Outcome<T> =
   { kind: 'ok'; value: T } | { kind: 'cancelled' } | { kind: 'error'; error: unknown };
 
 /** 요청 한 세트의 식별. 세대 번호가 바뀌면(새로고침·이탈·계정 전환) 이 세트의 응답은 버린다. */
-type RequestContext = { token: number; signal: AbortSignal };
+type RequestContext = { token: number; signal: AbortSignal; titleSince: number };
 
 const RANKING_LIMIT = 5;
 
@@ -82,6 +80,10 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
   private refreshInFlight: Promise<void> | null = null;
   private stopVisibility: (() => void) | null = null;
   private stopLikes: (() => void) | null = null;
+  private stopChanges: (() => void) | null = null;
+  /** 제목 변경 순서. 요청을 보낸 뒤의 변경만 그 응답에 덧입힌다. */
+  private changeSeq = 0;
+  private readonly titleChanges = new Map<string, { title: string | null; seq: number }>();
 
   /** 히어로 응답에서 얻은 상태(썸네일은 비어 있음). 달력 응답이 늦게 와도 썸네일만 다시 채워 낸다. */
   private heroBase: HeroState | null = null;
@@ -90,12 +92,13 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
   private calendarEntries: readonly CalendarEntry[] = [];
   /** AI 폴러를 시작해 둔 게시물. 같은 게시물로 폴러를 또 시작하지 않으려는 기록이다. */
   private polledPostId: string | null = null;
-  /** 로그인 이동을 이미 요청한 세대. 같은 세트의 여러 요청이 모두 401이어도 한 번만 보낸다. */
-  private loginRequestedGeneration = -1;
+  /** 같은 세트의 여러 요청이 모두 401이어도 로그인 이동은 세대마다 한 번만 보낸다. */
+  private readonly authErrors: AuthErrorPolicy;
 
   constructor(private readonly deps: HomeViewModelDeps) {
     const today = todayKst(deps.clock);
     super(initialHomeState(today, today.plusDays(-1)));
+    this.authErrors = new AuthErrorPolicy(deps.authFlow);
   }
 
   /**
@@ -119,6 +122,7 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
     this.shown = true;
     this.stopVisibility ??= this.deps.visibility.subscribe((state) => this.onVisibility(state));
     this.stopLikes ??= this.deps.likes.subscribe((change) => this.onLikeChange(change));
+    this.stopChanges ??= this.deps.changes.subscribe((change) => this.onPostChange(change));
     return this.quietReload();
   }
 
@@ -129,6 +133,8 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
     this.stopVisibility = null;
     this.stopLikes?.();
     this.stopLikes = null;
+    this.stopChanges?.();
+    this.stopChanges = null;
     this.invalidate();
     this.setState((s) => (s.refreshing ? { ...s, refreshing: false } : s));
     this.deps.bannerFeed.cancelPending();
@@ -282,6 +288,7 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
 
   /** 계정 전환·로그아웃: 상태와 진행 중 요청을 비운다. 이전 계정 요청의 늦은 응답은 무시한다. */
   clearAll(): void {
+    this.titleChanges.clear();
     this.invalidate();
     this.resetContent(todayKst(this.deps.clock));
     this.deps.bannerFeed.reset();
@@ -376,7 +383,7 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
     );
     if (outcome.kind === 'cancelled') return [];
     if (outcome.kind === 'ok') {
-      const posts = this.withLatestLikes(outcome.value.posts).slice(0, RANKING_LIMIT);
+      const posts = this.withLatestChanges(outcome.value.posts, ctx).slice(0, RANKING_LIMIT);
       this.setRanking(key, { status: 'ready', posts });
       return [];
     }
@@ -434,7 +441,9 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
     );
     if (outcome.kind === 'cancelled') return [];
     if (outcome.kind === 'ok') {
-      const entries = outcome.value.flatMap((month) => month.posts);
+      const entries = outcome.value
+        .flatMap((month) => month.posts)
+        .filter((e) => !this.deps.changes.isDeleted(e.postId));
       this.calendarEntries = entries;
       this.setWeekly(days, entries);
       this.publishHero();
@@ -484,20 +493,9 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
     }
   }
 
-  /**
-   * - AuthenticationRequiredError(갱신·재전송 뒤에도 남은 401 UNAUTHORIZED): 세션은 지우지 않고 화면이 로그인으로 보낸다.
-   *   임시 동작이다(boot-auth.md 확인 필요 5, REQ-NET-023, home.md 오류 표). 세션 정리는 세션 계층의 몫이라 여기서 하지 않는다.
-   * - ReauthenticationRequiredError(401 REAUTHENTICATION_REQUIRED): 세션이 이미 지워지고 session-expired 이벤트로
-   *   부트 흐름이 로그인으로 보내므로 홈은 오류로 보이지 않기만 한다.
-   */
+  /** 인증 오류 정책은 AuthErrorPolicy 한 곳에 있다(홈은 세대마다 한 번만 보낸다). */
   private handleAuthError(ctx: RequestContext, error: unknown): boolean {
-    if (error instanceof ReauthenticationRequiredError) return true;
-    if (!(error instanceof AuthenticationRequiredError)) return false;
-    if (this.loginRequestedGeneration !== ctx.token) {
-      this.loginRequestedGeneration = ctx.token;
-      this.deps.authFlow.toLogin();
-    }
-    return true;
+    return this.authErrors.handle(error, ctx.token);
   }
 
   // ---- 세대·날짜 ----
@@ -518,7 +516,7 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
 
   /** 세트를 새로 만들지 않고 지금 세대에 얹는 부분 재시도·푸시용. */
   private currentContext(): RequestContext {
-    return { token: this.generation, signal: this.controller.signal };
+    return { token: this.generation, signal: this.controller.signal, titleSince: this.changeSeq };
   }
 
   /** KST 날짜가 마지막으로 불러온 날짜와 다르면 이전 날짜의 내용을 비우고 새 날짜 기준으로 시작한다. */
@@ -617,12 +615,51 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
     }));
   }
 
-  /** 다른 화면에서 이미 바뀐 좋아요 값이 있으면 응답 위에 덮어 그린다(D-04). */
-  private withLatestLikes(posts: readonly PostSummary[]): PostSummary[] {
-    return posts.map((post) => {
-      const latest = this.deps.likes.snapshot(post.id);
-      return latest ? { ...post, likeCount: latest.likeCount, isLiked: latest.isLiked } : post;
-    });
+  /**
+   * 다른 화면에서 이미 바뀐 좋아요 값(D-04)과, 이 요청을 보낸 뒤 바뀐 제목을 응답 위에 덮어 그린다.
+   * 삭제된 게시물은 응답에 있어도 뺀다.
+   */
+  private withLatestChanges(posts: readonly PostSummary[], ctx: RequestContext): PostSummary[] {
+    return posts
+      .filter((post) => !this.deps.changes.isDeleted(post.id))
+      .map((post) => {
+        const latest = this.deps.likes.snapshot(post.id);
+        const withLikes = latest
+          ? { ...post, likeCount: latest.likeCount, isLiked: latest.isLiked }
+          : post;
+        const renamed = this.titleChanges.get(post.id);
+        return renamed && renamed.seq > ctx.titleSince
+          ? { ...withLikes, title: renamed.title }
+          : withLikes;
+      });
+  }
+
+  // ---- 게시물 변경(삭제·제목) ----
+
+  private onPostChange(change: PostChange): void {
+    if (change.kind === 'deleted') {
+      this.calendarEntries = this.calendarEntries.filter((e) => e.postId !== change.postId);
+      const days = weekOf(this.getSnapshot().todayDate);
+      this.setState((s) => ({
+        ...s,
+        yesterday: removeFromRanking(s.yesterday, change.postId),
+        popular: removeFromRanking(s.popular, change.postId),
+      }));
+      if (this.getSnapshot().weekly.status === 'ready') this.setWeekly(days, this.calendarEntries);
+      return;
+    }
+    this.changeSeq += 1;
+    this.titleChanges.set(change.postId, { title: change.title, seq: this.changeSeq });
+    const rename = (section: RankingSection): RankingSection =>
+      section.status === 'ready'
+        ? {
+            status: 'ready',
+            posts: section.posts.map((p) =>
+              p.id === change.postId ? { ...p, title: change.title } : p,
+            ),
+          }
+        : section;
+    this.setState((s) => ({ ...s, yesterday: rename(s.yesterday), popular: rename(s.popular) }));
   }
 
   private findPost(key: RankingKey, postId: string): PostSummary | undefined {
@@ -653,6 +690,12 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
         return t('home.banner.error');
     }
   }
+}
+
+function removeFromRanking(section: RankingSection, postId: string): RankingSection {
+  return section.status === 'ready'
+    ? { status: 'ready', posts: section.posts.filter((p) => p.id !== postId) }
+    : section;
 }
 
 function patchRanking(section: RankingSection, change: LikeChange): RankingSection {

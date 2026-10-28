@@ -9,10 +9,4 @@ interface AnalyticsTracker {
 }
 
 /** `screen_view` must never affect the screen (TC-ANL-021). */
-fun AnalyticsTracker.screenViewSafely(name: String) {
-    try {
-        screenView(name)
-    } catch (e: Exception) {
-        // Deliberately ignored, see above.
-    }
-}
+fun AnalyticsTracker.screenViewSafely(name: String) = SafeAnalyticsTracker(this).screenView(name)

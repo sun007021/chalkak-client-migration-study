@@ -32,6 +32,8 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>오늘의 주제에 맞는 사진을 바로 찍어 올리려면 카메라를 사용해야 해요.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

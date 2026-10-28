@@ -9,7 +9,7 @@ private func corrupted<K: CodingKey>(_ key: K, _ container: KeyedDecodingContain
 }
 
 /// `moderationStatus`. 알 수 없는 값(REJECTED·새 값)은 디코딩 실패 → 히어로 Error(TC-HOME-011).
-public enum ModerationStatus: String, Sendable, Equatable {
+public enum ModerationStatus: String, Sendable, Equatable, CaseIterable {
     case validating = "VALIDATING"
     case pending = "PENDING"
     case approved = "APPROVED"

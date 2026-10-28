@@ -15,6 +15,11 @@ export function formatNotificationTime(instant: Date): string {
   return `${date.month}월 ${date.day}일 ${pad2(hour)}:${pad2(minute)}`;
 }
 
+/** `M월 d일` */
+export function formatMonthDay(date: KstDate): string {
+  return `${date.month}월 ${date.day}일`;
+}
+
 /** `M월 d일의 주제` */
 export function formatTopicDateLabel(date: KstDate): string {
   return `${date.month}월 ${date.day}일의 주제`;
