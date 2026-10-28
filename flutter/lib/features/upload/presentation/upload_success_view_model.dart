@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/analytics/analytics_constants.dart';
 import '../../../core/analytics/analytics_tracker.dart';
 import '../../../core/time/kst_date.dart';
 import '../../home/domain/home_models.dart';
+import '../domain/korean_particle.dart';
 
 sealed class UploadSuccessEvent {
   const UploadSuccessEvent();
@@ -33,13 +35,35 @@ class UploadSuccessViewModel extends ChangeNotifier {
   final AnalyticsTracker analytics;
 
   /// "‘{주제}’을/를 기록했어요." (조사는 받침으로 고른다).
-  String get message => throw UnimplementedError();
+  String get message => UploadSuccessText.title(topicTitle);
 
   /// PENDING / VALIDATING에 따른 상태 안내.
-  String get statusMessage => throw UnimplementedError();
+  String get statusMessage => UploadSuccessText.status(moderationStatus);
 
-  Stream<UploadSuccessEvent> get events => throw UnimplementedError();
+  final StreamController<UploadSuccessEvent> _events =
+      StreamController<UploadSuccessEvent>.broadcast();
+  bool _shown = false;
+  bool _disposed = false;
 
-  void onShown() => throw UnimplementedError();
-  void onConfirmPressed() => throw UnimplementedError();
+  Stream<UploadSuccessEvent> get events => _events.stream;
+
+  void onShown() {
+    if (_shown) return;
+    _shown = true;
+    analytics.logEvent(
+      AnalyticsEvent.screenView(ScreenNames.photoUploadSuccess),
+    );
+  }
+
+  void onConfirmPressed() {
+    if (_disposed) return;
+    _events.add(OpenDisplayOn(topicDate));
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    unawaited(_events.close());
+    super.dispose();
+  }
 }

@@ -145,7 +145,11 @@ class PostSubmitter {
         title: title,
         cancelToken: cancelToken,
       );
-      return _succeeded(current, created.postId, created.moderationStatus);
+      return await _succeeded(
+        current,
+        created.postId,
+        created.moderationStatus,
+      );
     } on ApiError catch (error) {
       return _onCreateError(error, current, target, cancelToken, fail);
     } on Object {

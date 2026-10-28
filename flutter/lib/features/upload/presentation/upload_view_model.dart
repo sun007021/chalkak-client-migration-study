@@ -1,8 +1,14 @@
 import 'dart:async';
 
+import 'package:clock/clock.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../../core/analytics/analytics_constants.dart';
 import '../../../core/analytics/analytics_tracker.dart';
+import '../../../core/copy/ko.g.dart';
+import '../../../core/network/api_error.dart';
+import '../../../core/text/code_points.dart';
 import '../../../core/time/kst_date.dart';
 import '../../../core/ui/toast/toast_controller.dart';
 import '../../edit/domain/image_codec.dart';
@@ -12,6 +18,7 @@ import '../../home/domain/home_models.dart';
 import '../domain/gallery_saver.dart';
 import '../domain/photo_picker.dart';
 import '../domain/post_submitter.dart';
+import '../domain/upload_models.dart';
 import '../domain/upload_preparer.dart';
 import '../domain/upload_topic_source.dart';
 
@@ -62,6 +69,35 @@ class UploadState {
 
   /// 사진이 있고 제출 중이 아니면 활성. 준비 중이거나 준비 실패여도 활성이다(REQ-UPL-037).
   bool get canSubmit => photo != null && !isSubmitting;
+
+  UploadState copyWith({
+    UploadTopicStatus? topicStatus,
+    String? topicTitle,
+    PickedPhoto? photo,
+    RgbaImage? preview,
+    PhotoEdit? edit,
+    PreparationStatus? preparation,
+    String? title,
+    bool? isSubmitting,
+    String? error,
+    String? topicError,
+    bool clearPhoto = false,
+    bool clearError = false,
+    bool clearTopicError = false,
+  }) => UploadState(
+    topicDate: topicDate,
+    topicStatus: topicStatus ?? this.topicStatus,
+    topicTitle: topicTitle ?? this.topicTitle,
+    photo: clearPhoto ? null : (photo ?? this.photo),
+    preview: clearPhoto ? null : (preview ?? this.preview),
+    edit: edit ?? this.edit,
+    preparation: preparation ?? this.preparation,
+    title: title ?? this.title,
+    isSubmitting: isSubmitting ?? this.isSubmitting,
+    isCameraAvailable: isCameraAvailable,
+    error: clearError ? null : (error ?? this.error),
+    topicError: clearTopicError ? null : (topicError ?? this.topicError),
+  );
 }
 
 sealed class UploadEvent {
@@ -82,11 +118,15 @@ final class UploadSucceeded extends UploadEvent {
     required this.topicTitle,
     required this.topicDate,
     required this.moderationStatus,
+    this.preview,
   });
 
   final String topicTitle;
   final KstDate topicDate;
   final ModerationStatus moderationStatus;
+
+  /// 성공 화면 카드에 보여 줄 전시한 사진(편집 결과 미리보기).
+  final RgbaImage? preview;
 }
 
 /// 로그인 화면으로 간다(401 재인증). 임시 파일과 정책은 이미 지웠다(TC-UPL-078).
@@ -127,7 +167,15 @@ class UploadViewModel extends ChangeNotifier {
     required this.submitter,
     required this.toast,
     required this.analytics,
-  });
+  }) : _state = UploadState(
+         topicDate: topicDate,
+         topicStatus: UploadTopicStatus.loading,
+         preparation: PreparationStatus.none,
+         edit: PhotoEdit.identity,
+         title: '',
+         isSubmitting: false,
+         isCameraAvailable: picker.isCameraAvailable,
+       );
 
   final KstDate topicDate;
   final UploadTopicSource topics;
@@ -141,21 +189,402 @@ class UploadViewModel extends ChangeNotifier {
   final ToastSink toast;
   final AnalyticsTracker analytics;
 
-  UploadState get state => throw UnimplementedError();
-  Stream<UploadEvent> get events => throw UnimplementedError();
+  final StreamController<UploadEvent> _events =
+      StreamController<UploadEvent>.broadcast(sync: true);
+  UploadState _state;
+  bool _disposed = false;
+  bool _started = false;
 
-  Future<void> start() => throw UnimplementedError();
-  Future<void> onTopicRetry() => throw UnimplementedError();
-  Future<void> onAlbumPressed() => throw UnimplementedError();
-  Future<void> onCameraPressed() => throw UnimplementedError();
-  void onPhotoTapped() => throw UnimplementedError();
-  Future<void> onEditCompleted(PhotoEdit edit, RgbaImage rendered) =>
-      throw UnimplementedError();
-  void onEditCancelled() => throw UnimplementedError();
+  /// 진입 때 받은 주제. 제출은 이 값만 쓰고 시계로 다시 계산하지 않는다.
+  Topic? _topic;
+  Future<void>? _topicLoad;
+  final CancelToken _topicToken = CancelToken();
 
-  /// 제목 입력. 앞뒤 공백 제거 후 10 code point 상한을 넘으면 입력을 받지 않고 붙여넣기는 10
-  /// code point까지만 받는다(D-01).
-  void onTitleChanged(String next) => throw UnimplementedError();
+  int _pickSeq = 0;
 
-  Future<void> onSubmitPressed() => throw UnimplementedError();
+  /// 편집기를 열어 둔 새로 고른 사진(아직 확정되지 않음).
+  PickedPhoto? _candidate;
+
+  /// 확정된 사진을 다시 편집하는 중인가.
+  bool _reediting = false;
+
+  PreparedUpload? _prepared;
+  Future<void>? _preparing;
+  CancelToken? _prepareToken;
+  int _prepareGeneration = 0;
+
+  CancelToken? _submitToken;
+  bool _completed = false;
+
+  UploadState get state => _state;
+  Stream<UploadEvent> get events => _events.stream;
+
+  void _emit(UploadState next) {
+    if (_disposed) return;
+    _state = next;
+    notifyListeners();
+  }
+
+  void _send(UploadEvent event) {
+    if (!_disposed) _events.add(event);
+  }
+
+  // ------------------------------------------------------------------ 주제
+
+  Future<void> start() {
+    if (!_started) {
+      _started = true;
+      analytics.logEvent(AnalyticsEvent.screenView(ScreenNames.photoUpload));
+    }
+    return _loadTopic();
+  }
+
+  Future<void> onTopicRetry() {
+    if (_state.topicStatus == UploadTopicStatus.loading) return _loadTopic();
+    _emit(
+      _state.copyWith(
+        topicStatus: UploadTopicStatus.loading,
+        clearTopicError: true,
+      ),
+    );
+    return _loadTopic();
+  }
+
+  /// 주제를 받아 둔다. 이미 받았으면 다시 받지 않고, 받는 중이면 그 결과를 기다린다.
+  Future<void> _loadTopic() {
+    if (_topic != null) return Future.value();
+    return _topicLoad ??= _fetchTopic().whenComplete(() => _topicLoad = null);
+  }
+
+  Future<void> _fetchTopic() async {
+    try {
+      final topic = await topics.topicOn(topicDate, cancelToken: _topicToken);
+      if (_disposed) return;
+      _topic = topic;
+      _emit(
+        _state.copyWith(
+          topicStatus: UploadTopicStatus.loaded,
+          topicTitle: topic.title,
+          clearTopicError: true,
+        ),
+      );
+    } on ApiError catch (error) {
+      if (_disposed || error.isCancelled) return;
+      if (error.status == 401) {
+        _send(const UploadLoginRequired());
+        _emit(_state.copyWith(topicStatus: UploadTopicStatus.failed));
+        return;
+      }
+      _emit(
+        _state.copyWith(
+          topicStatus: UploadTopicStatus.failed,
+          topicError: error.isNetwork
+              ? Copy.uploadErrorNetwork
+              : Copy.uploadTopicLoadFailed,
+        ),
+      );
+    } on Object {
+      if (_disposed) return;
+      _emit(
+        _state.copyWith(
+          topicStatus: UploadTopicStatus.failed,
+          topicError: Copy.uploadTopicLoadFailed,
+        ),
+      );
+    }
+  }
+
+  // ------------------------------------------------------------------ 사진 선택
+
+  Future<void> onAlbumPressed() => _pick(picker.pickFromAlbum);
+
+  Future<void> onCameraPressed() => _pick(picker.capture);
+
+  Future<void> _pick(Future<PickResult> Function() open) async {
+    if (_state.isSubmitting || _completed) return;
+    // 가장 최근 선택의 결과만 반영한다.
+    final seq = ++_pickSeq;
+    final PickResult result;
+    try {
+      result = await open();
+    } on Object {
+      if (_disposed || seq != _pickSeq) return;
+      _emit(_state.copyWith(error: Copy.uploadErrorPrepare));
+      return;
+    }
+    if (_disposed || seq != _pickSeq) return;
+    switch (result) {
+      case PhotoPickCancelled():
+        return;
+      case PhotoPicked(:final photo):
+        await _onPicked(photo, seq);
+    }
+  }
+
+  Future<void> _onPicked(PickedPhoto photo, int seq) async {
+    // 빈 데이터·손상된 사진은 편집기를 열지 않는다(REQ-UPL-018).
+    if (photo.bytes.isEmpty) {
+      _emit(_state.copyWith(error: Copy.uploadErrorPrepare));
+      return;
+    }
+    try {
+      await decoder.readBounds(photo.bytes);
+    } on Object {
+      if (_disposed || seq != _pickSeq) return;
+      _emit(_state.copyWith(error: Copy.uploadErrorPrepare));
+      return;
+    }
+    if (_disposed || seq != _pickSeq) return;
+    if (photo.origin == PhotoOrigin.camera) unawaited(_saveCapture(photo));
+    _candidate = photo;
+    _reediting = false;
+    _emit(_state.copyWith(clearError: true));
+    _send(OpenPhotoEditor(photo.bytes, PhotoEdit.identity));
+  }
+
+  /// 촬영본을 앨범에 한 번만 저장한다. 실패해도 선택은 유지하고 토스트로만 알린다.
+  /// 화면이 닫힌 뒤 늦게 실패해도 전역 [toast]로 알린다.
+  Future<void> _saveCapture(PickedPhoto photo) async {
+    try {
+      await gallery.saveJpeg(
+        photo.bytes,
+        fileName: CaptureFileName.next(clock.now()),
+      );
+    } on Object {
+      toast.show(Copy.uploadCameraSaveFailed);
+    }
+  }
+
+  void onPhotoTapped() {
+    final photo = _state.photo;
+    if (photo == null || _state.isSubmitting || _completed) return;
+    _candidate = null;
+    _reediting = true;
+    _send(OpenPhotoEditor(photo.bytes, _state.edit));
+  }
+
+  // ------------------------------------------------------------------ 편집 결과
+
+  Future<void> onEditCompleted(PhotoEdit edit, RgbaImage rendered) async {
+    final candidate = _candidate;
+    final current = _state.photo;
+    if (candidate != null) {
+      _candidate = null;
+      final same =
+          current != null &&
+          listEquals(current.bytes, candidate.bytes) &&
+          edit == _state.edit;
+      _emit(
+        _state.copyWith(
+          photo: candidate,
+          preview: rendered,
+          edit: edit,
+          clearError: true,
+        ),
+      );
+      if (same && _state.preparation != PreparationStatus.failed) return;
+      _beginPreparation();
+      return;
+    }
+    if (_reediting && current != null) {
+      _reediting = false;
+      if (edit == _state.edit) {
+        // 같은 사진·같은 편집값이면 다시 준비하지 않는다.
+        _emit(_state.copyWith(preview: rendered));
+        return;
+      }
+      _emit(_state.copyWith(preview: rendered, edit: edit, clearError: true));
+      _beginPreparation();
+    }
+  }
+
+  void onEditCancelled() {
+    // 처음 고른 사진이면 선택이 없던 일이 되고, 재편집이면 기존 선택과 준비 결과를 유지한다.
+    _candidate = null;
+    _reediting = false;
+  }
+
+  // ------------------------------------------------------------------ 준비
+
+  /// 이전 준비를 취소·삭제하고 정책 발급 + 인코딩을 새로 시작한다.
+  void _beginPreparation() {
+    final photo = _state.photo;
+    if (photo == null || _disposed) return;
+    _cancelPreparation();
+    final token = CancelToken();
+    final generation = ++_prepareGeneration;
+    _prepareToken = token;
+    final edit = _state.edit;
+    _emit(_state.copyWith(preparation: PreparationStatus.preparing));
+    _preparing = _runPreparation(photo, edit, token, generation);
+  }
+
+  Future<void> _runPreparation(
+    PickedPhoto photo,
+    PhotoEdit edit,
+    CancelToken token,
+    int generation,
+  ) async {
+    try {
+      final prepared = await preparer.prepare(
+        photo.bytes,
+        edit,
+        cancelToken: token,
+      );
+      if (_disposed || generation != _prepareGeneration) {
+        // 뒤늦게 끝난 이전 준비는 새 상태를 덮지 않고 파일만 지운다.
+        await preparer.discard(prepared);
+        return;
+      }
+      _prepared = prepared;
+      _emit(_state.copyWith(preparation: PreparationStatus.ready));
+    } on UploadFailure catch (failure) {
+      if (_disposed || generation != _prepareGeneration) return;
+      switch (failure.kind) {
+        case UploadFailureKind.cancelled:
+          return;
+        case UploadFailureKind.loginRequired:
+          _emit(_state.copyWith(preparation: PreparationStatus.failed));
+          _send(const UploadLoginRequired());
+        case UploadFailureKind.failed:
+          _emit(
+            _state.copyWith(
+              preparation: PreparationStatus.failed,
+              error: failure.message,
+            ),
+          );
+      }
+    }
+  }
+
+  /// 진행 중인 준비를 취소하고 만들어 둔 임시 파일을 지운다.
+  void _cancelPreparation() {
+    _prepareGeneration++;
+    _prepareToken?.cancel();
+    _prepareToken = null;
+    _preparing = null;
+    final prepared = _prepared;
+    _prepared = null;
+    if (prepared != null) unawaited(preparer.discard(prepared));
+  }
+
+  // ------------------------------------------------------------------ 제목·제출
+
+  void onTitleChanged(String next) {
+    if (_state.isSubmitting || _completed) return;
+    final title = PostTitle.applyInput(previous: _state.title, next: next);
+    if (title == _state.title) {
+      // 거절된 입력도 화면의 입력창이 상태와 같아지도록 다시 알린다.
+      if (!_disposed) notifyListeners();
+      return;
+    }
+    _emit(_state.copyWith(title: title));
+  }
+
+  Future<void> onSubmitPressed() async {
+    if (_disposed || _completed || _state.photo == null) return;
+    if (_state.isSubmitting) return;
+    final photo = _state.photo!;
+    final token = CancelToken();
+    _submitToken = token;
+    _emit(_state.copyWith(isSubmitting: true, clearError: true));
+    try {
+      // 주제(topicId)는 진입 때 받은 것을 쓴다. 아직 못 받았다면 지금 받는다.
+      await _loadTopic();
+      final topic = _topic;
+      if (_disposed) return;
+      if (topic == null) {
+        _emit(
+          _state.copyWith(
+            isSubmitting: false,
+            error: _state.topicError ?? Copy.uploadErrorTopicLoad,
+          ),
+        );
+        return;
+      }
+
+      // 준비 중이면 끝날 때까지 기다렸다가 이어 간다. 준비가 없거나 실패했다면 처음부터 준비한다.
+      if (_state.preparation == PreparationStatus.none ||
+          _state.preparation == PreparationStatus.failed) {
+        _beginPreparation();
+      }
+      await _preparing;
+      if (_disposed) return;
+      final prepared = _prepared;
+      if (prepared == null) {
+        // 준비 실패: 문구는 준비 쪽이 이미 상태에 두었다.
+        _emit(_state.copyWith(isSubmitting: false));
+        return;
+      }
+
+      final outcome = await submitter.submit(
+        prepared: prepared,
+        source: photo.bytes,
+        target: UploadTarget(topicId: topic.id, topicDate: topicDate),
+        title: PostTitle.normalize(_state.title),
+        cancelToken: token,
+      );
+      if (_disposed) return;
+      switch (outcome) {
+        case SubmitSucceeded(:final moderationStatus):
+          _prepared = null;
+          _completed = true;
+          _send(
+            UploadSucceeded(
+              topicTitle: topic.title,
+              topicDate: topicDate,
+              moderationStatus: moderationStatus,
+              preview: _state.preview,
+            ),
+          );
+        case SubmitFailed(:final failure, :final retained):
+          _prepared = retained;
+          final nextPreparation = retained == null
+              ? PreparationStatus.none
+              : PreparationStatus.ready;
+          switch (failure.kind) {
+            case UploadFailureKind.cancelled:
+              _emit(
+                _state.copyWith(
+                  isSubmitting: false,
+                  preparation: nextPreparation,
+                ),
+              );
+            case UploadFailureKind.loginRequired:
+              _emit(
+                _state.copyWith(
+                  isSubmitting: false,
+                  preparation: nextPreparation,
+                ),
+              );
+              _send(const UploadLoginRequired());
+            case UploadFailureKind.failed:
+              _emit(
+                _state.copyWith(
+                  isSubmitting: false,
+                  preparation: nextPreparation,
+                  error: failure.message,
+                ),
+              );
+          }
+      }
+    } finally {
+      if (identical(_submitToken, token)) _submitToken = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _topicToken.cancel();
+    _prepareToken?.cancel();
+    _submitToken?.cancel();
+    _prepareGeneration++;
+    final prepared = _prepared;
+    _prepared = null;
+    if (prepared != null) unawaited(preparer.discard(prepared));
+    unawaited(_events.close());
+    super.dispose();
+  }
 }
