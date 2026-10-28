@@ -40,15 +40,43 @@ Kotlin + Jetpack Compose. 기존 `client/android`를 옮기지 않고 새로 작
 ```
 app/src/main/kotlin/com/stonefive/chalkak/
   ChalkakApplication.kt   AppContainer 생성
-  MainActivity.kt         setContent { ChalkakTheme { ChalkakRoot } }
-  di/AppContainer.kt      수동 DI. 시계, OkHttp, ApiClient, 세션 저장소, Repository를 lazy로 만든다
+  MainActivity.kt         setContent { ChalkakTheme { ChalkakRoot(copy, deps) } }. 현재 Activity 등록·해제, Play 업데이트 결과 launcher 등록
+  di/AppContainer.kt      수동 DI. 시계, OkHttp, ApiClient, 세션 저장소, Repository, BootGate, AuthEvent 릴레이(SharedFlow, 수집자 모두에게 전달),
+                          UserDataResetter, SignupContext. newRootDependencies()가 화면 holder 팩토리를 만든다
   data/                   SecretCipher(Keystore AES-GCM), KeystoreRecordStorage(SecureRecordStorage 어댑터)
+  platform/               플랫폼 어댑터(아래). PlatformAdapters가 묶고 headless()는 JVM 테스트용 빈 구현
   copy/Copy.kt            ko.json 조회(`copy["app.name"]`, `copy.format("display.picker.day", "n" to 5)`), LocalCopy
-  ui/ChalkakRoot.kt       루트. `testTagsAsResourceId = true`는 여기 한 곳에만 둔다
+  ui/ChalkakRoot.kt       루트. BootState와 NavigationController.state로 화면을 고른다. `testTagsAsResourceId = true`는 여기 한 곳에만 둔다
+  ui/RootSession.kt       회전을 넘어 유지되는 호스트 상태(NavigationController, 가입 시도 번호, 사인 PNG, 토스트). rememberStateHolder로 ViewModel에 둔다
+  ui/boot/                SplashScreen, UpdateGateDialog
+  ui/login/               LoginScreen(무상태) + LoginRoute(holder 연결)
+  ui/terms/               TermsScreen, TermsRoute(문서 시트 상태), LegalDocSheet, LegalWebView
+  ui/signature/           SignatureScreen(그리기), SignaturePreviewScreen, SignupPreviewRoute, ChangeSignaturePreviewRoute
+  ui/components/          Controls(버튼, 알림, BlockingLayer, ScreenGoneEffect), ToastLayer(`toast.container`, `toast.message`)
   ui/theme/               ChalkakTheme, 색, Pretendard·Continuous·Griun 폰트
-  ui/components/          ToastLayer(`toast.container`, `toast.message`)
   viewmodel/              StateHolderViewModel, rememberStateHolder
+app/src/kakaoOn/kotlin/.../platform/KakaoSdkFactory.kt    실제 Kakao SDK 어댑터 (-PkakaoNativeAppKey 있을 때만 컴파일)
+app/src/kakaoOff/kotlin/.../platform/KakaoSdkFactory.kt   SDK 없는 빌드의 대체(UnconfiguredKakaoSdk → 로그인은 `auth.login.error.config`)
 ```
+
+화면(`ui/**`)은 상태를 갖지 않는다. 상태와 로직은 `:feature:*` holder가 갖고, 화면은 `StateFlow`를 그리고 이벤트를 holder로 넘긴다. 예외는 문서 시트처럼 순수 표시 상태(열림, 로드 시도 번호)뿐이다. 화면을 떠날 때 holder 작업을 취소하는 `onScreenGone()`은 `ScreenGoneEffect`로 부른다. 화면 회전(Activity 재생성) 중에는 호출하지 않아 진행 중인 로그인·가입이 이어진다.
+
+### 플랫폼 어댑터 (`platform/`)
+
+`:feature:*`가 정의한 포트를 구현한다. `PlatformAdapters.android(context)`가 만들고 `AppContainer`가 holder에 넘긴다.
+
+| 포트 | 구현 | 비고 |
+| --- | --- | --- |
+| `SocialLoginClient` | `KakaoSocialLoginClient(KakaoSdkFactory.create(...))` 또는 `FakeSocialLoginClient` | Fake는 `fakeSocialLogin=true`인 **debug** 빌드에서만(BuildConfig 두 값이 모두 참일 때). release는 항상 Kakao |
+| `KakaoSdk` | kakaoOn: `KakaoSdkAdapter`(`UserApiClient.loginWithKakaoTalk`·`loginWithKakaoAccount`에 해시 nonce 전달, `OAuthToken.idToken`) / kakaoOff: `UnconfiguredKakaoSdk` | 로그인은 Activity가 필요해 `CurrentActivity`를 쓴다 |
+| `UpdateChecker`·`UpdateLauncher` | `PlayUpdateSourceAdapter`, `PlayUpdateLauncher`(IMMEDIATE, 불가하면 `StoreOpener`로 스토어 열기) | `ConfiguredUpdateChecker`가 `forceUpdateCheck`가 꺼져 있으면 조회 없이 통과시킨다 |
+| `ExternalBrowser` | `AndroidExternalBrowser` | 약관 URL 중 앱 안 허용 호스트가 아닌 것 |
+| `SignatureImageEncoder` | `AndroidSignatureEncoder` | `android.graphics`. 규칙은 순수 `SignaturePngEncoder`와 같다 |
+| `AnalyticsTracker`, `PushRegistrar`, `DeviceRegistrar`, `HomePreloader` | `LogAnalyticsTracker`, `NoopPushRegistrar`, `ReadyHomePreloader` | Firebase·FCM·홈 preload는 이후 PR이 교체 |
+
+Activity 참조 규칙: 어댑터는 Activity를 직접 쥐지 않는다. `CurrentActivity`(WeakReference)를 `MainActivity`가 `onCreate`에 등록하고 `onDestroy`에 해제하며, Play 업데이트 결과 launcher(`UpdateFlowBridge.launcher`)도 `onDestroy`에서 해제한다(launcher가 Activity의 result registry를 붙잡기 때문).
+
+법적 문서 `WebView`(`LegalWebView`)는 `LegalDocuments.classify`가 앱 안(InApp)으로 판정한 https `notion.com|so|site` 호스트만 로드하고, 다른 이동은 모두 막는다. JS와 DOM storage만 켜고 file·content 접근과 mixed content는 끈다.
 
 ### 빌드 설정
 
@@ -59,6 +87,34 @@ app/src/main/kotlin/com/stonefive/chalkak/
 - `google()`은 SDK가 있을 때만 `settings.gradle.kts`에 들어간다(pluginManagement와 dependencyResolutionManagement 모두, 필요한 group만). SDK가 없으면 `:app`도 빠지고 순수 모듈만 빌드된다.
 - AGP는 루트 `build.gradle.kts`의 `buildscript { classpath }`로 올린다(SDK가 있을 때만, 버전은 `libs.versions.toml`의 `agp`). Kotlin Gradle 플러그인과 같은 classloader에 있어야 한다. 빠지면 `NoClassDefFoundError: BaseVariant`로 죽는다. `alias(...) apply false`로 올리면 SDK 없는 환경에서도 AGP를 받으려다 실패해서 쓰지 않았다. 그래서 `:app`은 `id("com.android.application")`를 버전 없이 쓴다. AGP 9는 Kotlin을 내장하므로 `kotlin-android` 플러그인은 적용하지 않는다.
 - 이 환경의 SDK는 platform 36까지라서 compileSdk 37을 요구하는 androidx 최신판(core 1.19, lifecycle 2.11)은 쓸 수 없다. core-ktx 1.17.0, lifecycle 2.10.0, activity 1.12.0을 쓴다.
+
+### Gradle 속성
+
+`-P`로 넘기거나 `~/.gradle/gradle.properties`에 둔다. 값은 레포에 커밋하지 않는다.
+
+| 속성 | 기본 | 효과 |
+| --- | --- | --- |
+| `apiBaseUrl` | debug `http://10.0.2.2:4010`, release `https://chalkak-dev.pysun.kr` | `BuildConfig.API_BASE_URL`(서버 origin만, 앱이 `/api/v1`을 붙인다) |
+| `kakaoNativeAppKey` | 없음 | 있으면 `src/kakaoOn`을 컴파일하고 `com.kakao.sdk:v2-user`를 의존성에 넣고, `settings.gradle.kts`가 Kakao Maven 저장소(`devrepo.kakao.com`)를 추가한다. `BuildConfig.KAKAO_NATIVE_APP_KEY`와 매니페스트 `AuthCodeHandlerActivity`의 scheme `kakao<키>`에 들어간다. 없으면 `src/kakaoOff`가 컴파일되고 `AuthCodeHandlerActivity` 항목은 `enabled=false` |
+| `fakeSocialLogin` | `false` | `true`이면 debug 빌드의 로그인이 SDK 없이 픽스처 idToken을 돌려준다(E2E용). release에서는 무시된다 |
+| `forceUpdateCheck` | `false` | `FORCE_UPDATE_CHECK_ENABLED`. 켜야 Play In-App Update 조회가 실제로 돈다(D-15, REQ-BOOT-014) |
+
+### 소스셋: kakaoOn / kakaoOff
+
+Kakao 저장소는 일부 샌드박스에서 막혀 있어서, SDK가 없어도 `:app`이 빌드·테스트되도록 `KakaoSdkFactory`를 두 소스셋으로 나눴다. `app/build.gradle.kts`가 `kakaoNativeAppKey` 유무로 한쪽만 `variant.sources.kotlin`에 추가한다. 둘은 같은 이름·시그니처(`KakaoSdkFactory.create(context, nativeAppKey, activity)`)를 가져야 한다. 기본 빌드는 kakaoOn을 컴파일하지 않으므로 CI가 `./gradlew :app:compileDebugKotlin -PkakaoNativeAppKey=ci-dummy`로 따로 컴파일한다(`.github/workflows/android.yml`).
+
+### E2E 빌드 (mock 서버 + 가짜 로그인)
+
+Maestro 같은 E2E는 실제 카카오 없이 로그인 흐름을 돌린다.
+
+```
+(cd shared && PORT=4010 node mock-server/server.mjs)            # mock 서버. 에뮬레이터에서는 10.0.2.2:4010
+cd android
+LC_ALL=C.UTF-8 ./gradlew :app:assembleDebug -PfakeSocialLogin=true
+# 다른 서버: -PapiBaseUrl=http://10.0.2.2:PORT
+```
+
+`FakeSocialLoginClient`는 고정 idToken(`fixture-kakao-id-token`)을 돌려주고, mock 서버는 값과 무관하게 시나리오(로그인 성공, `SIGN_UP_REQUIRED` 등)로 응답한다. 이 APK는 debug라서 배포하지 않는다. 강제 업데이트 다이얼로그를 보려면 `-PforceUpdateCheck=true`를 더하되 Play 조회가 필요하다(스토어 배포 빌드가 아니면 조회가 실패해 통과한다, D-15).
 
 ### StateHolder를 ViewModel로 감싸기
 
