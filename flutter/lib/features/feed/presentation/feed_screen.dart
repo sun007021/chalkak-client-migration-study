@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
 import '../../../core/text/code_points.dart';
-import '../../../core/ui/network_photo.dart';
+import '../../../core/ui/app_network_image.dart';
 import '../../../core/ui/test_id.dart';
 import '../../like/domain/toast_message.dart';
 import '../../like/presentation/like_button.dart';
@@ -191,7 +191,7 @@ class _Loading extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (url != null) NetworkPhoto(url, fit: BoxFit.contain),
+          if (url != null) AppNetworkImage(url: url, fit: BoxFit.contain),
           const Center(child: CircularProgressIndicator()),
         ],
       ),
@@ -264,8 +264,8 @@ class _Content extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      NetworkPhoto(
-                        content.originalImageUrl,
+                      AppNetworkImage(
+                        url: content.originalImageUrl,
                         fit: BoxFit.contain,
                         semanticLabel: state.photoLabel,
                       ),
@@ -276,8 +276,8 @@ class _Content extends StatelessWidget {
                           width: 96,
                           child: TestId(
                             FeedTestIds.signatureImage,
-                            child: NetworkPhoto(
-                              signatureUrl,
+                            child: AppNetworkImage(
+                              url: signatureUrl,
                               fit: BoxFit.contain,
                               omitOnError: true,
                             ),

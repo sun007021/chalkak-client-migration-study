@@ -5,12 +5,14 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/copy/ko.g.dart';
 import '../../../core/network/api_error.dart';
+import '../../../core/post_events/post_event_bus.dart';
 import '../../../core/time/kst_clock.dart';
 import '../../../core/time/kst_date.dart';
 import '../../../core/time/kst_week.dart';
 import '../../../core/ui/toast/toast_controller.dart';
 import '../../banner/domain/banner_list_controller.dart';
 import '../../banner/domain/banner_models.dart';
+import '../../like/domain/like_store.dart';
 import 'home_models.dart';
 import 'home_preload.dart';
 import 'home_repository.dart';
@@ -49,9 +51,13 @@ class HomeViewModel extends ChangeNotifier {
     required this._toast,
     this._preloadCache,
     this._likeToggler,
+    this._likeStore,
+    PostEventBus? postEvents,
     this._kstClock = const KstClock(),
   }) {
     _banners.addListener(_publish);
+    _likeStore?.addListener(_publish);
+    _postEventSubscription = postEvents?.events.listen(_onPostEvent);
     _today = _kstClock.today();
     _state = _build();
   }
@@ -63,6 +69,10 @@ class HomeViewModel extends ChangeNotifier {
   final ToastSink _toast;
   final HomePreloadCache? _preloadCache;
   final RankingLikeToggler? _likeToggler;
+
+  /// 랭킹 사진의 좋아요 값을 전시·피드와 함께 쓰는 저장소(LIKE-005). 없으면 응답 값을 그대로 쓴다.
+  final LikeStore? _likeStore;
+  StreamSubscription<PostEvent>? _postEventSubscription;
   final KstClock _kstClock;
 
   /// 랭킹 섹션에 보이는 사진 수(앞 5장).
@@ -255,6 +265,8 @@ class HomeViewModel extends ChangeNotifier {
     _disposed = true;
     _token.cancel();
     _banners.removeListener(_publish);
+    _likeStore?.removeListener(_publish);
+    unawaited(_postEventSubscription?.cancel());
     _banners.cancelPending();
     unawaited(_events.close());
     super.dispose();
@@ -357,12 +369,13 @@ class HomeViewModel extends ChangeNotifier {
     int sequence,
     List<PostSummary>? seed,
   ) async {
+    final since = _likeStore?.version ?? 0;
     try {
       final posts =
           seed ??
           await _home.popularPosts(topic.topicDate, cancelToken: run.token);
       if (!_isLive(_Section.popular, sequence)) return;
-      _popular = RankingReady(posts: _top(posts), date: topic.topicDate);
+      _popular = RankingReady(posts: _top(posts, since), date: topic.topicDate);
     } on Object catch (error) {
       if (!_isLive(_Section.popular, sequence)) return;
       final apiError = _asApiError(error);
@@ -377,6 +390,7 @@ class HomeViewModel extends ChangeNotifier {
 
   Future<void> _loadYesterday(_Run run) async {
     final sequence = _begin(_Section.yesterday);
+    final since = _likeStore?.version ?? 0;
     try {
       final date = run.today.addDays(-1);
       final topic = await _home.topicOn(date, cancelToken: run.token);
@@ -385,7 +399,10 @@ class HomeViewModel extends ChangeNotifier {
           ? const <PostSummary>[]
           : await _home.popularPosts(topic.topicDate, cancelToken: run.token);
       if (!_isLive(_Section.yesterday, sequence)) return;
-      _yesterday = RankingReady(posts: _top(posts), date: topic?.topicDate);
+      _yesterday = RankingReady(
+        posts: _top(posts, since),
+        date: topic?.topicDate,
+      );
     } on Object catch (error) {
       if (!_isLive(_Section.yesterday, sequence)) return;
       final apiError = _asApiError(error);
@@ -515,14 +532,74 @@ class HomeViewModel extends ChangeNotifier {
   bool _isLive(_Section section, int sequence) =>
       !_disposed && _sequence[section] == sequence;
 
-  List<PostSummary> _top(List<PostSummary> posts) =>
-      posts.take(_rankingLimit).toList(growable: false);
+  /// 앞 5장을 고르고, 저장소가 있으면 응답의 좋아요 값을 저장소에 반영한다.
+  List<PostSummary> _top(List<PostSummary> posts, int since) {
+    final top = posts.take(_rankingLimit).toList(growable: false);
+    final likes = _likeStore;
+    if (likes != null) {
+      for (final post in top) {
+        likes.reconcile(
+          post.id,
+          isLiked: post.isLiked,
+          likeCount: post.likeCount,
+          since: since,
+        );
+      }
+    }
+    return top;
+  }
+
+  /// 화면에 낼 랭킹: 저장소에 값이 있으면 그 값(낙관 반영 포함)을 쓴다.
+  RankingState _withLikes(RankingState section) {
+    final likes = _likeStore;
+    if (likes == null || section is! RankingReady) return section;
+    return RankingReady(
+      date: section.date,
+      posts: [
+        for (final post in section.posts)
+          _withLike(post, likes.stateOf(post.id)),
+      ],
+    );
+  }
+
+  PostSummary _withLike(PostSummary post, LikeState? like) => like == null
+      ? post
+      : PostSummary(
+          id: post.id,
+          thumbnailImageUrl: post.thumbnailImageUrl,
+          originalImageUrl: post.originalImageUrl,
+          likeCount: like.likeCount,
+          isLiked: like.isLiked,
+          isMine: post.isMine,
+        );
+
+  /// 상세에서 지운 게시물은 랭킹에서 바로 빼고, 나머지는 조용히 다시 불러온다(LIKE-005).
+  void _onPostEvent(PostEvent event) {
+    if (_disposed || event is! PostRemoved) return;
+    _popular = _without(_popular, event.postId);
+    _yesterday = _without(_yesterday, event.postId);
+    _publish();
+    unawaited(_refreshQuietly());
+  }
+
+  RankingState _without(RankingState section, String postId) {
+    if (section is! RankingReady) return section;
+    return RankingReady(
+      date: section.date,
+      posts: [
+        for (final post in section.posts)
+          if (post.id != postId) post,
+      ],
+    );
+  }
 
   PostSummary? _findPost(String postId) {
     for (final section in [_popular, _yesterday]) {
       if (section is! RankingReady) continue;
       for (final post in section.posts) {
-        if (post.id == postId) return post;
+        if (post.id == postId) {
+          return _withLike(post, _likeStore?.stateOf(postId));
+        }
       }
     }
     return null;
@@ -543,8 +620,8 @@ class HomeViewModel extends ChangeNotifier {
     topic: _topic,
     hero: _deriveHero(),
     weekly: _weekly,
-    yesterday: _yesterday,
-    popular: _popular,
+    yesterday: _withLikes(_yesterday),
+    popular: _withLikes(_popular),
     banners: _banners.state,
     hasUnread: _hasUnread,
     isRefreshing: _isRefreshing,

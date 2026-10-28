@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
 import '../../../core/text/code_points.dart';
-import '../../../core/ui/network_photo.dart';
+import '../../../core/ui/app_network_image.dart';
 import '../../../core/ui/selectable_test_id.dart';
 import '../../../core/ui/test_id.dart';
 import '../../feed/domain/feed_target.dart';
@@ -493,7 +493,7 @@ class _GridCellState extends State<_GridCell> {
                 child: InkWell(
                   onTap: widget.onTap,
                   child: SizedBox.expand(
-                    child: NetworkPhoto(card.thumbnailImageUrl),
+                    child: AppNetworkImage(url: card.thumbnailImageUrl),
                   ),
                 ),
               ),
@@ -606,7 +606,7 @@ class _FeaturedCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            NetworkPhoto(card.thumbnailImageUrl),
+            AppNetworkImage(url: card.thumbnailImageUrl),
             Positioned(
               left: 0,
               right: 0,
