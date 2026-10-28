@@ -28,6 +28,9 @@ import kr.chalkak.core.data.post.PostChanges
 import kr.chalkak.core.data.post.PostSort
 import kr.chalkak.core.data.post.testing.FakeUser
 import kr.chalkak.core.data.post.testing.USER_A_ID
+import kr.chalkak.core.common.testing.FakeMonotonicClock
+import kr.chalkak.core.data.aireview.testing.FakeAiReviewRepository
+import kr.chalkak.feature.aireview.AiReviewStateHolder
 import kr.chalkak.feature.display.DisplayStateHolder
 import kr.chalkak.feature.display.FeedEntry
 import kr.chalkak.feature.display.FeedStateHolder
@@ -105,6 +108,10 @@ class MainRig(val mode: AccessMode = AccessMode.Member) {
     val uploadPainter = RecordingEditPainter()
     val uploadPlatform = UploadPlatform(uploadAcquirer, PhotoPreviewLoader { previewOf() }, uploadEditSource, uploadPainter)
 
+    /** AI feedback side: scripted repository and every holder the host asked for (one per stacked feed). */
+    val aiRepo = FakeAiReviewRepository()
+    val aiHolders = CopyOnWriteArrayList<AiReviewStateHolder>()
+
     init {
         posts.autoRespond()
         posts.likeHandler = { put, id -> likeServer.handle(put, id) }
@@ -128,6 +135,9 @@ class MainRig(val mode: AccessMode = AccessMode.Member) {
         newFeedHolder = { scope, entry ->
             feedEntries += entry
             FeedStateHolder(scope, posts, likes, changes, user, KstCalendar(postClock), postAnalytics, entry)
+        },
+        newAiReviewHolder = { scope ->
+            AiReviewStateHolder(scope, aiRepo, user, KstCalendar(postClock), FakeMonotonicClock()).also { aiHolders += it }
         },
         otherTab = { tab, _ ->
             otherTabsComposed += tab
