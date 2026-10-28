@@ -161,7 +161,7 @@ class _RouterNavigator implements MainShellNavigator {
 
   @override
   Future<void> openUpload(KstDate topicDate) async {
-    if (!_context.mounted || _dependencies.main.upload == null) return;
+    if (!_context.mounted) return;
     UploadExit? exit;
     await Navigator.of(_context).push<void>(
       MaterialPageRoute<void>(

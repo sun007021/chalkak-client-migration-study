@@ -39,6 +39,7 @@ import 'fake_analytics_tracker.dart';
 import 'net_harness.dart' show advance, sessionAt, sessionGuest, settle, t0, v1;
 import 'record_fakes.dart'
     show FakeCalendarImageRenderer, FakeCalendarImageSaver;
+import 'upload_dependencies_fake.dart';
 
 /// `shared/fixtures/<name>`을 manifest의 상태와 함께 응답으로 만든다(지연 선택).
 FakeResponse fx(String name, {Duration delay = Duration.zero}) =>
@@ -378,6 +379,7 @@ class HomeFakes {
     recordImageSaver: recordSaver,
     recordPostEvents: PostBusRecordEvents(postEvents),
     recordCleaner: recordCleaner,
+    upload: fakeUploadDependencies(),
   );
 
   /// 기록 탭은 홈과 같은 FakeAdapter 위의 `/posts/calendar`를 쓴다(홈 `api.calendar`로 스크립트).

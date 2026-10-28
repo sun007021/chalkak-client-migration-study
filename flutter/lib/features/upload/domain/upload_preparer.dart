@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../../../core/copy/ko.g.dart';
 import '../../../core/network/api_error.dart';
@@ -142,6 +143,8 @@ class UploadPreparer {
         error.reason == PhotoEncodeFailure.cancelled) {
       return const UploadFailure.cancelled();
     }
+    // 알려진 실패가 아니면 화면에는 "준비 실패"로만 보이므로 원인을 로그로 남긴다.
+    debugPrint('upload: 준비 중 예기치 못한 오류 $error');
     return const UploadFailure(Copy.uploadErrorPrepare);
   }
 }

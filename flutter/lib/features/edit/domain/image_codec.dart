@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'rgba_image.dart';
@@ -46,4 +47,16 @@ class ImageDecodeException implements Exception {
 
   @override
   String toString() => 'ImageDecodeException($reason)';
+}
+
+/// 긴 변이 [limit] 이하가 되도록 가로세로 비율을 지키며 줄인다(확대하지 않는다).
+/// 편집 원본 불러오기와 업로드 인코딩이 함께 쓴다.
+(int, int) fitWithin(int width, int height, int limit) {
+  final longEdge = math.max(width, height);
+  if (longEdge <= limit) return (width, height);
+  final scale = limit / longEdge;
+  return (
+    math.max(1, (width * scale).round()),
+    math.max(1, (height * scale).round()),
+  );
 }

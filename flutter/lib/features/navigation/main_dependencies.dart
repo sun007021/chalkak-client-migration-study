@@ -39,7 +39,7 @@ class MainDependencies {
     required this.recordImageSaver,
     required this.recordPostEvents,
     required this.recordCleaner,
-    this.upload,
+    required this.upload,
   });
 
   final HomeRepository homeRepository;
@@ -65,6 +65,6 @@ class MainDependencies {
   final RecordPostEvents recordPostEvents;
   final RecordDataCleaner recordCleaner;
 
-  /// 업로드·사진 편집. 비어 있으면(업로드를 쓰지 않는 테스트 묶음) 업로드 화면으로 이동하지 않는다.
-  final UploadDependencies? upload;
+  /// 업로드·사진 편집.
+  final UploadDependencies upload;
 }

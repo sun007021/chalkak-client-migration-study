@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../../../core/copy/ko.g.dart';
 import '../../../core/network/api_error.dart';
@@ -55,6 +56,10 @@ final class SubmitFailed extends SubmitOutcome {
 ///    - 403 -> `Copy.uploadGateBanned`, 재요청 없음.
 ///    - 5xx·그 밖 -> `Copy.uploadErrorCreate`(준비물 유지, 재시도 없음).
 /// 5. 성공·폐기 실패에는 임시 파일을 지운다.
+///
+/// 소유권: [submit]에 넘긴 준비물은 호출이 끝날 때까지 이 클래스가 소유한다(갱신으로 파일이 바뀌거나
+/// 지워질 수 있다). 호출한 쪽(ViewModel)이 이후에 가지는 것은 [SubmitFailed.retained]뿐이다.
+/// 성공과 폐기 실패에서는 `retained`가 없고 파일은 이미 지워져 있다.
 class PostSubmitter {
   const PostSubmitter({
     required this.repository,
@@ -127,8 +132,9 @@ class PostSubmitter {
       return fail(
         const UploadFailure(Copy.uploadErrorUpload, discardPrepared: true),
       );
-    } on Object {
-      // 임시 파일을 읽지 못했다.
+    } on Object catch (error, stack) {
+      // 임시 파일을 읽지 못했다. 화면에는 "준비 실패"로만 보이므로 원인은 로그로 남긴다.
+      debugPrint('upload: 임시 파일 읽기/전송 준비 실패 $error\n$stack');
       return fail(
         const UploadFailure(Copy.uploadErrorPrepare, discardPrepared: true),
       );
@@ -152,7 +158,8 @@ class PostSubmitter {
       );
     } on ApiError catch (error) {
       return _onCreateError(error, current, target, cancelToken, fail);
-    } on Object {
+    } on Object catch (error, stack) {
+      debugPrint('upload: POST /posts 예기치 못한 오류 $error\n$stack');
       return fail(const UploadFailure(Copy.uploadErrorCreate));
     }
   }

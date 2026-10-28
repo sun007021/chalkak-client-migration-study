@@ -46,7 +46,7 @@ class UploadRoute extends StatefulWidget {
 }
 
 class _UploadRouteState extends State<UploadRoute> {
-  late final _upload = widget.dependencies.main.upload!;
+  late final _upload = widget.dependencies.main.upload;
   late final UploadViewModel _viewModel = UploadViewModel(
     topicDate: widget.topicDate,
     topics: _upload.topics,

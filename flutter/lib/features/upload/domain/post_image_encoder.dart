@@ -95,7 +95,7 @@ class PostImageEncoder {
     try {
       // 크기만 읽고, 긴 변이 4096 이하가 되는 크기로 바로 디코드한다.
       final bounds = await decoder.readBounds(source);
-      final target = _fit(
+      final target = fitWithin(
         bounds.width,
         bounds.height,
         AppConstants.postImageMaxLongEdge,
@@ -142,16 +142,5 @@ class PostImageEncoder {
       }
     }
     throw const PhotoEncodeException(PhotoEncodeFailure.sizeLimitExceeded);
-  }
-
-  /// 긴 변이 [limit] 이하가 되도록 가로세로 비율을 지키며 줄인다(확대하지 않는다).
-  static (int, int) _fit(int width, int height, int limit) {
-    final longEdge = math.max(width, height);
-    if (longEdge <= limit) return (width, height);
-    final scale = limit / longEdge;
-    return (
-      math.max(1, (width * scale).round()),
-      math.max(1, (height * scale).round()),
-    );
   }
 }

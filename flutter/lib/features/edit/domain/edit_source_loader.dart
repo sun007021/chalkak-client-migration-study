@@ -35,28 +35,21 @@ class DecodingEditSourceLoader implements EditSourceLoader {
   @override
   Future<EditSource> load(Uint8List bytes) async {
     final bounds = await decoder.readBounds(bytes);
-    final edit = _fit(
+    final edit = fitWithin(
       bounds.width,
       bounds.height,
       AppConstants.postImageMaxLongEdge,
     );
-    final preview = _fit(edit.$1, edit.$2, PhotoEditConstants.previewLongEdge);
+    final preview = fitWithin(
+      edit.$1,
+      edit.$2,
+      PhotoEditConstants.previewLongEdge,
+    );
     final image = await decoder.decode(
       bytes,
       width: preview.$1,
       height: preview.$2,
     );
     return EditSource(preview: image, width: edit.$1, height: edit.$2);
-  }
-
-  /// 긴 변이 [limit] 이하가 되도록 줄인다(확대하지 않는다).
-  static (int, int) _fit(int width, int height, int limit) {
-    final longEdge = width > height ? width : height;
-    if (longEdge <= limit) return (width, height);
-    final scale = limit / longEdge;
-    return (
-      (width * scale).round().clamp(1, limit),
-      (height * scale).round().clamp(1, limit),
-    );
   }
 }

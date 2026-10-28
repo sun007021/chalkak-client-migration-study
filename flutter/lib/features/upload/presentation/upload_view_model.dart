@@ -18,6 +18,7 @@ import '../../home/domain/home_models.dart';
 import '../domain/gallery_saver.dart';
 import '../domain/photo_picker.dart';
 import '../domain/post_submitter.dart';
+import '../domain/preparation_controller.dart';
 import '../domain/upload_models.dart';
 import '../domain/upload_preparer.dart';
 import '../domain/upload_topic_source.dart';
@@ -208,10 +209,9 @@ class UploadViewModel extends ChangeNotifier {
   /// 확정된 사진을 다시 편집하는 중인가.
   bool _reediting = false;
 
-  PreparedUpload? _prepared;
-  Future<void>? _preparing;
-  CancelToken? _prepareToken;
-  int _prepareGeneration = 0;
+  late final PreparationController _preparation = PreparationController(
+    preparer: preparer,
+  );
 
   CancelToken? _submitToken;
   bool _completed = false;
@@ -410,62 +410,31 @@ class UploadViewModel extends ChangeNotifier {
   void _beginPreparation() {
     final photo = _state.photo;
     if (photo == null || _disposed) return;
-    _cancelPreparation();
-    final token = CancelToken();
-    final generation = ++_prepareGeneration;
-    _prepareToken = token;
     final edit = _state.edit;
+    _preparation.begin(photo.bytes, edit, onFinished: _onPreparationFinished);
     _emit(_state.copyWith(preparation: PreparationStatus.preparing));
-    _preparing = _runPreparation(photo, edit, token, generation);
   }
 
-  Future<void> _runPreparation(
-    PickedPhoto photo,
-    PhotoEdit edit,
-    CancelToken token,
-    int generation,
-  ) async {
-    try {
-      final prepared = await preparer.prepare(
-        photo.bytes,
-        edit,
-        cancelToken: token,
-      );
-      if (_disposed || generation != _prepareGeneration) {
-        // 뒤늦게 끝난 이전 준비는 새 상태를 덮지 않고 파일만 지운다.
-        await preparer.discard(prepared);
-        return;
-      }
-      _prepared = prepared;
+  void _onPreparationFinished(UploadFailure? failure) {
+    if (_disposed) return;
+    if (failure == null) {
       _emit(_state.copyWith(preparation: PreparationStatus.ready));
-    } on UploadFailure catch (failure) {
-      if (_disposed || generation != _prepareGeneration) return;
-      switch (failure.kind) {
-        case UploadFailureKind.cancelled:
-          return;
-        case UploadFailureKind.loginRequired:
-          _emit(_state.copyWith(preparation: PreparationStatus.failed));
-          _send(const UploadLoginRequired());
-        case UploadFailureKind.failed:
-          _emit(
-            _state.copyWith(
-              preparation: PreparationStatus.failed,
-              error: failure.message,
-            ),
-          );
-      }
+      return;
     }
-  }
-
-  /// 진행 중인 준비를 취소하고 만들어 둔 임시 파일을 지운다.
-  void _cancelPreparation() {
-    _prepareGeneration++;
-    _prepareToken?.cancel();
-    _prepareToken = null;
-    _preparing = null;
-    final prepared = _prepared;
-    _prepared = null;
-    if (prepared != null) unawaited(preparer.discard(prepared));
+    switch (failure.kind) {
+      case UploadFailureKind.cancelled:
+        return;
+      case UploadFailureKind.loginRequired:
+        _emit(_state.copyWith(preparation: PreparationStatus.failed));
+        _send(const UploadLoginRequired());
+      case UploadFailureKind.failed:
+        _emit(
+          _state.copyWith(
+            preparation: PreparationStatus.failed,
+            error: failure.message,
+          ),
+        );
+    }
   }
 
   // ------------------------------------------------------------------ 제목·제출
@@ -508,9 +477,9 @@ class UploadViewModel extends ChangeNotifier {
           _state.preparation == PreparationStatus.failed) {
         _beginPreparation();
       }
-      await _preparing;
+      await _preparation.settled;
       if (_disposed) return;
-      final prepared = _prepared;
+      final prepared = _preparation.prepared;
       if (prepared == null) {
         // 준비 실패: 문구는 준비 쪽이 이미 상태에 두었다.
         _emit(_state.copyWith(isSubmitting: false));
@@ -533,7 +502,7 @@ class UploadViewModel extends ChangeNotifier {
       }
       switch (outcome) {
         case SubmitSucceeded(:final moderationStatus):
-          _prepared = null;
+          _preparation.adopt(null);
           _completed = true;
           _send(
             UploadSucceeded(
@@ -544,34 +513,22 @@ class UploadViewModel extends ChangeNotifier {
             ),
           );
         case SubmitFailed(:final failure, :final retained):
-          _prepared = retained;
+          _preparation.adopt(retained);
           final nextPreparation = retained == null
               ? PreparationStatus.none
               : PreparationStatus.ready;
-          switch (failure.kind) {
-            case UploadFailureKind.cancelled:
-              _emit(
-                _state.copyWith(
-                  isSubmitting: false,
-                  preparation: nextPreparation,
-                ),
-              );
-            case UploadFailureKind.loginRequired:
-              _emit(
-                _state.copyWith(
-                  isSubmitting: false,
-                  preparation: nextPreparation,
-                ),
-              );
-              _send(const UploadLoginRequired());
-            case UploadFailureKind.failed:
-              _emit(
-                _state.copyWith(
-                  isSubmitting: false,
-                  preparation: nextPreparation,
-                  error: failure.message,
-                ),
-              );
+          // 취소는 문구 없이, 로그인 필요는 문구 없이 이동만, 그 밖은 실패 문구를 둔다.
+          _emit(
+            _state.copyWith(
+              isSubmitting: false,
+              preparation: nextPreparation,
+              error: failure.kind == UploadFailureKind.failed
+                  ? failure.message
+                  : null,
+            ),
+          );
+          if (failure.kind == UploadFailureKind.loginRequired) {
+            _send(const UploadLoginRequired());
           }
       }
     } finally {
@@ -584,12 +541,8 @@ class UploadViewModel extends ChangeNotifier {
     if (_disposed) return;
     _disposed = true;
     _topicToken.cancel();
-    _prepareToken?.cancel();
     _submitToken?.cancel();
-    _prepareGeneration++;
-    final prepared = _prepared;
-    _prepared = null;
-    if (prepared != null) unawaited(preparer.discard(prepared));
+    _preparation.dispose();
     unawaited(_events.close());
     super.dispose();
   }
