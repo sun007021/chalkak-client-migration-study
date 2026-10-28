@@ -5,11 +5,14 @@ import { ApiError } from './errors';
 import { HttpTransport } from './HttpTransport';
 import { sanitizeLogFields, stripUrlQuery } from './Logger';
 import type { Logger } from './Logger';
+import type { UploadUrlRewriter } from './UploadUrlRewriter';
 
 export interface PresignedUploaderDeps {
   fetch: typeof fetch;
   clock: Clock;
   logger?: Logger;
+  /** 전송 직전에 주소를 바꾼다(개발 프록시). 없으면 그대로. 허용 검사와 로그는 원래 주소 기준. */
+  urlRewriter?: UploadUrlRewriter;
 }
 
 export interface PresignedPutRequest {
