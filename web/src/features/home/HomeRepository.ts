@@ -1,6 +1,7 @@
 import { PAGE_SIZE } from '../../constants';
 import type { ApiClient } from '../../core/net/ApiClient';
 import { d } from '../../core/net/decode';
+import type { Decoder } from '../../core/net/decode';
 import { ApiError, InvalidResponseError } from '../../core/net/errors';
 import { path } from '../../core/net/url';
 import { parseDateString } from '../../core/time/kst';
@@ -9,6 +10,9 @@ import type { AiReviewSummary, CalendarEntry, HomeTopic, PostSummary, TodayPost 
 
 /** 본문의 errorCode까지 읽은 404(서버가 만든 "없음")만 값으로 바꾼다. 게이트웨이 HTML 같은 본문 없는 404는 오류로 둔다. */
 const isBusiness404 = (error: unknown): boolean => error instanceof ApiError && error.status === 404 && error.errorCode === 'BUSINESS_ERROR';
+
+/** d.enumOf는 결과를 string으로 넓히므로 허용 값 타입을 직접 지정한다. */
+const oneOf = <const T extends string>(values: readonly T[]): Decoder<T> => d.enumOf(values) as Decoder<T>;
 
 const dateString = (): ((value: unknown) => DateString) => {
   const text = d.string();
@@ -27,7 +31,7 @@ const decodeTopic = d.object({
   id: d.string(),
   title: d.string(),
   topicDate: dateString(),
-  phase: d.enumOf(['BEFORE_OPEN', 'OPEN', 'CLOSED'] as const),
+  phase: oneOf(['BEFORE_OPEN', 'OPEN', 'CLOSED']),
 });
 
 const decodePostList = d.object({
@@ -58,7 +62,7 @@ const decodeCalendar = d.object({
       topicDate: dateString(),
       postId: d.string(),
       thumbnailImageUrl: d.nullable(d.string()),
-      status: d.enumOf(['PENDING', 'APPROVED'] as const),
+      status: oneOf(['PENDING', 'APPROVED']),
     }),
   ),
 });
@@ -66,7 +70,7 @@ const decodeCalendar = d.object({
 const decodeUnread = d.object({ hasUnread: d.boolean() });
 
 const decodeAiReview = d.object({
-  status: d.enumOf(['NONE', 'PROCESSING', 'COMPLETED', 'FAILED'] as const),
+  status: oneOf(['NONE', 'PROCESSING', 'COMPLETED', 'FAILED']),
   canRequestAgain: d.nullable(d.boolean()),
 });
 
