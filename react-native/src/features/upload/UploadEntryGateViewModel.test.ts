@@ -146,6 +146,13 @@ describe('UploadEntryGateViewModel', () => {
     },
   );
 
+  it('TC-UPL-008 반려 뒤에는 isPosted=false라서 다시 작성하러 업로드 화면이 열린다', async () => {
+    const h = await setup({ [TODAY]: 'home/posts-today__not-posted-after-reject' });
+    await h.viewModel.press();
+    expect(h.navigator.calls).toEqual([{ type: 'open-upload', topicDate: '2026-10-27' }]);
+    expect(h.toast.messages).toEqual([]);
+  });
+
   it('TC-UPL-008 isPosted=true인데 moderationStatus가 REJECTED인 응답은 계약 위반이다', async () => {
     const h = await setup({
       [TODAY]: json(200, {

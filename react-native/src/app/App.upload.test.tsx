@@ -99,10 +99,13 @@ describe('App - 업로드 진입 (하단 + 버튼)', () => {
     });
     await screen.findByTestId('home.topic-title');
     const before = router.calls('GET /posts/today').length;
-    await press('bottom-bar.upload-button');
-    await press('bottom-bar.upload-button');
-    await press('bottom-bar.upload-button');
+    // 레이어가 뜨면 아래 화면은 접근성 트리에서 빠지므로(모달) 같은 버튼을 먼저 잡아 두고 연타한다.
+    const button = screen.getByTestId('bottom-bar.upload-button');
+    await fireEvent.press(button);
+    await fireEvent.press(button);
+    await fireEvent.press(button);
     expect(await screen.findByTestId('upload-entry.loading')).toBeOnTheScreen();
+    expect(screen.getByTestId('upload-entry.loading').props.accessibilityViewIsModal).toBe(true);
     expect(router.calls('GET /posts/today').length).toBe(before + 1);
     gate.resolve();
     expect(await screen.findByTestId('upload.root')).toBeOnTheScreen();

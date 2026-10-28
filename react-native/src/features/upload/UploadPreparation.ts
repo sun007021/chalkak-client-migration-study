@@ -12,6 +12,11 @@ import { UnsupportedContentTypeError } from './UploadErrors';
 
 export type PreparationInput = { sourceUri: string; edit: PhotoEdit };
 
+/** 같은 사진·같은 편집값인가. */
+export function inputsEqual(a: PreparationInput, b: PreparationInput): boolean {
+  return a.sourceUri === b.sourceUri && editsEqual(a.edit, b.edit);
+}
+
 export type PreparationState =
   | { phase: 'idle' }
   | { phase: 'issuing' }
@@ -53,9 +58,7 @@ export class UploadPreparation extends Observable<PreparationState> {
   /** 새 사진·편집값으로 준비를 시작한다. 지금 입력과 같으면(같은 사진, 같은 편집값) 아무것도 하지 않는다. */
   start(input: PreparationInput): void {
     const current = this.input;
-    if (current && current.sourceUri === input.sourceUri && editsEqual(current.edit, input.edit)) {
-      return;
-    }
+    if (current && inputsEqual(current, input)) return;
     this.discardWork();
     this.input = input;
     this.begin();
@@ -75,6 +78,11 @@ export class UploadPreparation extends Observable<PreparationState> {
     }
     const task = this.task as Promise<PreparedUpload>;
     return signal ? abortable(task, signal) : task;
+  }
+
+  /** 지금 준비 중이거나 준비된 입력(없으면 null). 제출 쪽이 들고 있는 업로드가 이 입력의 것인지 확인하는 데 쓴다. */
+  currentInput(): PreparationInput | null {
+    return this.input;
   }
 
   /** 정책과 파일을 버리고(파일 삭제) 입력은 유지한다: 다음 ready()가 처음부터 다시 한다(REQ-UPL-054, 059). */

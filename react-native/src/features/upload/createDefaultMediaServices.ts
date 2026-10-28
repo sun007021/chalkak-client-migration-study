@@ -9,7 +9,7 @@ import type { MediaServices } from './MediaServices';
 /** 실제 기기용 네이티브 경계(expo-image-picker, expo-image-manipulator, expo-media-library, expo-file-system). 테스트는 Fake를 `overrides.media`로 넣는다. */
 export function createDefaultMediaServices(platform: 'ios' | 'android'): MediaServices {
   return {
-    picker: new ExpoImagePicker(platform),
+    picker: new ExpoImagePicker(),
     gallery: new ExpoGallerySaver(),
     permissions: new ExpoMediaPermissions(),
     files: new ExpoLocalFiles(),

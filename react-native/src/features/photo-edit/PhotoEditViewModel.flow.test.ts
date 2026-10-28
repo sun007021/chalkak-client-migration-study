@@ -201,3 +201,39 @@ describe('PhotoEditViewModel 다시 편집(저장된 편집값 복원)', () => {
     expect(h.done).toHaveLength(0);
   });
 });
+
+describe('PhotoEditViewModel 임시 파일 정리(REQ-UPL-048)', () => {
+  const editableUri = `${EDIT_SOURCE_URI}#editable`;
+
+  it('완료하면 편집용 임시 JPEG를 지운다', async () => {
+    const h = createEditHarness();
+    await h.viewModel.start();
+    expect(h.files.exists(editableUri)).toBe(true);
+    await h.viewModel.done();
+    expect(h.files.exists(editableUri)).toBe(false);
+  });
+
+  it('취소하면 지운다', async () => {
+    const h = createEditHarness();
+    await h.viewModel.start();
+    h.viewModel.cancel();
+    expect(h.files.exists(editableUri)).toBe(false);
+  });
+
+  it('화면이 닫혀 dispose되면 지운다', async () => {
+    const h = createEditHarness();
+    await h.viewModel.start();
+    h.viewModel.dispose();
+    expect(h.files.exists(editableUri)).toBe(false);
+  });
+
+  it('준비가 끝나기 전에 취소해도 늦게 만들어진 파일을 지운다', async () => {
+    const h = createEditHarness();
+    const hold = h.engine.holdNext('prepareEditable');
+    void h.viewModel.start();
+    h.viewModel.cancel();
+    hold.release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(h.files.existing.filter((u) => u.endsWith('#editable'))).toEqual([]);
+  });
+});

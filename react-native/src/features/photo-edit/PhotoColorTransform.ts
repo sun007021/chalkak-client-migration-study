@@ -121,3 +121,75 @@ export function createPixelTransform(
 export function transformPixel(pixel: Rgba, values: AdjustValues, filter: PhotoFilter): Rgba {
   return createPixelTransform(values, filter)(pixel);
 }
+
+const SRGB_TO_LINEAR = Float64Array.from({ length: 256 }, (_, i) => srgbToLinear(i / 255));
+
+/** 한 픽셀을 src[s..s+3]에서 읽어 dst[d..d+3]에 쓴다. 배열을 만들지 않는다. */
+export type PixelRunner = (
+  src: Uint8ClampedArray,
+  s: number,
+  dst: Uint8ClampedArray,
+  d: number,
+) => void;
+
+/**
+ * `createPixelTransform`과 같은 결과를 내는 대량 처리용 변환기(배열을 만들지 않고 룩업 표를 쓴다).
+ * 채도가 0이면 채널이 서로 영향을 주지 않아 채널별 256칸 표 하나로 조정 단계가 끝난다.
+ * 채도가 0이 아니면 sRGB->선형만 표로 읽고 나머지는 같은 식을 쓴다.
+ */
+export function createPixelRunner(values: AdjustValues, filter: PhotoFilter): PixelRunner {
+  const neutral = isNeutral(values);
+  const table = neutral ? null : buildToneCurve(values);
+  const m = filterMatrix(filter);
+  const gain = 2 ** (C.exposureEvPerUnit * values.exposure);
+  const gains = [
+    gain * (1 + C.warmthGain * values.warmth),
+    gain,
+    gain * (1 - C.warmthGain * values.warmth),
+  ];
+  const storedOf = (linear: number): number => {
+    const stored = linearToSrgb(clamp(linear, 0, 1));
+    return clamp(Math.floor(toneCurveValue(table as Float64Array, stored) * 255 + 0.5), 0, 255);
+  };
+
+  // 조정 단계: 채널별 표(채도 0) 또는 직접 계산.
+  let channelTables: Uint8Array[] | null = null;
+  if (table && values.saturation === 0) {
+    channelTables = gains.map((g) =>
+      Uint8Array.from({ length: 256 }, (_, v) => storedOf(SRGB_TO_LINEAR[v] * g)),
+    );
+  }
+  const saturation = 1 + values.saturation;
+  const [gr, gg, gb] = gains;
+
+  return (src, s, dst, d) => {
+    let r = src[s];
+    let g = src[s + 1];
+    let b = src[s + 2];
+    const a = src[s + 3];
+    if (channelTables) {
+      r = channelTables[0][r];
+      g = channelTables[1][g];
+      b = channelTables[2][b];
+    } else if (table) {
+      const lr = SRGB_TO_LINEAR[r] * gr;
+      const lg = SRGB_TO_LINEAR[g] * gg;
+      const lb = SRGB_TO_LINEAR[b] * gb;
+      const luma = 0.2125 * lr + 0.7154 * lg + 0.0721 * lb;
+      r = storedOf(luma + saturation * (lr - luma));
+      g = storedOf(luma + saturation * (lg - luma));
+      b = storedOf(luma + saturation * (lb - luma));
+    }
+    if (m) {
+      dst[d] = Math.floor(m[0] * r + m[1] * g + m[2] * b + m[3] * a + m[4] + 0.5);
+      dst[d + 1] = Math.floor(m[5] * r + m[6] * g + m[7] * b + m[8] * a + m[9] + 0.5);
+      dst[d + 2] = Math.floor(m[10] * r + m[11] * g + m[12] * b + m[13] * a + m[14] + 0.5);
+      dst[d + 3] = Math.floor(m[15] * r + m[16] * g + m[17] * b + m[18] * a + m[19] + 0.5);
+    } else {
+      dst[d] = r;
+      dst[d + 1] = g;
+      dst[d + 2] = b;
+      dst[d + 3] = a;
+    }
+  };
+}

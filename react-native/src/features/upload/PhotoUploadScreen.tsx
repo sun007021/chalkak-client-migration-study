@@ -20,7 +20,7 @@ import { POST_TITLE_MAX } from '../../shared/constants';
 import { colors, spacing } from '../../shared/ui/theme';
 import { rotatedSize } from '../photo-edit/PhotoEditTransform';
 import { PhotoEditScreen } from '../photo-edit/PhotoEditScreen';
-import { encodePng } from '../signature/encodePng';
+import { encodePng } from '../../core/image/png';
 import { localCopy, titleCounterText } from './localCopy';
 import type { PhotoUploadViewModel, SelectedPhoto } from './PhotoUploadViewModel';
 
@@ -130,6 +130,7 @@ export function PhotoUploadScreen({ viewModel }: Props): ReactNode {
           {state.preparation === 'preparing' && state.photo ? (
             <View testID="upload.preparing-indicator" style={styles.status}>
               <ActivityIndicator size="small" />
+              <Text style={styles.statusText}>{localCopy.preparing}</Text>
             </View>
           ) : null}
           {state.error ? (
@@ -312,7 +313,8 @@ const styles = StyleSheet.create({
   titleBox: { borderBottomWidth: 1, borderColor: colors.border, paddingBottom: spacing.xs },
   titleInput: { fontSize: 16, color: colors.textPrimary, paddingVertical: spacing.sm },
   counter: { alignSelf: 'flex-end', fontSize: 12, color: colors.textSecondary },
-  status: { alignItems: 'center' },
+  status: { alignItems: 'center', gap: spacing.xs },
+  statusText: { color: colors.textSecondary, fontSize: 13 },
   errorMessage: { color: colors.danger, fontSize: 14 },
   footer: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   submit: {

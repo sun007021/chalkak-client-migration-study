@@ -19,11 +19,16 @@ export const localCopy = {
   permissionBody: '촬영한 사진을 앨범에 저장하려면 사진 접근 권한이 필요해요.',
   /** 권한 안내 "취소" */
   permissionCancel: '취소',
+  /** 카메라 권한을 거부해 촬영할 수 없을 때(스펙에 정해진 문구가 없다) */
+  cameraPermissionDenied:
+    '카메라 권한이 없어 촬영할 수 없어요. 설정에서 카메라 권한을 허용해 주세요.',
+  /** 업로드 화면: 전시 전 사진 준비(정책·WebP) 중 표시 */
+  preparing: '사진 다듬는 중',
   /** 편집기: 사진 준비 중 */
   editorLoading: '사진을 불러오는 중...',
   /** 편집기: 완료 후 원본 크기 렌더링 중 */
   editorRendering: '사진을 다듬는 중...',
-  /** 편집기 오류 알림 "확인" */
+  /** 편집기 오류 알림의 "다시 시도" 버튼 */
   editorErrorRetry: '다시 시도',
   /** 업로드 게이트 확인 중 접근성 라벨 */
   gateChecking: '확인하는 중...',

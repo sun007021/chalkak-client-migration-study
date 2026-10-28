@@ -38,4 +38,9 @@ export interface ImageEngine {
   samplePixels(request: AnalysisSampleRequest, signal?: AbortSignal): Promise<RgbaImage | null>;
   /** 원본에서 한 번에 손실 WebP로: 디코드 -> EXIF 회전 -> targetSize -> 편집 -> 인코딩(중간 손실 압축 없음, 메타데이터 제거). */
   encodeWebp(request: WebpEncodeRequest, signal?: AbortSignal): Promise<EncodedImage>;
+  /**
+   * 한 라운드(같은 사진·크기·편집)의 중간 결과를 놓는다. 품질 사다리 동안 같은 라운드는 다시 만들지 않고 WebP 저장만 되풀이하므로,
+   * 인코더가 라운드를 마치면(성공·실패·취소) 부른다. 중간 결과가 없는 구현은 구현하지 않아도 된다.
+   */
+  releaseRound?(): void;
 }

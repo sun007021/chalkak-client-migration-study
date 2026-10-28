@@ -16,7 +16,7 @@ import { bytesToBase64 } from '../../core/encoding/base64';
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t, type CopyKey } from '../../shared/copy';
 import { colors, spacing } from '../../shared/ui/theme';
-import { encodePng } from '../signature/encodePng';
+import { encodePng } from '../../core/image/png';
 import { localCopy } from '../upload/localCopy';
 import { ASPECT_KEYS, fitScale, type AspectKey } from './CropGeometry';
 import type { Size } from './ImageTypes';

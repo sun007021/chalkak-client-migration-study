@@ -468,3 +468,36 @@ describe('UploadSubmitter - 취소', () => {
     expect(countOf(h, CREATE)).toBe(0);
   });
 });
+
+describe('UploadSubmitter - 본문 크기와 파일 읽기', () => {
+  it('REQ-UPL-044 인코딩 결과가 정책 maxBytes를 넘으면 PUT을 보내지 않고 준비 실패 문구를 보인다', async () => {
+    const issued = fixtureResponse('upload/posts-uploads__issued');
+    const small = {
+      ...issued,
+      bodyText: JSON.stringify({ ...JSON.parse(issued.bodyText as string), maxBytes: 4 }),
+    };
+    const h = await setup({ [POLICY]: small });
+    h.engine.sizeFor = () => 3; // 보고된 크기는 통과하지만 실제 바이트(6)는 넘는다
+    await expect(submit(h)).resolves.toEqual(failed(t('upload.error.prepare')));
+    expect(h.transport.requests.filter((r) => r.method === 'PUT')).toHaveLength(0);
+    expect(countOf(h, CREATE)).toBe(0);
+    expect(h.files.existing).toEqual([]);
+  });
+
+  it('임시 파일을 읽지 못하면 준비 실패 문구를 보이고 다음 제출은 처음부터 다시 준비한다', async () => {
+    const h = await setup({ [POLICY]: ISSUED_TWICE });
+    await h.preparation.ready();
+    const original = h.files.readBytes.bind(h.files);
+    let broken = true;
+    h.files.readBytes = async (uri: string) => {
+      if (broken) throw new Error('read failed');
+      return original(uri);
+    };
+    await expect(submit(h)).resolves.toEqual(failed(t('upload.error.prepare')));
+    expect(h.transport.requests.filter((r) => r.method === 'PUT')).toHaveLength(0);
+
+    broken = false;
+    await expect(submit(h)).resolves.toMatchObject({ kind: 'success' });
+    expect(countOf(h, POLICY)).toBe(2);
+  });
+});

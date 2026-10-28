@@ -2,12 +2,14 @@ import { PHOTO_FILTERS, filterMatrix } from './PhotoFilters';
 import {
   applyColorMatrix,
   buildToneCurve,
+  createPixelRunner,
+  createPixelTransform,
   photoEditConstants,
   toneCurveValue,
   transformPixel,
   type Rgba,
 } from './PhotoColorTransform';
-import type { PhotoFilter } from './PhotoEdit';
+import { ZERO_ADJUST_VALUES, type AdjustValues, type PhotoFilter } from './PhotoEdit';
 import {
   loadFiltersFile,
   maxChannelDiff,
@@ -253,5 +255,45 @@ describe('파이프라인 순서와 필터', () => {
     expect(applyColorMatrix([0, 255, 0, 255], vivid)).toEqual([0, 255, 0, 255]);
     const warm = filterMatrix('warm') as readonly number[];
     expect(applyColorMatrix([250, 250, 250, 255], warm)).toEqual([255, 255, 220, 255]);
+  });
+});
+
+describe('createPixelRunner (대량 처리용 변환기)', () => {
+  const PIXELS: Rgba[] = [
+    [0, 0, 0, 255],
+    [255, 255, 255, 255],
+    [12, 200, 90, 128],
+    [250, 10, 10, 0],
+    [128, 128, 128, 255],
+    [33, 66, 99, 255],
+  ];
+  const SETTINGS: [Partial<AdjustValues>, PhotoFilter][] = [
+    [{}, 'original'],
+    [{}, 'vintage'],
+    [{ exposure: 0.4, contrast: 0.3, warmth: -0.2 }, 'original'],
+    [{ blackPoint: 0.5, shadows: 0.4, highlights: -0.3, saturation: 0.6 }, 'vivid'],
+    [{ saturation: -0.7, exposure: -0.5 }, 'mono'],
+  ];
+
+  it.each(SETTINGS)('%j + %s: createPixelTransform과 같은 결과', (partial, filter) => {
+    const values = { ...ZERO_ADJUST_VALUES, ...partial };
+    const reference = createPixelTransform(values, filter);
+    const run = createPixelRunner(values, filter);
+    for (const pixel of PIXELS) {
+      const out = new Uint8ClampedArray(4);
+      run(Uint8ClampedArray.from(pixel), 0, out, 0);
+      expect(Array.from(out)).toEqual(Array.from(reference(pixel)));
+    }
+  });
+
+  it('모든 회색 단계(0~255)도 채도 0 표와 직접 계산이 같다', () => {
+    const values = { ...ZERO_ADJUST_VALUES, exposure: 0.3, shadows: 0.5, warmth: 0.4 };
+    const reference = createPixelTransform(values, 'original');
+    const run = createPixelRunner(values, 'original');
+    for (let v = 0; v < 256; v += 1) {
+      const out = new Uint8ClampedArray(4);
+      run(Uint8ClampedArray.from([v, 255 - v, (v * 7) % 256, 255]), 0, out, 0);
+      expect(Array.from(out)).toEqual(Array.from(reference([v, 255 - v, (v * 7) % 256, 255])));
+    }
   });
 });

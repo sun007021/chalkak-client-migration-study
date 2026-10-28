@@ -156,11 +156,11 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
 
 **네이티브 라이브러리(정확한 버전).** `expo-image-picker 58.0.10`(시스템 포토 피커/카메라), `expo-image-manipulator 58.0.15`(방향·축소·회전·자르기·WebP 저장), `expo-media-library 58.0.12`(촬영본 갤러리 저장, iOS 사진 추가 권한), `expo-file-system 58.0.11`(임시 파일 읽기·삭제). 실제 구현은 `core/media/Expo*.ts`와 `features/photo-edit/ExpoImageEngine.ts`, 조립은 `createDefaultMediaServices`다. `AppContainer.media`는 `overrides.media ?? 기본 구현`이고 jest는 전부 Fake를 쓴다(Expo 모듈은 jest에서 호출되지 않는다).
 
-**Skia를 쓰지 않았다.** 색 파이프라인(노출·따뜻함·채도 → 감마 → 톤 곡선 → 필터 행렬)은 순수 TS(`PhotoColorTransform`, `renderPixels`)이고, 오라클 테스트가 검증한 **같은 코드**가 업로드 결과를 칠한다. 색이 있는 편집만 `manipulator(기하) → 무손실 PNG → decodePng(pako) → renderPixels → encodePng → manipulator(WebP)`를 거치고, 색이 없는 편집(회전·자르기만, 또는 원본)은 manipulator 한 번으로 끝난다. 중간에 JPEG 같은 손실 압축을 끼우지 않는다. 미리보기도 512px 표본에 같은 함수를 적용한다. **위험**: 12MP 사진에 색을 칠하는 TS 루프는 느릴 수 있다(품질 사다리가 내려가면 같은 칠하기를 다시 한다). 실기기에서 시간·메모리가 문제면 `ExpoImageEngine.paint`만 `@shopify/react-native-skia`(2.14.0, RuntimeShader + 오프스크린 서피스)로 바꾸면 된다. 경계(`ImageEngine`)는 그대로다.
+**Skia를 쓰지 않았다.** 색 파이프라인(노출·따뜻함·채도 → 감마 → 톤 곡선 → 필터 행렬)은 순수 TS(`PhotoColorTransform`의 오라클 + 같은 결과를 내는 LUT 버전 `createPixelRunner`, `createRenderJob`)이고, 오라클 테스트가 검증한 같은 식이 업로드 결과를 칠한다. 색이 있는 편집만 `manipulator(기하, 업로드 크기로 축소) → 무손실 PNG(zlib 1) → decodePng(pako) → 칠하기 → encodePng → manipulator`를 거치고, 색이 없는 편집(회전·자르기만, 또는 원본)은 manipulator 한 번으로 끝난다. 중간에 JPEG 같은 손실 압축을 끼우지 않는다. 미리보기도 512px 표본에 같은 함수를 적용한다. **성능**: 칠하기는 업로드 크기(긴 변 4096 이하, REQ-UPL-027)에서 라운드마다 **한 번**이고 품질 사다리는 그 결과를 WebP로만 다시 저장한다(`releaseRound()`가 라운드 끝에 메모리를 놓는다). 64줄마다 이벤트 루프를 양보하며 취소를 확인하고, `encodeWebp`는 한 번에 하나만 돈다. 업로드 크기 한도가 4096이라 12MP를 완전히 피할 수는 없다(축소 후 최대 약 16MP 이하): 실기기에서 시간·메모리가 여전히 문제면 `ExpoImageEngine.paint`만 `@shopify/react-native-skia`(2.14.0, RuntimeShader + 오프스크린 서피스)로 바꾼다. 경계(`ImageEngine`)는 그대로다. `ExpoImageEngine`은 `ImageEngine` 타입이 features에 있어 core가 features를 import하지 못하는 레이어 규칙 때문에 `features/photo-edit`에 둔다.
 
 **편집 상수의 단일 출처는 `src/features/photo-edit/filters.json`이다**(원래 `shared/photo-edit/filters.json`; RN이 `shared/`에 파일을 더하지 않는 규칙에 따라 옮김). 스펙 부록 표와 Android(`FilterMatrices.kt`, `PhotoEditConstants`)를 대조해 **차이가 없었다**(필터 5개 행렬, 노출 1.5 EV, 따뜻함 0.25, 블랙 포인트 0.3, 그림자·하이라이트 0.25, 대비 0.6, 최소 자르기 0.1, 분석 긴 변 256, 자동 노출 −0.5~1.0, 목표 흰색 0.96). 스펙 본문(REQ-EDIT-029, 부록 첫 문단)은 아직 `shared/photo-edit/filters.json`을 가리킨다 — 백엔드/공통 문서에서 정리가 필요하다.
 
-**권한(`app.config.ts`).** iOS: `NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription`(앨범은 PHPicker라 실제로는 필요 없지만 라이브러리가 키를 요구), `NSPhotoLibraryAddUsageDescription`(촬영본 저장). Android: 앨범은 시스템 포토 피커, 촬영은 시스템 카메라 앱이라 `CAMERA`·`READ_MEDIA_*`·`RECORD_AUDIO`·`ACCESS_MEDIA_LOCATION`을 `blockedPermissions`로 지운다(라이브러리 매니페스트가 넣는 권한이 설치 화면에 남지 않게). 문구는 스펙에 정해진 카피가 없어 임시 한국어 문구다 — 확정되면 바꾼다.
+**권한(`app.config.ts`).** iOS: `NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription`(앨범은 PHPicker라 실제로는 필요 없지만 라이브러리가 키를 요구), `NSPhotoLibraryAddUsageDescription`(촬영본 저장). Android: 앨범은 시스템 포토 피커라 `READ_MEDIA_*`·`RECORD_AUDIO`·`ACCESS_MEDIA_LOCATION`을 `blockedPermissions`로 지운다(라이브러리 매니페스트가 넣는 권한이 설치 화면에 남지 않게). **`CAMERA`는 지우지 않는다**: expo-image-picker 58.0.10의 `ImagePickerModule.kt`가 촬영 전에 `ensureCameraPermissionsAreGranted()`로 CAMERA를 요구한다(`plugins/appConfigPermissions.test.ts`가 CAMERA가 `blockedPermissions`에 없음을 검사한다). 카메라 권한을 거부하면 별도 문구(`localCopy.cameraPermissionDenied`)를 보인다. 문구는 스펙에 정해진 카피가 없어 임시 한국어 문구다 — 확정되면 바꾼다.
 
 ### ko.json 키 필요
 
@@ -179,7 +179,10 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
 - **생성 404.** 카탈로그(TC-UPL-065)를 따라 `GET /posts/today`로 판정하고 서버 메시지를 보인다. 스펙 표는 일반 생성 오류 문구라고 한다.
 - **S3 PUT 403은 재시도하지 않는다**(REQ-UPL-045, `ApiClient`는 네트워크 오류와 5xx만 재시도). TC-UPL-055의 "3회 시도"는 5xx 케이스로 나누어 고쳤다. PUT 403은 `errorCode === 'FORBIDDEN'`일 때만 이용 정지로 본다.
 - **`PostChanges`에 `created`를 넣지 않았다.** 구독자(홈·전시)가 `deleted`가 아니면 모두 제목 변경으로 읽는다. 별도 `DefaultPostCreationNotifier`로 알리고, 컨테이너가 구독해 홈 ViewModel을 `refresh()`한다(홈은 복귀 때 `onShown`으로도 다시 불러온다). 기록 PR이 같은 채널을 구독하면 된다.
-- 카메라 사용 가능 여부는 동기로 알 수 없어 `ExpoImagePicker.cameraAvailable`은 항상 true다(시뮬레이터에서는 촬영이 실패해 준비 실패 문구가 보인다). iOS 카메라 권한 거부는 던져서 같은 문구가 된다.
+- 카메라 사용 가능 여부는 동기로 알 수 없어 `ExpoImagePicker.cameraAvailable`은 항상 true다(시뮬레이터에서는 촬영이 실패해 준비 실패 문구가 보인다). 카메라 권한 거부는 양 플랫폼 모두 `CameraPermissionDeniedError`로 던져 권한 안내 문구를 보인다(그 밖의 촬영 실패는 일반 준비 실패 문구).
+- **201 본문이 깨졌을 때의 복구.** 현재는 `GET /posts/today`로 이미 만들어졌는지 확인한다(D-07). 스펙에 정해져 있지 않아 이 동작이 맞는지 백엔드 확인이 필요하다.
+- **PUT 거절 뒤 파일 보관(REQ-UPL-048 vs 다시 인코딩 생략).** 첫 PUT이 거절됐을 때 파일을 남기고 정책만 새로 받는 방식은 "제출이 실패하면 소유한 임시 파일을 삭제한다"(REQ-UPL-048)와 기존 테스트(TC-UPL-055·REQ-UPL-059)와 충돌해 적용하지 않았다. 지금은 파일을 지우고 다음 제출이 처음부터 준비한다. 바꾸려면 REQ-UPL-048 해석 합의가 먼저 필요하다.
+- **정책 한도 확인.** 읽은 바이트가 `policy.maxBytes`를 넘으면 PUT을 보내지 않고 준비 실패 문구를 보인다(REQ-UPL-044). `File.size`를 읽지 못하면 0으로 통과시키지 않고 실패한다.
 
 ### 함정
 
@@ -192,7 +195,7 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
 - 이 프로젝트의 eslint는 React Compiler 규칙(`react-hooks/refs`, `set-state-in-effect`)을 켜 둔다. 렌더 중 `ref.current`를 읽거나 쓰는 `PanResponder.create(...)`, effect 안의 동기 `setState`는 막힌다. 끌기 제스처는 `onResponder*` 핸들러를 JSX에 직접 쓰고(`CropFrame`의 `Drag`, `RulerSlider`), 비동기 결과는 `{key, value}`로 저장해 현재 키와 맞을 때만 쓴다.
 - `toHaveTextContent(문자열)`는 전체 일치라서, 같은 요소에 다른 텍스트(버튼 등)를 넣으면 실패한다(`photo-edit.error-dialog`와 권한 안내 제목은 텍스트만 가진 요소에 testID를 둔다).
 - `AppContainer.create`는 `overrides`를 키별로 옮겨 담는다. 새 의존성(`media` 등)은 `Dependencies`뿐 아니라 `create`의 객체에도 넣어야 테스트의 Fake가 반영된다.
-- **실기기 확인 필요**: `readBounds`는 manipulator로 한 번 디코드해 크기를 읽는다(EXIF 방향 반영과 메모리), 90도 회전 방향, 색 칠하기 시간, 눈금자·자르기 제스처의 감도, 시스템 카메라(Android)에서 CAMERA 권한 없이 촬영되는지, 촬영본 HEIC/JPEG 저장 이름.
+- **실기기 확인 필요**: `readBounds`는 manipulator로 한 번 디코드해 크기를 읽는다(EXIF 방향 반영과 메모리), 90도 회전 방향, 색 칠하기 시간, 눈금자·자르기 제스처의 감도, Android 카메라 권한 요청·거부 흐름, iOS Display P3 사진의 색(manipulator 중간 PNG가 sRGB 8비트인지 확인; 16비트·확장 색 공간이면 `decodePng`는 상위 바이트만 취하므로 색이 살짝 달라질 수 있다), 촬영본 HEIC/JPEG 저장 이름.
 
 ## Android OkHttp 자동 재시도 끄기 (`plugins/withOkHttpNoRetry.js`, D-21)
 

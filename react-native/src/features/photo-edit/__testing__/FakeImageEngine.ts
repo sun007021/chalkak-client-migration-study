@@ -41,6 +41,7 @@ export class FakeImageEngine implements ImageEngine {
   sizeFor: (request: WebpEncodeRequest) => number = () => 100_000;
   /** 자동 보정 분석 표본. 기본 null(분석 불가). */
   sample: (request: AnalysisSampleRequest) => RgbaImage | null = () => null;
+  releaseRoundCount = 0;
   private counter = 0;
   private readonly gates = new Map<EngineMethod, Promise<void>[]>();
   private readonly failures = new Map<EngineMethod, Error[]>();
@@ -48,6 +49,10 @@ export class FakeImageEngine implements ImageEngine {
   constructor(private readonly files: FakeLocalFiles) {}
 
   /** 해당 메서드의 다음 호출을 붙잡는다. release로 풀거나 fail로 실패시킨다. */
+  releaseRound(): void {
+    this.releaseRoundCount += 1;
+  }
+
   holdNext(method: EngineMethod): Hold {
     let release!: () => void;
     let fail!: (error: Error) => void;
@@ -109,7 +114,9 @@ export class FakeImageEngine implements ImageEngine {
     await this.enter('prepareEditable', signal);
     const size = this.sizes.get(uri) ?? DEFAULT_SIZE;
     if (size instanceof Error) throw new ImageDecodeError();
-    return { uri: `${uri}#editable`, ...shrinkToLongEdge(size, maxLongEdge) };
+    const editableUri = `${uri}#editable`;
+    this.files.put(editableUri, new Uint8Array([0xff, 0xd8]));
+    return { uri: editableUri, ...shrinkToLongEdge(size, maxLongEdge) };
   }
 
   async samplePixels(

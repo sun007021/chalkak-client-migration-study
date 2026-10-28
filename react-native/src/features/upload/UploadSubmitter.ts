@@ -9,8 +9,9 @@ import type { PostCreationRepository, UploadPolicy } from '../../data/post/PostC
 import type { TodayModerationStatus } from '../../data/post/PostModels';
 import type { PostRepository } from '../../data/post/PostRepository';
 import type { KstDate } from '../../core/time/KstDate';
+import { SizeLimitExceededError } from './UploadErrors';
 import { mapUploadError, type UploadStage } from './mapUploadError';
-import type { UploadPreparation } from './UploadPreparation';
+import { inputsEqual, type PreparationInput, type UploadPreparation } from './UploadPreparation';
 
 export type SubmitInput = {
   /** 게이트 통과 때 고정한 주제(시계로 다시 계산하지 않는다, REQ-UPL-008). */
@@ -35,7 +36,13 @@ export type UploadSubmitterDeps = {
 };
 
 /** PUT은 끝났지만 POST /posts의 결과를 확정하지 못한 업로드(같은 uploadId로 다시 제출한다, REQ-UPL-050). */
-type PendingCreate = { policy: UploadPolicy; issuedAtMs: number; bytes: Uint8Array };
+type PendingCreate = {
+  policy: UploadPolicy;
+  issuedAtMs: number;
+  bytes: Uint8Array;
+  /** 이 바이트를 만든 사진·편집값. 입력이 바뀌면 버린다(이전 사진이 올라가지 않게). */
+  input: PreparationInput | null;
+};
 
 /**
  * 제출 순서(REQ-UPL-040): 준비 완료 대기 -> URL 만료 확인 -> PUT -> POST /posts.
@@ -50,9 +57,21 @@ export class UploadSubmitter {
 
   constructor(private readonly deps: UploadSubmitterDeps) {}
 
+  /** 들고 있는 업로드(PUT 뒤 POST 미확정)를 버린다. 사진 교체·편집 변경·세션 만료·화면 종료 때 부른다. */
+  reset(): void {
+    this.pending = null;
+  }
+
   async submit(input: SubmitInput, signal?: AbortSignal): Promise<SubmitOutcome> {
     const { preparation } = this.deps;
     try {
+      const current = preparation.currentInput();
+      if (
+        this.pending &&
+        !(current && this.pending.input && inputsEqual(this.pending.input, current))
+      ) {
+        this.pending = null;
+      }
       let upload = this.pending;
       if (!upload) {
         let prepared;
@@ -61,8 +80,25 @@ export class UploadSubmitter {
         } catch (error) {
           return this.failure('policy', error, signal);
         }
-        const bytes = await preparation.readBytes(prepared);
-        upload = { policy: prepared.policy, issuedAtMs: prepared.issuedAtMs, bytes };
+        let bytes: Uint8Array;
+        try {
+          bytes = await preparation.readBytes(prepared);
+        } catch (error) {
+          // 임시 파일을 읽지 못했다: 파일을 버리고 다음 제출은 처음부터 다시 준비한다.
+          preparation.invalidate();
+          return this.failure('encode', error, signal);
+        }
+        if (bytes.length > prepared.policy.maxBytes) {
+          // 정책 한도를 넘는 본문은 보내지 않는다(REQ-UPL-044).
+          preparation.invalidate();
+          return this.failure('encode', new SizeLimitExceededError(), signal);
+        }
+        upload = {
+          policy: prepared.policy,
+          issuedAtMs: prepared.issuedAtMs,
+          bytes,
+          input: current,
+        };
         const failure = await this.put(upload, signal);
         if (failure) return failure;
         // 올린 뒤에는 임시 파일이 필요 없다. 정책도 다시 쓰지 않는다.
@@ -84,6 +120,7 @@ export class UploadSubmitter {
       return null;
     } catch (error) {
       // 거절된 정책은 버리고 다음 제출은 정책 발급부터 다시 한다(REQ-UPL-059).
+      // 제출이 실패하면 소유한 임시 파일도 지운다(REQ-UPL-048): 파일을 남기고 정책만 새로 받는 방식은 이 규칙과 충돌한다.
       this.pending = null;
       this.deps.preparation.invalidate();
       return this.failure('put', error, signal);

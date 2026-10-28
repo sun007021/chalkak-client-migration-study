@@ -1,5 +1,6 @@
 import { deferred } from '../../core/http/__testing__/FakeTransport';
 import { picked } from '../../core/media/__testing__/FakeImagePicker';
+import { CameraPermissionDeniedError } from '../../core/media/ImagePicker';
 import { t } from '../../shared/copy';
 import { ImageDecodeError } from '../photo-edit/ImageErrors';
 import {
@@ -10,6 +11,7 @@ import {
   type UploadHarness,
 } from './__testing__/createUploadHarness';
 import { pickAndConfirm } from './__testing__/uploadFlow';
+import { localCopy } from './localCopy';
 
 const POLICY = 'POST /posts/uploads';
 const A = 'file:///picked/a.jpg';
@@ -340,5 +342,22 @@ describe('PhotoUploadViewModel - 편집기', () => {
     expect(h.files.deleted).toContain(first);
     expect(countOf(h, POLICY)).toBe(2);
     expect(state(h).photo?.uri).toBe(B);
+  });
+});
+
+describe('PhotoUploadViewModel - 촬영 실패 구분', () => {
+  it('카메라 권한 거부는 준비 실패가 아니라 카메라 권한 안내 문구다', async () => {
+    const h = await setup();
+    h.picker.willCapture(new CameraPermissionDeniedError());
+    await h.viewModel.capture();
+    expect(state(h).error).toBe(localCopy.cameraPermissionDenied);
+    expect(state(h).editing).toBe(false);
+  });
+
+  it('그 밖의 선택기 오류는 사진 준비 실패 문구다', async () => {
+    const h = await setup();
+    h.picker.willCapture(new Error('camera crashed'));
+    await h.viewModel.capture();
+    expect(state(h).error).toBe(t('upload.error.prepare'));
   });
 });

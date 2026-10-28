@@ -13,3 +13,11 @@ export interface ImagePicker {
   pickFromLibrary(): Promise<PickResult>;
   capture(): Promise<PickResult>;
 }
+
+/** 사용자가 카메라 권한을 거부했다. 선택기 오류 중 이것만 따로 안내한다. */
+export class CameraPermissionDeniedError extends Error {
+  constructor() {
+    super('camera permission denied');
+    this.name = 'CameraPermissionDeniedError';
+  }
+}

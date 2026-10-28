@@ -7,7 +7,7 @@ import type { RootStackParamList } from './navigation/routes';
 /** 내비게이션이 아직 준비되지 않았을 때의 이동 요청은 버린다. */
 type NavigationRef = Pick<
   NavigationContainerRef<RootStackParamList>,
-  'isReady' | 'navigate' | 'dispatch' | 'goBack'
+  'isReady' | 'navigate' | 'dispatch' | 'goBack' | 'getRootState'
 >;
 
 /**
@@ -23,15 +23,18 @@ export class NavigationUploadNavigator implements UploadNavigator {
   }
 
   showSuccess(params: UploadSuccessParams): void {
-    this.go((nav) =>
-      nav.dispatch(
-        StackActions.replace('UploadSuccess', {
-          topicTitle: params.topicTitle,
-          topicDate: params.topicDate.toString(),
-          moderationStatus: params.moderationStatus,
-        }),
-      ),
-    );
+    this.go((nav) => {
+      const action = StackActions.replace('UploadSuccess', {
+        topicTitle: params.topicTitle,
+        topicDate: params.topicDate.toString(),
+        moderationStatus: params.moderationStatus,
+      });
+      // 편집기 같은 다른 화면이 위에 있어도 바꾸는 대상은 업로드 화면이다(키로 고정).
+      const upload = [...(nav.getRootState()?.routes ?? [])]
+        .reverse()
+        .find((route) => route.name === 'Upload');
+      nav.dispatch(upload ? { ...action, source: upload.key } : action);
+    });
   }
 
   close(): void {

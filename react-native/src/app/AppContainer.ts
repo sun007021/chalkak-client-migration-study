@@ -190,6 +190,9 @@ export class AppContainer {
   });
   private readonly uploadNavigator = new NavigationUploadNavigator(this.navigationHandle);
   private mediaServices: MediaServices | null;
+  /** 홈·업로드·피드 등이 함께 쓰는 저장소(요청 경로가 같아 하나만 만든다). */
+  private postRepositoryInstance: PostRepository | null = null;
+  private topicRepositoryInstance: TopicRepository | null = null;
   private readonly displayNavigator = new NavigationDisplayNavigator(this.navigationHandle);
   private readonly cacheRegistry = new UserDataCacheRegistry();
 
@@ -267,6 +270,14 @@ export class AppContainer {
     });
   }
 
+  private get postRepository(): PostRepository {
+    return (this.postRepositoryInstance ??= new PostRepository({ api: this.api }));
+  }
+
+  private get topicRepository(): TopicRepository {
+    return (this.topicRepositoryInstance ??= new TopicRepository({ api: this.api }));
+  }
+
   /** 네이티브 경계. 처음 필요할 때 실제 구현을 만든다(Fake를 넣은 테스트는 만들지 않는다). */
   get media(): MediaServices {
     this.mediaServices ??= createDefaultMediaServices(this.dependencies.appInfo.platform);
@@ -277,7 +288,7 @@ export class AppContainer {
   private createUploadGate(mode: MainMode): UploadEntryGateViewModel {
     return new UploadEntryGateViewModel({
       mode,
-      posts: new PostRepository({ api: this.api }),
+      posts: this.postRepository,
       toast: this.toast,
       authFlow: this.bootViewModel,
       navigator: this.uploadNavigator,
@@ -299,7 +310,7 @@ export class AppContainer {
       entry: { topicDate },
       clock: this.clock,
       platform: media.platform,
-      topics: new TopicRepository({ api }),
+      topics: this.topicRepository,
       picker: media.picker,
       gallery: media.gallery,
       permissions: media.permissions,
@@ -307,10 +318,11 @@ export class AppContainer {
       preparation,
       submitter: new UploadSubmitter({
         repository,
-        posts: new PostRepository({ api }),
+        posts: this.postRepository,
         preparation,
       }),
-      createEditor: (request) => new PhotoEditViewModel({ engine: media.engine, ...request }),
+      createEditor: (request) =>
+        new PhotoEditViewModel({ engine: media.engine, files: media.files, ...request }),
       toast: this.toast,
       analytics: this.analytics,
       navigator: this.uploadNavigator,
@@ -341,12 +353,12 @@ export class AppContainer {
 
   /** 소유자(displayOwner)만 부른다. */
   private createDisplayViewModel(mode: MainMode): DisplayViewModel {
-    const { api, clock } = this;
+    const { clock } = this;
     return new DisplayViewModel({
       mode,
       clock,
-      topics: new TopicRepository({ api }),
-      posts: new PostRepository({ api }),
+      topics: this.topicRepository,
+      posts: this.postRepository,
       likes: this.likes,
       changes: this.postChanges,
       navigator: this.displayNavigator,
@@ -361,7 +373,7 @@ export class AppContainer {
       target,
       userId,
       clock: this.clock,
-      posts: new PostRepository({ api: this.api }),
+      posts: this.postRepository,
       likes: this.likes,
       changes: this.postChanges,
       navigator,
@@ -427,8 +439,8 @@ export class AppContainer {
     return new HomeViewModel({
       mode,
       clock,
-      topics: new TopicRepository({ api }),
-      posts: new PostRepository({ api }),
+      topics: this.topicRepository,
+      posts: this.postRepository,
       notifications: new NotificationRepository({ api }),
       // ISSUE 목록 ViewModel은 홈이 소유한다(홈이 로드·정리·dispose를 시키고 HomeScreen은 홈을 통해서만 받는다).
       bannerFeed: new BannerFeedViewModel({ repository: new BannerRepository({ api }) }),

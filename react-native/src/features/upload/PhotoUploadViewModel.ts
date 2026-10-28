@@ -5,7 +5,7 @@ import {
 } from '../../core/http/ApiError';
 import type { AnalyticsTracker } from '../../core/analytics/AnalyticsTracker';
 import type { GallerySaver } from '../../core/media/GallerySaver';
-import type { ImagePicker } from '../../core/media/ImagePicker';
+import { CameraPermissionDeniedError, type ImagePicker } from '../../core/media/ImagePicker';
 import type { MediaPermissions } from '../../core/media/MediaPermissions';
 import { Observable } from '../../core/state/Observable';
 import type { Clock } from '../../core/time/Clock';
@@ -20,12 +20,16 @@ import type { RgbaImage, Size } from '../photo-edit/ImageTypes';
 import { FULL_CROP, type PhotoEdit } from '../photo-edit/PhotoEdit';
 import { renderPixels } from '../photo-edit/PhotoPixelRenderer';
 import type { PhotoEditViewModel } from '../photo-edit/PhotoEditViewModel';
+import { localCopy } from './localCopy';
 import { clampTitle, titleForRequest, titleLength } from './TitleInput';
 import { mapUploadError } from './mapUploadError';
 import type { PostCreationNotifier } from './PostCreationNotifier';
 import type { UploadNavigator } from './UploadNavigator';
-import type { UploadPreparation } from './UploadPreparation';
+import { inputsEqual, type UploadPreparation } from './UploadPreparation';
 import type { UploadSubmitter } from './UploadSubmitter';
+
+/** 이 화면에서 로그인 이동은 한 번만 요청한다. */
+const AUTH_KEY = 'upload';
 
 export type TopicState =
   | { status: 'loading' }
@@ -136,7 +140,8 @@ export class PhotoUploadViewModel extends Observable<PhotoUploadState> {
       });
     } catch (error) {
       if (this.gone || error instanceof CancelledError) return;
-      this.auth.handle(error, {});
+      // 인증 오류는 로그인 이동(또는 세션 만료 이벤트)이 맡는다: 오류 상태를 만들지 않는다.
+      if (this.auth.handle(error, AUTH_KEY)) return;
       this.patch({
         topic: {
           status: 'error',
@@ -161,8 +166,8 @@ export class PhotoUploadViewModel extends Observable<PhotoUploadState> {
       const result = await this.deps.picker.pickFromLibrary();
       if (token !== this.selection || result.kind === 'cancelled') return;
       await this.openForNewPhoto(token, result.image.uri);
-    } catch {
-      this.pickFailed(token);
+    } catch (error) {
+      this.pickFailed(token, error);
     }
   }
 
@@ -205,8 +210,8 @@ export class PhotoUploadViewModel extends Observable<PhotoUploadState> {
       // 저장은 기다리지 않는다: 실패해도 사진은 그대로 쓰고, 화면을 나간 뒤에 끝나도 토스트로 알린다(REQ-UPL-015·016).
       if (save) void this.saveToGallery(result.image.uri);
       await this.openForNewPhoto(token, result.image.uri);
-    } catch {
-      this.pickFailed(token);
+    } catch (error) {
+      this.pickFailed(token, error);
     }
   }
 
@@ -227,9 +232,15 @@ export class PhotoUploadViewModel extends Observable<PhotoUploadState> {
     return !this.gone && !this.completed && !this.getSnapshot().submitting;
   }
 
-  private pickFailed(token: number): void {
+  private pickFailed(token: number, error?: unknown): void {
     if (this.gone || token !== this.selection) return;
-    this.patch({ photoLoading: false, error: t('upload.error.prepare') });
+    this.patch({
+      photoLoading: false,
+      error:
+        error instanceof CameraPermissionDeniedError
+          ? localCopy.cameraPermissionDenied
+          : t('upload.error.prepare'),
+    });
   }
 
   /** 고른 사진의 표시 크기(EXIF 반영)를 읽고 편집기를 연다. 읽을 수 없으면 편집기를 열지 않는다(REQ-UPL-018). */
@@ -304,7 +315,11 @@ export class PhotoUploadViewModel extends Observable<PhotoUploadState> {
       error: null,
     });
     // 편집을 마친 즉시 백그라운드 준비를 시작한다(REQ-UPL-025). 같은 입력이면 다시 하지 않는다(REQ-UPL-035).
-    this.deps.preparation.start({ sourceUri: request.sourceUri, edit });
+    const next = { sourceUri: request.sourceUri, edit };
+    const previous = this.deps.preparation.currentInput();
+    // 입력이 바뀌면 이전 사진의 미확정 업로드(PUT 뒤 POST 실패)를 버린다.
+    if (!previous || !inputsEqual(previous, next)) this.deps.submitter.reset();
+    this.deps.preparation.start(next);
   }
 
   private onEditCancelled(editor: PhotoEditViewModel): void {
@@ -369,7 +384,7 @@ export class PhotoUploadViewModel extends Observable<PhotoUploadState> {
         break;
       case 'login-required':
         this.patch({ submitting: false });
-        this.auth.handle(new AuthenticationRequiredError('401'), {});
+        this.auth.handle(new AuthenticationRequiredError('401'), AUTH_KEY);
         break;
       case 'session-expired':
         this.discardPhoto();
@@ -383,6 +398,7 @@ export class PhotoUploadViewModel extends Observable<PhotoUploadState> {
   /** 세션이 만료됐다: 사진·정책·임시 파일을 버린다. 로그인 이동은 session-expired 이벤트가 맡는다. */
   private discardPhoto(): void {
     this.deps.preparation.cancel();
+    this.deps.submitter.reset();
     this.patch({ submitting: false, photo: null, error: null, preparation: 'idle' });
   }
 
@@ -407,7 +423,7 @@ export class PhotoUploadViewModel extends Observable<PhotoUploadState> {
     this.lastPreparationError = prep.error;
     const failure = mapUploadError('policy', prep.error);
     if (failure.kind === 'message') this.patch({ error: failure.message });
-    else if (failure.kind === 'login-required') this.auth.handle(prep.error, prep.error);
+    else if (failure.kind === 'login-required') this.auth.handle(prep.error, AUTH_KEY);
     else if (failure.kind === 'session-expired') this.discardPhoto();
   }
 
@@ -424,6 +440,7 @@ export class PhotoUploadViewModel extends Observable<PhotoUploadState> {
     this.unsubscribePreparation();
     this.closeEditor();
     this.deps.preparation.cancel();
+    this.deps.submitter.reset();
     super.dispose();
   }
 

@@ -1,6 +1,6 @@
 import * as ExpoPicker from 'expo-image-picker';
 
-import type { ImagePicker, PickResult } from './ImagePicker';
+import { CameraPermissionDeniedError, type ImagePicker, type PickResult } from './ImagePicker';
 
 const OPTIONS: ExpoPicker.ImagePickerOptions = {
   mediaTypes: ['images'],
@@ -12,23 +12,20 @@ const OPTIONS: ExpoPicker.ImagePickerOptions = {
 
 /**
  * expo-image-picker 구현. 앨범은 권한이 필요 없는 시스템 선택기(iOS PHPicker, Android 포토 피커)로 한 장을 고른다.
- * 카메라는 iOS만 카메라 권한을 요청하고(거부면 던진다 -> 화면은 준비 실패 문구), Android는 CAMERA 권한 없이 시스템 카메라 앱을 연다.
+ * 카메라는 두 플랫폼 모두 카메라 권한을 먼저 요청한다(expo-image-picker 58.0.10의 launchCameraAsync는 Android에서도
+ * ensureCameraPermissionsAreGranted()로 CAMERA 권한을 요구한다). 거부하면 CameraPermissionDeniedError를 던지고 화면이 따로 안내한다.
  * 기기에 카메라가 있는지는 동기로 알 수 없어 항상 true다(시뮬레이터의 촬영 실패는 오류 문구로 보인다).
  */
 export class ExpoImagePicker implements ImagePicker {
   readonly cameraAvailable = true;
-
-  constructor(private readonly platform: 'ios' | 'android') {}
 
   async pickFromLibrary(): Promise<PickResult> {
     return toResult(await ExpoPicker.launchImageLibraryAsync(OPTIONS));
   }
 
   async capture(): Promise<PickResult> {
-    if (this.platform === 'ios') {
-      const permission = await ExpoPicker.requestCameraPermissionsAsync();
-      if (!permission.granted) throw new Error('camera permission denied');
-    }
+    const permission = await ExpoPicker.requestCameraPermissionsAsync();
+    if (!permission.granted) throw new CameraPermissionDeniedError();
     return toResult(await ExpoPicker.launchCameraAsync(OPTIONS));
   }
 }

@@ -3,12 +3,14 @@ import { StackActions } from '@react-navigation/native';
 import { KstDate } from '../core/time/KstDate';
 import { NavigationUploadNavigator } from './NavigationUploadNavigator';
 
-function setup(ready = true) {
+function setup(ready = true, routes: { key: string; name: string }[] = []) {
+  const getRootState = jest.fn(() => ({ routes }));
   const navigate = jest.fn();
   const dispatch = jest.fn();
   const goBack = jest.fn();
   const navigator = new NavigationUploadNavigator({
     isReady: () => ready,
+    getRootState,
     navigate,
     dispatch,
     goBack,
@@ -39,6 +41,27 @@ describe('NavigationUploadNavigator', () => {
         moderationStatus: 'PENDING',
       }),
     );
+  });
+
+  it('showSuccess는 맨 위가 다른 화면이어도 업로드 화면의 키로 replace한다', () => {
+    const { navigator, dispatch } = setup(true, [
+      { key: 'tabs-1', name: 'Tabs' },
+      { key: 'upload-7', name: 'Upload' },
+      { key: 'editor-3', name: 'PhotoEdit' },
+    ]);
+    navigator.showSuccess({
+      topicTitle: 'x',
+      topicDate: KstDate.of(2026, 10, 27),
+      moderationStatus: 'PENDING',
+    });
+    expect(dispatch).toHaveBeenCalledWith({
+      ...StackActions.replace('UploadSuccess', {
+        topicTitle: 'x',
+        topicDate: '2026-10-27',
+        moderationStatus: 'PENDING',
+      }),
+      source: 'upload-7',
+    });
   });
 
   it('TC-UPL-090 close는 뒤로 간다(진입한 탭으로 복귀)', () => {

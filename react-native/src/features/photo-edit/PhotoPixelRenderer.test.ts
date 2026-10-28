@@ -1,6 +1,6 @@
 import type { RgbaImage } from './ImageTypes';
 import { identityEdit, type PhotoEdit } from './PhotoEdit';
-import { renderPixels } from './PhotoPixelRenderer';
+import { cropPixelRect, renderPixels } from './PhotoPixelRenderer';
 import type { Rgba } from './PhotoColorTransform';
 import { maxChannelDiff, oracleTransform, withValues, zeroValues } from './__testing__/colorOracle';
 
@@ -62,5 +62,17 @@ describe('기준 렌더러', () => {
     const out = renderPixels(patch(), turned);
     expect(at(out, 0, 0)).toEqual(at(patch(), 3, 3));
     expect(at(out, 3, 3)).toEqual(at(patch(), 0, 0));
+  });
+});
+
+describe('cropPixelRect 경계 반올림', () => {
+  it('오른쪽 끝을 먼저 반올림하고 크기는 그 차다(왼쪽 오차가 크기에 겹치지 않는다)', () => {
+    // 폭 7, 중심 0.5, 크기 0.5: 왼쪽 1.75 -> 2, 오른쪽 5.25 -> 5이므로 [2, 5) = 3칸.
+    expect(
+      cropPixelRect(
+        { width: 7, height: 7 },
+        { quarterTurns: 0, crop: { centerX: 0.5, centerY: 0.5, width: 0.5, height: 1 } },
+      ),
+    ).toEqual({ x0: 2, y0: 0, width: 3, height: 7 });
   });
 });

@@ -137,6 +137,7 @@ describe('PhotoUploadScreen - 전시하기', () => {
     const hold = h.engine.holdNext('encodeWebp');
     await pickAndConfirm(h);
     expect(await screen.findByTestId('upload.preparing-indicator')).toBeOnTheScreen();
+    expect(screen.getByText('사진 다듬는 중')).toBeOnTheScreen();
     expect(submitButton()).toBeEnabled();
     hold.release();
     await waitFor(() =>

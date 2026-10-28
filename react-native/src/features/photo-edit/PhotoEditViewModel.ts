@@ -2,6 +2,7 @@ import { CancelledError } from '../../core/http/ApiError';
 import { Observable } from '../../core/state/Observable';
 import { POST_IMAGE_MAX_LONG_EDGE } from '../../shared/constants';
 import { t } from '../../shared/copy';
+import type { LocalFiles } from '../../core/media/LocalFiles';
 import type { ImageEngine } from './ImageEngine';
 import type { ImageFile, RgbaImage, Size } from './ImageTypes';
 import {
@@ -66,6 +67,8 @@ export type PhotoEditState = {
 
 export type PhotoEditViewModelDeps = {
   engine: Pick<ImageEngine, 'prepareEditable' | 'samplePixels'>;
+  /** 편집용 임시 JPEG를 닫을 때 지운다(REQ-UPL-048). */
+  files: Pick<LocalFiles, 'delete'>;
   /** 편집할 원본(EXIF가 반영되기 전일 수 있다). */
   sourceUri: string;
   sourceSize: Size;
@@ -85,6 +88,7 @@ export type PhotoEditViewModelDeps = {
 export class PhotoEditViewModel extends Observable<PhotoEditState> {
   private loading: Promise<void> | null = null;
   private finished = false;
+  private editableDeleted = false;
   private confirming = false;
   private abort = new AbortController();
   /** 마지막으로 분석한 (회전, 자르기). 같으면 다시 분석하지 않는다(REQ-EDIT-025). */
@@ -122,7 +126,10 @@ export class PhotoEditViewModel extends Observable<PhotoEditState> {
         POST_IMAGE_MAX_LONG_EDGE,
         signal,
       );
-      if (signal.aborted) return;
+      if (signal.aborted) {
+        void this.deps.files.delete(editable.uri);
+        return;
+      }
       this.setState({ ...this.getSnapshot(), status: 'ready', editable });
     } catch (error) {
       if (signal.aborted || error instanceof CancelledError) return;
@@ -362,6 +369,11 @@ export class PhotoEditViewModel extends Observable<PhotoEditState> {
   private finish(): void {
     this.finished = true;
     this.abort.abort();
+    const editable = this.getSnapshot().editable;
+    if (editable && !this.editableDeleted) {
+      this.editableDeleted = true;
+      void this.deps.files.delete(editable.uri);
+    }
   }
 
   private normalizedEdit(): PhotoEdit {

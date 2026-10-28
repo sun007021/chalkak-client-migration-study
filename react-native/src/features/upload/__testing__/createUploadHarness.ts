@@ -88,6 +88,7 @@ export async function createUploadHarness(options: UploadHarnessOptions = {}) {
     createEditor: (request) =>
       new PhotoEditViewModel({
         engine,
+        files,
         sourceUri: request.sourceUri,
         sourceSize: request.sourceSize,
         initialEdit: request.initialEdit,

@@ -23,6 +23,7 @@ export function createEditHarness(options: EditHarnessOptions = {}) {
   const cancels: number[] = [];
   const viewModel = new PhotoEditViewModel({
     engine,
+    files,
     sourceUri: EDIT_SOURCE_URI,
     sourceSize,
     initialEdit: options.initialEdit ?? null,

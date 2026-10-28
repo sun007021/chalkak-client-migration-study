@@ -15,12 +15,14 @@ import {
   TOPIC_ID,
   TOPIC_TITLE,
   UPLOAD_ID_1,
+  UPLOAD_ID_2,
   type UploadHarness,
 } from './__testing__/createUploadHarness';
 import { pickAndConfirm } from './__testing__/uploadFlow';
 
 const CREATE = 'POST /posts';
 const PUT_1 = `PUT /__upload/${UPLOAD_ID_1}`;
+const PUT_2 = `PUT /__upload/${UPLOAD_ID_2}`;
 const POST_ID = '22222222-2222-4222-8222-222222222201';
 
 async function setup(routes: Record<string, RouteValue> = {}, withPhoto = true) {
@@ -208,11 +210,33 @@ describe('PhotoUploadViewModel - 제출', () => {
     expect(h.navigator.ofType('show-success')).toHaveLength(1);
   });
 
+  it('REQ-UPL-050 생성 실패 뒤 다른 사진으로 바꾸면 이전 사진이 아니라 새 사진이 올라간다', async () => {
+    const h = await setup({
+      'POST /posts/uploads': ['upload/posts-uploads__issued', 'upload/posts-uploads__issued-new'],
+      [CREATE]: ['upload/posts-create__500-server-error', 'upload/posts-create__201-pending'],
+    });
+    await h.viewModel.submit();
+    expect(state(h).error).toBe(t('upload.error.create'));
+    expect(countOf(h, PUT_1)).toBe(1);
+
+    await pickAndConfirm(h, 'file:///picked/photo-b.jpg');
+    await h.viewModel.submit();
+
+    expect(h.navigator.ofType('show-success')).toHaveLength(1);
+    expect(countOf(h, 'POST /posts/uploads')).toBe(2);
+    expect(countOf(h, PUT_1)).toBe(1);
+    expect(countOf(h, PUT_2)).toBe(1);
+    expect(body(h, 1).photoUploadId).toBe(UPLOAD_ID_2);
+  });
+
   it('TC-UPL-066 401 갱신 뒤에도 401이면 로그인 화면으로 가고 사진·제목 입력이 유지된다', async () => {
     const h = await setup({ [CREATE]: unauthorized(), 'POST /auth/refresh': refreshOk() });
     h.viewModel.setTitle('가을');
     await h.viewModel.submit();
     expect(h.authFlow.calls).toEqual(['login']);
+    // 갱신은 한 번, 갱신 뒤 재전송도 한 번(처음 + 재전송 = POST /posts 2회).
+    expect(countOf(h, 'POST /auth/refresh')).toBe(1);
+    expect(countOf(h, CREATE)).toBe(2);
     expect(state(h).photo).not.toBeNull();
     expect(state(h).title).toBe('가을');
     expect(state(h).submitting).toBe(false);

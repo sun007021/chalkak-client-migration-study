@@ -23,10 +23,9 @@ const config: ExpoConfig = {
   ios: { bundleIdentifier: 'com.chalkak.study.rn', supportsTablet: false },
   android: {
     package: 'com.chalkak.study.rn',
-    // 앨범은 시스템 포토 피커, 촬영은 시스템 카메라 앱(ACTION_IMAGE_CAPTURE)이라 CAMERA·미디어 읽기 권한이 필요 없다.
-    // 라이브러리 매니페스트가 넣는 권한을 지워 설치 화면과 심사에 쓰이지 않는 권한이 남지 않게 한다.
+    // 앨범은 시스템 포토 피커라 미디어 읽기 권한이 필요 없다. 라이브러리 매니페스트가 넣는 쓰이지 않는 권한을 지운다.
+    // CAMERA는 막지 않는다: expo-image-picker 58.0.10의 launchCameraAsync는 ensureCameraPermissionsAreGranted()로 CAMERA 권한을 요구한다.
     blockedPermissions: [
-      'android.permission.CAMERA',
       'android.permission.RECORD_AUDIO',
       'android.permission.READ_MEDIA_IMAGES',
       'android.permission.READ_MEDIA_VIDEO',

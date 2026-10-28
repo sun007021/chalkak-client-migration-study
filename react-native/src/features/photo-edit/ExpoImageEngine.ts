@@ -3,22 +3,25 @@ import { ImageManipulator, SaveFormat, type ImageRef } from 'expo-image-manipula
 
 import { CancelledError } from '../../core/http/ApiError';
 import { throwIfAborted } from '../../core/http/abort';
-import { encodePng } from '../signature/encodePng';
+import { ImageDecodeError } from '../../core/image/ImageErrors';
+import { decodePng, encodePng } from '../../core/image/png';
 import type {
   AnalysisSampleRequest,
   EncodedImage,
   ImageEngine,
   WebpEncodeRequest,
 } from './ImageEngine';
-import { ImageDecodeError } from './ImageErrors';
 import type { ImageFile, RgbaImage, Size } from './ImageTypes';
-import { identityEdit, isIdentityEdit } from './PhotoEdit';
+import { identityEdit, isIdentityEdit, type PhotoEdit } from './PhotoEdit';
 import { limitLongEdge } from './PhotoEditTransform';
-import { cropPixelRect, hasColorEdit, renderPixels } from './PhotoPixelRenderer';
-import { decodePng } from './PngDecoder';
+import { createRenderJob, cropPixelRect, hasColorEdit } from './PhotoPixelRenderer';
 
 /** 편집기 미리보기 파일의 JPEG 품질(0~1). 편집기 안에서만 쓰고 업로드 결과에는 섞이지 않는다. */
 const EDITABLE_QUALITY = 0.92;
+/** 중간 PNG의 zlib 수준: 속도 우선(파일 크기는 중요하지 않다). */
+const INTERMEDIATE_PNG_LEVEL = 1;
+/** 색을 칠하다가 이벤트 루프를 양보하고 취소를 확인하는 줄 간격. */
+const PAINT_ROWS_PER_SLICE = 64;
 
 let tempCounter = 0;
 
@@ -29,18 +32,25 @@ function tempFile(extension: string): File {
   return new File(Paths.cache, `chalkak-edit-${tempCounter}-${stamp}.${extension}`);
 }
 
+const yieldToEventLoop = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
+/** 한 라운드(같은 사진·크기·편집)의 기하와 색이 끝난 이미지. 품질 사다리는 이것을 WebP로 여러 번 저장한다. */
+type Round = { key: string; ref: ImageRef };
+
 /**
  * expo-image-manipulator + 순수 TS 색 파이프라인 구현.
  *
- * - 크기·방향(EXIF)·회전·자르기·축소·WebP 저장은 모두 네이티브(manipulator)가 한다. 원본은 디코드 한 번, 저장 한 번이다.
- * - 색(조정·필터)이 있는 편집만 중간에 **무손실 PNG**로 내려 받아 TS(`renderPixels`, 테스트가 오라클로 검증한 같은 코드)로 칠하고
- *   PNG로 다시 써서 manipulator가 WebP로 저장한다. 손실 압축(JPEG)을 중간에 끼우지 않는다.
- * - 자동 보정 표본(samplePixels)도 같은 경로의 무손실 PNG를 TS로 읽는다.
- *
- * 임시 파일은 호출한 쪽이 지우는 결과 파일(편집용 이미지, WebP)을 빼고 이 클래스가 만든 즉시 지운다.
- * 네이티브 작업은 취소할 수 없어 signal은 단계 사이에서만 확인한다(취소되면 만든 임시 파일을 지우고 CancelledError).
+ * - 크기·방향(EXIF)·회전·자르기·축소·WebP 저장은 네이티브(manipulator)가 한다.
+ * - 색(조정·필터)이 있는 편집만 중간에 **무손실 PNG**로 내려 받아 TS(`createRenderJob`, 테스트가 오라클로 검증한 같은 식)로 칠하고
+ *   PNG로 다시 써서 불러온다. 칠하기는 업로드 크기(`targetSize`)에서 **라운드마다 한 번**이고, 품질 사다리는 그 결과를 WebP로만 다시 저장한다.
+ *   라운드는 `releaseRound()`(또는 다른 입력의 다음 라운드)까지 메모리에 둔다. 중간 파일은 읽거나 불러온 즉시 지운다.
+ * - 칠하는 동안 `PAINT_ROWS_PER_SLICE`줄마다 이벤트 루프를 양보하고 취소를 확인한다.
+ * - 무거운 작업(encodeWebp)은 한 번에 하나만 돈다: 앞 작업이 (취소돼도) 끝난 뒤에야 다음이 시작한다.
  */
 export class ExpoImageEngine implements ImageEngine {
+  private round: Round | null = null;
+  private tail: Promise<unknown> = Promise.resolve();
+
   async readBounds(uri: string, signal?: AbortSignal): Promise<Size> {
     throwIfAborted(signal);
     const ref = await this.render(ImageManipulator.manipulate(uri));
@@ -83,7 +93,7 @@ export class ExpoImageEngine implements ImageEngine {
     const { sourceUri, sourceSize, quarterTurns, crop, maxLongEdge } = request;
     const rect = cropPixelRect(sourceSize, { quarterTurns, crop });
     const out = limitLongEdge({ width: rect.width, height: rect.height }, maxLongEdge);
-    let png: File | null = null;
+    let png: string | undefined;
     try {
       let context = ImageManipulator.manipulate(sourceUri);
       if (quarterTurns !== 0) context = context.rotate(quarterTurns * 90);
@@ -96,90 +106,143 @@ export class ExpoImageEngine implements ImageEngine {
       if (out.width !== rect.width || out.height !== rect.height) context = context.resize(out);
       const ref = await this.render(context);
       try {
-        const saved = await ref.saveAsync({ format: SaveFormat.PNG });
-        png = new File(saved.uri);
+        png = (await ref.saveAsync({ format: SaveFormat.PNG })).uri;
       } finally {
         ref.release();
       }
       throwIfAborted(signal);
-      return decodePng(await png.bytes());
+      return decodePng(await new File(png).bytes());
     } catch (error) {
       if (error instanceof CancelledError) throw error;
       return null; // 분석할 수 없다 -> 자동 보정 없음(REQ-EDIT-027)
     } finally {
-      discard(png?.uri);
+      discard(png);
     }
   }
 
-  async encodeWebp(request: WebpEncodeRequest, signal?: AbortSignal): Promise<EncodedImage> {
-    throwIfAborted(signal);
-    const { sourceUri, sourceSize, targetSize, quality } = request;
+  encodeWebp(request: WebpEncodeRequest, signal?: AbortSignal): Promise<EncodedImage> {
+    return this.exclusive(async () => {
+      throwIfAborted(signal);
+      const ref = await this.roundFor(request, signal);
+      throwIfAborted(signal);
+      const saved = await ref.saveAsync({
+        format: SaveFormat.WEBP,
+        compress: request.quality / 100,
+      });
+      if (signal?.aborted) {
+        discard(saved.uri);
+        throw new CancelledError('aborted');
+      }
+      const byteLength = new File(saved.uri).size;
+      if (byteLength === null || byteLength === undefined) {
+        // 크기를 모르면 한도(maxBytes) 판정을 할 수 없다: 0으로 통과시키지 않는다.
+        discard(saved.uri);
+        throw new Error('cannot read the size of the encoded image');
+      }
+      return { uri: saved.uri, width: saved.width, height: saved.height, byteLength };
+    }, signal);
+  }
+
+  releaseRound(): void {
+    this.round?.ref.release();
+    this.round = null;
+  }
+
+  /** 앞 작업이 끝난 뒤에 실행한다. 앞 작업의 실패는 이 작업과 상관없다. */
+  private exclusive<T>(work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    const run = this.tail.then(() => {
+      throwIfAborted(signal);
+      return work();
+    });
+    this.tail = run.catch(() => undefined);
+    return run;
+  }
+
+  /** 같은 라운드면 만들어 둔 이미지를, 아니면 이전 라운드를 놓고 새로 만든다. */
+  private async roundFor(request: WebpEncodeRequest, signal?: AbortSignal): Promise<ImageRef> {
     const edit = request.edit && !isIdentityEdit(request.edit) ? request.edit : null;
-    const temps: (string | undefined)[] = [];
-    try {
-      let context = ImageManipulator.manipulate(sourceUri);
-      if (targetSize.width !== sourceSize.width || targetSize.height !== sourceSize.height) {
-        context = context.resize({ width: targetSize.width, height: targetSize.height });
-      }
-      if (edit) {
-        if (edit.quarterTurns !== 0) context = context.rotate(edit.quarterTurns * 90);
-        const rect = cropPixelRect(targetSize, edit);
-        const rotated = edit.quarterTurns % 2 === 0 ? targetSize : swap(targetSize);
-        if (rect.width !== rotated.width || rect.height !== rotated.height) {
-          context = context.crop({
-            originX: rect.x0,
-            originY: rect.y0,
-            width: rect.width,
-            height: rect.height,
-          });
-        }
-      }
-      let ref = await this.render(context);
-      try {
-        throwIfAborted(signal);
-        if (edit && hasColorEdit(edit)) {
-          // 기하(회전·자르기)는 끝났으니 색만 칠한다: 무손실 PNG -> TS -> 무손실 PNG -> WebP.
-          const painted = await this.paint(ref, edit, temps, signal);
-          ref.release();
-          ref = painted;
-        }
-        throwIfAborted(signal);
-        const saved = await ref.saveAsync({ format: SaveFormat.WEBP, compress: quality / 100 });
-        if (signal?.aborted) {
-          discard(saved.uri);
-          throw new CancelledError('aborted');
-        }
-        const size = new File(saved.uri).size;
-        return { uri: saved.uri, width: saved.width, height: saved.height, byteLength: size ?? 0 };
-      } finally {
-        ref.release();
-      }
-    } finally {
-      for (const uri of temps) discard(uri);
+    const key = JSON.stringify([request.sourceUri, request.targetSize, edit]);
+    if (this.round?.key === key) return this.round.ref;
+    this.releaseRound();
+
+    const { sourceUri, sourceSize, targetSize } = request;
+    let context = ImageManipulator.manipulate(sourceUri);
+    if (targetSize.width !== sourceSize.width || targetSize.height !== sourceSize.height) {
+      context = context.resize({ width: targetSize.width, height: targetSize.height });
     }
+    if (edit) {
+      if (edit.quarterTurns !== 0) context = context.rotate(edit.quarterTurns * 90);
+      const rect = cropPixelRect(targetSize, edit);
+      const rotated = edit.quarterTurns % 2 === 0 ? targetSize : swap(targetSize);
+      if (rect.width !== rotated.width || rect.height !== rotated.height) {
+        context = context.crop({
+          originX: rect.x0,
+          originY: rect.y0,
+          width: rect.width,
+          height: rect.height,
+        });
+      }
+    }
+    let ref = await this.render(context);
+    try {
+      throwIfAborted(signal);
+      if (edit && hasColorEdit(edit)) {
+        const painted = await this.paint(ref, edit, signal);
+        ref = painted;
+      }
+      throwIfAborted(signal);
+    } catch (error) {
+      ref.release();
+      throw error;
+    }
+    this.round = { key, ref };
+    return ref;
   }
 
-  /** 기하가 끝난 이미지에 색 편집만 칠해 새 이미지로 돌려준다. */
-  private async paint(
-    ref: ImageRef,
-    edit: NonNullable<WebpEncodeRequest['edit']>,
-    temps: (string | undefined)[],
-    signal?: AbortSignal,
-  ): Promise<ImageRef> {
-    const lossless = await ref.saveAsync({ format: SaveFormat.PNG });
-    temps.push(lossless.uri);
-    const pixels = decodePng(await new File(lossless.uri).bytes());
-    throwIfAborted(signal);
-    const colored = renderPixels(pixels, {
+  /**
+   * 기하가 끝난 이미지에 색 편집만 칠해 새 이미지로 돌려준다. 받은 `ref`는 PNG로 저장한 즉시 놓는다(성공·실패 모두).
+   * 무손실 PNG -> TS 칠하기(양보하며) -> 무손실 PNG -> 불러오기. 두 중간 파일은 읽거나 불러온 즉시 지운다.
+   */
+  private async paint(ref: ImageRef, edit: PhotoEdit, signal?: AbortSignal): Promise<ImageRef> {
+    let lossless: string;
+    try {
+      lossless = (await ref.saveAsync({ format: SaveFormat.PNG })).uri;
+    } finally {
+      ref.release();
+    }
+    let pixels;
+    try {
+      pixels = decodePng(await new File(lossless).bytes());
+    } finally {
+      discard(lossless);
+    }
+    const job = createRenderJob(pixels, {
       ...identityEdit(),
       filter: edit.filter,
       adjustments: edit.adjustments,
     });
+    for (let row = 0; row < job.height; row += PAINT_ROWS_PER_SLICE) {
+      throwIfAborted(signal);
+      job.renderRows(row, Math.min(job.height, row + PAINT_ROWS_PER_SLICE));
+      await yieldToEventLoop();
+    }
+    throwIfAborted(signal);
+    const colored = job.result();
     const out = tempFile('png');
-    temps.push(out.uri);
-    out.create({ overwrite: true });
-    out.write(encodePng(new Uint8Array(colored.data.buffer), colored.width, colored.height));
-    return this.render(ImageManipulator.manipulate(out.uri));
+    try {
+      out.create({ overwrite: true });
+      out.write(
+        encodePng(
+          new Uint8Array(colored.data.buffer),
+          colored.width,
+          colored.height,
+          INTERMEDIATE_PNG_LEVEL,
+        ),
+      );
+      return await this.render(ImageManipulator.manipulate(out.uri));
+    } finally {
+      discard(out.uri);
+    }
   }
 
   /** 읽을 수 없는 사진은 모두 ImageDecodeError로 통일한다. */

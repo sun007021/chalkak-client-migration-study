@@ -7,12 +7,13 @@ import {
 } from '../../shared/constants';
 import type { LocalFiles } from '../../core/media/LocalFiles';
 import type { EncodedImage, ImageEngine } from '../photo-edit/ImageEngine';
+import type { Size } from '../photo-edit/ImageTypes';
 import { isIdentityEdit, type PhotoEdit } from '../photo-edit/PhotoEdit';
 import { limitLongEdge } from '../photo-edit/PhotoEditTransform';
 import { SizeLimitExceededError } from './UploadErrors';
 
 export type PostImageEncoderDeps = {
-  engine: Pick<ImageEngine, 'readBounds' | 'encodeWebp'>;
+  engine: Pick<ImageEngine, 'readBounds' | 'encodeWebp' | 'releaseRound'>;
   files: LocalFiles;
 };
 
@@ -33,14 +34,30 @@ export class PostImageEncoder {
   constructor(private readonly deps: PostImageEncoderDeps) {}
 
   async encode(input: EncodeInput, signal?: AbortSignal): Promise<EncodedImage> {
-    const { engine, files } = this.deps;
+    const { engine } = this.deps;
     throwIfAborted(signal);
     const sourceSize = await engine.readBounds(input.sourceUri, signal);
     throwIfAborted(signal);
     // 편집하지 않은 사진은 다시 그리지 않고 그대로 인코딩한다(REQ-UPL-028).
     const edit = isIdentityEdit(input.edit) ? null : input.edit;
-    let targetSize = limitLongEdge(sourceSize, POST_IMAGE_MAX_LONG_EDGE);
+    const targetSize = limitLongEdge(sourceSize, POST_IMAGE_MAX_LONG_EDGE);
 
+    try {
+      return await this.runRounds(input, signal, sourceSize, edit, targetSize);
+    } finally {
+      engine.releaseRound?.();
+    }
+  }
+
+  private async runRounds(
+    input: EncodeInput,
+    signal: AbortSignal | undefined,
+    sourceSize: Size,
+    edit: PhotoEdit | null,
+    initialSize: Size,
+  ): Promise<EncodedImage> {
+    const { engine, files } = this.deps;
+    let targetSize = initialSize;
     for (let round = 0; round <= WEBP_DOWNSCALE_MAX_ATTEMPTS; round += 1) {
       for (const quality of WEBP_QUALITY_LADDER) {
         const encoded = await engine.encodeWebp(

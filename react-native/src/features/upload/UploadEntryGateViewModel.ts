@@ -51,7 +51,7 @@ export class UploadEntryGateViewModel extends Observable<UploadEntryGateState> {
       else navigator.openUpload({ topicDate: today.topicDate });
     } catch (error) {
       if (this.gone || error instanceof CancelledError) return;
-      if (this.auth.handle(error, {})) return;
+      if (this.auth.handle(error, 'upload-entry')) return;
       toast.show(this.messageFor(error));
     } finally {
       if (!this.gone) this.setState({ checking: false });

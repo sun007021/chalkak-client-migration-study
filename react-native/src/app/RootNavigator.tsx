@@ -3,10 +3,9 @@ import {
   type NativeStackScreenProps,
 } from '@react-navigation/native-stack';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import { KstDate } from '../core/time/KstDate';
-import { todayKst } from '../core/time/kst';
 import type { FeedTarget } from '../features/feed/FeedTarget';
 import { PlaceholderScreen } from '../features/placeholder/PlaceholderScreen';
 import { PhotoUploadScreen } from '../features/upload/PhotoUploadScreen';
@@ -69,31 +68,52 @@ function IssueWebScreenRoute({
 /**
  * 업로드 화면 라우트. 화면을 열 때 ViewModel을 만들고 닫을 때 dispose한다(진행 중 작업·임시 파일 정리).
  * 만들고 버리는 시점은 useOwnedViewModel이 구독(commit)에 맞춰 정하므로 StrictMode의 mount/unmount/mount에도 안전하다.
+ * 주제 날짜는 게이트가 고정한 값만 쓴다: 읽을 수 없으면 오늘로 대신하지 않고 화면을 닫는다(REQ-UPL-008).
  */
-function UploadScreenRoute({ route }: NativeStackScreenProps<RootStackParamList, 'Upload'>) {
+function UploadScreenRoute({
+  route,
+  navigation,
+}: NativeStackScreenProps<RootStackParamList, 'Upload'>) {
+  const date = KstDate.parse(route.params.topicDate);
+  useCloseWhenInvalid(date === null, navigation);
+  return date ? <UploadScreenBody topicDate={date} /> : null;
+}
+
+function UploadScreenBody({ topicDate }: { topicDate: KstDate }) {
   const container = useAppContainer();
-  const { topicDate } = route.params;
-  const viewModel = useOwnedViewModel(() =>
-    container.createPhotoUploadViewModel(KstDate.parse(topicDate) ?? todayOf(container)),
-  );
+  const viewModel = useOwnedViewModel(() => container.createPhotoUploadViewModel(topicDate));
   return viewModel ? <PhotoUploadScreen viewModel={viewModel} /> : null;
 }
 
 function UploadSuccessScreenRoute({
   route,
+  navigation,
 }: NativeStackScreenProps<RootStackParamList, 'UploadSuccess'>) {
-  const container = useAppContainer();
   const { topicTitle, topicDate, moderationStatus } = route.params;
-  const viewModel = useOwnedViewModel(() =>
-    container.createUploadSuccessViewModel({
-      topicTitle,
-      topicDate: KstDate.parse(topicDate) ?? todayOf(container),
-      moderationStatus,
-    }),
-  );
+  const date = KstDate.parse(topicDate);
+  useCloseWhenInvalid(date === null, navigation);
+  return date ? (
+    <UploadSuccessBody
+      topicTitle={topicTitle}
+      topicDate={date}
+      moderationStatus={moderationStatus}
+    />
+  ) : null;
+}
+
+function UploadSuccessBody(params: {
+  topicTitle: string;
+  topicDate: KstDate;
+  moderationStatus: RootStackParamList['UploadSuccess']['moderationStatus'];
+}) {
+  const container = useAppContainer();
+  const viewModel = useOwnedViewModel(() => container.createUploadSuccessViewModel(params));
   return viewModel ? <UploadSuccessScreen viewModel={viewModel} /> : null;
 }
 
-/** 라우트 파라미터가 날짜로 읽히지 않는 비정상 상황의 대비(내비게이터는 항상 yyyy-MM-dd를 싣는다). */
-const todayOf = (container: ReturnType<typeof useAppContainer>): KstDate =>
-  todayKst(container.clock);
+/** 라우트 파라미터가 날짜로 읽히지 않는 비정상 상황: 화면을 닫는다(내비게이터는 항상 yyyy-MM-dd를 싣는다). */
+function useCloseWhenInvalid(invalid: boolean, navigation: { goBack: () => void }): void {
+  useEffect(() => {
+    if (invalid) navigation.goBack();
+  }, [invalid, navigation]);
+}

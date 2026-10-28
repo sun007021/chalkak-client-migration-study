@@ -271,4 +271,28 @@ describe('PostImageEncoder - 취소', () => {
     );
     expect(h.files.existing).toEqual([]);
   });
+
+  it('인코딩이 끝나면 성공·실패·취소 모두 라운드 자원을 한 번 놓는다', async () => {
+    const ok = setup();
+    await ok.encoder.encode(ok.input());
+    expect(ok.engine.releaseRoundCount).toBe(1);
+
+    const tooBig = setup();
+    tooBig.engine.sizeFor = () => MAX + 1;
+    await expect(tooBig.encoder.encode(tooBig.input())).rejects.toBeInstanceOf(
+      SizeLimitExceededError,
+    );
+    expect(tooBig.engine.releaseRoundCount).toBe(1);
+
+    const aborted = setup();
+    const controller = new AbortController();
+    aborted.engine.sizeFor = () => {
+      controller.abort();
+      return 1000;
+    };
+    await expect(aborted.encoder.encode(aborted.input(), controller.signal)).rejects.toBeInstanceOf(
+      CancelledError,
+    );
+    expect(aborted.engine.releaseRoundCount).toBe(1);
+  });
 });
