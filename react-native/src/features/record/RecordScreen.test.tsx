@@ -232,9 +232,12 @@ describe('RecordScreen 오류와 저장', () => {
   it('TC-REC-038 "이미지로 저장"을 누르면 저장하고 연타해도 1회만 저장한다 (TC-REC-040)', async () => {
     const h = await createRecordHarness();
     await renderRecord(h);
+    // 가짜 저장소가 즉시 끝나면 첫 탭이 `await fireEvent.press` 안에서 끝나 두 번째 탭은 "연타"가 아니다. 저장을 붙잡아 둔다.
+    let release!: () => void;
+    h.imageSaver.behavior = () => new Promise<void>((resolve) => (release = resolve));
     await fireEvent.press(screen.getByTestId('record.save-image-button'));
     await fireEvent.press(screen.getByTestId('record.save-image-button'));
-    await act(async () => {});
+    await act(async () => release());
     expect(h.imageSaver.saved.map((s) => s.fileName)).toEqual(['chalkak-calendar-2026-10.png']);
     expect(h.toast.messages).toEqual([t('record.save.ok')]);
   });

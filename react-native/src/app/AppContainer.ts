@@ -40,6 +40,7 @@ import { BannerRepository } from '../data/banner/BannerRepository';
 import { NotificationRepository } from '../data/notification/NotificationRepository';
 import { LikeRepository } from '../data/like/LikeRepository';
 import { PostRepository } from '../data/post/PostRepository';
+import { RecordRepository } from '../data/record/RecordRepository';
 import { TopicRepository } from '../data/topic/TopicRepository';
 import type { AiReviewPoller } from '../features/ai-review/AiReviewPoller';
 import { NoopAiReviewPoller } from '../features/ai-review/NoopAiReviewPoller';
@@ -51,6 +52,10 @@ import { HomeViewModelOwner } from '../features/home/HomeViewModelOwner';
 import { DisplayViewModel } from '../features/display/DisplayViewModel';
 import { DisplayViewModelOwner } from '../features/display/DisplayViewModelOwner';
 import type { CalendarImageRenderer, CalendarImageSaver } from '../features/record/CalendarImage';
+import { MediaLibraryCalendarImageSaver } from '../features/record/MediaLibraryCalendarImageSaver';
+import { RecordViewModel } from '../features/record/RecordViewModel';
+import { RecordViewModelOwner } from '../features/record/RecordViewModelOwner';
+import { ViewShotCalendarImageRenderer } from '../features/record/ViewShotCalendarImageRenderer';
 import type { FeedNavigator } from '../features/feed/FeedNavigator';
 import type { FeedTarget } from '../features/feed/FeedTarget';
 import { FeedViewModel } from '../features/feed/FeedViewModel';
@@ -59,6 +64,7 @@ import type { LikeController } from '../features/like/LikeController';
 import { DefaultPostChanges } from '../features/post/PostChanges';
 import { NavigationDisplayNavigator } from './NavigationDisplayNavigator';
 import { NavigationHomeNavigator } from './NavigationHomeNavigator';
+import { NavigationRecordNavigator } from './NavigationRecordNavigator';
 import type { RootStackParamList } from './navigation/routes';
 import { LoginViewModel } from '../features/auth/LoginViewModel';
 import { LoginViewModelOwner } from '../features/auth/LoginViewModelOwner';
@@ -147,6 +153,13 @@ export class AppContainer {
   readonly homeOwner: HomeViewModelOwner;
   /** 메인에 있는 동안 전시 ViewModel을 만들고 버린다. 전시 탭 화면은 이것을 구독해 받는다. */
   readonly displayOwner: DisplayViewModelOwner;
+  /** 메인에 있는 동안 기록 ViewModel을 만들고 버린다. 기록 탭 화면은 이것을 구독해 받는다. */
+  readonly recordOwner: RecordViewModelOwner;
+  /**
+   * 기본 렌더러(view-shot)를 쓸 때만 있다. 기록 화면에 마운트하는 캡처 호스트가 이것으로 달력 뷰를 그려 캡처한다.
+   * 테스트가 Fake 렌더러를 넣으면 null이라 호스트를 마운트하지 않는다.
+   */
+  readonly calendarCapture: ViewShotCalendarImageRenderer | null;
   /** 전시·홈·피드가 같이 쓰는 좋아요 저장소(D-04). 기본은 실제 컨트롤러다. */
   readonly likes: LikeController;
   /** 상세에서 일어난 제목 수정·삭제를 전시 등이 따라 반영하게 하는 채널. 계정 전환 때 비운다. */
@@ -166,6 +179,9 @@ export class AppContainer {
   private readonly dependencies: Dependencies;
   private readonly homeNavigator = new NavigationHomeNavigator(this.navigationHandle);
   private readonly displayNavigator = new NavigationDisplayNavigator(this.navigationHandle);
+  private readonly recordNavigator = new NavigationRecordNavigator(this.navigationHandle);
+  private readonly calendarImageRenderer: CalendarImageRenderer;
+  private readonly calendarImageSaver: CalendarImageSaver;
   private readonly cacheRegistry = new UserDataCacheRegistry();
 
   private constructor(dependencies: Dependencies, toastCenter: ToastCenter | null) {
@@ -230,6 +246,34 @@ export class AppContainer {
       boot: this.bootViewModel,
       create: (mode) => this.createDisplayViewModel(mode),
       registerCache: (cache) => this.cacheRegistry.register(cache),
+    });
+    const defaultRenderer = dependencies.calendarImageRenderer
+      ? null
+      : new ViewShotCalendarImageRenderer();
+    this.calendarCapture = defaultRenderer;
+    this.calendarImageRenderer = dependencies.calendarImageRenderer ?? defaultRenderer!;
+    this.calendarImageSaver =
+      dependencies.calendarImageSaver ?? new MediaLibraryCalendarImageSaver();
+    this.recordOwner = new RecordViewModelOwner({
+      boot: this.bootViewModel,
+      create: (mode) => this.createRecordViewModel(mode),
+      registerCache: (cache) => this.cacheRegistry.register(cache),
+    });
+  }
+
+  /** 소유자(recordOwner)만 부른다. */
+  private createRecordViewModel(mode: MainMode): RecordViewModel {
+    return new RecordViewModel({
+      mode,
+      clock: this.clock,
+      records: new RecordRepository({ api: this.api }),
+      changes: this.postChanges,
+      navigator: this.recordNavigator,
+      toast: this.toast,
+      authFlow: this.bootViewModel,
+      visibility: this.dependencies.visibility,
+      imageRenderer: this.calendarImageRenderer,
+      imageSaver: this.calendarImageSaver,
     });
   }
 
@@ -431,6 +475,8 @@ export class AppContainer {
         sleeper,
         signatureRasterizer: overrides.signatureRasterizer ?? new SoftwareSignatureRasterizer(),
         likes: overrides.likes,
+        calendarImageRenderer: overrides.calendarImageRenderer,
+        calendarImageSaver: overrides.calendarImageSaver,
         aiReview: overrides.aiReview ?? new NoopAiReviewPoller(),
       },
       toastCenter,

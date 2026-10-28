@@ -28,7 +28,7 @@ async function renderApp(mode: 'member' | 'guest', extra: Record<string, RouteVa
           ...MEMBER_ROUTES,
           ...RECORD_ROUTES,
           [`GET /posts/${P_1031}`]: 'feed/posts-detail__mine-today',
-          ...datedRoutes(['2026-10-31']),
+          ...datedRoutes(['2026-10-20', '2026-10-31']),
           ...extra,
         }
       : GUEST_ROUTES,
@@ -93,8 +93,10 @@ describe('기록 탭 연결', () => {
   it('TC-REC-034 "전시 보러가기"는 해당 주제 날짜의 전시를 연다(뒤로 가면 기록 복귀는 E 범위)', async () => {
     await renderApp('member');
     await openRecordTab();
+    // 기준 시각(10-27)보다 미래인 10-31은 전시가 오늘로 맞춰 열어 버리므로(실제로는 없는 데이터) 과거 날짜의 사진으로 확인한다.
+    await fireEvent.press(screen.getByTestId('record.day-2026-10-20'));
     await fireEvent.press(screen.getByTestId('record.view-display-button'));
-    expect(await screen.findByTestId('display.date-label')).toHaveTextContent('10월 31일');
+    expect(await screen.findByTestId('display.date-label')).toHaveTextContent('10월 20일');
     expect(screen.getByTestId('bottom-bar.tab-display')).toBeSelected();
   });
 

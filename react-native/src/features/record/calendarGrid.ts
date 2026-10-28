@@ -1,5 +1,6 @@
-import type { KstDate } from '../../core/time/KstDate';
+import { KstDate } from '../../core/time/KstDate';
 import type { YearMonth } from '../../core/time/YearMonth';
+import { RECORD_COPY } from './recordCopy';
 
 export type CalendarGrid = {
   /** 7열 격자의 행 수. */
@@ -12,12 +13,18 @@ export type CalendarGrid = {
 };
 
 export function buildCalendarGrid(month: YearMonth): CalendarGrid {
-  void month;
-  throw new Error('not implemented');
+  const first = KstDate.of(month.year, month.month, 1);
+  const lastDay = KstDate.of(month.year, month.month, month.daysInMonth());
+  const leadingBlanks = first.dayOfWeek();
+  const rows = Math.ceil((leadingBlanks + lastDay.day) / 7);
+  const cells = Array.from({ length: rows * 7 }, (_, index) => {
+    const day = index - leadingBlanks + 1;
+    return day >= 1 && day <= lastDay.day ? KstDate.of(month.year, month.month, day) : null;
+  });
+  return { rows, leadingBlanks, cells, lastDay };
 }
 
-/** 연월 라벨: `2026년 10월` ([가정] 문구 키가 없어 형식을 코드에 둔다). */
+/** 연월 라벨: `2026년 10월`. 문구 키가 shared/copy/ko.json에 없어 형식을 recordCopy.ts에 둔다. */
 export function formatRecordMonthLabel(month: YearMonth): string {
-  void month;
-  throw new Error('not implemented');
+  return RECORD_COPY.monthLabel(month);
 }

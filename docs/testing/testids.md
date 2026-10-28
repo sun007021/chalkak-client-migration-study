@@ -295,6 +295,7 @@
 | record | 월 선택 버튼           | `record.month-picker-button`         |                                                |
 | record | 월 선택 시트           | `record.month-picker-sheet`          |                                                |
 | record | 월 선택 항목           | `record.month-picker-item-{yyyy-mm}` | 현재 달은 기록이 없어도 존재                   |
+| record | 월 선택 닫기 버튼      | `record.month-picker-close-button`   | 월 선택 시트 안 (RN 추가)                      |
 | record | 요일 헤더              | `record.weekday-header`              | 일월화수목금토                                 |
 | record | 달력 그리드            | `record.calendar-grid`               |                                                |
 | record | 날짜 칸                | `record.day-{yyyy-mm-dd}`            | 기록이 있는 날은 사진 존재, selected 상태 노출 |
@@ -315,6 +316,7 @@
 | record | 날짜 칸 반영 중 배지   | `record.day-pending-{yyyy-mm-dd}`    | PENDING인 날만 존재 (RN 추가)                  |
 | record | 오늘 표시              | `record.today-marker`                | 오늘(KST) 날짜 칸 안에 하나만 존재 (RN 추가)   |
 | record | 오류 메시지            | `record.error-message`               | 오류 상태 안, "기록을 불러오지 못했어요" (RN 추가) |
+| record | 저장용 달력 이미지의 사진 | `calendar-image.photo-{yyyy-mm-dd}` | 화면 밖 캡처용 뷰의 썸네일, 접근성 숨김 (RN 추가) |
 
 ### 알림함
 
