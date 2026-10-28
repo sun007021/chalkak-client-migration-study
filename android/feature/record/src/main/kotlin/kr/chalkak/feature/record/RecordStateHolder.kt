@@ -1,5 +1,7 @@
 package kr.chalkak.feature.record
 
+import java.time.LocalDate
+import java.time.YearMonth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -8,12 +10,12 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kr.chalkak.core.common.Clock
 import kr.chalkak.core.common.KstCalendar
 import kr.chalkak.core.common.analytics.AnalyticsTracker
+import kr.chalkak.core.common.analytics.screenViewSafely
 import kr.chalkak.core.data.post.PostChanges
 import kr.chalkak.core.data.record.RecordRepository
+import kr.chalkak.core.network.JobTracker
 import kr.chalkak.feature.auth.HomeMode
 import kr.chalkak.feature.display.FeedEntry
-import java.time.LocalDate
-import java.time.YearMonth
 
 /**
  * Record tab state (REC). Runs on the injected [scope]; every date comes from [clock] in KST.
@@ -44,7 +46,7 @@ class RecordStateHolder(
     saver: CalendarImageSaver,
 ) {
     private val core = RecordCore(mode, KstCalendar(clock), postChanges)
-    private val jobs = RecordJobs(scope) { core.crashed() }
+    private val jobs = JobTracker(scope) { core.crashed() }
     private val loader = RecordLoader(jobs, core, repository)
     private val saveFlow = RecordSaveFlow(jobs, core, renderer, saver)
     private var visible = false

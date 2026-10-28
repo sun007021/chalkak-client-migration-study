@@ -1,17 +1,15 @@
-package kr.chalkak.feature.record
+package kr.chalkak.core.network
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kr.chalkak.core.network.ApiError
-import kr.chalkak.core.network.ApiResult
 
 /**
  * Runs one repository call for a holder. A throwing collaborator becomes `Failure(InvalidResponse)` carrying only the
- * exception type (never its message). Cancellation is rethrown, and a result that arrives after the caller was cancelled is dropped.
- * Same contract as the settings / onboarding helpers (internal there); a later PR consolidates them.
+ * exception type (never its message, which could echo secrets), so a holder never crashes. Cancellation is rethrown, and a
+ * result that arrives after the caller was cancelled is dropped instead of being handled (no late state change or navigation).
  */
-internal suspend fun <T> guardedApiCall(what: String, call: suspend () -> ApiResult<T>): ApiResult<T> {
+suspend fun <T> guardedApiCall(what: String, call: suspend () -> ApiResult<T>): ApiResult<T> {
     val result = try {
         call()
     } catch (e: CancellationException) {
@@ -22,3 +20,6 @@ internal suspend fun <T> guardedApiCall(what: String, call: suspend () -> ApiRes
     currentCoroutineContext().ensureActive()
     return result
 }
+
+/** HTTP status of a failed call, null for network / contract errors. */
+val ApiError.httpStatus: Int? get() = (this as? ApiError.Http)?.status

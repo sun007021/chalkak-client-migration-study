@@ -13,11 +13,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kr.chalkak.core.data.settings.NotificationSettingsRepository
 import kr.chalkak.core.data.settings.NotificationSettings
+import kr.chalkak.core.data.settings.NotificationSettingsRepository
 import kr.chalkak.core.data.settings.PushSetting
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
+import kr.chalkak.core.network.guardedApiCall
 
 /**
  * Push switches (REQ-SET-008..021). [values] is empty until a GET succeeded for the current account: no value is

@@ -25,11 +25,12 @@ import kr.chalkak.feature.auth.HomeMode
 import java.time.LocalDate
 
 /**
- * Home like interaction port. A later PR wires it to the shared optimistic like-toggle (LIKE area, D-04); the
- * holder only decides whether a tap is allowed (guest -> toast `home.guest.like`, no call).
+ * Home like interaction port, backed by the shared optimistic like-toggle ([LikeControllerToggler], D-04); the
+ * holder only decides whether a tap is allowed (guest -> toast `home.guest.like`, no call). [currentlyLiked] and
+ * [likeCount] are the values the tapped card shows, so a post unknown to the shared toggle can be registered first.
  */
 fun interface LikeToggler {
-    suspend fun toggle(postId: String, currentlyLiked: Boolean)
+    suspend fun toggle(postId: String, currentlyLiked: Boolean, likeCount: Int)
 }
 
 /**
@@ -254,7 +255,7 @@ class HomeStateHolder(
         if (!core.member) return core.showToast(HomeCopyKeys.GUEST_LIKE)
         scope.launch {
             try {
-                likes.toggle(post.id, post.isLiked)
+                likes.toggle(post.id, post.isLiked, post.likeCount)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

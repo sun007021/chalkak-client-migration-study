@@ -21,6 +21,7 @@ import kr.chalkak.core.data.onboarding.SignupUpload
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
 import kr.chalkak.core.network.ErrorCode
+import kr.chalkak.core.network.guardedApiCall
 
 data class SignupUiState(
     /** True from "시작하기" until the flow ends, including PENDING waits: button disabled + progress. */

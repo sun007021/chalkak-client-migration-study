@@ -5,6 +5,8 @@ import kr.chalkak.core.data.post.PostChanges
 import kr.chalkak.core.data.post.PostRepository
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
+import kr.chalkak.core.network.guardedApiCall
+import kr.chalkak.core.network.httpStatus
 
 /** What the holder must do after a save, besides showing [TitleEditor.dialog]. */
 internal enum class TitleSaveOutcome { SAVED, SHOWN_IN_DIALOG, POST_GONE, LOGIN_REQUIRED }

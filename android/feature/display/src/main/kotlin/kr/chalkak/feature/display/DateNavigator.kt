@@ -1,10 +1,11 @@
 package kr.chalkak.feature.display
 
+import java.time.LocalDate
 import kotlinx.coroutines.Job
 import kr.chalkak.core.data.post.Topic
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
-import java.time.LocalDate
+import kr.chalkak.core.network.httpStatus
 
 /**
  * Loads dates and lists for the exhibition and decides which answer may become the shown one. Every request that
