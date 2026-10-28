@@ -47,6 +47,7 @@ describe('DefaultLikeController 낙관적 갱신', () => {
 
   it('TC-LIKE-032 내 게시물도 똑같이 처리한다(컨트롤러는 작성자를 구분하지 않는다)', async () => {
     const h = createLikeHarness();
+    h.api.setServer(P1, 10, false);
     h.controller.toggle(snap(P1, 10, false));
     h.api.succeed(0);
     await settle();
@@ -212,6 +213,7 @@ describe('DefaultLikeController 직렬화(D-04)', () => {
 
   it('TC-LIKE-021 완료된 좋아요 이후 값만 latestSince로 돌려준다(요청 시작 revision 병합)', async () => {
     const h = createLikeHarness();
+    h.api.setServer(P1, 10, false);
     const before = h.controller.revision();
     h.controller.toggle(snap(P1, 10, false));
     h.api.succeed(0);

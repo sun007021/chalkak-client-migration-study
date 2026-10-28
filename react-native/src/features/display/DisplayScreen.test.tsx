@@ -221,7 +221,7 @@ describe('DisplayScreen 상태별 렌더링', () => {
       q('2026-10-27', 'recent', 2),
       'display/posts-list__recent-page2',
     );
-    void act(async () => void h.viewModel.onLastVisibleIndexChanged(19));
+    await act(async () => void h.viewModel.onLastVisibleIndexChanged(19));
     expect(await screen.findByTestId('display.load-more-indicator')).toBeOnTheScreen();
     await act(async () => gate.release());
     await flush();

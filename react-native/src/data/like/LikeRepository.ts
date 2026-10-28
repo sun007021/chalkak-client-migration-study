@@ -1,4 +1,6 @@
 import type { ApiClient } from '../../core/http/ApiClient';
+import { apiPath } from '../../core/http/UrlBuilder';
+import { asObject, bool, nonNegInt, str } from '../decode';
 
 /** 좋아요 PUT/DELETE의 성공 응답. */
 export type LikeResult = { postId: string; likeCount: number; isLiked: boolean };
@@ -13,15 +15,34 @@ export interface LikeApi {
 
 export type LikeRepositoryDeps = { api: ApiClient };
 
+function decodeLike(postId: string, expectedLiked: boolean) {
+  return (raw: unknown): LikeResult => {
+    const o = asObject(raw, 'like result');
+    const result: LikeResult = {
+      postId: str(o, 'postId'),
+      likeCount: nonNegInt(o, 'likeCount'),
+      isLiked: bool(o, 'isLiked'),
+    };
+    if (result.postId !== postId) throw new Error('postId mismatch');
+    if (result.isLiked !== expectedLiked) throw new Error('isLiked contradicts the request');
+    return result;
+  };
+}
+
 export class LikeRepository implements LikeApi {
   constructor(private readonly deps: LikeRepositoryDeps) {}
 
-  like(_postId: string, _signal?: AbortSignal): Promise<LikeResult> {
-    void this.deps;
-    throw new Error('not implemented');
+  like(postId: string, signal?: AbortSignal): Promise<LikeResult> {
+    return this.deps.api.requestJson(
+      { method: 'PUT', path: apiPath`/posts/${postId}/likes`, signal },
+      decodeLike(postId, true),
+    );
   }
 
-  unlike(_postId: string, _signal?: AbortSignal): Promise<LikeResult> {
-    throw new Error('not implemented');
+  unlike(postId: string, signal?: AbortSignal): Promise<LikeResult> {
+    return this.deps.api.requestJson(
+      { method: 'DELETE', path: apiPath`/posts/${postId}/likes`, signal },
+      decodeLike(postId, false),
+    );
   }
 }

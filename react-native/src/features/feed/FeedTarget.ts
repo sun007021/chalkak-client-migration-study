@@ -27,6 +27,16 @@ export type FeedTarget = {
 };
 
 /** 목록 항목에서 내비게이션 시드를 만든다(필요한 필드만 복사). */
-export function toFeedSeed(_post: PostSummary): FeedSeed {
-  throw new Error('not implemented');
+export function toFeedSeed(post: PostSummary): FeedSeed {
+  return {
+    id: post.id,
+    authorId: post.authorId,
+    originalImageUrl: post.originalImageUrl,
+    thumbnailImageUrl: post.thumbnailImageUrl,
+    signatureOriginalImageUrl: post.signatureOriginalImageUrl,
+    title: post.title,
+    likeCount: post.likeCount,
+    isLiked: post.isLiked,
+    isMine: post.isMine,
+  };
 }

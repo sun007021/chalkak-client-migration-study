@@ -230,8 +230,9 @@ describe('FeedScreen 삭제 다이얼로그', () => {
     await renderFeed(h);
     await fireEvent.press(screen.getByTestId('feed.delete-button'));
     const dialog = await screen.findByTestId('feed.delete-dialog');
-    expect(dialog).toHaveTextContent(t('feed.delete.title'));
-    expect(dialog).toHaveTextContent(t('feed.delete.body'));
+    // 다이얼로그 전체 텍스트에 제목과 본문이 함께 들어 있으므로 부분 일치로 비교한다(기본은 전체 일치).
+    expect(dialog).toHaveTextContent(t('feed.delete.title'), { exact: false });
+    expect(dialog).toHaveTextContent(t('feed.delete.body'), { exact: false });
     expect(screen.getByTestId('feed.delete-confirm-button')).toHaveTextContent(
       t('feed.delete.confirm'),
     );

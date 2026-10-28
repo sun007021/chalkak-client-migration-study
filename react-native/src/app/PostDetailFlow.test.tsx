@@ -90,9 +90,18 @@ describe('홈 → 게시물 상세 내비게이션 계약', () => {
   });
 
   it('TC-LIKE-009 TC-LIKE-025 좋아요가 실패하면 모든 화면에서 롤백되고 토스트 "좋아요를 반영하지 못했어요"가 뜬다', async () => {
-    await renderApp({ [`PUT /posts/${ID}/likes`]: 'like/posts-likes-put__500-server-error' });
+    // 가짜 전송은 즉시 응답하므로, 응답을 잡아 두지 않으면 press를 기다리는 사이 롤백까지 끝나 낙관 값(39)을 볼 수 없다.
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await renderApp({
+      [`PUT /posts/${ID}/likes`]: async () => {
+        await gate;
+        return fixtureResponse('like/posts-likes-put__500-server-error');
+      },
+    });
     await fireEvent.press(await screen.findByTestId(`home.popular-like-button-${ID}`));
     expect(screen.getByTestId(`home.popular-like-count-${ID}`)).toHaveTextContent('39');
+    await act(async () => release());
     await waitFor(() =>
       expect(screen.getByTestId(`home.popular-like-count-${ID}`)).toHaveTextContent('38'),
     );

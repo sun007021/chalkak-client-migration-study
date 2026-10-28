@@ -116,3 +116,23 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
 - **React Compiler lint(`react-hooks/refs`)**: 컨테이너처럼 `...Ref` 이름의 프로퍼티(내비게이션 ref)를 가진 객체를 렌더 중 읽으면 "refs during render" 오류가 난다. 그런 값은 `useAppContainer()`로 자식 컴포넌트에서 꺼내 쓰고, 프로퍼티 이름도 `navigationHandle`처럼 Ref로 끝내지 않는다.
 - **토스트**: `ToastCenter`(ToastPresenter 구현)가 상태를 들고 `ToastHost`가 그린다(`toast.container`/`toast.message`, 2.5초, 같은 문구도 id가 달라 다시 그림, 백그라운드면 버림).
 - **앱 생명주기**: `ReactNativeAppVisibility`는 `active`/`background` 전환만 알린다. iOS `inactive`(알림 센터·앱 전환기)는 곧 돌아오는 상태라 알리지 않는다(알리면 그때마다 홈이 다시 불러온다).
+
+## 전시·피드·좋아요 (`src/features/display`, `src/features/feed`, `src/features/like`, `src/features/post`)
+
+- **좋아요 컨트롤러(`DefaultLikeController`)는 앱 전체가 하나를 공유한다.** 기본 `AppContainer.likes`가 실제 구현이고 로그아웃·계정 전환 때 `UserDataCacheRegistry`가 `clearAll`을 불러 진행 중 요청(abort)과 값을 버린다. 게시물마다 요청은 한 번에 하나, 진행 중 탭은 마지막 의도만 기억한다. 응답 뒤 의도와 서버 값이 다르면 한 번 더 보내고, **실패하면 롤백만 하고 자동으로 다시 보내지 않는다**(LIKE-022). 롤백 대상은 "요청을 시작하기 직전 값"이다. 404는 롤백 뒤 `removed`, PUT 403은 정지 문구, 재인증 필요는 롤백 뒤 `toLogin`(토스트 없음).
+- **목록·상세 응답과 좋아요 병합은 revision으로 한다.** 요청을 보내기 **전에 동기로** `likes.revision()`을 읽어 두고(첫 `await` 앞), 응답이 오면 `latestSince(id, since)`가 있는 게시물만 덮는다. 요청 시작 뒤에 `await`로 읽으면 그 사이 끝난 좋아요를 "이전 것"으로 오인한다. 홈은 예전 방식(`snapshot()`)이라 이 규칙을 쓰지 않는다.
+- **전시 ViewModel은 생성부터 dispose까지 좋아요·`PostChanges`를 구독한다**(상세가 위에 있어 전시가 가려진 동안에도 반영해야 한다). 반대로 **피드는 `onShown`~`onHidden` 동안만** 좋아요를 구독한다(화면 언마운트 시 리스너 0). 둘 다 만들고 버리는 쪽은 소유자다: 전시는 `DisplayViewModelOwner`(메인 단계 동안 유지, `MainPhaseViewModelOwner` 공통), 피드는 `PostDetailRoute`(`useOwnedViewModel`, IssueWebRoute와 같은 StrictMode 안전 방식).
+- **전시의 세대 번호와 취소**: 날짜·정렬 선택은 세대 번호만 올리고 **요청은 취소하지 않는다**. 밀려난 요청도 끝까지 받아 (랜덤이 아니면) 캐시에 남겨야 같은 (날짜, 정렬)을 다시 골랐을 때 즉시 보인다(TC-DISP-047). 화면 이탈·`clearAll`·dispose만 abort한다. abort된 요청은 `CancelledError`로 끝나 캐시에도 남지 않는다.
+- **랜덤 시드는 (날짜, 랜덤) 캐시 항목에 붙어 있다.** 랜덤이 아닌 정렬로 **확정되면**(응답이 와서 화면이 바뀐 시점) 모든 랜덤 항목을 버린다. 확정 전에 지우면 이동 실패 복원 때 시드 없는 목록이 남는다. 첫 페이지 재검증은 저장된 시드를 보내고, 응답 시드가 같으면 받아 둔 뒤쪽 페이지를 유지한다.
+- **날짜 이동은 날짜를 먼저 바꾼다.** `state.date`는 요청 전에 새 날짜가 되어 연타(TC-DISP-038)가 "대기 중인 날짜" 기준으로 이어지고, 실패(404 주제 없음·네트워크)는 `lastGood`(마지막 확정 상태)로 복원한다. 첫 로딩(복원할 것이 없음)만 `navigationLocked`로 이동을 막는다. 오늘이 바뀐 뒤 복귀하면 상한(`today`)만 갱신하고 보던 날짜는 유지해 아카이브(popular)로 취급한다.
+- **탭 연동**: 전시 탭은 라우트 파라미터(`date`, `sort`)를 화면을 그리기 **전에** `openDate`로 넘기고 비운다(안 비우면 탭에 돌아올 때마다 같은 날짜로 열림). 소유자가 이미 같은 전시를 불러오는 중이면 `onShown`이 그 요청을 이어받는다. 전시 탭 재선택은 `tabPress` 이벤트 + `navigation.isFocused()`로 구분한다(다른 탭에서 올 때도 이벤트가 온다).
+- **접근성 라벨 "좋아요 N개"**는 `shared/copy/ko.json`에 키가 없어 `features/like/likeLabel.ts`의 상수(`LIKE_COUNT_LABEL`)로 조립한다. 키가 생기면 `t()`로 바꾼다.
+- **제목 수정 400의 한 가지 예외(D-02)**: 클라이언트 검증을 우회한 "제목은 10자 이하여야 합니다." 400만 `serverMessage`가 `feed.edit.title-too-long`과 같을 때 그 문구로 보인다(표시 전용, 정상 흐름에서는 나오지 않음). 그 밖의 400은 모두 상태 문구다.
+- **핀치 줌은 제스처 라이브러리 없이** `View`의 `onTouch*`와 `Animated`(JS 구동)로 구현했다. 터치 좌표는 `pageX/Y`라서 `measureInWindow`로 컨테이너 원점을 빼야 컨테이너 좌표가 된다. 변환 순서는 `[translateX, translateY, scale]`(CSS와 같은 순서)이라 `photoZoom`의 `translate(pan) -> scale` 정의와 맞는다. **실기기에서 부드러움·한 손가락 제스처와의 충돌은 확인이 필요하다.** 날짜 선택 시트도 네이티브 휠이 아니라 세 열 목록(탭해서 선택)이다.
+- **테스트 함정**
+  - `void act(async () => …)`처럼 `await` 없는 `act`는 React의 act 범위가 닫히지 않아 **이후 같은 파일의 모든 테스트가 렌더 갱신을 못 본다**(엉뚱한 "요소 없음"으로 실패). 반드시 `await act(...)`.
+  - `FixtureRouter.set`은 그 키의 **호출 기록을 새로 시작**한다. 게이트 라우트를 건 뒤의 `callsOf`는 게이트 이후 호출만 센다.
+  - 가짜 전송은 응답이 즉시라 `await fireEvent.press(...)`가 끝나기 전에 요청 체인(재시도·롤백 포함)이 모두 끝난다. 중간 상태(낙관 값)를 보려면 라우트를 게이트로 잡아 두었다가 확인한 뒤 풀어야 한다.
+  - `toHaveTextContent(문자열)`는 전체 일치다. 다이얼로그처럼 제목·본문이 한 요소에 같이 있으면 `{ exact: false }`를 쓴다.
+  - RN 0.88에서 `View`는 함수 컴포넌트 타입이라 `useRef<View>`로는 `measureInWindow`를 못 쓴다. `HostInstance`를 쓴다.
+- **미결**: 홈(이번 주 기록·랭킹)과 기록 탭이 `PostChanges`(삭제·제목 변경)를 구독하는 것은 아직 연결하지 않았다(전시만 반영). 해당 화면 PR에서 `container.postChanges`를 구독시킨다.

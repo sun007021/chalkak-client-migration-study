@@ -2,6 +2,7 @@ import type { NavigationContainerRef } from '@react-navigation/native';
 
 import type { PostSummary } from '../data/post/PostModels';
 import type { DisplayNavigator } from '../features/display/DisplayNavigator';
+import { toFeedSeed } from '../features/feed/FeedTarget';
 import type { RootStackParamList } from './navigation/routes';
 
 type NavigationRef = Pick<NavigationContainerRef<RootStackParamList>, 'isReady' | 'navigate'>;
@@ -10,8 +11,11 @@ type NavigationRef = Pick<NavigationContainerRef<RootStackParamList>, 'isReady' 
 export class NavigationDisplayNavigator implements DisplayNavigator {
   constructor(private readonly navigation: NavigationRef) {}
 
-  openPostDetail(_target: { postId: string; seed: PostSummary }): void {
-    void this.navigation;
-    throw new Error('not implemented');
+  openPostDetail(target: { postId: string; seed: PostSummary }): void {
+    if (!this.navigation.isReady()) return;
+    this.navigation.navigate('PostDetail', {
+      postId: target.postId,
+      seed: toFeedSeed(target.seed),
+    });
   }
 }

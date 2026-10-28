@@ -57,7 +57,8 @@ describe('DisplayViewModel 정렬', () => {
     expect(h.viewModel.getSnapshot().sort).toBe('recent');
     gate.release();
     await back;
-    expect(h.callsOf(RECENT)).toBe(2);
+    // gatedRoute가 라우트를 교체하면서 호출 기록이 새로 시작되므로, 재검증 요청 1건만 남는다.
+    expect(h.callsOf(RECENT)).toBe(1);
   });
 
   it('TC-DISP-013 지난 날짜는 아카이브로 popular만 쓰고 상위 5개를 추천에 쓴다', async () => {

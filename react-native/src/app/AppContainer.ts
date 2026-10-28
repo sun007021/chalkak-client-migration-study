@@ -24,6 +24,7 @@ import type { ToastPresenter } from '../core/toast/ToastPresenter';
 import { AuthRepository } from '../data/auth/AuthRepository';
 import { BannerRepository } from '../data/banner/BannerRepository';
 import { NotificationRepository } from '../data/notification/NotificationRepository';
+import { LikeRepository } from '../data/like/LikeRepository';
 import { PostRepository } from '../data/post/PostRepository';
 import { TopicRepository } from '../data/topic/TopicRepository';
 import type { AiReviewPoller } from '../features/ai-review/AiReviewPoller';
@@ -33,8 +34,15 @@ import { BannerFeedViewModel } from '../features/banner/BannerFeedViewModel';
 import { IssueWebViewModel } from '../features/banner/IssueWebViewModel';
 import { HomeViewModel } from '../features/home/HomeViewModel';
 import { HomeViewModelOwner } from '../features/home/HomeViewModelOwner';
+import { DisplayViewModel } from '../features/display/DisplayViewModel';
+import { DisplayViewModelOwner } from '../features/display/DisplayViewModelOwner';
+import type { FeedNavigator } from '../features/feed/FeedNavigator';
+import type { FeedTarget } from '../features/feed/FeedTarget';
+import { FeedViewModel } from '../features/feed/FeedViewModel';
+import { DefaultLikeController } from '../features/like/DefaultLikeController';
 import type { LikeController } from '../features/like/LikeController';
-import { NoopLikeController } from '../features/like/NoopLikeController';
+import { DefaultPostChanges } from '../features/post/PostChanges';
+import { NavigationDisplayNavigator } from './NavigationDisplayNavigator';
 import { NavigationHomeNavigator } from './NavigationHomeNavigator';
 import type { RootStackParamList } from './navigation/routes';
 import { LoginViewModel } from '../features/auth/LoginViewModel';
@@ -83,8 +91,8 @@ export interface Dependencies {
   readonly linkOpener: ExternalLinkOpener;
   /** 기본은 화면 위에 그리는 ToastCenter(`container.toastCenter`). 테스트는 Fake를 넣는다. */
   readonly toast: ToastPresenter;
-  /** 좋아요·AI 리뷰 PR이 실제 구현으로 바꾼다. 그 전에는 아무 일도 하지 않는 구현이다. */
-  readonly likes: LikeController;
+  /** null이면 컨테이너가 실제 구현(DefaultLikeController)을 만들어 로그아웃 때 비우는 캐시에 올린다. 테스트는 Fake를 넣는다. */
+  readonly likes: LikeController | null;
   readonly aiReview: AiReviewPoller;
   /** 로그아웃·탈퇴·계정 전환 때 비울 사용자별 캐시. 캐시를 가진 기능 PR이 추가한다. */
   readonly userDataCaches: readonly UserDataCache[];
@@ -112,6 +120,12 @@ export class AppContainer {
   readonly updateDialogViewModel: UpdateDialogViewModel;
   /** 메인에 있는 동안 홈 ViewModel을 만들고 버린다. 홈 탭 화면은 이것을 구독해 받는다. */
   readonly homeOwner: HomeViewModelOwner;
+  /** 메인에 있는 동안 전시 ViewModel을 만들고 버린다. 전시 탭 화면은 이것을 구독해 받는다. */
+  readonly displayOwner: DisplayViewModelOwner;
+  /** 전시·홈·피드가 같이 쓰는 좋아요 저장소(D-04). 기본은 실제 컨트롤러다. */
+  readonly likes: LikeController;
+  /** 상세에서 일어난 제목 수정·삭제를 전시 등이 따라 반영하게 하는 채널. 계정 전환 때 비운다. */
+  readonly postChanges = new DefaultPostChanges();
   /** phase가 login인 동안 로그인 ViewModel을 만들고 버린다. 화면은 이것을 구독해 받는다. */
   readonly loginOwner: LoginViewModelOwner;
   private readonly socialLoginClient: SocialLoginClient;
@@ -119,6 +133,7 @@ export class AppContainer {
   private readonly pushRegistrar: PushRegistrar;
   private readonly dependencies: Dependencies;
   private readonly homeNavigator = new NavigationHomeNavigator(this.navigationHandle);
+  private readonly displayNavigator = new NavigationDisplayNavigator(this.navigationHandle);
   private readonly cacheRegistry = new UserDataCacheRegistry();
 
   private constructor(dependencies: Dependencies, toastCenter: ToastCenter | null) {
@@ -158,17 +173,66 @@ export class AppContainer {
     this.loginOwner = new LoginViewModelOwner(this.bootViewModel, () =>
       this.createLoginViewModel(),
     );
+    this.likes = dependencies.likes ?? this.createDefaultLikes();
+    this.cacheRegistry.register(this.postChanges);
     this.homeOwner = new HomeViewModelOwner({
       boot: this.bootViewModel,
       create: (mode) => this.createHomeViewModel(mode),
       registerCache: (cache) => this.cacheRegistry.register(cache),
+    });
+    this.displayOwner = new DisplayViewModelOwner({
+      boot: this.bootViewModel,
+      create: (mode) => this.createDisplayViewModel(mode),
+      registerCache: (cache) => this.cacheRegistry.register(cache),
+    });
+  }
+
+  /** 실제 좋아요 컨트롤러. 로그아웃·계정 전환 때 진행 중 요청과 값을 버리도록 캐시 레지스트리에 올린다. */
+  private createDefaultLikes(): DefaultLikeController {
+    const likes = new DefaultLikeController({
+      api: new LikeRepository({ api: this.api }),
+      toast: this.toast,
+      authFlow: this.bootViewModel,
+    });
+    this.cacheRegistry.register(likes);
+    return likes;
+  }
+
+  /** 소유자(displayOwner)만 부른다. */
+  private createDisplayViewModel(mode: MainMode): DisplayViewModel {
+    const { api, clock } = this;
+    return new DisplayViewModel({
+      mode,
+      clock,
+      topics: new TopicRepository({ api }),
+      posts: new PostRepository({ api }),
+      likes: this.likes,
+      changes: this.postChanges,
+      navigator: this.displayNavigator,
+      toast: this.toast,
+    });
+  }
+
+  /** 상세 라우트(내비게이션)만 부른다. 게시물 하나를 열 때마다 만들고 닫을 때 dispose한다. */
+  createFeedViewModel(target: FeedTarget, userId: string, navigator: FeedNavigator): FeedViewModel {
+    return new FeedViewModel({
+      target,
+      userId,
+      clock: this.clock,
+      posts: new PostRepository({ api: this.api }),
+      likes: this.likes,
+      changes: this.postChanges,
+      navigator,
+      toast: this.toast,
+      authFlow: this.bootViewModel,
     });
   }
 
   /** 소유자(homeOwner)만 부른다. */
   private createHomeViewModel(mode: MainMode): HomeViewModel {
     const { api, clock } = this;
-    const { likes, aiReview, visibility } = this.dependencies;
+    const { aiReview, visibility } = this.dependencies;
+    const { likes } = this;
     return new HomeViewModel({
       mode,
       clock,
@@ -266,7 +330,7 @@ export class AppContainer {
         visibility,
         linkOpener: overrides.linkOpener ?? new LinkingExternalLinkOpener(),
         toast: overrides.toast ?? toastCenter!,
-        likes: overrides.likes ?? new NoopLikeController(),
+        likes: overrides.likes ?? null,
         aiReview: overrides.aiReview ?? new NoopAiReviewPoller(),
       },
       toastCenter,

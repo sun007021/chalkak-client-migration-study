@@ -13,20 +13,34 @@ export interface PostChanges {
 }
 
 export class DefaultPostChanges implements PostChanges, UserDataCache {
-  publish(_change: PostChange): void {
-    throw new Error('not implemented');
+  private readonly deleted = new Set<string>();
+  private readonly listeners = new Set<(change: PostChange) => void>();
+
+  publish(change: PostChange): void {
+    if (change.kind === 'deleted') this.deleted.add(change.postId);
+    // 순회 중 구독 해제가 있어도 안전하도록 복사해서 돈다. 한 구독자의 예외가 나머지를 막지 않는다.
+    for (const listener of [...this.listeners]) {
+      try {
+        listener(change);
+      } catch (error) {
+        console.error(error);
+      }
+    }
   }
 
-  subscribe(_listener: (change: PostChange) => void): () => void {
-    throw new Error('not implemented');
+  subscribe(listener: (change: PostChange) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
 
-  isDeleted(_postId: string): boolean {
-    throw new Error('not implemented');
+  isDeleted(postId: string): boolean {
+    return this.deleted.has(postId);
   }
 
   /** 계정 전환: 삭제 기억을 비운다. */
   clearAll(): void {
-    throw new Error('not implemented');
+    this.deleted.clear();
   }
 }
