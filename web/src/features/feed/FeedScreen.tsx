@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode, WheelEvent } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { useContainer } from '../../app/AppContext';
 import { t } from '../../copy/ko';
@@ -8,6 +8,7 @@ import { useScreenView } from '../../core/analytics/useScreenView';
 import { useOwnedViewModel } from '../../core/state/useOwnedViewModel';
 import { useViewModel } from '../../core/state/useViewModel';
 import { LoadingIndicator } from '../../core/ui/StateViews';
+import { useDialogFocus } from '../../core/ui/useDialogFocus';
 import { useScrollRestore } from '../../core/ui/useScrollRestore';
 import { LikeButton } from '../like/LikeButton';
 import type { FeedPost, FeedState, FeedViewModel } from './FeedViewModel';
@@ -38,11 +39,13 @@ export function FeedScreen(): ReactNode {
   }, [location, navigate]);
   const close = useCallback(() => closeRef.current(), []);
 
-  const create = useCallback(() => container.createFeedViewModel({ postId, seed, navigator: { close } }), [container, postId, seed, close]);
+  // 만들자마자 load를 시작한다: 시드가 있으면 같은 효과 안에서 content가 되므로 loading 프레임이 그려지지 않는다.
+  const create = useCallback(() => {
+    const created = container.createFeedViewModel({ postId, seed, navigator: { close } });
+    void created.load();
+    return created;
+  }, [container, postId, seed, close]);
   const vm = useOwnedViewModel(create);
-  useEffect(() => {
-    if (vm) void vm.load();
-  }, [vm]);
 
   return vm ? <FeedBody vm={vm} onClose={close} /> : null;
 }
@@ -50,6 +53,14 @@ export function FeedScreen(): ReactNode {
 function FeedBody({ vm, onClose }: { vm: FeedViewModel; onClose: () => void }): ReactNode {
   const state = useViewModel(vm);
   useScrollRestore(state.view.kind !== 'loading');
+  // 다른 탭·앱에서 돌아와 문서가 다시 보이면 내용을 조용히 재검증한다(실패하면 내용 유지 + 토스트).
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void vm.refresh();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [vm]);
   const { view } = state;
   return (
     <div data-testid="feed.root">
@@ -118,44 +129,58 @@ function ZoomablePhoto({ post }: { post: FeedPost }): ReactNode {
   const pointers = useRef(new Map<number, Point>());
   const start = useRef<{ distance: number; scale: number } | null>(null);
   const [zoom, setZoom] = useState(releaseZoom);
+  const scaleRef = useRef(zoom.scale);
+  useEffect(() => {
+    scaleRef.current = zoom.scale;
+  }, [zoom.scale]);
 
-  const frameSize = () => {
+  const apply = useCallback((toScale: number, focalClient: Point) => {
     const rect = frameRef.current?.getBoundingClientRect();
-    return { width: rect?.width ?? 0, height: rect?.height ?? 0, left: rect?.left ?? 0, top: rect?.top ?? 0 };
-  };
-  const apply = (toScale: number, focalClient: Point) => {
-    const frame = frameSize();
+    const frame = { width: rect?.width ?? 0, height: rect?.height ?? 0, left: rect?.left ?? 0, top: rect?.top ?? 0 };
     const focal = { x: focalClient.x - frame.left - frame.width / 2, y: focalClient.y - frame.top - frame.height / 2 };
     setZoom((prev) => {
       const scale = clampZoomScale(toScale);
       if (scale <= 1) return releaseZoom();
       return { scale, translate: zoomAroundPoint({ focal, translate: prev.translate, fromScale: prev.scale, toScale: scale, size: frame }) };
     });
-  };
-  const distanceAndCenter = () => {
+  }, []);
+
+  // Ctrl+휠(웹 데스크톱의 핀치): 브라우저 확대로 번지지 않게 preventDefault가 필요하므로 passive:false 네이티브 리스너로 단다.
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el) return;
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      apply(scaleRef.current * Math.exp(-event.deltaY / 100), { x: event.clientX, y: event.clientY });
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [apply]);
+
+  const pair = () => {
     const [a, b] = [...pointers.current.values()];
     if (!a || !b) return null;
     return { distance: Math.hypot(a.x - b.x, a.y - b.y), center: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
   };
   const onPointerDown = (event: ReactPointerEvent) => {
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    const pair = distanceAndCenter();
-    if (pair && pointers.current.size === 2) start.current = { distance: pair.distance, scale: zoom.scale };
+    // 손가락이 사진 밖으로 나가도 이동·해제 이벤트를 계속 받는다(없는 환경에서는 건너뛴다).
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    const current = pair();
+    if (current && pointers.current.size === 2) start.current = { distance: current.distance, scale: scaleRef.current };
   };
   const onPointerMove = (event: ReactPointerEvent) => {
     if (!pointers.current.has(event.pointerId)) return;
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    const pair = distanceAndCenter();
-    if (pair && start.current) apply(pinchScale(start.current.scale, start.current.distance, pair.distance), pair.center);
+    const current = pair();
+    if (current && start.current) apply(pinchScale(start.current.scale, start.current.distance, current.distance), current.center);
   };
+  // 놓음·취소·캡처 상실 모두 같은 정리: 남은 포인터가 없으면 원래 크기로 돌아간다.
   const onPointerEnd = (event: ReactPointerEvent) => {
     pointers.current.delete(event.pointerId);
     if (pointers.current.size < 2) start.current = null;
     if (pointers.current.size === 0) setZoom(releaseZoom());
-  };
-  const onWheel = (event: WheelEvent) => {
-    if (!event.ctrlKey) return;
-    apply(zoom.scale * Math.exp(-event.deltaY / 100), { x: event.clientX, y: event.clientY });
   };
   const content: CSSProperties = {
     position: 'relative',
@@ -171,7 +196,7 @@ function ZoomablePhoto({ post }: { post: FeedPost }): ReactNode {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerEnd}
       onPointerCancel={onPointerEnd}
-      onWheel={onWheel}
+      onLostPointerCapture={onPointerEnd}
     >
       <div data-testid="feed.photo-content" style={content}>
         <img
@@ -195,33 +220,45 @@ const sheet: CSSProperties = { width: 'min(90vw, 360px)', padding: 16, borderRad
 
 function TitleDialog({ vm, state }: { vm: FeedViewModel; state: FeedState }): ReactNode {
   const dialog = state.titleDialog;
+  const ref = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  const inputId = useId();
+  useDialogFocus(ref, { onClose: dialog.saving ? undefined : () => vm.cancelTitleEdit(), initialFocus: inputRef });
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    void vm.saveTitle();
+  };
   return (
     <div style={overlay}>
-      <div data-testid="feed.title-dialog" role="dialog" aria-modal="true" aria-label={t('feed.edit.title')} style={sheet}>
-        <h2 style={{ margin: '0 0 8px', fontSize: 16 }}>{t('feed.edit.title')}</h2>
-        <input
-          ref={inputRef}
-          data-testid="feed.title-input"
-          value={dialog.input}
-          placeholder={t('feed.edit.placeholder')}
-          disabled={dialog.saving}
-          onChange={(event) => vm.setTitleInput(event.target.value)}
-          style={{ width: '100%', boxSizing: 'border-box' }}
-        />
-        {dialog.error ? <p role="alert">{dialog.error}</p> : null}
-        {dialog.saving ? <span data-testid="feed.title-saving" role="status" aria-busy="true" /> : null}
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
-          <button type="button" data-testid="feed.title-cancel-button" disabled={dialog.saving} onClick={() => vm.cancelTitleEdit()}>
-            {t('feed.edit.cancel')}
-          </button>
-          <button type="button" data-testid="feed.title-save-button" disabled={dialog.saving} onClick={() => void vm.saveTitle()}>
-            {dialog.saving ? t('feed.edit.saving') : t('feed.edit.save')}
-          </button>
-        </div>
+      <div ref={ref} data-testid="feed.title-dialog" role="dialog" aria-modal="true" aria-labelledby={`${inputId}-title`} style={sheet}>
+        <form onSubmit={submit}>
+          <h2 id={`${inputId}-title`} style={{ margin: '0 0 8px', fontSize: 16 }}>
+            {t('feed.edit.title')}
+          </h2>
+          <label htmlFor={inputId} style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
+            {t('feed.edit.title')}
+          </label>
+          <input
+            id={inputId}
+            ref={inputRef}
+            data-testid="feed.title-input"
+            value={dialog.input}
+            placeholder={t('feed.edit.placeholder')}
+            readOnly={dialog.saving}
+            onChange={(event) => vm.setTitleInput(event.target.value)}
+            style={{ width: '100%', boxSizing: 'border-box' }}
+          />
+          {dialog.error ? <p role="alert">{dialog.error}</p> : null}
+          {dialog.saving ? <span data-testid="feed.title-saving" role="status" aria-busy="true" /> : null}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+            <button type="button" data-testid="feed.title-cancel-button" disabled={dialog.saving} onClick={() => vm.cancelTitleEdit()}>
+              {t('feed.edit.cancel')}
+            </button>
+            <button type="submit" data-testid="feed.title-save-button" disabled={dialog.saving}>
+              {dialog.saving ? t('feed.edit.saving') : t('feed.edit.save')}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -229,20 +266,26 @@ function TitleDialog({ vm, state }: { vm: FeedViewModel; state: FeedState }): Re
 
 function DeleteDialog({ vm, state }: { vm: FeedViewModel; state: FeedState }): ReactNode {
   const { deleting } = state.deleteDialog;
+  const ref = useRef<HTMLDivElement | null>(null);
+  const cancelRef = useRef<HTMLButtonElement | null>(null);
+  useDialogFocus(ref, { onClose: deleting ? undefined : () => vm.cancelDelete(), initialFocus: cancelRef });
   return (
     <div style={overlay}>
-      <div data-testid="feed.delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="feed-delete-title" style={sheet}>
+      <div ref={ref} data-testid="feed.delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="feed-delete-title" aria-describedby="feed-delete-body" style={sheet}>
         <h2 id="feed-delete-title" data-testid="feed.delete-title" style={{ margin: '0 0 8px', fontSize: 16 }}>
           {t('feed.delete.title')}
         </h2>
-        <p data-testid="feed.delete-body">{t('feed.delete.body')}</p>
+        <p id="feed-delete-body" data-testid="feed.delete-body">
+          {t('feed.delete.body')}
+        </p>
         {deleting ? (
           <span data-testid="feed.deleting" role="status" aria-busy="true">
             {webOnlyCopy['feed.deleting']}
           </span>
         ) : null}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
-          <button type="button" data-testid="feed.delete-cancel-button" disabled={deleting} onClick={() => vm.cancelDelete()}>
+          {/* 되돌릴 수 없는 삭제라 처음 포커스는 취소에 둔다. */}
+          <button ref={cancelRef} type="button" data-testid="feed.delete-cancel-button" disabled={deleting} onClick={() => vm.cancelDelete()}>
             {t('feed.delete.cancel')}
           </button>
           <button type="button" data-testid="feed.delete-confirm-button" disabled={deleting} onClick={() => void vm.confirmDelete()}>

@@ -35,7 +35,7 @@ export function LikeButton({
       >
         <span aria-hidden="true">{isLiked ? '♥' : '♡'}</span>
       </button>
-      <span data-testid={countTestId}>{likeCount}</span>
+      <span data-testid={countTestId} aria-hidden="true">{likeCount}</span>
     </span>
   );
 }

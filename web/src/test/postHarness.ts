@@ -55,14 +55,14 @@ export function createPostHarness(options: PostHarnessOptions = {}) {
     new DisplayViewModel({ mode, clock: env.clock, repository: displayRepository, likes, changes, toast, guestGate, navigator, ...overrides });
 
   const feed = (
-    args: { postId: string; seed?: PostSeed | null; assumeMine?: boolean; userId?: string | null; repository?: FeedRepository },
+    args: { postId: string; seed?: PostSeed | null; assumeMine?: boolean; userId?: string | null; getUserId?: () => Promise<string | null>; repository?: FeedRepository },
   ) => {
     const feedNavigator = new FakeFeedNavigator();
     const vm = new FeedViewModel({
       postId: args.postId,
       seed: args.seed ?? null,
       assumeMine: args.assumeMine,
-      getUserId: async () => (args.userId === undefined ? ME : args.userId),
+      getUserId: args.getUserId ?? (async () => (args.userId === undefined ? ME : args.userId)),
       clock: env.clock,
       repository: args.repository ?? feedRepository,
       likes,

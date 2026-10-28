@@ -141,7 +141,7 @@ export class FeedViewModel extends ViewModel<FeedState> {
     return this.read();
   }
 
-  /** 이미 내용이 보이는 상태에서 다시 확인(복귀). 실패하면 내용을 유지하고 토스트만. */
+  /** 이미 내용이 보이는 상태에서 다시 확인(문서가 다시 보일 때 화면이 부른다). 실패하면 내용을 유지하고 토스트만. */
   refresh(): Promise<void> {
     return this.read();
   }
@@ -183,7 +183,12 @@ export class FeedViewModel extends ViewModel<FeedState> {
     this.update({});
     const dialog = this.state.titleDialog;
     const { post, canEditTitle } = this.state;
-    if (!dialog.open || dialog.saving || !canEditTitle || !post) return;
+    if (!dialog.open || dialog.saving || !post) return;
+    if (!canEditTitle) {
+      // 다이얼로그가 열린 채 KST 자정을 지났다: 요청은 보내지 않고(REQ-FEED-017) 사유를 보여 준다(REQ-FEED-023, 입력은 유지).
+      if (this.state.isMine) this.setState({ titleDialog: { ...dialog, error: t('feed.edit.error.state') } });
+      return;
+    }
     this.setState({ titleDialog: { ...dialog, saving: true, error: null } });
     try {
       const result = await this.deps.repository.updateTitle(post.id, titlePayload(dialog.input));
@@ -269,7 +274,8 @@ export class FeedViewModel extends ViewModel<FeedState> {
       this.onReadFailure(error);
       return;
     }
-    const userId = await this.deps.getUserId().catch(() => null);
+    // 저장된 userId를 읽지 못하면(저장소 오류) 판정을 바꾸지 않고 지금의 isMine을 유지한다. 게스트·미확인(null)과는 다르다.
+    const userId = await this.deps.getUserId().catch(() => undefined);
     if (this.closed || token !== this.loadSeq) return;
     const [merged] = this.deps.likes.merge([{ id: detail.id, isLiked: detail.isLiked, likeCount: detail.likeCount }], stamp);
     const current = this.state.post;
@@ -277,7 +283,7 @@ export class FeedViewModel extends ViewModel<FeedState> {
       view: { kind: 'content' },
       confirmed: true,
       refreshing: false,
-      isMine: this.deps.assumeMine === true || (userId !== null && detail.authorId === userId),
+      isMine: this.deps.assumeMine === true || (userId === undefined ? this.state.isMine : userId !== null && detail.authorId === userId),
       post: {
         id: detail.id,
         authorId: detail.authorId,
