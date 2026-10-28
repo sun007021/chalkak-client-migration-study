@@ -1,22 +1,23 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import '../../../core/copy/ko.g.dart';
-import '../../../core/network/url_rule.dart';
 import '../domain/record_calendar_grid.dart';
 import '../domain/record_calendar_image.dart';
 import '../domain/record_models.dart';
+import 'http_calendar_thumbnail_loader.dart';
 
 /// 썸네일 URL의 바이트를 받는다. 받지 못하면 null이고, 그 칸은 사진 대신 색 칸으로 그린다.
-typedef CalendarThumbnailLoader = Future<Uint8List?> Function(String url);
 
 /// `dart:ui`로 달력을 PNG로 그리는 [CalendarImageRenderer]. 월 제목, 요일 머리글, 날짜 숫자,
 /// 사진이 있는 날 표시를 담는다. 썸네일은 받을 수 있는 것만 담고 못 받은 칸은 색 칸으로 둔다
 /// (썸네일 포함 여부는 spec 확인 필요 항목이라 저장 자체를 실패시키지 않는다).
 class PngCalendarImageRenderer implements CalendarImageRenderer {
-  const PngCalendarImageRenderer({this.thumbnailLoader = _downloadThumbnail});
+  const PngCalendarImageRenderer({this.thumbnailLoader = _defaultLoader});
+
+  static Future<Uint8List?> _defaultLoader(String url) =>
+      const HttpCalendarThumbnailLoader()(url);
 
   final CalendarThumbnailLoader thumbnailLoader;
 
@@ -26,7 +27,6 @@ class PngCalendarImageRenderer implements CalendarImageRenderer {
   static const double _titleHeight = 160;
   static const double _weekdayHeight = 72;
   static const Duration _loadTimeout = Duration(seconds: 10);
-  static const int _maxThumbnailBytes = 5 * 1024 * 1024;
 
   static const ui.Color _background = ui.Color(0xFFFFFFFF);
   static const ui.Color _ink = ui.Color(0xFF1B1B1F);
@@ -96,13 +96,19 @@ class PngCalendarImageRenderer implements CalendarImageRenderer {
       }
 
       final picture = recorder.endRecording();
-      final image = await picture.toImage(_width.toInt(), height.ceil());
       try {
-        final data = await image.toByteData(format: ui.ImageByteFormat.png);
-        if (data == null) throw StateError('PNG 인코딩 결과가 없다');
-        return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+        final image = await picture.toImage(_width.toInt(), height.ceil());
+        try {
+          final data = await image.toByteData(format: ui.ImageByteFormat.png);
+          if (data == null) throw StateError('PNG 인코딩 결과가 없다');
+          return data.buffer.asUint8List(
+            data.offsetInBytes,
+            data.lengthInBytes,
+          );
+        } finally {
+          image.dispose();
+        }
       } finally {
-        image.dispose();
         picture.dispose();
       }
     } finally {
@@ -242,28 +248,6 @@ class PngCalendarImageRenderer implements CalendarImageRenderer {
       }
     } on Object {
       return null;
-    }
-  }
-
-  static Future<Uint8List?> _downloadThumbnail(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri == null || !UrlRule.isAllowed(uri)) return null;
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
-    try {
-      final request = await client.getUrl(uri);
-      final response = await request.close();
-      if (response.statusCode != HttpStatus.ok) {
-        await response.drain<void>();
-        return null;
-      }
-      final builder = BytesBuilder(copy: false);
-      await for (final chunk in response) {
-        builder.add(chunk);
-        if (builder.length > _maxThumbnailBytes) return null;
-      }
-      return builder.takeBytes();
-    } finally {
-      client.close(force: true);
     }
   }
 }

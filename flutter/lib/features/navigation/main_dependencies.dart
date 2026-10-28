@@ -10,6 +10,10 @@ import '../home/domain/home_repository.dart';
 import '../home/domain/today_post_repository.dart';
 import '../home/presentation/home_screen.dart';
 import '../like/domain/like_store.dart';
+import '../record/domain/record_calendar_image.dart';
+import '../record/domain/record_data_cleaner.dart';
+import '../record/domain/record_post_events.dart';
+import '../record/domain/record_repository.dart';
 import 'domain/guest_flag.dart';
 
 /// 메인(홈·전시 탭·상세·배너·업로드 게이트)이 쓰는 의존성 묶음. `AppDependencies.main`으로 들어간다.
@@ -29,6 +33,11 @@ class MainDependencies {
     required this.likeStore,
     required this.postEvents,
     required this.guestFlag,
+    required this.recordRepository,
+    required this.recordImageRenderer,
+    required this.recordImageSaver,
+    required this.recordPostEvents,
+    required this.recordCleaner,
   });
 
   final HomeRepository homeRepository;
@@ -46,4 +55,11 @@ class MainDependencies {
   final LikeStore likeStore;
   final PostEventBus postEvents;
   final GuestFlag guestFlag;
+
+  /// 기록 탭. [recordPostEvents]와 [recordCleaner]는 기록 ViewModel보다 오래 산다.
+  final RecordRepository recordRepository;
+  final CalendarImageRenderer recordImageRenderer;
+  final CalendarImageSaver recordImageSaver;
+  final RecordPostEvents recordPostEvents;
+  final RecordDataCleaner recordCleaner;
 }
