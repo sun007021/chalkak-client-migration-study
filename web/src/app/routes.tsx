@@ -16,6 +16,9 @@ import { DisplayScreen } from '../features/display/DisplayScreen';
 import { FeedScreen } from '../features/feed/FeedScreen';
 import { HomeScreen } from '../features/home/HomeScreen';
 import { TermsScreen } from '../features/onboarding/TermsScreen';
+import { UploadEntryLoading } from '../features/upload/UploadEntryLoading';
+import { UploadScreen } from '../features/upload/UploadScreen';
+import { UploadSuccessScreen } from '../features/upload/UploadSuccessScreen';
 import { SignatureDrawScreen } from '../features/signature/SignatureDrawScreen';
 import { SignaturePreviewScreen } from '../features/signature/SignaturePreviewScreen';
 import { MemberOnly } from '../features/shell/MemberOnly';
@@ -79,6 +82,7 @@ function RootLayout({ container }: { container: AppContainer }): ReactNode {
             <Outlet />
           </main>
           <div ref={setBottomBarSlot} />
+          <UploadEntryLoading />
           <ToastHost controller={container.toast} />
         </BottomBarSlotContext.Provider>
       </AnalyticsProvider>
@@ -137,6 +141,14 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
         {
           element: <RequireSession container={container}>{(mode) => <MemberOnly mode={mode} action="feed"><Outlet /></MemberOnly>}</RequireSession>,
           children: [{ path: `${ROUTES.feed}/:postId`, element: <FeedScreen /> }],
+        },
+        // 업로드: 회원만, 탭 셸 밖(하단 바 없음). 게스트가 URL로 오면 홈으로 + nav.guest.upload 토스트.
+        {
+          element: <RequireSession container={container}>{(mode) => <MemberOnly mode={mode} action="upload"><Outlet /></MemberOnly>}</RequireSession>,
+          children: [
+            { path: ROUTES.upload, element: <UploadScreen /> },
+            { path: ROUTES.uploadSuccess, element: <UploadSuccessScreen /> },
+          ],
         },
         ...devSessionRoutes(container),
         { path: '*', element: <Navigate to={ROUTES.boot} replace /> },

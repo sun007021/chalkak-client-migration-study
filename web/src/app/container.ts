@@ -70,8 +70,19 @@ import type { SignatureRasterizer } from '../features/signature/SignatureRasteri
 import { SignatureRepository } from '../features/signature/SignatureRepository';
 import { GuestGate } from '../features/shell/GuestGate';
 import { MainShellViewModel } from '../features/shell/MainShellViewModel';
-import { NoopUploadEntry } from '../features/shell/UploadEntry';
 import type { UploadEntry } from '../features/shell/UploadEntry';
+import { BrowserImageDecoder, BrowserWebpCompressor } from '../features/upload/browserImage';
+import { BrowserCameraCaptureSupport } from '../features/upload/CameraCaptureSupport';
+import type { CameraCaptureSupport } from '../features/upload/CameraCaptureSupport';
+import { IdentityEditRenderer } from '../features/upload/imagePorts';
+import type { EditRenderer, ImageDecoder, WebpCompressor } from '../features/upload/imagePorts';
+import { PhotoPreparer } from '../features/upload/PhotoPreparer';
+import type { PhotoEditorComponent } from '../features/upload/photoEditor';
+import { UploadGate } from '../features/upload/UploadGate';
+import { AttachableUploadNavigator } from '../features/upload/UploadNavigator';
+import { UploadRepository } from '../features/upload/UploadRepository';
+import { UploadResultStore } from '../features/upload/UploadResult';
+import { UploadViewModel } from '../features/upload/UploadViewModel';
 import type { SessionMode } from '../features/boot/authGate';
 import { BootViewModel } from '../features/boot/BootViewModel';
 import { NoopHomePreloader } from '../features/boot/HomePreloader';
@@ -109,8 +120,18 @@ export interface AppContainerOptions {
   sessionChannel?: SessionChannel;
   /** 목록 끝 센티넬이 보이는지 보는 수단. 기본 IntersectionObserver(없는 환경이면 null=자동 다음 페이지 읽기 없음). */
   visibilityObserver?: VisibilityObserverFactory | null;
-  /** 업로드 버튼(회원)이 부르는 진입. 기본 NoopUploadEntry. */
+  /** 업로드 버튼(회원)이 부르는 진입. 기본 UploadGate(container.uploadGate). 테스트가 Fake로 덮어쓰면 uploadGate는 null. */
   uploadEntry?: UploadEntry;
+  /** 사진 디코드(EXIF 반영·다운샘플). 기본 BrowserImageDecoder. */
+  imageDecoder?: ImageDecoder;
+  /** WebP 한 번 압축. 기본 BrowserWebpCompressor(canvas, 안 되면 WASM). */
+  webpCompressor?: WebpCompressor;
+  /** 편집값 적용. 기본 IdentityEditRenderer(W7b 전). */
+  editRenderer?: EditRenderer;
+  /** 카메라 버튼 표시 판정. 기본 BrowserCameraCaptureSupport. */
+  cameraCapture?: CameraCaptureSupport;
+  /** 편집기 화면(W7b). 기본 null = 편집기 없음(고른 사진은 편집하지 않은 값으로 바로 확정). */
+  photoEditor?: PhotoEditorComponent | null;
   /** 약관 문서를 새 탭으로 여는 수단. 기본 WindowExternalLinkOpener. */
   externalLinkOpener?: ExternalLinkOpener;
   /** 사인 PNG 내보내기. 기본 CanvasSignatureRasterizer(canvas). */
@@ -142,6 +163,16 @@ export interface AppContainer {
   devSessionEnabled: boolean;
   guestGate: GuestGate;
   uploadEntry: UploadEntry;
+  /** 기본 진입 구현. options.uploadEntry를 주면 null. 라우트 루트의 UploadEntryLoading이 checking을 구독한다. */
+  uploadGate: UploadGate | null;
+  /** 게이트가 화면을 여는 통로. 라우트 루트가 마운트되는 동안 RouterUploadNavigator를 꽂는다. */
+  uploadNavigator: AttachableUploadNavigator;
+  uploadRepository: UploadRepository;
+  photoPreparer: PhotoPreparer;
+  /** 업로드 화면 → 성공 화면 사이 결과(메모리). 계정 전환 때 비운다. */
+  uploadResults: UploadResultStore;
+  cameraCapture: CameraCaptureSupport;
+  photoEditor: PhotoEditorComponent | null;
   /** 다른 탭의 로그아웃·계정 전환을 받는다. 라우트 루트가 마운트될 때 start()한다. */
   crossTabSync: CrossTabSessionSync;
   /** 인증 헤더 없는 presigned PUT(사진·사인). */
@@ -193,6 +224,8 @@ export interface AppContainer {
   /** 빈 패드(1024×512)로 시작한다. */
   createSignatureDrawViewModel(mode: SignatureMode): SignatureDrawViewModel;
   createSignaturePreviewViewModel(mode: SignatureMode, png: Blob): SignaturePreviewViewModel;
+  /** 업로드 화면이 마운트될 때마다 새 ViewModel을 만든다. topicDate는 게이트가 고정한 값(location.state). */
+  createUploadViewModel(topicDate: string): UploadViewModel;
 }
 
 /**
@@ -287,6 +320,36 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
       displaySession?.viewModel.resetForAccountChange();
     },
   });
+  const uploadNavigator = new AttachableUploadNavigator();
+  const uploadResults = new UploadResultStore();
+  const uploadRepository = new UploadRepository({ api });
+  const homeRepository = new HomeRepository({ api });
+  const photoPreparer = new PhotoPreparer({
+    repository: uploadRepository,
+    decoder: options.imageDecoder ?? new BrowserImageDecoder(),
+    compressor: options.webpCompressor ?? new BrowserWebpCompressor(),
+    renderer: options.editRenderer ?? new IdentityEditRenderer(),
+    clock,
+  });
+  const guestGate = new GuestGate({ toast });
+  const uploadGate = options.uploadEntry
+    ? null
+    : new UploadGate({
+        mode: async () => {
+          const session = await store.read();
+          return session.userId && session.tokens ? 'member' : 'guest';
+        },
+        guestGate,
+        today: homeRepository,
+        navigator: uploadNavigator,
+        toast,
+      });
+  userCaches.register({
+    clear: () => {
+      uploadResults.clear();
+      uploadGate?.cancel();
+    },
+  });
   const container: AppContainer = {
     clock,
     logger,
@@ -305,8 +368,15 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     preloader: options.preloader ?? new NoopHomePreloader(),
     accountService: new AccountService({ authApi, store, userCaches, toast, sessionEvents, logger }),
     devSessionEnabled,
-    guestGate: new GuestGate({ toast }),
-    uploadEntry: options.uploadEntry ?? new NoopUploadEntry(),
+    guestGate,
+    uploadEntry: options.uploadEntry ?? uploadGate!,
+    uploadGate,
+    uploadNavigator,
+    uploadRepository,
+    photoPreparer,
+    uploadResults,
+    cameraCapture: options.cameraCapture ?? new BrowserCameraCaptureSupport(),
+    photoEditor: options.photoEditor ?? null,
     crossTabSync,
     presignedUploader,
     externalLinkOpener: options.externalLinkOpener ?? new WindowExternalLinkOpener(),
@@ -316,7 +386,7 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     blobUrls: options.blobUrls ?? new ObjectUrlFactory(),
     signatureRepository,
     signatureCard,
-    homeRepository: new HomeRepository({ api }),
+    homeRepository,
     displayRepository: new DisplayRepository({ api }),
     feedRepository: new FeedRepository({ api }),
     likeRepository,
@@ -429,6 +499,18 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
         submitter: mode === 'onboarding' ? this.signupService : this.changeSignatureService,
         toast: this.toast,
         refreshSignatureCard: mode === 'change' ? () => this.signatureCard.refresh() : undefined,
+      });
+    },
+    createUploadViewModel(topicDate) {
+      return new UploadViewModel({
+        topicDate,
+        repository: this.uploadRepository,
+        today: this.homeRepository,
+        preparer: this.photoPreparer,
+        uploader: this.presignedUploader,
+        results: this.uploadResults,
+        changes: this.postChanges,
+        editorEnabled: this.photoEditor !== null,
       });
     },
     createBootViewModel() {

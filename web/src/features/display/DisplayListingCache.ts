@@ -88,7 +88,8 @@ export class DisplayListingCache {
       let pages: PostItem[][];
       if (change.type === 'like') pages = listing.pages.map((page) => page.map((post) => (same(post) ? { ...post, isLiked: change.isLiked, likeCount: change.likeCount } : post)));
       else if (change.type === 'title') pages = listing.pages.map((page) => page.map((post) => (same(post) ? { ...post, title: change.title } : post)));
-      else pages = listing.pages.map((page) => page.filter((post) => !same(post)));
+      else if (change.type === 'removed') pages = listing.pages.map((page) => page.filter((post) => !same(post)));
+      else continue;
       this.listings.set(key, withPages(listing, pages));
     }
   }

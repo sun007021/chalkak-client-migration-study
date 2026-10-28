@@ -22,6 +22,11 @@ export interface PresignedPutRequest {
   /** 정책이 준 Content-Type(사진 image/webp, 사인 image/png). */
   contentType: string;
   signal?: AbortSignal;
+  /**
+   * true면 네트워크 오류·5xx에 0.5s, 1s 백오프로 최대 2회 자동 재시도한다(D-21: PUT은 멱등, 사진 업로드 TC-UPL-055). 4xx는 재시도하지 않는다.
+   * 기본 false(사인 업로드는 기존 동작 그대로).
+   */
+  retry?: boolean;
 }
 
 /** presigned PUT: 타임아웃 60초, Authorization·Accept 등 앱 공통 헤더 없이 Content-Type만. 비 2xx는 ApiError(status, null). */

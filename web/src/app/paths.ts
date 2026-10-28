@@ -15,6 +15,10 @@ export const ROUTES = {
   changeSignaturePreview: '/settings/signature/preview',
   /** 알림함(홈 벨). 화면은 알림 PR. 지금은 자리표시. */
   notifications: '/notifications',
+  /** 업로드 화면(게이트 통과 뒤 push, state { topicDate }). 탭 셸 밖, 하단 바 없음. */
+  upload: '/upload',
+  /** 업로드 성공 화면(업로드 화면을 replace). */
+  uploadSuccess: '/upload/success',
   /** 게시물 상세(피드) 접두. 실제 경로는 `${ROUTES.feed}/:postId`(feedPath). 화면은 전시·피드 PR. 지금은 자리표시. */
   feed: '/feed',
 } as const;
