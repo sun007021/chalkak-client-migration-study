@@ -333,7 +333,11 @@ class MainHostTest {
     @Test
     fun `TC-NAV-031 알림 벨을 연타해도 알림 화면은 하나만 쌓여 뒤로 한 번에 홈이다`() {
         launch()
-        repeat(3) { node("home.notification-button").performClick() }
+        // The first tap opens the screen and the bell leaves the tree, so the repeated taps are the same user-tap request the host
+        // would forward from a fast triple tap (the old body clicked a node that no longer exists).
+        node("home.notification-button").performClick()
+        rule.waitForIdle()
+        repeat(2) { rule.runOnUiThread { rig.nav.open(Route.Notifications) } }
         rule.waitForIdle()
         assertEquals(1, rig.nav.stack.count { it == Route.Notifications })
         systemBack()

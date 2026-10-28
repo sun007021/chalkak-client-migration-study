@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -146,7 +147,10 @@ fun HomeScreen(
                 item(key = "hero") { HeroBlock(state, callbacks, image) }
                 if (state.aiCardVisible) {
                     item(key = "ai") {
-                        Box(Modifier.fillMaxWidth().padding(horizontal = ScreenPadding).padding(top = SectionGap).testTag("home.ai-card")) { aiCard() }
+                        // The card content (AIR PR) fills this box; until then it keeps a 16dp row so the container is a real, displayed node.
+                        Box(
+                            Modifier.fillMaxWidth().padding(horizontal = ScreenPadding).padding(top = SectionGap).heightIn(min = 16.dp).testTag("home.ai-card"),
+                        ) { aiCard() }
                     }
                 }
                 item(key = "week") { WeekBlock(state.week, callbacks, image) }
