@@ -30,15 +30,21 @@ import kr.chalkak.feature.home.LikeControllerToggler
 import kr.chalkak.feature.navigation.AccessMode
 import kr.chalkak.feature.navigation.NavigationController
 import kr.chalkak.feature.navigation.Tab
+import java.time.LocalDate
 import java.util.concurrent.CopyOnWriteArrayList
+import kr.chalkak.feature.upload.UploadGateEffect
 
 /** Upload gate stand-in: counts `GET /posts/today` runs, optionally held on [hold]. */
-class RecordingUploadGate(var opens: Boolean = true, var hold: CompletableDeferred<Unit>? = null) : UploadEntryGate {
+class RecordingUploadGate(var result: UploadGateEffect = Open, var hold: CompletableDeferred<Unit>? = null) : UploadEntryGate {
     var calls = 0
-    override suspend fun enter(): Boolean {
+    override suspend fun enter(): UploadGateEffect {
         calls++
         hold?.await()
-        return opens
+        return result
+    }
+
+    companion object {
+        val Open = UploadGateEffect.Open(LocalDate.of(2026, 10, 28))
     }
 }
 

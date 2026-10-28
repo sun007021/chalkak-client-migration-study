@@ -9,6 +9,8 @@ import kr.chalkak.feature.navigation.NavOutcome
 import kr.chalkak.feature.navigation.NavigationController
 import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
+import kr.chalkak.feature.upload.UploadCopyKeys
+import kr.chalkak.feature.upload.UploadGateEffect
 
 /**
  * Executes what the main area's inputs ask for and what the [NavigationController] answers: toasts for blocked guest actions, the
@@ -40,14 +42,16 @@ class MainCoordinator(
         when (val outcome = nav.onUploadButton()) {
             is NavOutcome.Blocked -> showToast(copy[outcome.copyKey])
             NavOutcome.StartUploadGate -> session.scope.launch {
-                val opened = try {
+                val effect = try {
                     deps.uploadGate.enter()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    false
+                    UploadGateEffect.Toast(0, UploadCopyKeys.GATE_CHECK_FAILED)
                 }
-                nav.onUploadGateFinished(opened)
+                if (effect is UploadGateEffect.Toast) showToast(copy[effect.copyKey])
+                // LoginRequired: the 401 also arrives as AuthEvent.GoToLogin, which ends the session (the controller then drops this result).
+                nav.onUploadGateFinished(effect is UploadGateEffect.Open)
             }
             else -> Unit
         }

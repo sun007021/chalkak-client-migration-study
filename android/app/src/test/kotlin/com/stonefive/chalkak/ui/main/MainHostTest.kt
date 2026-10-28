@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import com.stonefive.chalkak.testing.MainRig
+import com.stonefive.chalkak.testing.RecordingUploadGate
 import com.stonefive.chalkak.testing.awaitTag
 import com.stonefive.chalkak.testing.hasNode
 import com.stonefive.chalkak.testing.loadCopy
@@ -28,6 +29,7 @@ import kr.chalkak.feature.navigation.AccessMode
 import kr.chalkak.feature.navigation.FeedSource
 import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
+import kr.chalkak.feature.upload.UploadGateEffect
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -193,13 +195,26 @@ class MainHostTest {
     }
 
     @Test
-    fun `TC-NAV-005 게이트가 열지 않기로 하면 업로드 화면 없이 현재 화면과 하단바가 그대로다`() {
-        launch { gate.opens = false }
+    fun `TC-NAV-005 게이트가 열지 않기로 하면 업로드 화면 없이 안내 토스트를 보이고 현재 화면과 하단바가 그대로다`() {
+        launch { gate.result = UploadGateEffect.Toast(1, "upload.gate.already-posted") }
         tap("bottom-bar.upload-button")
         assertEquals(1, rig.gate.calls)
+        assertToast(copy["upload.gate.already-posted"])
         node("upload.root").assertDoesNotExist()
         node("bottom-bar.root").assertIsDisplayed()
         assertSelectedTab(Tab.Home)
+    }
+
+    @Test
+    fun `TC-NAV-005 게이트가 던져도 확인 실패 토스트를 보이고 다음 탭에서 게이트를 다시 부를 수 있다`() {
+        launch()
+        rig.gate.result = UploadGateEffect.Toast(1, "upload.gate.check-failed")
+        tap("bottom-bar.upload-button")
+        assertToast(copy["upload.gate.check-failed"])
+        rig.gate.result = RecordingUploadGate.Open
+        tap("bottom-bar.upload-button")
+        rule.awaitTag("upload.root")
+        assertEquals(2, rig.gate.calls)
     }
 
     @Test

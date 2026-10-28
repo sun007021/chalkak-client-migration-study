@@ -1,6 +1,7 @@
 package com.stonefive.chalkak.ui.main
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -20,6 +21,7 @@ import androidx.compose.ui.platform.testTag
 import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.ui.home.HomeRoute
 import com.stonefive.chalkak.ui.issue.IssueWebRoute
+import com.stonefive.chalkak.viewmodel.SessionHolders
 import com.stonefive.chalkak.viewmodel.rememberStateHolder
 import com.stonefive.chalkak.ui.home.RemoteImage
 import com.stonefive.chalkak.ui.issue.IssueWebContent
@@ -33,13 +35,16 @@ import kr.chalkak.feature.navigation.AccessMode
 import kr.chalkak.feature.navigation.NavigationController
 import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
+import kr.chalkak.feature.upload.UploadGateEffect
 
 /**
- * Upload entry gate port: the host calls it once per accepted upload-button tap (`GET /posts/today` lives behind it) and reports the
- * result to `NavigationController.onUploadGateFinished(opened)`. `true` = the upload screen may open.
+ * Upload entry gate port: the host calls it once per accepted upload-button tap (`GET /posts/today` lives behind it). The answer is
+ * the upload feature's [UploadGateEffect]: `Open` lets the upload screen open, `Toast` is shown (REQ-UPL-003/004/007), `LoginRequired`
+ * (a 401 that survived the refresh) is handled by the auth event that the network layer sends. Either way the controller is told that
+ * the gate finished.
  */
 fun interface UploadEntryGate {
-    suspend fun enter(): Boolean
+    suspend fun enter(): UploadGateEffect
 }
 
 /** "Scroll the visible list of this tab to the top" request: every [request] increments [count]; the tab content scrolls on a change. */
@@ -101,6 +106,22 @@ fun MainHost(
     onExitApp: () -> Unit,
     modifier: Modifier = Modifier,
     sessionKey: Int = 0,
+) {
+    val activity = LocalActivity.current
+    // The holders of a finished session are cleared with it (not kept in the Activity's store until the Activity dies).
+    SessionHolders(sessionKey, isChangingConfigurations = { activity?.isChangingConfigurations == true }) {
+        MainHostContent(nav, deps, showToast, onExitApp, modifier, sessionKey)
+    }
+}
+
+@Composable
+private fun MainHostContent(
+    nav: NavigationController,
+    deps: MainDependencies,
+    showToast: (String) -> Unit,
+    onExitApp: () -> Unit,
+    modifier: Modifier,
+    sessionKey: Int,
 ) {
     val copy = LocalCopy.current
     val navState by nav.state.collectAsState()

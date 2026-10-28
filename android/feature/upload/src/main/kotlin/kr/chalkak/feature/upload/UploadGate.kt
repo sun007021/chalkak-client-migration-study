@@ -59,7 +59,7 @@ class UploadGateStateHolder(
         _state.value = UploadGateUiState(checking = true)
         check = jobs.launch {
             try {
-                emit(map(guardedApiCall("today") { home.today() }))
+                emit(mapUploadGateResult(guardedApiCall("today") { home.today() }, ++toastCounter))
             } finally {
                 _state.value = UploadGateUiState(checking = false)
             }
@@ -72,34 +72,30 @@ class UploadGateStateHolder(
         _state.value = UploadGateUiState(checking = false)
     }
 
-    private fun map(result: ApiResult<TodayPost>): UploadGateEffect = when (result) {
-        is ApiResult.Success ->
-            if (result.value.isPosted) toast(UploadCopyKeys.GATE_ALREADY_POSTED) else UploadGateEffect.Open(result.value.topicDate)
-        is ApiResult.Failure -> mapFailure(result.error)
-    }
-
-    // D-02: only status / errorCode / API decide, never the server message.
-    private fun mapFailure(error: ApiError): UploadGateEffect {
-        val status = (error as? ApiError.Http)?.status
-        return when (status) {
-            HTTP_NOT_FOUND -> toast(UploadCopyKeys.GATE_NO_OPEN_TOPIC)
-            HTTP_FORBIDDEN -> toast(UploadCopyKeys.GATE_BANNED)
-            HTTP_UNAUTHORIZED -> UploadGateEffect.LoginRequired
-            else -> toast(UploadCopyKeys.GATE_CHECK_FAILED)
-        }
-    }
-
-    private fun toast(copyKey: String) = UploadGateEffect.Toast(++toastCounter, copyKey)
-
-    private fun emitToast(copyKey: String) = emit(toast(copyKey))
+    private fun emitToast(copyKey: String) = emit(UploadGateEffect.Toast(++toastCounter, copyKey))
 
     private fun emit(effect: UploadGateEffect) {
         _effects.trySend(effect)
     }
+}
 
-    private companion object {
-        const val HTTP_UNAUTHORIZED = 401
-        const val HTTP_FORBIDDEN = 403
-        const val HTTP_NOT_FOUND = 404
+/**
+ * One `GET /posts/today` answer as the gate's effect (REQ-UPL-003..007): isPosted -> already-posted toast; 404 -> no-open-topic;
+ * 403 -> banned; 401 -> [UploadGateEffect.LoginRequired]; anything else -> check-failed; a pass -> [UploadGateEffect.Open].
+ * D-02: only status / API decide, never the server message. [toastId] makes the same toast twice show twice (D-20).
+ * Shared by [UploadGateStateHolder] and hosts that run the gate themselves.
+ */
+fun mapUploadGateResult(result: ApiResult<TodayPost>, toastId: Long = 0): UploadGateEffect = when (result) {
+    is ApiResult.Success ->
+        if (result.value.isPosted) UploadGateEffect.Toast(toastId, UploadCopyKeys.GATE_ALREADY_POSTED) else UploadGateEffect.Open(result.value.topicDate)
+    is ApiResult.Failure -> when ((result.error as? ApiError.Http)?.status) {
+        HTTP_NOT_FOUND -> UploadGateEffect.Toast(toastId, UploadCopyKeys.GATE_NO_OPEN_TOPIC)
+        HTTP_FORBIDDEN -> UploadGateEffect.Toast(toastId, UploadCopyKeys.GATE_BANNED)
+        HTTP_UNAUTHORIZED -> UploadGateEffect.LoginRequired
+        else -> UploadGateEffect.Toast(toastId, UploadCopyKeys.GATE_CHECK_FAILED)
     }
 }
+
+private const val HTTP_UNAUTHORIZED = 401
+private const val HTTP_FORBIDDEN = 403
+private const val HTTP_NOT_FOUND = 404

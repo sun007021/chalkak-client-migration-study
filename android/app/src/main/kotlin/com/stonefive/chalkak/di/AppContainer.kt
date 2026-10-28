@@ -57,7 +57,9 @@ import kr.chalkak.core.data.post.DefaultPostRepository
 import kr.chalkak.core.data.post.LikeController
 import kr.chalkak.core.data.post.PostChanges
 import kr.chalkak.core.data.post.PostRepository
-import kr.chalkak.core.network.ApiResult
+import kr.chalkak.core.network.guardedApiCall
+import kr.chalkak.feature.upload.UploadGateEffect
+import kr.chalkak.feature.upload.mapUploadGateResult
 import kr.chalkak.feature.home.ExternalLinkOpener
 import kr.chalkak.feature.home.HomeStateHolder
 import kr.chalkak.feature.home.LikeControllerToggler
@@ -259,10 +261,7 @@ class AppContainer(
     }
 
     /** `GET /posts/today` once: the upload screen may open only when today's photo has not been posted yet (REQ-UPL-002/003). */
-    private suspend fun enterUploadGate(): Boolean = when (val result = homeRepository.today()) {
-        is ApiResult.Success -> !result.value.isPosted
-        is ApiResult.Failure -> false
-    }
+    private suspend fun enterUploadGate(): UploadGateEffect = mapUploadGateResult(guardedApiCall("today") { homeRepository.today() })
 
     private object NoScreenViews : AnalyticsTracker {
         override fun screenView(screen: String) = Unit
@@ -271,14 +270,22 @@ class AppContainer(
     companion object {
         private const val TAG = "Chalkak"
 
-        fun create(context: Context, cipher: SecretCipher = KeystoreSecretCipher()): AppContainer = AppContainer(
+        fun create(context: Context, cipher: SecretCipher = KeystoreSecretCipher()): AppContainer {
+            // One connection pool for API and images. Images use this bare client; `ApiClient` adds the Authorization header per
+            // request itself, so the token never goes to the image CDN.
+            val base = OkHttpClient()
+            return create(context, cipher, base)
+        }
+
+        private fun create(context: Context, cipher: SecretCipher, base: OkHttpClient): AppContainer = AppContainer(
             copy = Copy.load(context),
+            okHttpBase = base,
             apiBaseUrlRaw = BuildConfig.API_BASE_URL,
             clock = SystemClock,
             secureStorage = KeystoreRecordStorage(context, cipher),
             platform = PlatformAdapters.android(context),
             imageLoader = ImageLoader.Builder(context)
-                .components { add(OkHttpNetworkFetcherFactory(callFactory = { OkHttpClient() })) }
+                .components { add(OkHttpNetworkFetcherFactory(callFactory = { base })) }
                 .build(),
         )
     }
