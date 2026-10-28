@@ -93,10 +93,6 @@ describe('NotificationDetailViewModel', () => {
   it('TC-NOTI-046 500은 일반 오류, 네트워크 오류는 network 문구이고 retry가 재요청한다', async () => {
     const h = await setup(REJECTED, [
       'notification/notification-detail__internal-error',
-      'notification/notification-detail__internal-error',
-      'notification/notification-detail__internal-error',
-      networkFailure(),
-      networkFailure(),
       networkFailure(),
       'notification/notification-detail__rejected',
     ]);

@@ -8,17 +8,18 @@ import { FakePushPromptFlagStore } from '../core/push/__testing__/FakePushPrompt
 import { FakePushTokenProvider } from '../core/push/__testing__/FakePushTokenProvider';
 import { FakePendingPushStore } from '../features/push/__testing__/FakePendingPushStore';
 import { FakePushTapBlocker } from '../features/push/__testing__/FakePushTapBlocker';
+import type { PushData } from '../core/push/NotificationResponseSource';
 import { AppContainer } from './AppContainer';
 
 const settle = async () => {
   for (let i = 0; i < 80; i += 1) await Promise.resolve();
 };
 
-function create() {
+function create(initial: PushData | null = null) {
   const net = createNetHarness();
   const permission = new FakePushPermissionGateway('undetermined');
   const tokens = new FakePushTokenProvider('fcm-1');
-  const responses = new FakeNotificationResponseSource();
+  const responses = new FakeNotificationResponseSource(initial);
   const messages = new FakePushMessageSource();
   const presenter = new FakePushNotificationPresenter();
   const flags = new FakePushPromptFlagStore();
@@ -29,14 +30,16 @@ function create() {
       sessionStore: net.sessionStore,
       events: net.events,
       api: net.api,
-      pushPermission: permission,
       pushTokens: tokens,
-      pushResponses: responses,
-      pushMessages: messages,
-      pushPresenter: presenter,
-      pushPromptFlags: flags,
-      pendingPushStore: new FakePendingPushStore(),
-      pushTapBlocker: new FakePushTapBlocker(),
+      push: {
+        permission,
+        responses,
+        messages,
+        presenter,
+        promptFlags: flags,
+        pendingStore: new FakePendingPushStore(),
+        tapBlocker: new FakePushTapBlocker(),
+      },
     },
   );
   return { net, container, permission, tokens, responses, messages, presenter, flags };
@@ -78,5 +81,41 @@ describe('AppContainer 푸시 조립', () => {
       h.net.transport.requests.filter((r) => r.method === 'PUT' && r.url.includes('push-devices')),
     );
     expect(h.net.transport.requests.some((r) => r.method === 'DELETE')).toBe(false);
+  });
+
+  it('StrictMode: start, stop, start에서도 콜드 스타트 탭을 한 번만 소비하고 한 번만 처리한다', async () => {
+    const initial = loadFixture<{ data: PushData }>('push/payload__topic').data;
+    const h = create(initial);
+    await h.net.signIn();
+    const process = jest.spyOn(
+      (h.container as unknown as { notificationProcessor: { process(): Promise<unknown> } })
+        .notificationProcessor,
+      'process',
+    );
+    process.mockResolvedValue('navigated');
+    const stop1 = h.container.startPush();
+    stop1();
+    const stop2 = h.container.startPush();
+    h.container.bootViewModel.toMain('member');
+    await settle();
+    expect(h.responses.consumeInitialCalls).toBe(1);
+    expect(process).toHaveBeenCalledTimes(1);
+    expect(h.responses.listenerCount).toBe(1);
+    stop2();
+    expect(h.responses.listenerCount).toBe(0);
+  });
+
+  it('startPush를 중첩해서 두 번 불러도 구독은 한 벌이고 권한은 한 번만 묻는다', async () => {
+    const h = create();
+    const stopA = h.container.startPush();
+    const stopB = h.container.startPush();
+    expect(h.responses.listenerCount).toBe(1);
+    h.container.bootViewModel.toMain('member');
+    await settle();
+    expect(h.permission.requestCalls).toBe(1);
+    stopA();
+    expect(h.responses.listenerCount).toBe(1);
+    stopB();
+    expect(h.responses.listenerCount).toBe(0);
   });
 });

@@ -87,8 +87,6 @@ describe('NotificationInboxViewModel 첫 로드', () => {
       routes: {
         [LIST_P1]: [
           'notification/notifications__internal-error',
-          'notification/notifications__internal-error',
-          'notification/notifications__internal-error',
           'notification/notifications__page1',
         ],
       },
@@ -190,8 +188,6 @@ describe('NotificationInboxViewModel 페이징·새로고침', () => {
       routes: {
         [LIST_P2]: [
           'notification/notifications__internal-error',
-          'notification/notifications__internal-error',
-          'notification/notifications__internal-error',
           'notification/notifications__page2-last',
         ],
       },
@@ -246,6 +242,23 @@ describe('NotificationInboxViewModel 페이징·새로고침', () => {
     expect(ids(h)).toEqual(['31', '32']);
   });
 
+  it('당겨서 새로고침 중 gone 이벤트가 조용한 새로고침으로 대체해도 refreshing이 남지 않는다', async () => {
+    const h = await setup();
+    await h.viewModel.onShown();
+    const slow = deferredRoute('notification/notifications__page1');
+    h.router.set(LIST_P1, slow.value);
+    const pull = h.viewModel.refresh();
+    await flush();
+    expect(h.viewModel.getSnapshot().refreshing).toBe(true);
+    h.router.set(LIST_P1, 'notification/notifications__page1');
+    h.events.emit({ type: 'gone', notificationId: nid('01') });
+    await flush();
+    slow.release();
+    await pull;
+    await flush();
+    expect(h.viewModel.getSnapshot().refreshing).toBe(false);
+  });
+
   it('TC-NOTI-022 화면을 떠나면(onHidden) 진행 중 요청의 응답이 와도 오류 토스트가 없다', async () => {
     const gate = deferredRoute('notification/notifications__page1');
     const h = await setup({ routes: { [LIST_P1]: gate.value } });
@@ -263,7 +276,8 @@ describe('NotificationInboxViewModel 페이징·새로고침', () => {
     await h.viewModel.onShown();
     h.router.set(LIST_P1, 'notification/notifications__internal-error');
     await h.viewModel.onShown();
-    expect(gets(h, LIST_P1).length).toBeGreaterThanOrEqual(2);
+    // router.set이 호출 기록을 새로 시작하므로 실패한 조용한 재조회 1번만 센다.
+    expect(gets(h, LIST_P1)).toHaveLength(1);
     expect(ids(h)).toHaveLength(20);
     expect(h.toast.messages).toEqual([]);
     expect(h.viewModel.getSnapshot().status).toBe('ready');

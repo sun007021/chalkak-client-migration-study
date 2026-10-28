@@ -61,8 +61,6 @@ describe('NotificationDetailScreen', () => {
       routes: {
         [detailKey(nid('02'))]: [
           'notification/notification-detail__internal-error',
-          'notification/notification-detail__internal-error',
-          'notification/notification-detail__internal-error',
           'notification/notification-detail__rejected',
         ] as never,
       },

@@ -235,8 +235,10 @@ export class NotificationInboxViewModel extends Observable<NotificationInboxStat
     this.generation += 1;
     this.controller.abort();
     this.controller = new AbortController();
-    // 취소된 다음 페이지 요청이 남긴 진행 표시를 지운다.
-    this.setState((s) => (s.loadingMore ? { ...s, loadingMore: false } : s));
+    // 취소된 요청이 남긴 진행 표시(다음 페이지·당겨서 새로고침)를 지운다. 새 요청이 필요하면 호출자가 다시 켠다.
+    this.setState((s) =>
+      s.loadingMore || s.refreshing ? { ...s, loadingMore: false, refreshing: false } : s,
+    );
     return this.generation;
   }
 

@@ -3,7 +3,7 @@ import { StackActions, type NavigationContainerRef } from '@react-navigation/nat
 import type { NotificationNavigator } from '../features/notification/NotificationNavigator';
 import type { RootStackParamList } from './navigation/routes';
 
-/** 내비게이션이 아직 준비되지 않았을 때(콜드 스타트 직후)의 이동 요청은 버린다. */
+/** 내비게이션이 준비되지 않았을 때의 이동은 버린다. 푸시 탭은 `PushTapBlocker`가 준비될 때까지 보류하므로 여기서 유실되지 않는다. */
 type NavigationRef = Pick<
   NavigationContainerRef<RootStackParamList>,
   'isReady' | 'navigate' | 'dispatch' | 'getCurrentRoute'
@@ -14,8 +14,9 @@ export class NavigationNotificationNavigator implements NotificationNavigator {
   constructor(private readonly navigation: NavigationRef) {}
 
   openHome(): void {
-    // 이미 홈 탭이 스택 맨 아래에 있으면 위에 쌓인 화면만 걷어 내고 새로 쌓지 않는다.
-    if (this.navigation.isReady()) this.navigation.navigate('Tabs', { screen: 'Home' });
+    // React Navigation 7의 navigate는 기본으로 쌓는다. pop: true여야 스택에 이미 있는 Tabs까지 되돌아간다.
+    if (this.navigation.isReady())
+      this.navigation.navigate('Tabs', { screen: 'Home' }, { pop: true });
   }
 
   openPostDetail(target: { postId: string; openAiSheet: boolean }): void {
@@ -40,7 +41,8 @@ export class NavigationNotificationNavigator implements NotificationNavigator {
   }
 
   openInbox(): void {
-    // 이미 알림함이 아래에 있으면 그 위의 화면만 닫힌다.
-    if (this.navigation.isReady()) this.navigation.navigate('Notifications');
+    // pop: true: 이미 알림함이 스택에 있으면 그 위의 화면만 닫고 새로 쌓지 않는다.
+    if (this.navigation.isReady())
+      this.navigation.navigate('Notifications', undefined, { pop: true });
   }
 }

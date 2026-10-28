@@ -35,3 +35,9 @@ export type RootStackParamList = {
   /** 업로드 화면을 바꿔 올라온다(뒤로 가도 업로드 화면이 없다, REQ-UPL-064). */
   UploadSuccess: { topicTitle: string; topicDate: string; moderationStatus: TodayModerationStatus };
 };
+
+/**
+ * 작성 중 내용을 보호하려고 푸시 탭 이동을 미루는 화면(REQ-PUSH-031).
+ * TODO(SET·FDBK PR): 피드백 화면 라우트가 생기면 여기에 넣는다(아직 없는 이름은 적지 않는다).
+ */
+export const PUSH_TAP_BLOCKING_ROUTES: readonly (keyof RootStackParamList)[] = ['Upload'];

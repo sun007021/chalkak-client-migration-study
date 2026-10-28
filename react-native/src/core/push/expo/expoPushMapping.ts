@@ -96,3 +96,18 @@ export function foregroundBehaviorFor(notification: ExpoNotificationLike): {
     shouldSetBadge: false,
   };
 }
+
+/**
+ * 같은 알림 탭이 getLastNotificationResponse(콜드 스타트)와 응답 리스너 양쪽으로 올 수 있어
+ * 알림 요청 식별자로 한 번만 통과시킨다. 최근 몇 개만 기억한다.
+ */
+export function createResponseDeduper(limit = 20): (identifier: string) => boolean {
+  const seen: string[] = [];
+  return (identifier) => {
+    if (identifier === '') return true;
+    if (seen.includes(identifier)) return false;
+    seen.push(identifier);
+    if (seen.length > limit) seen.shift();
+    return true;
+  };
+}

@@ -38,13 +38,21 @@ export class PushPermissionCoordinator {
     const { flags, gateway, toast } = this.deps;
     try {
       if (await flags.wasRequested()) return;
-      // 요청을 띄우는 시점에 표시를 남겨 실패해도 다시 묻지 않는다.
-      await flags.markRequested();
+      await this.markRequested();
       if ((await gateway.status()) !== 'undetermined') return;
       await gateway.request();
     } catch (error) {
       console.warn('[PushPermissionCoordinator] permission request failed', errorName(error));
       toast.show(t('noti.perm.error'));
+    }
+  }
+
+  /** 요청을 띄우기 전에 표시를 남겨 실패해도 다시 묻지 않는다. 표시 저장만 실패하면 사용자에게 알리지 않고 로그만 남긴다. */
+  private async markRequested(): Promise<void> {
+    try {
+      await this.deps.flags.markRequested();
+    } catch (error) {
+      console.warn('[PushPermissionCoordinator] mark failed', errorName(error));
     }
   }
 }

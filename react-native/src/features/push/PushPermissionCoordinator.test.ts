@@ -94,6 +94,27 @@ describe('PushPermissionCoordinator', () => {
     expect(h.flags.requested).toBe(true);
   });
 
+  it('요청함 표시 저장(markRequested)만 실패하면 토스트 없이 권한은 요청한다', async () => {
+    const h = setup();
+    h.flags.markRequested = async () => {
+      throw new Error('storage');
+    };
+    h.boot.toMain('member');
+    await settle();
+    expect(h.toast.messages).toEqual([]);
+    expect(h.gateway.requestCalls).toBe(1);
+  });
+
+  it('stop 뒤 다시 start해도 이 프로세스에서는 한 번만 요청한다', async () => {
+    const h = setup();
+    h.boot.toMain('member');
+    await settle();
+    h.stop();
+    h.coordinator.start();
+    await settle();
+    expect(h.gateway.requestCalls).toBe(1);
+  });
+
   it('stop 뒤에는 요청하지 않는다', async () => {
     const h = setup();
     h.stop();

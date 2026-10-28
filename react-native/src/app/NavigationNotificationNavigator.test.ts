@@ -22,7 +22,7 @@ describe('NavigationNotificationNavigator', () => {
   it('TC-PUSH-022 TC-PUSH-065 홈은 탭 루트 Home으로 이동한다(이미 홈이면 쌓이지 않는다)', () => {
     const { navigator, navigate } = setup();
     navigator.openHome();
-    expect(navigate).toHaveBeenCalledWith('Tabs', { screen: 'Home' });
+    expect(navigate).toHaveBeenCalledWith('Tabs', { screen: 'Home' }, { pop: true });
   });
 
   it('TC-PUSH-039 게시물 상세는 postId와 entry=mine(내 게시물)로 연다', () => {
@@ -63,7 +63,7 @@ describe('NavigationNotificationNavigator', () => {
   it('REQ-NOTI-026 알림함 열기는 Notifications로 navigate한다(이미 아래에 있으면 상세만 닫힌다)', () => {
     const { navigator, navigate } = setup();
     navigator.openInbox();
-    expect(navigate).toHaveBeenCalledWith('Notifications');
+    expect(navigate).toHaveBeenCalledWith('Notifications', undefined, { pop: true });
   });
 
   it('내비게이션이 준비되기 전의 요청은 버린다', () => {

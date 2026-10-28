@@ -14,7 +14,7 @@ function setup(route: string | null, ready = true) {
 }
 
 describe('NavigationPushTapBlocker', () => {
-  it.each(['Upload', 'Feedback'])('TC-PUSH-061 %s 화면이 열려 있으면 막는다', (name) => {
+  it.each(['Upload'])('TC-PUSH-061 %s 화면이 열려 있으면 막는다', (name) => {
     expect(setup(name).blocker.isBlocked()).toBe(true);
   });
 
@@ -22,8 +22,13 @@ describe('NavigationPushTapBlocker', () => {
     expect(setup(name).blocker.isBlocked()).toBe(false);
   });
 
-  it('내비게이션이 준비되기 전에는 막지 않는다', () => {
-    expect(setup('Upload', false).blocker.isBlocked()).toBe(false);
+  it('내비게이션이 준비되기 전에는 막고, 준비되면 구독자에게 알린다(콜드 스타트 탭 유실 방지)', () => {
+    const { blocker } = setup('Tabs', false);
+    const calls: string[] = [];
+    blocker.subscribe(() => calls.push('changed'));
+    expect(blocker.isBlocked()).toBe(true);
+    blocker.notifyReady();
+    expect(calls).toEqual(['changed']);
   });
 
   it('화면 상태가 바뀌면 구독자에게 알리고 해제할 수 있다', () => {
@@ -32,5 +37,10 @@ describe('NavigationPushTapBlocker', () => {
     expect(listeners.size).toBe(1);
     stop();
     expect(listeners.size).toBe(0);
+    let notified = 0;
+    const stop2 = blocker.subscribe(() => (notified += 1));
+    stop2();
+    blocker.notifyReady();
+    expect(notified).toBe(0);
   });
 });

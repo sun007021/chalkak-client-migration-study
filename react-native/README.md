@@ -238,11 +238,14 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
 - **기기 등록**: `DevicePushRegistrar`가 `PUT /push-devices/current {fcmToken}`을 보낸다. 토큰은 JWT에 세션 ID가 있어야 보내고(없으면 한 번 갱신), 같은 (사용자, 토큰)은 다시 보내지 않으며, 세션 세대가 바뀌었으면 성공을 기록하지 않는다. 실패는 reject하지 않고 로그만 남긴다.
 - **탭 처리**: `PushTapRouter`가 부팅 단계로 정한다. 스플래시·업데이트 필요 -> 보류(`PendingPushStore`에 저장), 로그인 -> 폐기, 가입 -> 인증 상태면 보류, 메인 회원 -> 처리(업로드·피드백 화면에서는 `PushTapBlocker`가 막음), 메인 게스트 -> 폐기. 계정이 바뀌면 보류분을 버린다.
 - **확인 필요(백엔드·기획)**
-  1. **iOS 토큰 종류**: `getDevicePushTokenAsync`는 iOS에서 APNs 토큰을 준다. 서버는 `fcmToken`이므로 iOS는 현재 토큰을 보내지 않는다(`fcmTokenFrom`은 Android만). iOS를 지원하려면 Firebase messaging SDK로 FCM 토큰을 얻거나 서버가 APNs 토큰을 받도록 해야 한다.
+  1. **iOS 푸시 토큰(미해결, 후속 필요)**: iOS는 지금 **기기 등록을 하지 않는다**. `getDevicePushTokenAsync`는 iOS에서 APNs 토큰을 주는데 서버는 FCM 토큰(`fcmToken`)만 받으므로 APNs 토큰은 보내지 않는다(`PushTokenProvider`가 iOS에서 null). 네이티브 iOS도 `PlaceholderFCMTokenProvider`로 같은 상태다. 후속: 기존 `PushTokenProvider` 이음새 뒤에 `@react-native-firebase/messaging`으로 FCM 토큰을 얻는 구현을 꽂는다(iOS에 `GoogleService-Info.plist`와 APNs 키 필요). `docs/spec`은 고치지 않았다.
   2. **스펙 충돌 2(권한 대화상자)**: 스펙은 OS 대화상자만 말하는 곳과 iOS 앱 내 사전 안내(`push-permission.*` testid, `noti.perm.title/body`)를 말하는 곳이 있다. OS 대화상자만 구현했고 사전 안내 testid는 쓰지 않았다.
   3. **스펙 충돌 3(포그라운드 AI 푸시)**: 포그라운드에서 받은 원격 푸시는 OS 배너를 끄고(`setNotificationHandler`) 앱이 직접 로컬 알림으로 보여 주며 AI 푸시도 억제하지 않는다.
   4. **프롬프트 플래그 저장**: `PushPromptFlagStore`/`PendingPushStore`는 AsyncStorage라 앱 삭제 후 재설치하면 초기화된다(키체인이 아님).
   5. **포그라운드 로컬 알림 탭**: 앱이 보여 준 로컬 알림에도 `data`를 실어 탭하면 같은 경로로 이동한다.
   6. **Android 채널**: `moderation_push`(기본 채널, `app.config.ts` 플러그인 `defaultChannel`). 채널 이름/중요도 확정 필요.
   7. **Firebase 설정**: `GOOGLE_SERVICES_JSON` 환경 변수가 있으면 `android.googleServicesFile`로 쓴다. 실기기 푸시 E2E에는 이 파일(과 iOS APNs 키)이 필요하다.
-- **테스트 함정**: `ApiClient`가 멱등 요청(GET/PUT)의 5xx·네트워크 오류를 최대 3번 시도하므로, 배열 라우트로 "실패 후 성공"을 만들 때 실패 단계를 3번 반복해야 한다. 헤더 키는 `Authorization`(대문자)이다.
+  8. **Android 데이터 전용 푸시(실기기 확인 필요)**: 포그라운드에서 `notification` 블록 없이 `data`만 오는 푸시가 `addNotificationReceivedListener`로 오는지, 앱이 직접 표시할 제목·본문이 있는지는 기기에서 확인한다.
+- **내비게이션**: React Navigation 7의 `navigate`는 기본으로 쌓으므로 `openHome`·`openInbox`는 `{ pop: true }`로 스택에 이미 있는 화면까지 되돌아간다(`NavigationNotificationNavigator.integration.test.tsx`가 실제 RootNavigator로 확인). 내비게이션이 준비되기 전의 푸시 탭은 `NavigationPushTapBlocker`가 막아 두었다가 `NavigationContainer`의 `onReady`(`AppContainer.onNavigationReady`)에서 다시 처리한다. 작성 중 화면 목록은 `routes.ts`의 `PUSH_TAP_BLOCKING_ROUTES`이고 피드백 화면은 아직 없어 SET·FDBK PR에서 추가한다(TODO).
+- **시작·정지**: `PushFeature`가 컨테이너당 하나이고 참조 수로 센다(StrictMode의 start -> stop -> start 안전). 콜드 스타트 탭은 컨테이너 수명 동안 한 번만 소비하고, 같은 탭이 응답 리스너로도 오면 알림 요청 식별자로 거른다. 라우터는 세션 첫 `load()` 뒤에 세대를 읽는다(부팅의 첫 load가 세대를 올리므로).
+- **테스트 함정**: 알림 하네스는 `createNetHarness({ maxRetries: 0 })`(`ApiClientDeps.maxRetries`, 기본 `RETRY_MAX`)라 "실패 후 성공" 스크립트가 한 단계씩이다. 재시도 자체는 `ApiClient.retry.test.ts`가 검증한다. `FixtureRouter.set`은 호출 기록을 새로 시작한다. 헤더는 대소문자를 구분하지 않고 `authorizationOf`로 읽는다.

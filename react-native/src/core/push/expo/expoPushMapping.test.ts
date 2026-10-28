@@ -1,4 +1,5 @@
 import {
+  createResponseDeduper,
   fcmTokenFrom,
   foregroundBehaviorFor,
   isRemotePush,
@@ -57,5 +58,19 @@ describe('expoPushMapping', () => {
     expect(permissionStatusFrom({ status: 'denied', granted: false, ios: { status: 3 } })).toBe(
       'granted',
     );
+  });
+
+  it('같은 알림 요청 식별자의 탭은 초기 응답과 실시간 리스너 중 먼저 온 한 번만 통과한다', () => {
+    const isNew = createResponseDeduper();
+    expect(isNew('req-1')).toBe(true);
+    expect(isNew('req-1')).toBe(false);
+    expect(isNew('req-2')).toBe(true);
+    expect(isNew('req-1')).toBe(false);
+  });
+
+  it('식별자가 비어 있으면 거르지 않는다', () => {
+    const isNew = createResponseDeduper();
+    expect(isNew('')).toBe(true);
+    expect(isNew('')).toBe(true);
   });
 });

@@ -29,7 +29,12 @@ export class PushTapRouter {
   private pending: PushData | null = null;
   private pendingGeneration = 0;
   private chain: Promise<void> = Promise.resolve();
-  private stopped = false;
+  private stopped = true;
+  /** 저장된 보류분과 콜드 스타트 탭은 컨테이너 수명 동안 한 번만 읽는다(StrictMode의 stop -> start에서도). */
+  private savedRestored = false;
+  private initialConsumed = false;
+  /** 처리 중인 탭의 취소 신호: stop과 새 탭(교체)이 끊는다. */
+  private inflight: AbortController | null = null;
 
   constructor(private readonly deps: PushTapRouterDeps) {}
 
@@ -37,13 +42,17 @@ export class PushTapRouter {
     this.stopped = false;
     const { responses, boot, blocker } = this.deps;
     const stops = [
-      responses.subscribe((data) => this.enqueue(() => this.accept(data))),
+      responses.subscribe((data) => {
+        this.inflight?.abort();
+        this.enqueue(() => this.accept(data));
+      }),
       boot.subscribe(() => this.enqueue(() => this.drain())),
       blocker.subscribe(() => this.enqueue(() => this.drain())),
     ];
     this.enqueue(() => this.restore());
     return () => {
       this.stopped = true;
+      this.inflight?.abort();
       stops.forEach((stop) => stop());
     };
   }
@@ -55,26 +64,47 @@ export class PushTapRouter {
     });
   }
 
-  /** 이전 프로세스가 남긴 보류분과 콜드 스타트 탭을 이어받는다(콜드 스타트 탭이 더 새롭다). */
+  /**
+   * 세션 세대는 부팅의 첫 load에서 처음 올라가므로(undefined -> userId) 읽기 전에 load를 기다린다.
+   * 그렇지 않으면 콜드 스타트 탭이 "계정이 바뀌었다"로 버려진다.
+   */
+  private async currentGeneration(): Promise<number> {
+    await this.deps.sessionStore.load();
+    return this.deps.sessionStore.generation();
+  }
+
+  /**
+   * 이전 프로세스가 남긴 보류분과 콜드 스타트 탭을 이어받는다(콜드 스타트 탭이 더 새롭다).
+   * 단계마다 결과를 상태에 바로 남기므로 중간에 stop되어도 다음 start가 이어받고, 두 번 읽지 않는다.
+   */
   private async restore(): Promise<void> {
-    const saved = await this.deps.store.load();
-    if (saved !== null && this.pending === null) {
-      this.pending = saved;
-      this.pendingGeneration = this.deps.sessionStore.generation();
+    if (!this.savedRestored) {
+      const saved = await this.deps.store.load();
+      this.savedRestored = true;
+      if (saved !== null && this.pending === null) {
+        this.pending = saved;
+        this.pendingGeneration = await this.currentGeneration();
+      }
     }
-    const initial = await this.deps.responses.consumeInitial();
-    if (initial !== null) await this.setPending(initial);
+    if (this.stopped) return;
+    if (!this.initialConsumed) {
+      this.initialConsumed = true;
+      const initial = await this.deps.responses.consumeInitial();
+      if (initial !== null) await this.setPending(initial);
+    }
+    if (this.stopped) return;
     await this.drain();
   }
 
   private async accept(data: PushData): Promise<void> {
     await this.setPending(data);
+    if (this.stopped) return;
     await this.drain();
   }
 
   private async setPending(data: PushData): Promise<void> {
     this.pending = data;
-    this.pendingGeneration = this.deps.sessionStore.generation();
+    this.pendingGeneration = await this.currentGeneration();
     await this.deps.store.save(data);
   }
 
@@ -88,13 +118,23 @@ export class PushTapRouter {
     const data = this.pending;
     if (data === null || this.stopped) return;
     const decision = await this.decide();
-    if (this.pending !== data) return;
+    if (this.pending !== data || this.stopped) return;
     if (decision === 'defer') return;
-    const sameAccount = this.pendingGeneration === this.deps.sessionStore.generation();
+    const sameAccount = this.pendingGeneration === (await this.currentGeneration());
     await this.clear();
-    if (decision === 'discard' || !sameAccount) return;
+    if (decision === 'discard' || !sameAccount || this.stopped) return;
     const { type, notificationId, sourceType, sourceId } = parsePushPayload(data);
-    await this.deps.processor.process({ type, notificationId, sourceType, sourceId }, 'push');
+    const controller = new AbortController();
+    this.inflight = controller;
+    try {
+      await this.deps.processor.process(
+        { type, notificationId, sourceType, sourceId },
+        'push',
+        controller.signal,
+      );
+    } finally {
+      if (this.inflight === controller) this.inflight = null;
+    }
   }
 
   private async decide(): Promise<Decision> {

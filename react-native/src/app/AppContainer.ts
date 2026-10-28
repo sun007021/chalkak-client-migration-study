@@ -100,6 +100,7 @@ import { AsyncStoragePendingPushStore } from '../features/push/AsyncStoragePendi
 import { ForegroundPushHandler } from '../features/push/ForegroundPushHandler';
 import type { PendingPushStore } from '../features/push/PendingPushStore';
 import { PushPermissionCoordinator } from '../features/push/PushPermissionCoordinator';
+import { PushFeature } from '../features/push/PushFeature';
 import { PushTapRouter } from '../features/push/PushTapRouter';
 import type { PushTapBlocker } from '../features/push/PushTapBlocker';
 import { NavigationRecordNavigator } from './NavigationRecordNavigator';
@@ -169,16 +170,26 @@ export interface Dependencies {
    */
   readonly media?: MediaServices;
   /** 푸시의 네이티브 경계. 없으면 expo-notifications 어댑터를 쓴다(테스트는 Fake를 넣는다). */
-  readonly pushPermission: PushPermissionGateway;
-  readonly pushTokens: PushTokenProvider;
-  readonly pushResponses: NotificationResponseSource;
-  readonly pushMessages: PushMessageSource;
-  readonly pushPresenter: PushNotificationPresenter;
-  readonly pushPromptFlags: PushPromptFlagStore;
-  readonly pendingPushStore: PendingPushStore;
-  /** 없으면 내비게이션의 현재 화면(업로드·피드백)으로 판단한다. */
-  readonly pushTapBlocker?: PushTapBlocker;
+  readonly push: PushPorts;
 }
+
+/** 푸시의 네이티브 경계 묶음(기기 등록용 토큰 공급자는 레지스트라가 이미 가진다). */
+type PushPorts = {
+  readonly permission: PushPermissionGateway;
+  readonly responses: NotificationResponseSource;
+  readonly messages: PushMessageSource;
+  readonly presenter: PushNotificationPresenter;
+  readonly promptFlags: PushPromptFlagStore;
+  readonly pendingStore: PendingPushStore;
+  /** 없으면 내비게이션의 현재 화면(업로드)으로 판단한다. */
+  readonly tapBlocker?: PushTapBlocker;
+};
+
+/** 테스트가 일부만 바꿀 수 있는 의존성. 푸시 포트는 필요한 것만 `push`에 넣고 토큰 공급자는 `pushTokens`다. */
+type ContainerOverrides = Partial<Omit<Dependencies, 'push'>> & {
+  push?: Partial<PushPorts>;
+  pushTokens?: PushTokenProvider;
+};
 
 function isUserDataCache(value: object): value is UserDataCache {
   return typeof (value as Partial<UserDataCache>).clearAll === 'function';
@@ -261,6 +272,8 @@ export class AppContainer {
     this.navigationHandle,
   );
   private readonly notificationProcessor: NotificationTapProcessor;
+  private readonly navigationBlocker = new NavigationPushTapBlocker(this.navigationHandle);
+  private readonly pushFeature: PushFeature;
 
   private constructor(dependencies: Dependencies, toastCenter: ToastCenter | null) {
     this.dependencies = dependencies;
@@ -307,6 +320,7 @@ export class AppContainer {
       toast: this.toast,
       authFlow: this.bootViewModel,
     });
+    this.pushFeature = this.createPushFeature();
     this.updateDialogViewModel = new UpdateDialogViewModel(dependencies.storeOpener);
     this.loginOwner = new LoginViewModelOwner(this.bootViewModel, () =>
       this.createLoginViewModel(),
@@ -588,36 +602,43 @@ export class AppContainer {
   }
 
   /**
-   * 푸시 수신 기능을 시작한다(기기 등록 트리거, 권한 요청, 탭 라우팅, 포그라운드 표시). 반환 함수로 모두 해제한다.
-   * 앱 루트의 효과(effect)가 한 번 부른다. 해제 뒤 다시 불러도 안전하다(StrictMode).
+   * 푸시 수신 기능을 시작한다(기기 등록 트리거, 권한 요청, 탭 라우팅, 포그라운드 표시). 반환 함수로 해제한다.
+   * 앱 루트의 효과(effect)가 부른다. 기능 객체는 컨테이너당 하나라 StrictMode의 start -> stop -> start에서도
+   * 콜드 스타트 탭을 한 번만 소비한다.
    */
   startPush(): () => void {
-    const d = this.dependencies;
+    return this.pushFeature.start();
+  }
+
+  /** NavigationContainer의 onReady: 준비 전에 보류된 푸시 탭을 다시 처리하게 한다. */
+  readonly onNavigationReady = (): void => this.navigationBlocker.notifyReady();
+
+  private createPushFeature(): PushFeature {
+    const p = this.dependencies.push;
     const home = () => this.homeOwner.getSnapshot().viewModel;
-    const stops = [
-      this.pushRegistrar.start?.(),
+    return new PushFeature([
+      { start: () => this.pushRegistrar.start?.() },
       new PushPermissionCoordinator({
         boot: this.bootViewModel,
-        gateway: d.pushPermission,
-        flags: d.pushPromptFlags,
+        gateway: p.permission,
+        flags: p.promptFlags,
         toast: this.toast,
-      }).start(),
+      }),
       new ForegroundPushHandler({
-        messages: d.pushMessages,
-        permission: d.pushPermission,
-        presenter: d.pushPresenter,
+        messages: p.messages,
+        permission: p.permission,
+        presenter: p.presenter,
         home,
-      }).start(),
+      }),
       new PushTapRouter({
-        responses: d.pushResponses,
+        responses: p.responses,
         boot: this.bootViewModel,
         sessionStore: this.sessionStore,
-        blocker: d.pushTapBlocker ?? new NavigationPushTapBlocker(this.navigationHandle),
-        store: d.pendingPushStore,
+        blocker: p.tapBlocker ?? this.navigationBlocker,
+        store: p.pendingStore,
         processor: this.notificationProcessor,
-      }).start(),
-    ];
-    return () => stops.forEach((stop) => stop?.());
+      }),
+    ]);
   }
 
   /** 웹뷰 라우트(내비게이션)만 부른다. */
@@ -643,7 +664,7 @@ export class AppContainer {
   }
 
   /** `config`는 앱 루트가 `readAppConfig()`로 읽어 넘긴다. 나머지는 기본 구현이며 `overrides`로 바꾼다. */
-  static create(config: AppConfig, overrides: Partial<Dependencies> = {}): AppContainer {
+  static create(config: AppConfig, overrides: ContainerOverrides = {}): AppContainer {
     const clock = overrides.clock ?? new SystemClock();
     const logger = new ConsoleNetworkLogger();
     const sessionStore =
@@ -673,6 +694,7 @@ export class AppContainer {
         clock,
         logger,
       });
+    const o = overrides.push ?? {};
     const pushTokens = overrides.pushTokens ?? new ExpoPushTokenProvider();
     const featureFlags = overrides.featureFlags ?? readFeatureFlags(undefined);
     const appInfo = overrides.appInfo ?? DEFAULT_APP_INFO;
@@ -705,14 +727,15 @@ export class AppContainer {
           selectSocialLoginClient(featureFlags, new KakaoSocialLoginClient(new SeoulKakaoSdk())),
         nonceGenerator: overrides.nonceGenerator ?? new SecureNonceGenerator(getRandomBytes),
         pushRegistrar,
-        pushPermission: overrides.pushPermission ?? new ExpoPushPermissionGateway(),
-        pushTokens,
-        pushResponses: overrides.pushResponses ?? new ExpoNotificationResponseSource(),
-        pushMessages: overrides.pushMessages ?? new ExpoPushMessageSource(),
-        pushPresenter: overrides.pushPresenter ?? new ExpoPushNotificationPresenter(),
-        pushPromptFlags: overrides.pushPromptFlags ?? new AsyncStoragePushPromptFlagStore(),
-        pendingPushStore: overrides.pendingPushStore ?? new AsyncStoragePendingPushStore(),
-        pushTapBlocker: overrides.pushTapBlocker,
+        push: {
+          permission: o.permission ?? new ExpoPushPermissionGateway(),
+          responses: o.responses ?? new ExpoNotificationResponseSource(),
+          messages: o.messages ?? new ExpoPushMessageSource(),
+          presenter: o.presenter ?? new ExpoPushNotificationPresenter(),
+          promptFlags: o.promptFlags ?? new AsyncStoragePushPromptFlagStore(),
+          pendingStore: o.pendingStore ?? new AsyncStoragePendingPushStore(),
+          tapBlocker: o.tapBlocker,
+        },
         homePreloader: overrides.homePreloader ?? new NoopHomePreloader(),
         updateChecker: overrides.updateChecker ?? createUpdateChecker(appInfo, transport),
         storeOpener: overrides.storeOpener ?? new LinkingStoreOpener(storeUrlFor(appInfo)),

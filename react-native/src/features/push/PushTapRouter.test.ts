@@ -5,6 +5,7 @@ import { createNetHarness } from '../../core/http/__testing__/createNetHarness';
 import { createBootHarness } from '../boot/__testing__/createBootHarness';
 import { FakePendingPushStore } from './__testing__/FakePendingPushStore';
 import { FakePushTapBlocker } from './__testing__/FakePushTapBlocker';
+import { SecureSessionStore } from '../../core/session/SecureSessionStore';
 import { PushTapRouter } from './PushTapRouter';
 
 const data = (name: string): PushData => loadFixture<{ data: PushData }>(`push/${name}`).data;
@@ -14,7 +15,15 @@ const settle = async () => {
   for (let i = 0; i < 40; i += 1) await Promise.resolve();
 };
 
-type Options = { initial?: PushData | null; signedIn?: boolean; pending?: PushData | null };
+type Options = {
+  initial?: PushData | null;
+  signedIn?: boolean;
+  pending?: PushData | null;
+  /** true면 저장소를 새로 만든다(콜드 스타트: 첫 load에서 세대가 처음 올라간다). */
+  coldStore?: boolean;
+  /** true면 처리기가 끝나지 않는다(처리 중 stop·교체 검증). */
+  hang?: boolean;
+};
 
 async function setup(options: Options = {}) {
   const boot = createBootHarness();
@@ -24,23 +33,38 @@ async function setup(options: Options = {}) {
   const blocker = new FakePushTapBlocker();
   const store = new FakePendingPushStore();
   store.saved = options.pending ?? null;
+  const sessionStore = options.coldStore ? new SecureSessionStore(net.storage) : net.sessionStore;
   const processed: unknown[] = [];
+  const signals: (AbortSignal | undefined)[] = [];
   const router = new PushTapRouter({
     responses,
     boot: boot.viewModel,
-    sessionStore: net.sessionStore,
+    sessionStore,
     blocker,
     store,
     processor: {
-      process: async (input, origin) => {
+      process: async (input, origin, signal) => {
         processed.push({ input, origin });
+        signals.push(signal);
+        if (options.hang) await new Promise<never>(() => undefined);
         return 'navigated';
       },
     },
   });
   const stop = router.start();
   await settle();
-  return { boot: boot.viewModel, net, responses, blocker, store, router, processed, stop };
+  return {
+    boot: boot.viewModel,
+    net,
+    sessionStore,
+    responses,
+    blocker,
+    store,
+    router,
+    processed,
+    signals,
+    stop,
+  };
 }
 type Harness = Awaited<ReturnType<typeof setup>>;
 const inputs = (h: Harness) =>
@@ -62,6 +86,54 @@ describe('PushTapRouter 처리', () => {
         origin: 'push',
       },
     ]);
+  });
+
+  it('콜드 스타트: 부팅의 첫 load가 세대를 올려도 콜드 스타트 탭과 저장된 보류 탭이 버려지지 않는다', async () => {
+    const h = await setup({ initial: TOPIC, coldStore: true });
+    await h.sessionStore.load(); // 부팅의 첫 load
+    h.boot.toMain('member');
+    await settle();
+    expect(inputs(h)).toEqual(['TOPIC']);
+  });
+
+  it('콜드 스타트: 이전 프로세스가 저장한 보류 탭도 첫 load 뒤에 처리된다', async () => {
+    const h = await setup({ pending: APPROVED, coldStore: true });
+    await h.sessionStore.load();
+    h.boot.toMain('member');
+    await settle();
+    expect(inputs(h)).toEqual(['POST_APPROVED']);
+  });
+
+  it('처리기에 취소 신호를 넘기고 stop하면 끊는다', async () => {
+    const h = await setup({ hang: true });
+    h.boot.toMain('member');
+    h.responses.tap(APPROVED);
+    await settle();
+    const signal = h.signals[0];
+    expect(signal).toBeDefined();
+    expect(signal?.aborted).toBe(false);
+    h.stop();
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it('처리 중에 새 탭이 오면 이전 처리의 취소 신호를 끊는다', async () => {
+    const h = await setup({ hang: true });
+    h.boot.toMain('member');
+    h.responses.tap(APPROVED);
+    await settle();
+    h.responses.tap(TOPIC);
+    expect(h.signals[0]?.aborted).toBe(true);
+  });
+
+  it('stop 뒤 같은 라우터를 다시 start해도 콜드 스타트 탭은 한 번만 읽고 한 번만 처리한다', async () => {
+    const h = await setup({ initial: TOPIC });
+    h.stop();
+    const stop2 = h.router.start();
+    h.boot.toMain('member');
+    await settle();
+    expect(h.responses.consumeInitialCalls).toBe(1);
+    expect(inputs(h)).toEqual(['TOPIC']);
+    stop2();
   });
 
   it('TC-PUSH-044 알 수 없는 payload도 처리기로 넘긴다(알림함 폴백은 처리기의 몫)', async () => {

@@ -40,9 +40,9 @@ export function App({ configResult, overrides }: AppProps) {
 
 /** 내비게이션 컨테이너와 화면 위 오버레이(토스트). 내비게이션 핸들은 컨테이너(AppContainer)가 소유한다. */
 function AppNavigation() {
-  const { navigationHandle, toastCenter } = useAppContainer();
+  const { navigationHandle, toastCenter, onNavigationReady } = useAppContainer();
   return (
-    <NavigationContainer ref={navigationHandle}>
+    <NavigationContainer ref={navigationHandle} onReady={onNavigationReady}>
       <AppShell />
       <UploadEntryOverlay />
       {toastCenter ? <ToastHost center={toastCenter} /> : null}

@@ -50,7 +50,8 @@ export type NotificationHarnessOptions = {
 };
 
 export async function createNotificationHarness(options: NotificationHarnessOptions = {}) {
-  const net = createNetHarness();
+  // 재시도 없이 한 번에 실패하게 해 "실패 후 성공" 스크립트를 단순하게 둔다(재시도는 ApiClient 테스트가 검증).
+  const net = createNetHarness({ maxRetries: 0 });
   net.clock.set(NOW);
   if (options.signedIn !== false) await net.signIn();
   const router = new FixtureRouter({ ...NOTI_ROUTES, ...options.routes }).install(net.transport);
