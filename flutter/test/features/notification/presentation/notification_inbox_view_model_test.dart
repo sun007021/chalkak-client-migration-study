@@ -31,7 +31,7 @@ void main() {
       (async) {
         final r = _rig();
         final p = start(async, r.vm.start());
-        expect(r.state.status, InboxStatus.loading);
+        // 로딩 상태 자체는 TC-NOTI-004가 gate로 검증한다. 여기서는 settle 뒤이므로 이미 끝났다.
         expect(p.done, isTrue);
         expect(r.repo.pageCalls, [(page: 1, pageSize: 20)]);
         expect(r.state.status, InboxStatus.content);

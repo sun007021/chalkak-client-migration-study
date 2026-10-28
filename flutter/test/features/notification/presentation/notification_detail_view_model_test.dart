@@ -24,7 +24,7 @@ void main() {
     final r = DetailRig(notiId(2));
     r.repo.onDetail(notiId(2), [Reply.ok(notiDetailFx(detailRejectedFx))]);
     final p = start(async, r.vm.start());
-    expect(r.state.status, DetailStatus.loading);
+    // settle 뒤이므로 로딩은 이미 끝났다(로딩 중 상태는 화면 테스트가 gate로 검증한다).
     expect(p.done, isTrue);
     expect(r.state.status, DetailStatus.content);
     expect(r.state.detail!.type, NotificationType.postRejected);
