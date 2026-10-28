@@ -5,6 +5,7 @@ import { watchAdded } from '../../test/domWatch';
 import { guestSession, memberSession } from '../../test/fixtures';
 import { t } from '../../copy/ko';
 import type { TabDestination } from '../../constants';
+import { expectGuestRequestsOnlyPublic, outsideHome } from '../../test/homeRequests';
 
 const TABS: readonly TabDestination[] = ['home', 'display', 'record', 'settings'];
 const TAB_IDS = {
@@ -147,10 +148,10 @@ describe('새로고침 복원과 URL', () => {
 
   it('REQ-NAV-012 게스트도 홈과 전시 탭을 볼 수 있고 인증 API 호출은 0건이다', async () => {
     const { h, path } = await openMain('guest');
-    expect(screen.getByTestId('home.root')).toHaveAttribute('data-mode', 'guest');
+    expect(await screen.findByTestId('home.root')).toHaveAttribute('data-mode', 'guest');
     await goTo('display', path);
     expect(screen.getByTestId('display.root')).toBeInTheDocument();
-    expect(h.ff.calls).toHaveLength(0);
+    expectGuestRequestsOnlyPublic(h.ff);
   });
 
   it('TC-NAV-016 게스트가 /record URL로 직접 들어와도 기록 화면은 열리지 않는다: 홈으로 replace + 토스트 nav.guest.record + 요청 0건 [임시안]', async () => {
@@ -162,7 +163,7 @@ describe('새로고침 복원과 URL', () => {
     expect(router.state.historyAction).toBe('REPLACE');
     expect(record.seen()).toBe(false);
     expect(toastText()).toBe(t('nav.guest.record'));
-    expect(h.ff.calls).toHaveLength(0);
+    expectGuestRequestsOnlyPublic(h.ff);
     record.stop();
   });
 
@@ -173,12 +174,48 @@ describe('새로고침 복원과 URL', () => {
   });
 
   it('TC-NAV-045 앱이 정의하지 않은 경로·딥링크형 URL은 어떤 화면도 열지 않고 부팅 판정대로 홈이 열린다', async () => {
-    for (const url of ['/feed/11111111-1111-4111-8111-111111111111', '/notifications', '/home/extra', '/chalkak:/open']) {
+    // /feed/<uuid>와 /notifications는 이제 앱이 정의한 화면(자리표시)이라 회원에게는 열린다: 아래 게스트 테스트와 W5 홈 이동 테스트가 다룬다.
+    for (const url of ['/feed', '/notification', '/home/extra', '/chalkak:/open']) {
       const h = makeHarness({ session: memberSession() });
       const { path, unmount } = renderApp(h.container, url);
       await screen.findByTestId('home.root');
       expect(path(), url).toBe('/home');
-      expect(h.ff.calls, url).toHaveLength(0);
+      expect(outsideHome(h.ff), url).toHaveLength(0);
+      unmount();
+    }
+  });
+
+  it('TC-NAV-045 REQ-NAV-012 게스트가 딥링크형 /feed/<uuid>, /notifications로 들어와도 화면을 열지 않고 홈으로 replace + 게스트 토스트이며 요청은 공개 읽기뿐이다', async () => {
+    const cases: [string, string][] = [
+      ['/feed/11111111-1111-4111-8111-111111111111', t('nav.guest.feed')],
+      ['/notifications', t('nav.guest.notification')],
+    ];
+    for (const [url, toast] of cases) {
+      const h = makeHarness({ session: guestSession });
+      const feed = watchAdded('feed.root');
+      const inbox = watchAdded('notifications.root');
+      const { path, router, unmount } = renderApp(h.container, url);
+      await screen.findByTestId('home.root');
+      expect(path(), url).toBe('/home');
+      expect(router.state.historyAction, url).toBe('REPLACE');
+      expect(feed.seen() || inbox.seen(), url).toBe(false);
+      expect(toastText(), url).toBe(toast);
+      expectGuestRequestsOnlyPublic(h.ff);
+      feed.stop();
+      inbox.stop();
+      unmount();
+    }
+  });
+
+  it('REQ-NAV-012 회원은 새로고침·직접 진입으로도 알림함과 게시물 상세 자리표시가 열린다(앱이 정의한 경로)', async () => {
+    for (const [url, id] of [
+      ['/feed/11111111-1111-4111-8111-111111111111', 'feed.root'],
+      ['/notifications', 'notifications.root'],
+    ] as const) {
+      const h = makeHarness({ session: memberSession() });
+      const { path, unmount } = renderApp(h.container, url);
+      await screen.findByTestId(id);
+      expect(path()).toBe(url);
       unmount();
     }
   });
@@ -188,7 +225,7 @@ describe('새로고침 복원과 URL', () => {
     const { router } = renderApp(h.container, '/home?postId=11111111-1111-4111-8111-111111111111');
     await screen.findByTestId('home.root');
     expect(router.state.location.pathname).toBe('/home');
-    expect(h.ff.calls).toHaveLength(0);
+    expect(outsideHome(h.ff)).toHaveLength(0);
   });
 });
 
@@ -265,7 +302,7 @@ describe('게스트 제한 (D-05)', () => {
     expect(router.state.location.key).toBe(before);
     expect(selectedTab()).toEqual(['home']);
     expect(screen.queryByTestId('record.root')).not.toBeInTheDocument();
-    expect(h.ff.calls).toHaveLength(0);
+    expectGuestRequestsOnlyPublic(h.ff);
   });
 
   it('TC-NAV-016 전시 탭에서 기록 탭을 눌러도 전시에 머문다', async () => {
@@ -297,7 +334,7 @@ describe('게스트 제한 (D-05)', () => {
     expect(toastText()).toBe(t('nav.guest.upload'));
     expect(h.upload.starts).toBe(0);
     expect(h.ff.callsTo('GET /posts/today')).toHaveLength(0);
-    expect(h.ff.calls).toHaveLength(0);
+    expectGuestRequestsOnlyPublic(h.ff);
     expect(selectedTab()).toEqual(['home']);
   });
 
@@ -314,7 +351,7 @@ describe('게스트 제한 (D-05)', () => {
   it('TC-NAV-005 TC-NAV-017 업로드 진입 시작은 셸이 직접 API를 부르지 않는다(게이트 요청은 UPL 몫)', async () => {
     const { h } = await openMain('member');
     fireEvent.click(screen.getByTestId('bottom-bar.upload-button'));
-    expect(h.ff.calls).toHaveLength(0);
+    expect(outsideHome(h.ff)).toHaveLength(0);
   });
 
   it('REQ-NAV-044 TC-NAV-025 게스트 제한 토스트는 2.5초 동안 보였다가 사라진다', async () => {
@@ -335,7 +372,7 @@ describe('게스트 제한 (D-05)', () => {
     state.mockReturnValue('visible');
     act(() => void document.dispatchEvent(new Event('visibilitychange')));
     expect(screen.queryByTestId('toast.container')).not.toBeInTheDocument();
-    expect(h.ff.calls).toHaveLength(0);
+    expectGuestRequestsOnlyPublic(h.ff);
     fireEvent.click(tabButton('record'));
     expect(toastText()).toBe(t('nav.guest.record'));
     state.mockRestore();
