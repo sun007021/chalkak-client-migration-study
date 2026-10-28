@@ -223,7 +223,7 @@ function TitleDialog({ vm, state }: { vm: FeedViewModel; state: FeedState }): Re
   const ref = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const inputId = useId();
-  useDialogFocus(ref, { onClose: dialog.saving ? undefined : () => vm.cancelTitleEdit(), initialFocus: inputRef });
+  useDialogFocus(ref, dialog.saving ? undefined : () => vm.cancelTitleEdit(), inputRef);
   const submit = (event: FormEvent) => {
     event.preventDefault();
     void vm.saveTitle();
@@ -268,7 +268,7 @@ function DeleteDialog({ vm, state }: { vm: FeedViewModel; state: FeedState }): R
   const { deleting } = state.deleteDialog;
   const ref = useRef<HTMLDivElement | null>(null);
   const cancelRef = useRef<HTMLButtonElement | null>(null);
-  useDialogFocus(ref, { onClose: deleting ? undefined : () => vm.cancelDelete(), initialFocus: cancelRef });
+  useDialogFocus(ref, deleting ? undefined : () => vm.cancelDelete(), cancelRef);
   return (
     <div style={overlay}>
       <div ref={ref} data-testid="feed.delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="feed-delete-title" aria-describedby="feed-delete-body" style={sheet}>

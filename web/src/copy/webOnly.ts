@@ -21,8 +21,14 @@ export const webOnlyCopy = {
   'display.refresh-indicator': '새로고침 중',
   'display.load-more': '불러오는 중',
   'display.photo-alt': '사진',
-  /** 추천 카드 페이저의 접근성 이름. */
+  /** 추천 카드 페이저의 접근성 이름과 이전·다음 버튼. */
   'display.featured.a11y': '추천 사진',
+  'display.featured.previous': '이전 추천 사진',
+  'display.featured.next': '다음 추천 사진',
+  /** 날짜 선택 시트의 연·월·일 select 접근성 이름. */
+  'display.picker.year-label': '연도',
+  'display.picker.month-label': '월',
+  'display.picker.day-label': '일',
   /** 상세: 삭제 요청 중 표시. */
   'feed.deleting': '삭제 중',
 } as const;

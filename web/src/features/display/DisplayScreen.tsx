@@ -1,12 +1,14 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import { useContainer } from '../../app/AppContext';
+import { FIRST_TOPIC_DATE } from '../../constants';
 import { t } from '../../copy/ko';
 import { webOnlyCopy } from '../../copy/webOnly';
 import { useScreenView } from '../../core/analytics/useScreenView';
 import { useViewModel } from '../../core/state/useViewModel';
 import { EmptyState, ErrorState, LoadingIndicator } from '../../core/ui/StateViews';
+import { useDialogFocus } from '../../core/ui/useDialogFocus';
 import { useScrollRestore } from '../../core/ui/useScrollRestore';
 import type { DateString } from '../../core/time/kst';
 import { formatTopicHeaderDate } from '../home/homeDates';
@@ -15,7 +17,8 @@ import { LikeButton } from '../like/LikeButton';
 import type { PostItem } from '../post/postModels';
 import { RouterPostNavigator } from '../post/postNavigation';
 import { useShellContext } from '../shell/MainShell';
-import { DISPLAY_SORTS, displaySentinelIndex, normalizePickedDate, parseDisplayRoute, pickerOptions, toPickedDate } from './displayDates';
+import { useDisplayUrlSync } from './useDisplayUrlSync';
+import { DISPLAY_SORTS, displaySentinelIndex, normalizePickedDate, pickerOptions, toPickedDate } from './displayDates';
 import type { DisplaySort, PickedDate } from './displayDates';
 import type { DisplayState, DisplayViewModel } from './DisplayViewModel';
 
@@ -28,18 +31,12 @@ export function DisplayScreen(): ReactNode {
   const { mode, shell } = useShellContext();
   const container = useContainer();
   const navigate = useNavigate();
-  const location = useLocation();
   useScreenView('display');
   const { viewModel: vm, navigator } = container.displaySession(mode);
-  const latest = useRef(location);
-  useEffect(() => {
-    latest.current = location;
-  }, [location]);
 
-  // URL → 상태(마운트, Link·주소 변경). 같은 값이면 ViewModel이 아무 일도 하지 않는다.
-  useEffect(() => {
-    void vm.applyRoute(parseDisplayRoute(location.search));
-  }, [vm, location.search]);
+  // URL ↔ 상태(마운트, Link·주소 변경, 날짜·정렬 선택). applyRoute가 먼저 돌도록 라이프사이클 효과보다 앞에 둔다.
+  const state = useViewModel(vm);
+  useDisplayUrlSync(vm, state);
 
   useEffect(() => {
     const detach = navigator.attach(new RouterPostNavigator((to, options) => navigate(to, options)));
@@ -59,21 +56,6 @@ export function DisplayScreen(): ReactNode {
       detach();
     };
   }, [vm, navigator, navigate, shell]);
-
-  const state = useViewModel(vm);
-
-  // 상태 → URL. 기본값(오늘, 최신순)은 파라미터가 없는 URL과 같은 뜻이라 쓰지 않는다.
-  // 같은 커밋에서 applyRoute가 막 바꾼 값을 되돌리지 않도록 렌더 시점의 state가 아니라 ViewModel의 지금 값을 읽는다.
-  useEffect(() => {
-    const { date, sort, today } = vm.state;
-    const now = latest.current;
-    const route = parseDisplayRoute(now.search);
-    if ((route.date ?? today) === date && (route.sort ?? 'recent') === sort) return;
-    const params = new URLSearchParams(now.search);
-    params.set('date', date);
-    params.set('sort', sort);
-    void navigate({ pathname: now.pathname, search: `?${params.toString()}` }, { replace: true, state: now.state });
-  }, [vm, state.date, state.sort, state.today, navigate]);
 
   // 탭 재선택: 맨 위로.
   const seenScrollToTop = useRef(state.scrollToTop);
@@ -122,7 +104,7 @@ function DateHeader({ vm, state }: { vm: DisplayViewModel; state: DisplayState }
         <button type="button" data-testid="display.prev-date-button" aria-label={t('display.nav.previous')} disabled={!state.canGoPrevious} onClick={() => void vm.selectPreviousDate()}>
           <span aria-hidden="true">‹</span>
         </button>
-        <button type="button" data-testid="display.date-picker-button" aria-label={t('display.picker.title')} style={plainButton} onClick={() => setPickerOpen(true)}>
+        <button type="button" data-testid="display.date-picker-button" aria-label={`${formatTopicHeaderDate(state.date)} ${t('display.picker.title')}`} style={plainButton} onClick={() => setPickerOpen(true)}>
           <span data-testid="display.date-label">{formatTopicHeaderDate(state.date)}</span>
         </button>
         <button type="button" data-testid="display.next-date-button" aria-label={t('display.nav.next')} disabled={!state.canGoNext} onClick={() => void vm.selectNextDate()}>
@@ -187,26 +169,78 @@ function SortTabs({ vm, state }: { vm: DisplayViewModel; state: DisplayState }):
   );
 }
 
+/** 두 값이 이 거리(px) 안이면 같은 위치로 본다. */
+const SNAP_EPSILON = 2;
+
 function Featured({ vm, state, items }: { vm: DisplayViewModel; state: DisplayState; items: PostItem[] }): ReactNode {
   const ref = useRef<HTMLDivElement | null>(null);
   const page = state.featuredPage;
-  // 보던 페이지로 되돌린다(같은 날짜를 다시 불러와도 유지, 다른 날짜는 0).
+  /** 프로그램이 시작한 스크롤의 도착 위치. 도착하기 전의 중간 scroll 이벤트가 페이지를 되돌려 놓지 않게 한다. */
+  const target = useRef<number | null>(null);
+  const last = items.length - 1;
+
+  const scrollToPage = useCallback((next: number, smooth: boolean) => {
+    const el = ref.current;
+    if (!el || el.clientWidth <= 0 || typeof el.scrollTo !== 'function') return;
+    target.current = next * el.clientWidth;
+    el.scrollTo({ left: target.current, behavior: smooth ? 'smooth' : 'auto' });
+  }, []);
+
+  // 상태가 바깥에서 바뀐 경우(다른 날짜로 가면 0)에만 스크롤한다. 사용자가 넘기는 중에는 위치와 page의 차이가 반 페이지 이내라 건드리지 않는다.
   useLayoutEffect(() => {
     const el = ref.current;
-    if (el && typeof el.scrollTo === 'function' && el.clientWidth > 0) el.scrollTo({ left: page * el.clientWidth });
-  }, [page, items.length]);
+    if (!el || el.clientWidth <= 0) return;
+    if (Math.abs(el.scrollLeft - page * el.clientWidth) > el.clientWidth / 2) scrollToPage(page, false);
+  }, [page, items.length, scrollToPage]);
+
+  // 스크롤이 멈춘 위치의 페이지를 상태에 반영한다: scrollend(멈춤 신호)와, 신호가 없는 브라우저를 위해 scroll 중 스냅 지점에 놓였을 때. 둘 다 같은 값을 쓰므로 겹쳐도 무해하다.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const commit = (settledOnly: boolean) => {
+      if (el.clientWidth <= 0) return;
+      if (target.current !== null) {
+        if (Math.abs(el.scrollLeft - target.current) > SNAP_EPSILON) return;
+        target.current = null;
+      }
+      const index = Math.round(el.scrollLeft / el.clientWidth);
+      if (settledOnly && Math.abs(el.scrollLeft - index * el.clientWidth) > SNAP_EPSILON) return;
+      if (index !== vm.state.featuredPage && index >= 0 && index <= last) vm.setFeaturedPage(index);
+    };
+    const onScroll = () => commit(true);
+    const onScrollEnd = () => commit(false);
+    el.addEventListener('scrollend', onScrollEnd);
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scrollend', onScrollEnd);
+      el.removeEventListener('scroll', onScroll);
+    };
+  }, [vm, last]);
+
   if (items.length === 0) return null;
+  const go = (next: number) => scrollToPage(Math.min(last, Math.max(0, next)), true);
   return (
-    <section aria-label={webOnlyCopy['display.featured.a11y']} style={{ padding: '0 16px' }}>
+    <section style={{ padding: '0 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
+        <button type="button" aria-label={webOnlyCopy['display.featured.previous']} disabled={page <= 0} onClick={() => go(page - 1)}>
+          <span aria-hidden="true">‹</span>
+        </button>
+        <button type="button" aria-label={webOnlyCopy['display.featured.next']} disabled={page >= last} onClick={() => go(page + 1)}>
+          <span aria-hidden="true">›</span>
+        </button>
+      </div>
       <div
         ref={ref}
         data-testid="display.featured-pager"
+        role="group"
+        aria-label={webOnlyCopy['display.featured.a11y']}
+        tabIndex={0}
         style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', gap: 8 }}
-        onScroll={(event) => {
-          const el = event.currentTarget;
-          if (el.clientWidth <= 0) return;
-          const next = Math.round(el.scrollLeft / el.clientWidth);
-          if (next !== page && next >= 0 && next < items.length) vm.setFeaturedPage(next);
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowRight') go(page + 1);
+          else if (event.key === 'ArrowLeft') go(page - 1);
+          else return;
+          event.preventDefault();
         }}
       >
         {items.map((post) => (
@@ -286,33 +320,38 @@ function Grid({
   );
 }
 
-/** 연·월·일 select 세 개와 확인 버튼. 연·월을 바꾸면 선택 가능한 범위에 맞춘다(2월 30일 → 말일 등). */
+/** 연·월·일 select 세 개와 확인 버튼. 연·월을 바꾸면 선택 가능한 범위에 맞춘다(2월 30일 → 말일 등). Esc·닫기로 닫으면 포커스가 날짜 버튼으로 돌아온다. */
 function DatePickerSheet({ current, today, onConfirm, onClose }: { current: DateString; today: DateString; onConfirm: (date: DateString) => void; onClose: () => void }): ReactNode {
-  const [picked, setPicked] = useState<PickedDate>(() => toPickedDate(current) ?? { year: 2026, month: 1, day: 1 });
+  const ref = useRef<HTMLDivElement | null>(null);
+  const titleId = useId();
+  useDialogFocus(ref, onClose);
+  const [picked, setPicked] = useState<PickedDate>(() => toPickedDate(current) ?? toPickedDate(FIRST_TOPIC_DATE)!);
   const options = pickerOptions(picked, today);
   const change = (patch: Partial<PickedDate>) => {
     const next = toPickedDate(normalizePickedDate({ ...picked, ...patch }, today));
     if (next) setPicked(next);
   };
   return (
-    <div data-testid="display.date-picker-sheet" role="dialog" aria-modal="true" aria-label={t('display.picker.title')} style={{ padding: 12, background: '#fff', border: '1px solid #e5e5e5', borderRadius: 8 }}>
-      <h2 style={{ margin: '0 0 8px', fontSize: 16 }}>{t('display.picker.title')}</h2>
+    <div ref={ref} data-testid="display.date-picker-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} style={{ padding: 12, background: '#fff', border: '1px solid #e5e5e5', borderRadius: 8 }}>
+      <h2 id={titleId} style={{ margin: '0 0 8px', fontSize: 16 }}>
+        {t('display.picker.title')}
+      </h2>
       <div style={{ display: 'flex', gap: 8 }}>
-        <select data-testid="display.date-picker-year" aria-label={t('display.picker.year', { n: '' }).trim()} value={picked.year} onChange={(e) => change({ year: Number(e.target.value) })}>
+        <select data-testid="display.date-picker-year" aria-label={webOnlyCopy['display.picker.year-label']} value={picked.year} onChange={(e) => change({ year: Number(e.target.value) })}>
           {options.years.map((year) => (
             <option key={year} value={year}>
               {t('display.picker.year', { n: year })}
             </option>
           ))}
         </select>
-        <select data-testid="display.date-picker-month" aria-label={t('display.picker.month', { n: '' }).trim()} value={picked.month} onChange={(e) => change({ month: Number(e.target.value) })}>
+        <select data-testid="display.date-picker-month" aria-label={webOnlyCopy['display.picker.month-label']} value={picked.month} onChange={(e) => change({ month: Number(e.target.value) })}>
           {options.months.map((month) => (
             <option key={month} value={month}>
               {t('display.picker.month', { n: month })}
             </option>
           ))}
         </select>
-        <select data-testid="display.date-picker-day" aria-label={t('display.picker.day', { n: '' }).trim()} value={picked.day} onChange={(e) => change({ day: Number(e.target.value) })}>
+        <select data-testid="display.date-picker-day" aria-label={webOnlyCopy['display.picker.day-label']} value={picked.day} onChange={(e) => change({ day: Number(e.target.value) })}>
           {options.days.map((day) => (
             <option key={day} value={day}>
               {t('display.picker.day', { n: day })}

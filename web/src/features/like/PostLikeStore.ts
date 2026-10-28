@@ -48,6 +48,8 @@ export class PostLikeStore {
   private tick = 0;
   /** reset마다 올린다. 이전 계정의 늦은 응답은 이 값이 달라 무시된다. */
   private epoch = 0;
+  /** 이 세대의 요청 취소 신호. reset()이 취소하고 새 것으로 바꾼다. */
+  private controller = new AbortController();
 
   constructor(protected readonly deps: PostLikeStoreDeps) {}
 
@@ -95,12 +97,18 @@ export class PostLikeStore {
     const entry: Entry = { shown: start, server: start, intent: !base.isLiked, pending: true, version: this.tick, done: Promise.resolve() };
     this.entries.set(id, entry);
     this.show(base.id, entry, flip(start, entry.intent));
-    entry.done = this.run(base.id, entry, this.epoch);
+    entry.done = this.run(base.id, entry, this.epoch, this.controller.signal);
     return entry.done;
   }
 
-  /** 계정 전환·로그아웃: 상태를 모두 버리고 진행 중이던 응답은 무시한다(TC-LIKE-031). */
+  /**
+   * 계정 전환·로그아웃: 상태를 모두 버리고 진행 중이던 응답은 무시한다(TC-LIKE-031).
+   * 아직 서버로 나가지 않은 요청(재시도 대기, 직렬화로 기다리는 다음 요청)은 AbortController로 취소한다.
+   * 이미 서버에 나간 요청은 되돌릴 수 없으므로 취소 여부와 관계없이 그 응답을 무시할 뿐이다(결과를 상태·이벤트·토스트에 반영하지 않는다).
+   */
   reset(): void {
+    this.controller.abort();
+    this.controller = new AbortController();
     this.epoch += 1;
     this.entries = new Map();
   }
@@ -112,12 +120,12 @@ export class PostLikeStore {
   }
 
   /** 마지막 의도와 서버 상태가 같아질 때까지 요청을 하나씩 보낸다(동시 요청 1개). */
-  private async run(postId: string, entry: Entry, epoch: number): Promise<void> {
+  private async run(postId: string, entry: Entry, epoch: number, signal: AbortSignal): Promise<void> {
     for (;;) {
       const liked = entry.intent;
       let result: LikeResult;
       try {
-        result = liked ? await this.deps.repository.like(postId) : await this.deps.repository.unlike(postId);
+        result = liked ? await this.deps.repository.like(postId, signal) : await this.deps.repository.unlike(postId, signal);
       } catch (error) {
         if (epoch !== this.epoch) return;
         this.fail(postId, entry, error, liked);
