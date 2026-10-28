@@ -53,7 +53,7 @@ subprojects {
             inputs.file(rootDir.parentFile.resolve("shared/constants.json")).withPropertyName("sharedConstants")
             testLogging {
                 events("passed", "failed", "skipped")
-                exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.SHORT
+                exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
             }
         }
     }

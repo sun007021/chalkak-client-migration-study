@@ -51,5 +51,12 @@ jobs:
         run: ./gradlew projects | grep -q "Project ':app'"
       - name: Pure Kotlin modules and app unit tests
         run: ./gradlew test :app:testDebugUnitTest --continue
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-reports
+          path: android/**/build/reports/tests/
+          retention-days: 7
       - name: Debug APK
         run: ./gradlew :app:assembleDebug
