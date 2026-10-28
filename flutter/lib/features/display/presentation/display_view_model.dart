@@ -183,6 +183,9 @@ class DisplayViewModel extends ChangeNotifier {
 
   Future<void> onReturnedFromFeed() => _refresh();
 
+  /// 지금 보고 있는 날짜.
+  KstDate get selectedDate => _selected;
+
   /// 화면이 다시 보일 때: KST 오늘만 다시 계산한다(보던 날짜·요청은 그대로).
   Future<void> onResumed() async {
     if (_disposed) return;

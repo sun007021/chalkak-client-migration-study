@@ -5,6 +5,10 @@ import 'package:chalkak/core/post_events/post_event_bus.dart';
 import 'package:chalkak/core/time/kst_date.dart';
 import 'package:chalkak/core/ui/test_id.dart';
 import 'package:chalkak/core/ui/toast/toast_controller.dart';
+import 'package:chalkak/features/ai_review/data/api_ai_review_repository.dart';
+import 'package:chalkak/features/ai_review/domain/ai_review_session.dart';
+import 'package:chalkak/features/ai_review/domain/ai_review_target.dart';
+import 'package:chalkak/features/ai_review/presentation/ai_review_home_entry.dart';
 import 'package:chalkak/features/banner/data/api_banner_repository.dart';
 import 'package:chalkak/features/banner/domain/banner_link_launcher.dart';
 import 'package:chalkak/features/banner/domain/banner_list_controller.dart';
@@ -39,6 +43,7 @@ import 'fake_analytics_tracker.dart';
 import 'net_harness.dart' show advance, sessionAt, sessionGuest, settle, t0, v1;
 import 'record_fakes.dart'
     show FakeCalendarImageRenderer, FakeCalendarImageSaver;
+import 'upload_dependencies_fake.dart';
 
 /// `shared/fixtures/<name>`을 manifest의 상태와 함께 응답으로 만든다(지연 선택).
 FakeResponse fx(String name, {Duration delay = Duration.zero}) =>
@@ -356,6 +361,18 @@ class HomeFakes {
     isGuest: () => guestFlag.value,
   );
 
+  /// true면 홈 AI 카드를 실제 위젯으로 그린다(AI 응답은 `AiApi`로 스크립트한다).
+  bool useRealAiCard = false;
+
+  late final ApiAiReviewRepository aiReviewRepository = ApiAiReviewRepository(
+    client: http.client,
+  );
+  late final AiReviewSession homeAiReview = AiReviewSession(
+    repository: aiReviewRepository,
+    toast: toast,
+    surface: AiReviewSurface.home,
+  );
+
   MainDependencies get dependencies => MainDependencies(
     homeRepository: home,
     todayPostRepository: home,
@@ -364,10 +381,20 @@ class HomeFakes {
     toast: toast,
     bannerWebViewBuilder: webView,
     externalLinks: launcher,
-    aiCardBuilder: (context, postId) => const TestId(
-      HomeTestIds.aiCard,
-      child: SizedBox(width: 10, height: 10),
-    ),
+    aiCardBuilder: (context, postId, {required topicDate, required visible}) =>
+        useRealAiCard
+        ? AiReviewHomeEntry(
+            session: homeAiReview,
+            postId: postId,
+            topicDate: topicDate,
+            visible: visible,
+          )
+        : const TestId(
+            HomeTestIds.aiCard,
+            child: SizedBox(width: 10, height: 10),
+          ),
+    aiReviewRepository: aiReviewRepository,
+    homeAiReview: homeAiReview,
     displayRepository: displayRepository,
     postRepository: postRepository,
     likeStore: likeStore,
@@ -378,6 +405,7 @@ class HomeFakes {
     recordImageSaver: recordSaver,
     recordPostEvents: PostBusRecordEvents(postEvents),
     recordCleaner: recordCleaner,
+    upload: fakeUploadDependencies(),
   );
 
   /// 기록 탭은 홈과 같은 FakeAdapter 위의 `/posts/calendar`를 쓴다(홈 `api.calendar`로 스크립트).

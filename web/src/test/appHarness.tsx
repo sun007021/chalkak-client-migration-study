@@ -11,6 +11,9 @@ import { FakeClock } from './FakeClock';
 import { FakeHomePreloader } from './FakeHomePreloader';
 import { FakeSessionStore } from './FakeSessionStore';
 import { FakeUploadEntry } from './FakeUploadEntry';
+import { FakeBlobUrls } from './FakeBlobUrls';
+import { FakeExternalLinkOpener } from './FakeExternalLinkOpener';
+import { FakeSignatureRasterizer } from './FakeSignatureRasterizer';
 import { FakeSocialLoginClient } from './FakeSocialLoginClient';
 import { FakeFetch } from './fakeFetch';
 import { MOCK_BASE } from './apiEnv';
@@ -29,6 +32,11 @@ export interface Harness {
   upload: FakeUploadEntry;
   tracker: FakeAnalyticsTracker;
   logger: RecordingLogger;
+  /** 약관 문서 새 탭 열기 기록. */
+  opener: FakeExternalLinkOpener;
+  /** 사인 PNG 내보내기 Fake(크기·실패를 조절). */
+  rasterizer: FakeSignatureRasterizer;
+  blobUrls: FakeBlobUrls;
 }
 
 /** 실제 구현을 엮되 시계·fetch·저장소·카카오·프리로드·분석만 Fake로 둔 앱 컨테이너. */
@@ -41,6 +49,9 @@ export function makeHarness(options: { session?: StoredSession; env?: Partial<Ap
   const upload = new FakeUploadEntry();
   const tracker = new FakeAnalyticsTracker();
   const logger = new RecordingLogger();
+  const opener = new FakeExternalLinkOpener();
+  const rasterizer = new FakeSignatureRasterizer();
+  const blobUrls = new FakeBlobUrls();
   const container = createAppContainer({
     env: { VITE_API_BASE_URL: MOCK_BASE, ...options.env },
     devSessionEnabled: options.devSession ?? false,
@@ -55,8 +66,11 @@ export function makeHarness(options: { session?: StoredSession; env?: Partial<Ap
     resumeKakaoRedirect: options.resume,
     preloader,
     uploadEntry: upload,
+    externalLinkOpener: opener,
+    signatureRasterizer: rasterizer,
+    blobUrls,
   });
-  return { container, clock, ff, store, social, preloader, upload, tracker, logger };
+  return { container, clock, ff, store, social, preloader, upload, tracker, logger, opener, rasterizer, blobUrls };
 }
 
 /** 라우터를 만들어 그린다. router.state로 현재 경로·이동 방식(PUSH/REPLACE)을 확인한다. */

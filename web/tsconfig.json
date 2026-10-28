@@ -14,8 +14,9 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom", "node"],
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src", "e2e", "../shared/constants.json", "../shared/copy/ko.json", "vite.config.ts", "playwright.config.ts"]
+  "include": ["src", "e2e", "../shared/constants.json", "../shared/copy/ko.json", "vite.config.ts", "vite", "playwright.config.ts"]
 }
