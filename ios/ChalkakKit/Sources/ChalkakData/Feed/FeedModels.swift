@@ -301,6 +301,12 @@ extension KeyedDecodingContainer {
         return date
     }
 
+    /// 키가 없거나 null이면 nil, 값이 있는데 ISO-8601이 아니면 실패.
+    func decodeInstantIfPresent(forKey key: Key) throws -> Date? {
+        guard contains(key), try !decodeNil(forKey: key) else { return nil }
+        return try decodeInstant(forKey: key)
+    }
+
     func decodeURL(forKey key: Key) throws -> URL {
         let text = try decode(String.self, forKey: key)
         guard !text.isEmpty, let url = URL(string: text) else {
