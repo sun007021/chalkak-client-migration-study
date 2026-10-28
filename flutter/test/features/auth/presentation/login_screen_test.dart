@@ -124,6 +124,9 @@ void main() {
       requests.where((r) => r.headers.containsKey('Authorization')),
       isEmpty,
     );
+    // 게스트 홈은 로그인 전용 조회를 하지 않는다(TC-HOME-012).
+    final authOnly = ['/posts/today', '/posts/calendar', '/notifications'];
+    expect(requests.where((r) => authOnly.any(r.uri.path.contains)), isEmpty);
     expect(h.http.store.current!.isGuest, isTrue);
   });
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/time/kst_date.dart';
+import '../core/ui/toast/toast_host.dart';
 import '../features/banner/domain/banner_list_controller.dart';
 import '../features/banner/domain/banner_models.dart';
 import '../features/banner/domain/banner_web_view_model.dart';
@@ -64,7 +65,7 @@ class _MainRouteHostState extends State<MainRouteHost> {
     return MainShell(
       shell: parts.shell,
       home: parts.home,
-      navigator: _RouterNavigator(context),
+      navigator: _RouterNavigator(context, widget.dependencies),
       toast: widget.dependencies.main.toast,
       aiCardBuilder: widget.dependencies.main.aiCardBuilder,
     );
@@ -105,12 +106,10 @@ class _MainParts {
 /// 셸의 이동 요청을 라우터/네비게이터로 보낸다. 알림함·피드·업로드 화면은 해당 PR이 추가하기 전까지
 /// 이동하지 않고 바로 끝난다.
 class _RouterNavigator implements MainShellNavigator {
-  _RouterNavigator(this._context);
+  _RouterNavigator(this._context, this._dependencies);
 
   final BuildContext _context;
-
-  AppDependencies get _dependencies =>
-      (_context.findAncestorWidgetOfExactType<MainRouteHost>()!).dependencies;
+  final AppDependencies _dependencies;
 
   @override
   Future<void> openNotifications() => Future<void>.value();
@@ -124,10 +123,10 @@ class _RouterNavigator implements MainShellNavigator {
   @override
   Future<void> openBanner(BannerItem item) async {
     if (!_context.mounted) return;
-    final d = _dependencies;
     await Navigator.of(_context).push<void>(
       MaterialPageRoute<void>(
-        builder: (context) => _BannerRoute(dependencies: d, item: item),
+        builder: (context) =>
+            _BannerRoute(dependencies: _dependencies, item: item),
       ),
     );
   }
@@ -163,9 +162,13 @@ class _BannerRouteState extends State<_BannerRoute> {
   }
 
   @override
-  Widget build(BuildContext context) => BannerWebScreen(
-    viewModel: _viewModel,
-    webViewBuilder: widget.dependencies.main.bannerWebViewBuilder,
-    onBack: () => Navigator.of(context).maybePop(),
+  // 배너 화면은 메인 셸 위에 쌓이는 라우트라 셸의 토스트가 가려진다. 같은 컨트롤러로 여기서도 그린다.
+  Widget build(BuildContext context) => ToastHost(
+    controller: widget.dependencies.main.toast,
+    child: BannerWebScreen(
+      viewModel: _viewModel,
+      webViewBuilder: widget.dependencies.main.bannerWebViewBuilder,
+      onBack: () => Navigator.of(context).maybePop(),
+    ),
   );
 }
