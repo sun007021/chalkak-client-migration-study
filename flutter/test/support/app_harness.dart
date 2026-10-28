@@ -6,7 +6,6 @@ import 'package:chalkak/features/auth/domain/login_use_case.dart';
 import 'package:chalkak/features/auth/domain/session_use_cases.dart';
 import 'package:chalkak/features/auth/domain/user_data_cleaner.dart';
 import 'package:chalkak/features/boot/domain/auth_gate.dart';
-import 'package:chalkak/features/boot/domain/pending_navigation.dart';
 import 'package:chalkak/features/boot/domain/update_gate.dart';
 import 'package:chalkak/features/notification/data/push_platform.dart';
 import 'package:chalkak/features/notification/notification_dependencies.dart';
@@ -36,12 +35,8 @@ class AppHarness {
       launcher: launcher,
       enabled: updateGateEnabled,
     );
-    pendingNavigation = PendingNavigation(
-      gate: updateGate,
-      navigate: pushNavigations.add,
-    );
     final repository = ApiAuthRepository(client: http.client);
-    final cleaner = CompositeUserDataCleaner([userData, pendingNavigation]);
+    final cleaner = CompositeUserDataCleaner([userData]);
     final signatureRepository = ApiSignatureRepository(client: http.client);
     final signatureUploader = ApiSignatureUploader(client: http.client);
     dependencies = AppDependencies(
@@ -51,7 +46,6 @@ class AppHarness {
       authGate: AuthGate(sessions: http.sessions),
       homePreloader: preloader,
       pushRegistrar: push,
-      pendingNavigation: pendingNavigation,
       userDataCleaner: cleaner,
       loginUseCase: LoginUseCase(
         socialLogin: kakao,
@@ -119,9 +113,7 @@ class AppHarness {
   final SignUpContext signUpContext = SignUpContext();
   final FakeSignatureRenderer renderer = FakeSignatureRenderer();
   final FakeExternalLinkLauncher externalLinks = FakeExternalLinkLauncher();
-  final List<String> pushNavigations = [];
   late final UpdateGate updateGate;
-  late final PendingNavigation pendingNavigation;
   late final AppDependencies dependencies;
 
   Widget get app => ChalkakApp(dependencies: dependencies);

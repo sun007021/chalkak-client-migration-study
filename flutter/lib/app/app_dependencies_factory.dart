@@ -16,7 +16,6 @@ import '../features/auth/domain/session_use_cases.dart';
 import '../features/auth/domain/user_data_cleaner.dart';
 import '../features/boot/data/disabled_update_check.dart';
 import '../features/boot/domain/auth_gate.dart';
-import '../features/boot/domain/pending_navigation.dart';
 import '../features/boot/domain/update_gate.dart';
 import '../features/home/domain/home_preload.dart';
 import '../features/like/domain/like_data_cleaner.dart';
@@ -57,11 +56,6 @@ AppDependencies buildAppDependencies(
     launcher: const DisabledUpdateLauncher(),
     enabled: config.forceUpdateCheckEnabled,
   );
-  // 푸시 탭 보류·이동은 PushTapCoordinator가 맡는다. 이 객체는 업데이트 게이트 뒤 외부 이동 요청용으로 남긴다.
-  final pendingNavigation = PendingNavigation(
-    gate: updateGate,
-    navigate: (_) {},
-  );
   final main = buildMainDependencies(client);
   final notification = buildNotificationDependencies(
     repository: ApiNotificationRepository(client: client),
@@ -74,7 +68,6 @@ AppDependencies buildAppDependencies(
     toast: main.toast,
   );
   final cleaner = CompositeUserDataCleaner([
-    pendingNavigation,
     notification.registrar,
     notification.coordinator,
     notification.tapRunner,
@@ -98,7 +91,6 @@ AppDependencies buildAppDependencies(
       cache: main.preloadCache,
     ),
     pushRegistrar: pushRegistrar,
-    pendingNavigation: pendingNavigation,
     userDataCleaner: cleaner,
     loginUseCase: LoginUseCase(
       socialLogin: KakaoSocialLoginClient(sdk: DefaultKakaoSdkGateway()),

@@ -31,6 +31,9 @@ class PushPlatform {
       presenter = const _NoopLocalNotificationPresenter(),
       showsLocalNotification = false;
 
+  /// 초기화가 끝나면 완료된다. 이미 정해진 구성은 바로 완료되고, [PushPlatform.deferred]는 초기화를 기다린다.
+  Future<void> get ready => Future.value();
+
   /// false면 권한 요청·기기 등록·수신 연결을 하지 않는다.
   final bool isAvailable;
   final PushMessageSource messages;
@@ -40,6 +43,13 @@ class PushPlatform {
 
   /// Android: 포그라운드 푸시를 앱이 직접 표시한다. iOS는 OS가 표시한다.
   final bool showsLocalNotification;
+
+  /// `runApp`을 막지 않도록 초기화를 뒤로 미룬 구성. 초기화가 끝나기 전의 호출은 끝날 때까지 기다리고,
+  /// 초기화가 실패하면 [PushPlatform.disabled]처럼 아무 일도 하지 않는다.
+  factory PushPlatform.deferred(
+    Future<PushPlatform> initialization, {
+    TargetPlatform? platform,
+  }) = _DeferredPushPlatform;
 
   /// Firebase를 초기화하고 실제 구현을 만든다. 실패하면 이유를 한 번만 로그에 남기고
   /// [PushPlatform.disabled]를 돌려준다(예외를 밖으로 내지 않는다).
@@ -54,7 +64,7 @@ class PushPlatform {
     FirebaseMessagingGateway Function()? messagingGateway,
     LocalNotificationsGateway Function()? localGateway,
     void Function(String message)? log,
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = const Duration(seconds: 3),
   }) async {
     final write = log ?? debugPrint;
     final target = platform ?? defaultTargetPlatform;
@@ -152,4 +162,104 @@ class _NoopLocalNotificationPresenter implements LocalNotificationPresenter {
     required String body,
     String? payload,
   }) async {}
+}
+
+class _DeferredPushPlatform implements PushPlatform {
+  _DeferredPushPlatform(
+    Future<PushPlatform> initialization, {
+    TargetPlatform? platform,
+  }) : showsLocalNotification =
+           (platform ?? defaultTargetPlatform) == TargetPlatform.android {
+    _future = initialization.then<PushPlatform>(
+      (resolved) => _resolved = resolved,
+      onError: (Object _) => _resolved = const PushPlatform.disabled(),
+    );
+    messages = _DeferredMessages(_future);
+    tokens = _DeferredTokens(_future);
+    permission = _DeferredPermission(_future);
+    presenter = _DeferredPresenter(_future);
+  }
+
+  late final Future<PushPlatform> _future;
+  PushPlatform? _resolved;
+
+  @override
+  bool get isAvailable => _resolved?.isAvailable ?? false;
+
+  /// 로컬 표시 여부는 플랫폼으로 정해진다. 꺼진 구성이면 권한이 denied라 핸들러가 표시하지 않는다.
+  @override
+  final bool showsLocalNotification;
+
+  @override
+  Future<void> get ready => _future.then((_) {});
+
+  @override
+  late final PushMessageSource messages;
+  @override
+  late final PushTokenProvider tokens;
+  @override
+  late final NotificationPermission permission;
+  @override
+  late final LocalNotificationPresenter presenter;
+}
+
+class _DeferredMessages implements PushMessageSource {
+  _DeferredMessages(this._platform);
+  final Future<PushPlatform> _platform;
+
+  @override
+  Stream<PushMessage> get foreground =>
+      Stream.fromFuture(_platform).asyncExpand((p) => p.messages.foreground);
+
+  @override
+  Stream<PushMessage> get opened =>
+      Stream.fromFuture(_platform).asyncExpand((p) => p.messages.opened);
+
+  @override
+  Future<PushMessage?> initialMessage() async =>
+      (await _platform).messages.initialMessage();
+}
+
+class _DeferredTokens implements PushTokenProvider {
+  _DeferredTokens(this._platform);
+  final Future<PushPlatform> _platform;
+
+  @override
+  Future<String?> currentToken() async =>
+      (await _platform).tokens.currentToken();
+
+  @override
+  Stream<String> get tokenRefreshed =>
+      Stream.fromFuture(_platform).asyncExpand((p) => p.tokens.tokenRefreshed);
+}
+
+class _DeferredPermission implements NotificationPermission {
+  _DeferredPermission(this._platform);
+  final Future<PushPlatform> _platform;
+
+  @override
+  Future<OsPermissionStatus> status() async =>
+      (await _platform).permission.status();
+
+  @override
+  Future<OsPermissionStatus> request() async =>
+      (await _platform).permission.request();
+}
+
+class _DeferredPresenter implements LocalNotificationPresenter {
+  _DeferredPresenter(this._platform);
+  final Future<PushPlatform> _platform;
+
+  @override
+  Future<void> show({
+    required String channelId,
+    required String title,
+    required String body,
+    String? payload,
+  }) async => (await _platform).presenter.show(
+    channelId: channelId,
+    title: title,
+    body: body,
+    payload: payload,
+  );
 }

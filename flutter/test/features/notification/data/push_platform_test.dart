@@ -252,4 +252,31 @@ void main() {
       );
     });
   });
+
+  group('PushPlatform.deferred', () {
+    test('초기화가 끝나기 전에는 꺼진 것으로 보이고 끝나면 실제 구성을 따른다', () async {
+      final done = Completer<PushPlatform>();
+      final p = PushPlatform.deferred(
+        done.future,
+        platform: TargetPlatform.iOS,
+      );
+      expect(p.isAvailable, isFalse);
+      final token = p.tokens.currentToken();
+      done.complete(const PushPlatform.disabled());
+      await p.ready;
+      expect(await token, isNull);
+      expect(p.isAvailable, isFalse);
+    });
+
+    test('초기화 future가 실패해도 예외 없이 꺼진 구성으로 동작한다', () async {
+      final p = PushPlatform.deferred(
+        Future<PushPlatform>.error(StateError('x')),
+        platform: TargetPlatform.android,
+      );
+      await p.ready;
+      expect(p.isAvailable, isFalse);
+      expect(await p.permission.status(), OsPermissionStatus.denied);
+      expect(await p.messages.initialMessage(), isNull);
+    });
+  });
 }

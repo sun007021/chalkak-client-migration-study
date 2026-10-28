@@ -6,7 +6,6 @@ import '../features/auth/domain/session_use_cases.dart';
 import '../features/auth/domain/user_data_cleaner.dart';
 import '../features/boot/domain/auth_gate.dart';
 import '../features/boot/domain/home_preloader.dart';
-import '../features/boot/domain/pending_navigation.dart';
 import '../features/boot/domain/update_gate.dart';
 import '../features/navigation/main_dependencies.dart';
 import '../features/notification/notification_dependencies.dart';
@@ -28,7 +27,6 @@ class AppDependencies {
     required this.authGate,
     required this.homePreloader,
     required this.pushRegistrar,
-    required this.pendingNavigation,
     required this.userDataCleaner,
     required this.loginUseCase,
     required this.enterGuest,
@@ -52,7 +50,6 @@ class AppDependencies {
   final AuthGate authGate;
   final HomePreloader homePreloader;
   final PushRegistrar pushRegistrar;
-  final PendingNavigation pendingNavigation;
   final UserDataCleaner userDataCleaner;
   final LoginUseCase loginUseCase;
   final EnterGuestUseCase enterGuest;

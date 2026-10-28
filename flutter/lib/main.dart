@@ -18,8 +18,11 @@ Future<void> main() async {
     return;
   }
   await KakaoSdk.init(nativeAppKey: config.kakaoNativeAppKey);
-  // Firebase 설정이 없거나 초기화가 실패하면 푸시가 꺼진 채로 뜬다(로그 한 번).
-  final push = await PushPlatform.initialize(config: config.firebase);
+  // 앱을 먼저 띄우고 Firebase는 뒤에서 초기화한다(짧은 시간 제한). 설정이 없거나 실패하면
+  // 푸시가 꺼진 채로 동작한다(로그 한 번).
+  final push = PushPlatform.deferred(
+    PushPlatform.initialize(config: config.firebase),
+  );
   runApp(ChalkakApp(dependencies: buildAppDependencies(config, push: push)));
 }
 

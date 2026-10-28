@@ -75,7 +75,10 @@ class NotificationInboxViewModel extends ChangeNotifier {
     required this._runner,
     required this._toast,
     required this._analytics,
-  });
+  }) {
+    // 화면을 떠나면 진행 중인 첫 페이지 요청도 취소한다(한 번만 등록).
+    _screenToken.whenCancel.then((_) => _reloadToken?.cancel());
+  }
 
   final NotificationRepository _repository;
   final NotificationTapRunner _runner;
@@ -132,9 +135,6 @@ class NotificationInboxViewModel extends ChangeNotifier {
     _reloadToken?.cancel();
     final token = _reloadToken = CancelToken();
     // 화면을 떠나면 진행 중 요청도 취소한다.
-    _screenToken.whenCancel.then((_) {
-      if (!token.isCancelled) token.cancel();
-    });
     return _repository.fetchPage(page: 1, cancelToken: token);
   }
 

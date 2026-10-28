@@ -194,18 +194,21 @@ void main() {
       expect(r.nav, ['home:top']);
     });
 
-    fakeTest('TC-PUSH-062 콜드 스타트 탭은 메인이 준비될 때까지 버퍼링했다가 정확히 1회만 소비한다', (async) {
-      final r = _Rig(ready: false);
-      resolve(async, r.coordinator.onTapped(pushPayloadFx('payload__topic')));
-      expect(r.nav, isEmpty);
-      r.coordinator.setMainReady(true);
-      settle(async);
-      expect(r.nav, ['home:top']);
-      r.coordinator.setMainReady(false);
-      r.coordinator.setMainReady(true);
-      resolve(async, r.coordinator.flush());
-      expect(r.nav, ['home:top'], reason: '다시 소비하지 않는다');
-    });
+    fakeTest(
+      'TC-BOOT-035 TC-PUSH-062 콜드 스타트 탭은 메인이 준비될 때까지 버퍼링했다가 정확히 1회만 소비한다',
+      (async) {
+        final r = _Rig(ready: false);
+        resolve(async, r.coordinator.onTapped(pushPayloadFx('payload__topic')));
+        expect(r.nav, isEmpty);
+        r.coordinator.setMainReady(true);
+        settle(async);
+        expect(r.nav, ['home:top']);
+        r.coordinator.setMainReady(false);
+        r.coordinator.setMainReady(true);
+        resolve(async, r.coordinator.flush());
+        expect(r.nav, ['home:top'], reason: '다시 소비하지 않는다');
+      },
+    );
 
     fakeTest('TC-PUSH-063 보류 중인 탭은 프로세스 종료 뒤에도 복원되고 소비 뒤에는 저장되지 않는다', (async) {
       final r = _Rig(ready: false);

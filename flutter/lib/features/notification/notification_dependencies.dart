@@ -140,6 +140,7 @@ class NotificationDependencies {
 
   /// 인증 사용자의 메인 첫 진입 직후. 푸시를 쓸 수 없는 구성이면 OS 권한을 묻지도 표시를 남기지도 않는다.
   Future<void> onMainEntered({required bool isGuest}) async {
+    await platform.ready;
     if (!platform.isAvailable) return;
     await permissionPrompt.onMainEntered(isGuest: isGuest);
   }
