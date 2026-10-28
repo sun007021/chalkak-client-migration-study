@@ -1,7 +1,9 @@
+import 'package:chalkak/app/feed_route.dart';
 import 'package:chalkak/core/copy/ko.g.dart';
 import 'package:chalkak/features/ai_review/presentation/ai_review_test_ids.dart';
 import 'package:chalkak/features/display/domain/display_models.dart';
 import 'package:chalkak/features/display/presentation/display_test_ids.dart';
+import 'package:chalkak/features/feed/domain/feed_target.dart';
 import 'package:chalkak/features/feed/presentation/feed_test_ids.dart';
 import 'package:chalkak/features/home/presentation/home_test_ids.dart';
 import 'package:chalkak/features/navigation/presentation/navigation_test_ids.dart';
@@ -149,4 +151,31 @@ void main() {
     expect(byId(AiReviewTestIds.feedChecking), findsNothing);
     expect(ai.totalCalls, before);
   });
+
+  widgetTest(
+    'TC-AIR-058 REQ-AIR-046 AI 푸시로 연 상세는 COMPLETED면 결과 시트를 한 번 자동으로 연다',
+    (tester) async {
+      final (:h, :ai) = await _enterMain(
+        tester,
+        scriptAi: (ai) => ai.get([fx(aiGet('completed'))]),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FeedRoute(
+            dependencies: h.dependencies,
+            target: FeedTarget(
+              postId: _mine,
+              origin: FeedOrigin.push,
+              isMine: true,
+            ),
+            userId: myUserId,
+            openAiFeedback: true,
+          ),
+        ),
+      );
+      await _settle(tester);
+      expect(byId(AiReviewTestIds.resultSheetRoot), findsOneWidget);
+      expect(ai.postCalls(), 0);
+    },
+  );
 }

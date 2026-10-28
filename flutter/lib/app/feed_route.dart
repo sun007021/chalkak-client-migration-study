@@ -22,6 +22,7 @@ class FeedRoute extends StatefulWidget {
     required this.dependencies,
     required this.target,
     required this.userId,
+    this.openAiFeedback = false,
   });
 
   final AppDependencies dependencies;
@@ -29,6 +30,10 @@ class FeedRoute extends StatefulWidget {
 
   /// 게스트·세션 없음이면 null(내 게시물 판정이 항상 false).
   final String? userId;
+
+  /// AI 피드백 알림(`AI_REVIEW_*`)으로 들어왔다. AI 세션이 첫 `GET` 결과가 COMPLETED·FAILED일 때
+  /// 결과·실패 시트를 한 번 자동으로 연다(REQ-AIR-046).
+  final bool openAiFeedback;
 
   @override
   State<FeedRoute> createState() => _FeedRouteState();
@@ -42,11 +47,10 @@ class _FeedRouteState extends State<FeedRoute> with WidgetsBindingObserver {
     postEvents: widget.dependencies.main.postEvents,
     userId: widget.userId,
   );
-  // 푸시로 열렸으면 첫 GET이 COMPLETED·FAILED일 때 시트를 한 번 자동으로 연다(REQ-AIR-046).
   late final AiReviewSession _aiReview = AiReviewSession(
     repository: widget.dependencies.main.aiReviewRepository,
     toast: widget.dependencies.main.toast,
-    openSheetOnEntry: widget.target.origin == FeedOrigin.push,
+    openSheetOnEntry: widget.openAiFeedback,
   );
   StreamSubscription<FeedEvent>? _events;
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -18,7 +20,7 @@ class ChalkakApp extends StatefulWidget {
   State<ChalkakApp> createState() => _ChalkakAppState();
 }
 
-class _ChalkakAppState extends State<ChalkakApp> {
+class _ChalkakAppState extends State<ChalkakApp> with WidgetsBindingObserver {
   late final GoRouter _router = createAppRouter(widget.dependencies);
   late final SessionRedirector _redirector = SessionRedirector(
     sessions: widget.dependencies.sessions,
@@ -30,10 +32,23 @@ class _ChalkakAppState extends State<ChalkakApp> {
   void initState() {
     super.initState();
     _redirector.start();
+    WidgetsBinding.instance.addObserver(this);
+    // 보류 푸시 복원과 수신 연결. 인증 상태로 시작했다면 기기 등록도 시도한다(BootViewModel도 부르며 중복은 등록기가 걸러낸다).
+    unawaited(widget.dependencies.notification.start());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 포그라운드 복귀: 기기 등록 재시도(세션·토큰이 같으면 등록기가 요청을 보내지 않는다).
+    if (state == AppLifecycleState.resumed) {
+      widget.dependencies.notification.registerDevice();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(widget.dependencies.notification.dispose());
     _redirector.dispose();
     _router.dispose();
     super.dispose();
