@@ -78,6 +78,27 @@ class FirebaseNotificationPermission implements NotificationPermission {
       };
 }
 
+/// Firebase가 없는 구성(설정 없음, 초기화 실패)의 권한 창구. 푸시를 받을 수 없으니 OS 권한을 읽거나 묻지
+/// 않고, 스위치를 서버 설정에만 연결한다(Web과 같다, REQ-SET-019). 거부로 답하면 설정 탭이 켜기를 막고
+/// 시스템 설정으로만 보내 다시는 켤 수 없게 되므로 [OsPermissionStatus.notRequired]로 답한다.
+/// 시스템 앱 알림 설정 열기는 Firebase 없이도 동작해 그대로 연다.
+class NoFirebaseNotificationPermission implements NotificationPermission {
+  const NoFirebaseNotificationPermission({this._openSettings});
+
+  final Future<void> Function()? _openSettings;
+
+  @override
+  Future<OsPermissionStatus> status() async => OsPermissionStatus.notRequired;
+
+  @override
+  Future<OsPermissionStatus> request() async => OsPermissionStatus.notRequired;
+
+  @override
+  Future<void> openSystemSettings() =>
+      (_openSettings ??
+      FirebaseNotificationPermission._openAppNotificationSettings)();
+}
+
 /// FCM 수신 창구. 알림을 누른 이벤트는 FCM이 만든 시스템 알림과 앱이 직접 만든 로컬 알림(Android 포그라운드)
 /// 두 곳에서 오므로 [opened]로 합친다.
 class FirebasePushMessageSource implements PushMessageSource {
