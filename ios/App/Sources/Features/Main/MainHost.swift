@@ -112,6 +112,8 @@ struct MainView: View {
             PlaceholderView(title: AnalyticsScreen.changeSignature.rawValue, identifier: "change-signature", onBack: { shell.pop() })
         case .changeSignaturePreview:
             PlaceholderView(title: AnalyticsScreen.changeSignaturePreview.rawValue, identifier: "change-signature-preview", onBack: { shell.pop() })
+        case .notificationDetail:
+            PlaceholderView(title: AnalyticsScreen.notificationDetail.rawValue, identifier: "notification-detail", onBack: { shell.pop() })
         }
     }
 
