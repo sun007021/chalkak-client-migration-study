@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import com.stonefive.chalkak.copy.Copy
 import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.copy.ProvideCopy
+import com.stonefive.chalkak.push.PushTapWiring
 import com.stonefive.chalkak.ui.boot.SplashScreen
 import com.stonefive.chalkak.ui.boot.UpdateGateDialog
 import com.stonefive.chalkak.ui.components.ToastLayer
@@ -108,6 +109,8 @@ class RootDependencies(
     val authEvents: Flow<AuthEvent> = emptyFlow(),
     val onExitApp: () -> Unit = {},
     val main: MainDependencies? = null,
+    /** Push tap queue and the navigation view it reads; null = push taps are not handled. */
+    val pushTaps: PushTapWiring? = null,
 )
 
 /** `home.root` placeholder until the home PR lands. */

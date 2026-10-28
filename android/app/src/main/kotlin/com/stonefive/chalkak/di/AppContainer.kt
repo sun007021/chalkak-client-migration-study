@@ -7,6 +7,8 @@ import com.stonefive.chalkak.data.KeystoreRecordStorage
 import com.stonefive.chalkak.data.KeystoreSecretCipher
 import com.stonefive.chalkak.data.SecretCipher
 import com.stonefive.chalkak.platform.PlatformAdapters
+import com.stonefive.chalkak.push.PushRuntime
+import com.stonefive.chalkak.push.PushTapWiring
 import com.stonefive.chalkak.ui.RootDependencies
 import com.stonefive.chalkak.ui.SignupDependencies
 import com.stonefive.chalkak.ui.signature.SignaturePadSpace
@@ -233,6 +235,12 @@ class AppContainer(
     /** AI feedback holder for one post detail (one per stacked feed). */
     fun newAiReviewHolder(scope: CoroutineScope): AiReviewStateHolder =
         AiReviewStateHolder(scope, aiReviewRepository, currentUser, kstCalendar, SystemMonotonicClock)
+
+    /** STUB (A8 test step): the push glue (channel, token refresh, foreground messages). */
+    val pushRuntime: PushRuntime by lazy { TODO("A8 implementer") }
+
+    /** STUB (A8 test step): tap queue + navigation view; also what `RootDependencies.pushTaps` carries. */
+    val pushTaps: PushTapWiring by lazy { TODO("A8 implementer") }
 
     /** BootGate state is touched on the main thread only (its contract). Created on first use. */
     private val mainScope: CoroutineScope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }

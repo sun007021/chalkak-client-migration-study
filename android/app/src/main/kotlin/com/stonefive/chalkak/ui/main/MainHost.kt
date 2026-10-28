@@ -50,6 +50,12 @@ import kr.chalkak.feature.navigation.NavigationController
 import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
 import kr.chalkak.feature.record.RecordStateHolder
+import kr.chalkak.feature.notification.NotificationDetailStateHolder
+import kr.chalkak.feature.notification.NotificationInboxStateHolder
+import kr.chalkak.feature.notification.NotificationPermissionFlow
+import kr.chalkak.feature.notification.PushNavigationEvent
+import kotlinx.coroutines.flow.Flow
+import com.stonefive.chalkak.ui.home.ActiveHomeUnread
 import kr.chalkak.feature.upload.PhotoUploadStateHolder
 import kr.chalkak.feature.upload.UploadGateEffect
 
@@ -121,6 +127,19 @@ class MainDependencies(
     val newRecordHolder: ((scope: CoroutineScope, mode: HomeMode) -> RecordStateHolder)? = null,
     /** KST today for the record calendar's today marker; always from the injected clock (TC-TIME-029). */
     val today: () -> LocalDate,
+    /** Inbox list holder, built once per opened inbox screen; null = presence-only placeholder (`notifications.root`). */
+    val newNotificationInboxHolder: ((scope: CoroutineScope) -> NotificationInboxStateHolder)? = null,
+    /** Notification detail holder, built once per opened detail screen; null = presence-only placeholder. */
+    val newNotificationDetailHolder: ((scope: CoroutineScope) -> NotificationDetailStateHolder)? = null,
+    /**
+     * AI feedback holder with the push entry flag (`openSheetOnEntry`); takes precedence over [newAiReviewHolder] when non-null.
+     * The flag is true only for the feed that a push or an inbox row opened with `PostDetail(openAiFeedbackSheet = true)`.
+     */
+    val newAiReviewHolderOnEntry: ((scope: CoroutineScope, openSheetOnEntry: Boolean) -> AiReviewStateHolder)? = null,
+    /** Asked once each time an authenticated home opens (`onMainEntered`); null = no OS permission prompt. */
+    val notificationPermission: NotificationPermissionFlow? = null,
+    /** Re-checks the unread dot of the home holder shown by this host; attached/detached by the host. */
+    val homeUnread: ActiveHomeUnread? = null,
 )
 
 /**
@@ -139,11 +158,13 @@ fun MainHost(
     onExitApp: () -> Unit,
     modifier: Modifier = Modifier,
     sessionKey: Int = 0,
+    /** Push taps the queue released (`PushTapQueue.events`); the host navigates. Null = no push taps. */
+    pushEvents: Flow<PushNavigationEvent>? = null,
 ) {
     val activity = LocalActivity.current
     // The holders of a finished session are cleared with it (not kept in the Activity's store until the Activity dies).
     SessionHolders(sessionKey, isChangingConfigurations = { activity?.isChangingConfigurations == true }) {
-        MainHostContent(nav, deps, showToast, onExitApp, modifier, sessionKey)
+        MainHostContent(nav, deps, showToast, onExitApp, modifier, sessionKey, pushEvents)
     }
 }
 
@@ -155,6 +176,7 @@ private fun MainHostContent(
     onExitApp: () -> Unit,
     modifier: Modifier,
     sessionKey: Int,
+    @Suppress("UNUSED_PARAMETER") pushEvents: Flow<PushNavigationEvent>?,
 ) {
     val copy = LocalCopy.current
     val navState by nav.state.collectAsState()
