@@ -6,6 +6,8 @@ import '../display/domain/display_models.dart';
 import '../display/presentation/display_view_model.dart';
 import '../home/domain/home_view_model.dart';
 import '../like/domain/like_store.dart';
+import '../record/domain/record_data_cleaner.dart';
+import '../record/domain/record_view_model.dart';
 import 'domain/guest_guard.dart';
 import 'domain/main_shell_view_model.dart';
 import 'domain/upload_entry_gate.dart';
@@ -13,7 +15,13 @@ import 'main_dependencies.dart';
 
 /// 메인 화면이 함께 쓰는 ViewModel 묶음. 조립은 여기서 하고, 화면 위젯은 만들고 [dispose]만 한다.
 class MainComposition {
-  MainComposition._(this.banners, this.home, this.shell);
+  MainComposition._(
+    this.banners,
+    this.home,
+    this.shell,
+    this.record,
+    this._cleaner,
+  );
 
   factory MainComposition.create({
     required MainDependencies dependencies,
@@ -41,12 +49,28 @@ class MainComposition {
       uploadGate: UploadEntryGate(todayPost: dependencies.todayPostRepository),
       toast: dependencies.toast,
     );
-    return MainComposition._(banners, home, shell);
+    final record = RecordViewModel(
+      repository: dependencies.recordRepository,
+      postEvents: dependencies.recordPostEvents,
+      imageRenderer: dependencies.recordImageRenderer,
+      imageSaver: dependencies.recordImageSaver,
+      toast: dependencies.toast,
+    );
+    dependencies.recordCleaner.attach(record);
+    return MainComposition._(
+      banners,
+      home,
+      shell,
+      record,
+      dependencies.recordCleaner,
+    );
   }
 
   final BannerListController banners;
   final HomeViewModel home;
   final MainShellViewModel shell;
+  final RecordViewModel record;
+  final RecordDataCleaner _cleaner;
 
   /// 전시 탭 ViewModel을 만든다. 처음 열 때 한 번 호출하며, 소유와 정리는 부른 쪽이 한다.
   static DisplayViewModel createDisplay({
@@ -64,6 +88,8 @@ class MainComposition {
   );
 
   void dispose() {
+    _cleaner.detach(record);
+    record.dispose();
     shell.dispose();
     home.dispose();
     banners.dispose();

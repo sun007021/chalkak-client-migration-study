@@ -1,11 +1,12 @@
 package kr.chalkak.feature.record
 
+import java.time.YearMonth
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kr.chalkak.core.common.DateFormats
-import java.time.YearMonth
+import kr.chalkak.core.network.JobTracker
 
 /**
  * "이미지로 저장": render the shown month -> save `chalkak-calendar-yyyy-MM.png` -> one toast (REQ-REC-037..039). A tap while a save
@@ -13,7 +14,7 @@ import java.time.YearMonth
  * should keep their MediaStore write atomic (pending flag) because the coroutine can be cancelled between render and write.
  */
 internal class RecordSaveFlow(
-    private val jobs: RecordJobs,
+    private val jobs: JobTracker,
     private val core: RecordCore,
     private val renderer: CalendarImageRenderer,
     private val saver: CalendarImageSaver,

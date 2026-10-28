@@ -32,7 +32,7 @@ fun <T> TestScope.collectAll(flow: Flow<T>): MutableList<T> {
 
 class RecordingLikeToggler : LikeToggler {
     val calls = CopyOnWriteArrayList<Pair<String, Boolean>>()
-    override suspend fun toggle(postId: String, currentlyLiked: Boolean) { calls += postId to currentlyLiked }
+    override suspend fun toggle(postId: String, currentlyLiked: Boolean, likeCount: Int) { calls += postId to currentlyLiked }
 }
 
 class RecordingAnalytics : AnalyticsTracker {

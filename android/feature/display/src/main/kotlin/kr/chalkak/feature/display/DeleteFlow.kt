@@ -3,6 +3,8 @@ package kr.chalkak.feature.display
 import kr.chalkak.core.data.post.PostChanges
 import kr.chalkak.core.data.post.PostRepository
 import kr.chalkak.core.network.ApiResult
+import kr.chalkak.core.network.guardedApiCall
+import kr.chalkak.core.network.httpStatus
 
 /**
  * Delete confirmation + `DELETE /posts/{id}` of the detail screen (REQ-FEED-025..030). The holder decides whether

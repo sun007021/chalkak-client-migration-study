@@ -1,5 +1,6 @@
 package kr.chalkak.feature.upload
 
+import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -8,17 +9,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kr.chalkak.core.common.MonotonicClock
 import kr.chalkak.core.common.PostTitle
 import kr.chalkak.core.common.analytics.AnalyticsTracker
+import kr.chalkak.core.common.analytics.screenViewSafely
 import kr.chalkak.core.data.home.HomeRepository
 import kr.chalkak.core.data.upload.PostCreationRepository
 import kr.chalkak.core.data.upload.PostCreations
 import kr.chalkak.core.data.upload.PostImageUploader
+import kr.chalkak.core.network.JobTracker
 import kr.chalkak.feature.upload.edit.PhotoEdit
 import kr.chalkak.feature.upload.image.ImageSize
 import kr.chalkak.feature.upload.image.PhotoCodec
 import kr.chalkak.feature.upload.image.PhotoSource
 import kr.chalkak.feature.upload.image.PickedPhoto
 import kr.chalkak.feature.upload.image.PostImageEncoder
-import java.time.LocalDate
 
 /**
  * Upload screen state (UPL). [topicDate] is pinned by the gate and never recomputed from a clock (REQ-UPL-008). Contract:
@@ -63,7 +65,7 @@ class PhotoUploadStateHolder(
     private val analytics: AnalyticsTracker,
 ) {
     private val store = UploadStore(cameraAvailable = camera.hasCamera())
-    private val jobs = UploadJobs(scope) { failUnexpectedly() }
+    private val jobs = JobTracker(scope) { failUnexpectedly() }
     private val topic = UploadTopic(topicDate, home, store)
     private val preparer = UploadPreparer(creation, encoder, files, monotonic, store, jobs)
     private val submitter = UploadSubmitter(

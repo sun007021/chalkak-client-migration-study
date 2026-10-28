@@ -83,6 +83,7 @@ class _MainRouteHostState extends State<MainRouteHost> {
     return MainShell(
       shell: parts.shell,
       home: parts.home,
+      record: parts.record,
       navigator: _navigator,
       toast: widget.dependencies.main.toast,
       aiCardBuilder: widget.dependencies.main.aiCardBuilder,

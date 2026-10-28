@@ -1,5 +1,6 @@
 package kr.chalkak.feature.display
 
+import java.time.LocalDate
 import kr.chalkak.core.data.post.LikeController
 import kr.chalkak.core.data.post.LikeSnapshot
 import kr.chalkak.core.data.post.PostPage
@@ -10,7 +11,7 @@ import kr.chalkak.core.data.post.PostsQuery
 import kr.chalkak.core.data.post.Topic
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
-import java.time.LocalDate
+import kr.chalkak.core.network.guardedApiCall
 
 /** Cache key of a list: the date and the sort actually requested (archive = POPULAR). */
 internal data class ListKey(val date: LocalDate, val sort: PostSort)
