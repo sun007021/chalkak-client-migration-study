@@ -51,6 +51,8 @@ class PlatformAdapters(
     /** Record tab "이미지로 저장": MediaStore writer and the month-calendar bitmap renderer (gets the app's image loader). */
     val calendarSaver: CalendarImageSaver = CalendarImageSaver { _, _ -> SaveOutcome.Failed },
     val calendarRenderer: (ImageLoader?) -> CalendarImageRenderer = { CalendarImageRenderer { _, _ -> ByteArray(0) } },
+    /** Push ports (FCM token, POST_NOTIFICATIONS, notification display, stores). */
+    val pushPlatform: PushPlatform = PushPlatform.headless(),
 ) {
     companion object {
         fun android(context: Context, copy: Copy = Copy.load(context)): PlatformAdapters {
@@ -81,6 +83,7 @@ class PlatformAdapters(
                 upload = UploadAdapters.android(app, activity, photoBridge, copy, SystemClock),
                 calendarSaver = AndroidCalendarImageSaver(app),
                 calendarRenderer = { loader -> AndroidCalendarImageRenderer(app, copy, loader) },
+                pushPlatform = PushPlatform.android(app),
             )
         }
 
