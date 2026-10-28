@@ -43,6 +43,8 @@ import kr.chalkak.feature.home.LikeControllerToggler
 import kr.chalkak.feature.navigation.AccessMode
 import kr.chalkak.feature.navigation.NavigationController
 import kr.chalkak.feature.navigation.Tab
+import kr.chalkak.core.data.record.testing.FakeRecordRepository
+import kr.chalkak.feature.record.RecordStateHolder
 import java.time.LocalDate
 import java.util.concurrent.CopyOnWriteArrayList
 import kr.chalkak.feature.upload.UploadGateEffect
@@ -97,6 +99,11 @@ class MainRig(val mode: AccessMode = AccessMode.Member) {
     val postClock = FakeClock()
     val postAnalytics = RecordingAnalytics()
 
+    /** Record tab (A7): fixture-answered calendar endpoints and the stand-ins for the PNG renderer / MediaStore writer. */
+    val recordRepo = FakeRecordRepository()
+    val recordRenderer = RecordingCalendarRenderer()
+    val recordSaver = RecordingCalendarSaver()
+
     /** Every display holder / feed entry the host asked for, in order (a holder per request, not per recomposition). */
     val displayRequests = CopyOnWriteArrayList<Pair<LocalDate?, PostSort?>>()
     val feedEntries = CopyOnWriteArrayList<FeedEntry>()
@@ -142,6 +149,10 @@ class MainRig(val mode: AccessMode = AccessMode.Member) {
         otherTab = { tab, _ ->
             otherTabsComposed += tab
             TabPlaceholder(tab)
+        },
+        today = kr.chalkak.core.common.KstCalendar(postClock)::today,
+        newRecordHolder = { scope, recordMode ->
+            RecordStateHolder(scope, postClock, recordRepo, changes, NoAnalytics, recordMode, recordRenderer, recordSaver)
         },
     )
 
