@@ -177,7 +177,7 @@ private fun MainHostContent(
             Route.TabRoot(Tab.Display) -> {
                 val entry = session.displayEntry
                 val holder = rememberStateHolder("display-$sessionKey-${entry.seq}") { scope ->
-                    deps.newDisplayHolder(scope, entry.date, entry.sort)
+                    deps.newDisplayHolder(session.newDisplayScope(scope), entry.date, entry.sort)
                 }
                 // Upload success asks for its topic date through the controller; the route applies it once, then it is consumed.
                 val requestedDate = navState.displayDateRequest

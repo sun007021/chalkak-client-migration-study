@@ -4,6 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kr.chalkak.core.data.home.Banner
 import kr.chalkak.core.data.post.PostSort
 import kr.chalkak.core.data.post.PostSummary
@@ -34,6 +36,19 @@ class MainSession(val scope: CoroutineScope) {
      * is only set by the upload success flow, which `MainHost` forwards to the running holder).
      */
     var displayEntry: DisplayEntry by mutableStateOf(DisplayEntry(0, null, null))
+
+    private var displayJob: Job? = null
+
+    /**
+     * Scope for a new display holder, as a child of [parent] (the holder's ViewModel scope). The previous display holder's child scope
+     * is cancelled: each "더보기" request builds a new holder, and the old one (replaced for good) must stop collecting shared state.
+     */
+    fun newDisplayScope(parent: CoroutineScope): CoroutineScope {
+        displayJob?.cancel()
+        val job = SupervisorJob(parent.coroutineContext[Job])
+        displayJob = job
+        return CoroutineScope(parent.coroutineContext + job)
+    }
 
     /** List items handed over by the screen that opens a feed, by post id; taken when the feed route first shows (D-26). */
     val feedSeeds = HashMap<String, PostSummary>()

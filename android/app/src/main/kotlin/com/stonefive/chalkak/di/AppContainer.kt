@@ -330,28 +330,45 @@ class AppContainer(
     }
 }
 
-/** Decorates the session store with a synchronous view of the signed-in user id (`CurrentUser` is not suspending). */
+/**
+ * Decorates the session store with a synchronous view of the signed-in user id (`CurrentUser` is not suspending).
+ * A `read()` that was already running when a `write()` / `clear()` happened returns the older state; it must not overwrite the newer
+ * user id (logout during a token-refresh read would otherwise leave the old user "signed in"), so each change bumps [generation]
+ * and a read tracks its result only if none happened meanwhile.
+ */
 internal class UserTrackingSessionStore(private val delegate: SessionStore) : SessionStore {
     @Volatile
     var userId: String? = null
         private set
 
-    override suspend fun read(): StoredSession = delegate.read().also(::track)
+    private val generation = java.util.concurrent.atomic.AtomicInteger()
+    private val lock = Any()
+
+    override suspend fun read(): StoredSession {
+        val started = generation.get()
+        val stored = delegate.read()
+        synchronized(lock) {
+            if (generation.get() == started) userId = (stored as? StoredSession.User)?.session?.userId
+        }
+        return stored
+    }
 
     override suspend fun write(session: Session) {
+        generation.incrementAndGet()
         delegate.write(session)
-        userId = session.userId
+        set(session.userId)
     }
 
     override suspend fun clear() {
         try {
             delegate.clear()
         } finally {
-            userId = null
+            set(null)
         }
     }
 
-    private fun track(stored: StoredSession) {
-        userId = (stored as? StoredSession.User)?.session?.userId
+    private fun set(id: String?) = synchronized(lock) {
+        generation.incrementAndGet()
+        userId = id
     }
 }

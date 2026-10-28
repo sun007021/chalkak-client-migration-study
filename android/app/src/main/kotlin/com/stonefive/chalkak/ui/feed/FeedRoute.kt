@@ -51,7 +51,10 @@ fun FeedRoute(
         holder.onScreenHidden()
         if (finishOnLeave) holder.onCleared()
     }
-    BackHandler(enabled = state.edit == null && !state.deleteConfirmVisible && !state.deleting) { back() }
+    // Always registered: while a title save or a delete is running the dialogs ignore back, and it must not fall through to the
+    // host's handler (which would pop this feed and finish the holder while the request is in flight).
+    val blocked = state.deleting || state.edit?.saving == true
+    BackHandler(enabled = state.edit == null && !state.deleteConfirmVisible || blocked) { if (!blocked) back() }
 
     val callbacks = remember(holder) {
         FeedCallbacks(

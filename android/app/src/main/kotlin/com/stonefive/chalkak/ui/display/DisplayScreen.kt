@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -186,7 +187,9 @@ private fun Header(state: DisplayUiState, callbacks: DisplayCallbacks, onPickDat
                     .testTag("display.date-picker-button")
                     .pointerInput(Unit) { detectTapGestures { onPickDate() } }
                     .semantics { role = Role.Button; onClick { onPickDate(); true } }
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                    .defaultMinSize(minHeight = 48.dp)
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.CenterStart,
             ) {
                 Text(
                     text = state.dateLabel ?: DateFormats.monthDay(state.date),
@@ -220,7 +223,7 @@ private fun Header(state: DisplayUiState, callbacks: DisplayCallbacks, onPickDat
 private fun ArrowButton(icon: Int, description: String, enabled: Boolean, onClick: () -> Unit, tag: String) {
     Box(
         Modifier
-            .size(44.dp)
+            .size(48.dp)
             .testTag(tag)
             .semantics { contentDescription = description }
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
@@ -244,15 +247,23 @@ private fun SortTab(sort: PostSort, selected: Boolean, onClick: () -> Unit) {
         PostSort.POPULAR -> "display.sort-popular-tab" to "display.sort.popular"
         PostSort.RANDOM -> "display.sort-random-tab" to "display.sort.random"
     }
+    // The tappable area is >= 48dp high; the pill drawn inside it keeps the compact look.
     Box(
         Modifier
             .testTag(tag)
-            .clip(CircleShape)
-            .background(if (selected) colors.actionPrimary else colors.inputBackground)
-            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .defaultMinSize(minHeight = 48.dp)
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(copy[key], style = MaterialTheme.typography.labelLarge, color = if (selected) colors.onActionPrimary else colors.textPrimary)
+        Text(
+            copy[key],
+            style = MaterialTheme.typography.labelLarge,
+            color = if (selected) colors.onActionPrimary else colors.textPrimary,
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(if (selected) colors.actionPrimary else colors.inputBackground)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        )
     }
 }
 

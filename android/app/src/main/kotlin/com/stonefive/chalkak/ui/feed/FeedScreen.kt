@@ -31,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +40,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
@@ -50,6 +55,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -191,7 +197,7 @@ private fun Detail(state: FeedUiState, content: FeedContent, callbacks: FeedCall
 private fun IconTool(icon: Int, description: String, tag: String, onClick: () -> Unit) {
     Box(
         Modifier
-            .size(44.dp)
+            .size(48.dp)
             .testTag(tag)
             .semantics { contentDescription = description }
             .clickable(role = Role.Button, onClick = onClick),
@@ -263,6 +269,8 @@ private fun EditDialog(edit: EditDialogState, callbacks: FeedCallbacks) {
     val copy = LocalCopy.current
     val colors = ChalkakTheme.colors
     BackHandler(enabled = !edit.saving, onBack = callbacks.onEditCancel)
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
     DialogCard("feed.title-dialog") {
         Text(copy["feed.edit.title"], style = MaterialTheme.typography.titleLarge, color = colors.textPrimary)
         BasicTextField(
@@ -272,7 +280,9 @@ private fun EditDialog(edit: EditDialogState, callbacks: FeedCallbacks) {
             singleLine = true,
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.textPrimary),
             cursorBrush = SolidColor(colors.inputCursor),
-            modifier = Modifier.fillMaxWidth().padding(top = 16.dp).testTag("feed.title-input"),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { if (!edit.saving) callbacks.onSaveClick() }),
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp).focusRequester(focus).testTag("feed.title-input"),
             decorationBox = { inner ->
                 Column {
                     Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {

@@ -26,6 +26,7 @@ import com.stonefive.chalkak.testing.recentQuery
 import java.time.LocalDate
 import kr.chalkak.core.common.DateFormats
 import kr.chalkak.core.network.ApiResult
+import kr.chalkak.core.data.post.testing.gated
 import kr.chalkak.core.data.post.PostSort
 import kr.chalkak.core.data.post.testing.POST_MINE
 import kr.chalkak.core.data.post.testing.PostFixtures
@@ -535,6 +536,23 @@ class MainHostTest {
         assertEquals(Route.TabRoot(Tab.Home), rig.nav.top)
         node("bottom-bar.root").assertIsDisplayed()
         assertTrue(rig.changes.isRemoved(POST_MINE))
+    }
+
+    @Test
+    fun `삭제 요청이 진행 중일 때 시스템 뒤로 가기는 상세를 닫지 않는다`() {
+        launch(setup = ownPost)
+        val gate = gated<ApiResult<Unit>>(ApiResult.Success(Unit))
+        rig.posts.deletes.enqueue(POST_MINE, gate)
+        tap("home.hero-photo")
+        rule.awaitTag("feed.delete-button")
+        tap("feed.delete-button")
+        tap("feed.delete-confirm-button")
+        rule.awaitTag("feed.deleting")
+        systemBack()
+        node("feed.root").assertIsDisplayed()
+        gate.release()
+        rule.waitUntil(2_000) { !rule.hasNode("feed.root") }
+        assertToast(copy["nav.post-deleted"])
     }
 
     @Test

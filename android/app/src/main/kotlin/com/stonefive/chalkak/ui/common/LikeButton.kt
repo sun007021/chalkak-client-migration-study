@@ -43,7 +43,7 @@ fun LikeButton(
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(48.dp) // touch target >= 48dp
                 .testTag(buttonTag)
                 .semantics {
                     selected = isLiked
