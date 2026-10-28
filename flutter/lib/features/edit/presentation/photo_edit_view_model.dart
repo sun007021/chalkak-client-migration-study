@@ -2,14 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/copy/ko.g.dart';
 import '../domain/adjustment.dart';
 import '../domain/auto_adjuster.dart';
 import '../domain/crop_aspect_ratio.dart';
+import '../domain/crop_geometry.dart';
 import '../domain/crop_window.dart';
 import '../domain/edit_source_loader.dart';
 import '../domain/photo_edit.dart';
 import '../domain/photo_edit_renderer.dart';
 import '../domain/photo_filter.dart';
+import '../domain/photo_transform.dart';
 import '../domain/rgba_image.dart';
 
 /// 편집기 하단 탭. 처음은 [crop](REQ-EDIT-001).
@@ -52,6 +55,33 @@ class PhotoEditState {
 
   /// 렌더 실패 문구(`Copy.editErrorRender`). 닫기 전까지 유지.
   final String? error;
+
+  PhotoEditState copyWith({
+    EditTab? tab,
+    CropAspectRatio? ratio,
+    int? quarterTurns,
+    CropWindow? crop,
+    AdjustItem? adjustItem,
+    AdjustmentLayers? layers,
+    PhotoFilter? filter,
+    RgbaImage? preview,
+    bool? isReady,
+    bool? isRendering,
+    String? error,
+    bool clearError = false,
+  }) => PhotoEditState(
+    tab: tab ?? this.tab,
+    ratio: ratio ?? this.ratio,
+    quarterTurns: quarterTurns ?? this.quarterTurns,
+    crop: crop ?? this.crop,
+    adjustItem: adjustItem ?? this.adjustItem,
+    layers: layers ?? this.layers,
+    filter: filter ?? this.filter,
+    preview: preview ?? this.preview,
+    isReady: isReady ?? this.isReady,
+    isRendering: isRendering ?? this.isRendering,
+    error: clearError ? null : (error ?? this.error),
+  );
 }
 
 sealed class PhotoEditEvent {
@@ -92,7 +122,15 @@ class PhotoEditViewModel extends ChangeNotifier {
     required this.renderer,
     required this.analyzer,
     this.initial = PhotoEdit.identity,
-  });
+  }) : _state = PhotoEditState(
+         tab: EditTab.crop,
+         ratio: CropAspectRatio.free,
+         quarterTurns: initial.quarterTurns % 4,
+         crop: _fromStored(initial.crop, initial.quarterTurns % 4),
+         adjustItem: AdjustItem.auto,
+         layers: initial.adjustments,
+         filter: initial.filter,
+       );
 
   final Uint8List sourceBytes;
   final PhotoEdit initial;
@@ -100,52 +138,296 @@ class PhotoEditViewModel extends ChangeNotifier {
   final PhotoEditRenderer renderer;
   final AutoAdjustAnalyzer analyzer;
 
-  PhotoEditState get state => throw UnimplementedError();
-  Stream<PhotoEditEvent> get events => throw UnimplementedError();
+  final StreamController<PhotoEditEvent> _events =
+      StreamController<PhotoEditEvent>.broadcast(sync: true);
+  PhotoEditState _state;
+  EditSource? _source;
+  Future<void>? _starting;
+  bool _disposed = false;
+
+  /// 마지막으로 자동 보정을 분석(시작)한 자른 영역. 같은 영역이면 다시 분석하지 않는다.
+  _RegionKey? _analyzedKey;
+  Future<void>? _analysis;
+  int _analysisToken = 0;
+
+  PhotoEditState get state => _state;
+  Stream<PhotoEditEvent> get events => _events.stream;
+
+  /// 원본(편집 기준 크기) 준비가 끝났는가.
+  EditSource? get source => _source;
+
+  /// 돌린 사진 기준 자르기 기하. 준비 전에는 null.
+  CropGeometry? get geometry {
+    final src = _source;
+    if (src == null) return null;
+    final size = PhotoTransform.rotatedSize(
+      _state.quarterTurns,
+      sourceWidth: src.width,
+      sourceHeight: src.height,
+    );
+    return CropGeometry(
+      imageWidth: size.width.toDouble(),
+      imageHeight: size.height.toDouble(),
+    );
+  }
+
+  /// 프레임을 끌 때 지킬 가로 / 세로 비율. 자유와 준비 전에는 null.
+  double? get cropAspect {
+    final g = geometry;
+    if (_state.ratio == CropAspectRatio.original) {
+      return g == null ? null : g.imageWidth / g.imageHeight;
+    }
+    return _state.ratio.fixedRatio;
+  }
+
+  void _emit(PhotoEditState next) {
+    if (_disposed) return;
+    _state = next;
+    notifyListeners();
+  }
 
   /// 지금까지의 확정 전 편집값(정규화 전).
-  PhotoEdit get currentEdit => throw UnimplementedError();
+  PhotoEdit get currentEdit => PhotoEdit(
+    quarterTurns: _state.quarterTurns,
+    crop: _toStored(_state.crop, _state.quarterTurns),
+    filter: _state.filter,
+    adjustments: _state.layers,
+  );
 
-  Future<void> start() => throw UnimplementedError();
+  Future<void> start() => _starting ??= _start();
 
-  void selectTab(EditTab tab) => throw UnimplementedError();
+  Future<void> _start() async {
+    try {
+      final src = await loader.load(sourceBytes);
+      if (_disposed) return;
+      _source = src;
+      _emit(_state.copyWith(preview: src.preview, isReady: true));
+    } on Object {
+      if (_disposed) return;
+      _emit(_state.copyWith(error: Copy.editErrorRender));
+      return;
+    }
+    // 재편집으로 열 때 저장된 자동값이 있으면 그대로 쓰고 다시 분석하지 않는다.
+    if (!initial.adjustments.autoValues.isZero) {
+      _analyzedKey = _regionKey();
+      return;
+    }
+    await _refreshAutoAdjustments();
+  }
 
-  /// 비율을 고르면 이전 자르기 영역을 버리고 전체 사진에서 그 비율로 가장 크게 들어가는
-  /// 영역으로 다시 시작한다. 자유는 현재 영역을 유지하며 고정만 푼다(REQ-EDIT-011).
-  /// 원본 비율은 지금 회전 방향의 사진 가로세로 비율을 고정 비율로 쓴다(REQ-EDIT-012).
-  void selectRatio(CropAspectRatio ratio) => throw UnimplementedError();
+  void selectTab(EditTab tab) {
+    if (_state.tab != tab) _emit(_state.copyWith(tab: tab));
+    // 자르기를 바꾼 뒤 탭을 옮기면 자른 영역 기준으로 분석한다(REQ-EDIT-025).
+    unawaited(_refreshAutoAdjustments());
+  }
 
-  /// 자르기 프레임을 제스처로 바꾼 결과를 반영한다(경계·최소 크기는 CropGeometry가 보장).
-  void updateCrop(CropWindow crop) => throw UnimplementedError();
+  void selectRatio(CropAspectRatio ratio) {
+    if (ratio == CropAspectRatio.free) {
+      _emit(_state.copyWith(ratio: ratio));
+      return;
+    }
+    final next = _state.copyWith(ratio: ratio);
+    _state = next;
+    final aspect = cropAspect;
+    final g = geometry;
+    if (g == null) {
+      _emit(next);
+      return;
+    }
+    _emit(next.copyWith(crop: g.largest(aspect)));
+  }
 
-  /// "90도 회전": 시계 방향 90도, 4번이면 원상. 고정 비율은 회전 뒤에도 같은 비율로 가장 크게
-  /// 맞추고(REQ-EDIT-014), 원본 비율이거나 전체 자유 영역이면 영역이 함께 돌며 고정 비율의
-  /// 가로세로가 뒤바뀐다(REQ-EDIT-015). 원본이 준비되기 전에는 현재 화면을 유지한다.
-  void rotate() => throw UnimplementedError();
+  void updateCrop(CropWindow crop) => _emit(_state.copyWith(crop: crop));
 
-  /// 자르기 "초기화": 회전과 자르기 영역·비율만 처음으로. 필터와 조정은 유지(REQ-EDIT-016).
-  void resetCrop() => throw UnimplementedError();
+  void rotate() {
+    final g = geometry;
+    if (g == null) return;
+    final turns = (_state.quarterTurns + 1) % 4;
+    final old = _state.crop;
+    final fixed = _state.ratio.fixedRatio;
+    final src = _source!;
+    final size = PhotoTransform.rotatedSize(
+      turns,
+      sourceWidth: src.width,
+      sourceHeight: src.height,
+    );
+    final CropWindow crop;
+    if (fixed != null) {
+      crop = CropGeometry(
+        imageWidth: size.width.toDouble(),
+        imageHeight: size.height.toDouble(),
+      ).largest(fixed);
+    } else {
+      // 원본 비율·자유: 영역이 사진과 함께 시계 방향으로 돈다.
+      crop = CropWindow(
+        centerX: 1 - old.centerY,
+        centerY: old.centerX,
+        width: old.height,
+        height: old.width,
+      );
+    }
+    _emit(_state.copyWith(quarterTurns: turns, crop: crop));
+  }
 
-  /// 다른 항목에서 자동으로 옮기면 꺼져 있을 때만 강도 1로 켜고, 이미 자동이 선택돼 있으면
-  /// 켜짐(1)과 꺼짐(0)을 번갈아 바꾼다(REQ-EDIT-021).
-  void selectAdjustItem(AdjustItem item) => throw UnimplementedError();
+  void resetCrop() => _emit(
+    _state.copyWith(
+      quarterTurns: 0,
+      crop: CropWindow.full,
+      ratio: CropAspectRatio.free,
+    ),
+  );
 
-  /// 항목 값을 직접 정한다(-1~1). 자동 보정 몫과 같은 값이면 직접 만진 표시가 지워진다.
-  void setAdjustValue(AdjustItem item, double value) =>
-      throw UnimplementedError();
+  void selectAdjustItem(AdjustItem item) {
+    var layers = _state.layers;
+    if (item == AdjustItem.auto) {
+      if (_state.adjustItem == AdjustItem.auto) {
+        layers = layers.withAutoStrength(layers.autoStrength > 0 ? 0 : 1);
+      } else if (layers.autoStrength == 0) {
+        layers = layers.withAutoStrength(1);
+      }
+    }
+    _emit(_state.copyWith(adjustItem: item, layers: layers));
+  }
 
-  /// 자동 보정 강도(0~1).
-  void setAutoStrength(double strength) => throw UnimplementedError();
+  void setAdjustValue(AdjustItem item, double value) {
+    if (!item.isValue) return;
+    _emit(
+      _state.copyWith(
+        layers: _state.layers.withValue(item, value.clamp(-1.0, 1.0)),
+      ),
+    );
+  }
 
-  /// 조정 탭 "초기화"(REQ-EDIT-024).
-  void resetAdjustments() => throw UnimplementedError();
+  void setAutoStrength(double strength) => _emit(
+    _state.copyWith(
+      layers: _state.layers.withAutoStrength(strength.clamp(0.0, 1.0)),
+    ),
+  );
 
-  void selectFilter(PhotoFilter filter) => throw UnimplementedError();
+  void resetAdjustments() =>
+      _emit(_state.copyWith(layers: _state.layers.cleared()));
 
-  Future<void> onDonePressed() => throw UnimplementedError();
+  void selectFilter(PhotoFilter filter) =>
+      _emit(_state.copyWith(filter: filter));
 
-  void onCancelPressed() => throw UnimplementedError();
+  Future<void> onDonePressed() async {
+    final preview = _state.preview;
+    if (_state.isRendering || !_state.isReady || preview == null) return;
+    _emit(_state.copyWith(isRendering: true, clearError: true));
+    try {
+      if (_state.layers.autoStrength > 0) await _refreshAutoAdjustments();
+      final edit = _normalized(currentEdit);
+      final rendered = await renderer.render(preview, edit);
+      if (_disposed) return;
+      _emit(_state.copyWith(isRendering: false));
+      _events.add(EditDone(edit, rendered));
+    } on Object {
+      if (_disposed) return;
+      _emit(_state.copyWith(isRendering: false, error: Copy.editErrorRender));
+    }
+  }
 
-  /// 렌더 실패 알림을 닫는다.
-  void dismissError() => throw UnimplementedError();
+  void onCancelPressed() {
+    if (_disposed) return;
+    _events.add(const EditCancelled());
+  }
+
+  void dismissError() => _emit(_state.copyWith(clearError: true));
+
+  /// 확정 전 정규화: 전체에 가까운 자르기는 전체로, 자동 보정이 꺼져 있으면 자동값을 버린다.
+  PhotoEdit _normalized(PhotoEdit edit) {
+    final layers = edit.adjustments;
+    return PhotoEdit(
+      quarterTurns: edit.quarterTurns,
+      crop: edit.crop.isFull() ? CropWindow.full : edit.crop,
+      filter: edit.filter,
+      adjustments: layers.autoStrength > 0
+          ? layers
+          : AdjustmentLayers(userValues: layers.userValues),
+    );
+  }
+
+  _RegionKey _regionKey() {
+    final c = currentEdit.crop;
+    // 홀수 회전이면 돌린 사진의 가로·세로 비율이 원본의 세로·가로에 해당한다.
+    final odd = _state.quarterTurns.isOdd;
+    double r(double v) => (v * 1e6).round() / 1e6;
+    return _RegionKey(
+      r(c.centerX),
+      r(c.centerY),
+      r(odd ? c.height : c.width),
+      r(odd ? c.width : c.height),
+    );
+  }
+
+  /// 자른 영역이 지난 분석과 다를 때만 그 영역으로 자동 보정값을 다시 구한다.
+  Future<void> _refreshAutoAdjustments() async {
+    final preview = _state.preview;
+    if (preview == null || _disposed) return;
+    final key = _regionKey();
+    if (key != _analyzedKey) {
+      _analyzedKey = key;
+      final token = ++_analysisToken;
+      final region = cropAndRotate(preview, currentEdit);
+      _analysis = () async {
+        try {
+          final values = await analyzer.analyze(region);
+          if (_disposed || token != _analysisToken) return;
+          _emit(_state.copyWith(layers: _state.layers.withAutoValues(values)));
+        } on Object {
+          // 분석할 수 없으면 자동 보정은 아무것도 바꾸지 않는다(REQ-EDIT-027).
+          if (!_disposed && token == _analysisToken) _analyzedKey = null;
+        }
+      }();
+    }
+    await _analysis;
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _events.close();
+    super.dispose();
+  }
+
+  // 회전 전 원본 비율 중심 <-> 돌린 사진 비율 중심.
+  static CropWindow _fromStored(CropWindow c, int turns) {
+    final (x, y) = switch (turns % 4) {
+      1 => (1 - c.centerY, c.centerX),
+      2 => (1 - c.centerX, 1 - c.centerY),
+      3 => (c.centerY, 1 - c.centerX),
+      _ => (c.centerX, c.centerY),
+    };
+    return CropWindow(centerX: x, centerY: y, width: c.width, height: c.height);
+  }
+
+  static CropWindow _toStored(CropWindow c, int turns) {
+    final (x, y) = switch (turns % 4) {
+      1 => (c.centerY, 1 - c.centerX),
+      2 => (1 - c.centerX, 1 - c.centerY),
+      3 => (1 - c.centerY, c.centerX),
+      _ => (c.centerX, c.centerY),
+    };
+    return CropWindow(centerX: x, centerY: y, width: c.width, height: c.height);
+  }
+}
+
+class _RegionKey {
+  const _RegionKey(this.cx, this.cy, this.w, this.h);
+
+  final double cx;
+  final double cy;
+  final double w;
+  final double h;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _RegionKey &&
+      other.cx == cx &&
+      other.cy == cy &&
+      other.w == w &&
+      other.h == h;
+
+  @override
+  int get hashCode => Object.hash(cx, cy, w, h);
 }

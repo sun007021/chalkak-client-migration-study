@@ -1,7 +1,6 @@
-import '../../../core/constants/app_constants.dart';
-
 import 'dart:typed_data';
 
+import '../../../core/constants/app_constants.dart';
 import 'image_codec.dart';
 import 'photo_edit_constants.dart';
 import 'rgba_image.dart';

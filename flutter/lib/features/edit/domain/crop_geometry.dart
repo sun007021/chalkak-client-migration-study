@@ -82,8 +82,8 @@ class CropGeometry {
         minCropFraction * (imageWidth < imageHeight ? imageWidth : imageHeight);
 
     // 요청한 px 크기(앵커 반대 방향으로 뒤집히면 0 취급).
-    var wantW = ((dragX - anchorX) * signX * imageWidth).clamp(0.0, maxW);
-    var wantH = ((dragY - anchorY) * signY * imageHeight).clamp(0.0, maxH);
+    final wantW = ((dragX - anchorX) * signX * imageWidth).clamp(0.0, maxW);
+    final wantH = ((dragY - anchorY) * signY * imageHeight).clamp(0.0, maxH);
 
     double w;
     double h;
