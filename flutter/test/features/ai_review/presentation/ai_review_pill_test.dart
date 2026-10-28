@@ -212,6 +212,9 @@ void main() {
         findsOneWidget,
       );
       expect(isEnabled(tester, AiReviewTestIds.feedRequesting), isFalse);
+      // 화면을 내리고 지연된 POST 응답(어댑터 타이머)이 끝나도록 시간을 흘린다.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 3));
     });
   });
 

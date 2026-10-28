@@ -32,9 +32,9 @@ class _AiReviewHostState extends State<AiReviewHost>
   bool _foreground = true;
 
   Object? _sheetToken;
-  BuildContext? _sheetContext;
+  ModalRoute<Object?>? _sheetRoute;
   Object? _dialogToken;
-  BuildContext? _dialogContext;
+  ModalRoute<Object?>? _dialogRoute;
 
   @override
   void initState() {
@@ -126,13 +126,13 @@ class _AiReviewHostState extends State<AiReviewHost>
       isScrollControlled: true,
       showDragHandle: true,
       builder: (sheetContext) {
-        _sheetContext = sheetContext;
+        _sheetRoute = ModalRoute.of(sheetContext);
         return AiReviewSheetContent(session: session);
       },
     ).whenComplete(() {
       if (_sheetToken != token) return;
       _sheetToken = null;
-      _sheetContext = null;
+      _sheetRoute = null;
       if (session.state.sheet != null) session.onSheetDismissed();
     });
   }
@@ -143,36 +143,33 @@ class _AiReviewHostState extends State<AiReviewHost>
     showDialog<void>(
       context: context,
       builder: (dialogContext) {
-        _dialogContext = dialogContext;
+        _dialogRoute = ModalRoute.of(dialogContext);
         return const AiReviewCriteriaDialog();
       },
     ).whenComplete(() {
       if (_dialogToken != token) return;
       _dialogToken = null;
-      _dialogContext = null;
+      _dialogRoute = null;
       if (session.state.criteriaDialogOpen) session.onCriteriaHelpDismissed();
     });
   }
 
   void _closeSheet() {
-    final route = _routeOf(_sheetContext);
+    final route = _activeOrNull(_sheetRoute);
     _sheetToken = null;
-    _sheetContext = null;
+    _sheetRoute = null;
     _removeRoute(route);
   }
 
   void _closeDialog() {
-    final route = _routeOf(_dialogContext);
+    final route = _activeOrNull(_dialogRoute);
     _dialogToken = null;
-    _dialogContext = null;
+    _dialogRoute = null;
     _removeRoute(route);
   }
 
-  static ModalRoute<Object?>? _routeOf(BuildContext? context) {
-    if (context == null || !context.mounted) return null;
-    final route = ModalRoute.of(context);
-    return route != null && route.isActive ? route : null;
-  }
+  static ModalRoute<Object?>? _activeOrNull(ModalRoute<Object?>? route) =>
+      route != null && route.isActive ? route : null;
 
   static void _removeRoute(ModalRoute<Object?>? route) {
     final navigator = route?.navigator;
@@ -186,11 +183,11 @@ class _AiReviewHostState extends State<AiReviewHost>
 
   /// 위젯이 사라질 때 열려 있는 시트·다이얼로그를 프레임 뒤에 닫는다(세션은 호출자가 정리한다).
   void _closeLeftovers() {
-    final routes = [_routeOf(_dialogContext), _routeOf(_sheetContext)];
+    final routes = [_activeOrNull(_dialogRoute), _activeOrNull(_sheetRoute)];
     _sheetToken = null;
     _dialogToken = null;
-    _sheetContext = null;
-    _dialogContext = null;
+    _sheetRoute = null;
+    _dialogRoute = null;
     if (routes.every((r) => r == null)) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       for (final route in routes) {

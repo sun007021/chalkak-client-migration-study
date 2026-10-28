@@ -167,5 +167,9 @@ Future<void> pumpAiWidget(
 }
 
 /// 시트 열림·닫힘 애니메이션이 끝나도록 시간을 흘린다.
-Future<void> settleSheet(WidgetTester tester) =>
-    tester.pump(const Duration(milliseconds: 600));
+///
+/// 시트 route의 애니메이션은 첫 프레임에서 시작(경과 0)하므로 프레임을 한 번 먼저 돌린 뒤 시간을 흘린다.
+Future<void> settleSheet(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 600));
+}
