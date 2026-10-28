@@ -1,6 +1,7 @@
 package com.stonefive.chalkak.ui.main
 
 import com.stonefive.chalkak.copy.Copy
+import com.stonefive.chalkak.ui.upload.UploadResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kr.chalkak.core.data.home.HomePost
@@ -13,7 +14,10 @@ import kr.chalkak.feature.navigation.NavigationController
 import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
 import kr.chalkak.feature.upload.UploadCopyKeys
+import kr.chalkak.feature.upload.SuccessInfo
 import kr.chalkak.feature.upload.UploadGateEffect
+import kr.chalkak.feature.upload.edit.PhotoEdit
+import kr.chalkak.feature.upload.image.PickedPhoto
 
 /**
  * Executes what the main area's inputs ask for and what the [NavigationController] answers: toasts for blocked guest actions, the
@@ -53,11 +57,27 @@ class MainCoordinator(
                     UploadGateEffect.Toast(0, UploadCopyKeys.GATE_CHECK_FAILED)
                 }
                 if (effect is UploadGateEffect.Toast) showToast(copy[effect.copyKey])
+                if (effect is UploadGateEffect.Open) {
+                    session.uploadTopicDate = effect.topicDate
+                    session.uploadSerial++
+                }
                 // LoginRequired: the 401 also arrives as AuthEvent.GoToLogin, which ends the session (the controller then drops this result).
                 nav.onUploadGateFinished(effect is UploadGateEffect.Open)
             }
             else -> Unit
         }
+    }
+
+    /** The upload holder reported a created post: the upload route is replaced by the success route (REQ-NAV-037). */
+    fun onUploadSucceeded(info: SuccessInfo, photo: PickedPhoto?, edit: PhotoEdit) {
+        session.uploadResult = UploadResult(info, photo, edit)
+        nav.onUploadSubmitted(info.topicDate)
+    }
+
+    /** "확인했어요.": the display tab of the uploaded date; upload and success screens are gone (REQ-NAV-038). */
+    fun onUploadSuccessConfirmed() {
+        nav.onUploadSuccessConfirmed()
+        session.uploadResult = null
     }
 
     fun onSystemBack() {
