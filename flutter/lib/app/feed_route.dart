@@ -3,16 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/ui/toast/toast_host.dart';
+import '../features/ai_review/domain/ai_review_session.dart';
+import '../features/ai_review/domain/ai_review_target.dart';
+import '../features/ai_review/presentation/ai_review_pill.dart';
 import '../features/feed/domain/feed_target.dart';
 import '../features/feed/presentation/feed_screen.dart';
 import '../features/feed/presentation/feed_view_model.dart';
 import 'app_dependencies.dart';
-
-/// AI 피드백 시트를 여는 훅. 푸시·알림함에서 AI 알림으로 들어오면(`openAiFeedback`) 상세 로드가 끝난 뒤 한 번 불린다.
-/// AI 피드백 기능이 시트를 제공하면 그 구현을 연결한다. 기본값은 아무것도 하지 않는다.
-typedef AiFeedbackOpener = void Function(BuildContext context, String postId);
-
-void _noAiFeedbackOpener(BuildContext context, String postId) {}
 
 /// 게시물 상세 라우트: [FeedViewModel]을 만들고 `load()`를 부른 뒤 [FeedScreen]을 그린다.
 /// - [FeedToast]는 메인의 토스트 컨트롤러로, [FeedClose]와 뒤로 가기는 라우트를 닫는다.
@@ -26,7 +23,6 @@ class FeedRoute extends StatefulWidget {
     required this.target,
     required this.userId,
     this.openAiFeedback = false,
-    this.aiFeedbackOpener = _noAiFeedbackOpener,
   });
 
   final AppDependencies dependencies;
@@ -35,9 +31,9 @@ class FeedRoute extends StatefulWidget {
   /// 게스트·세션 없음이면 null(내 게시물 판정이 항상 false).
   final String? userId;
 
-  /// AI 피드백 알림으로 들어왔다. 상세가 로드된 뒤 [aiFeedbackOpener]를 한 번 부른다.
+  /// AI 피드백 알림(`AI_REVIEW_*`)으로 들어왔다. AI 세션이 첫 `GET` 결과가 COMPLETED·FAILED일 때
+  /// 결과·실패 시트를 한 번 자동으로 연다(REQ-AIR-046).
   final bool openAiFeedback;
-  final AiFeedbackOpener aiFeedbackOpener;
 
   @override
   State<FeedRoute> createState() => _FeedRouteState();
@@ -51,29 +47,27 @@ class _FeedRouteState extends State<FeedRoute> with WidgetsBindingObserver {
     postEvents: widget.dependencies.main.postEvents,
     userId: widget.userId,
   );
+  late final AiReviewSession _aiReview = AiReviewSession(
+    repository: widget.dependencies.main.aiReviewRepository,
+    toast: widget.dependencies.main.toast,
+    openSheetOnEntry: widget.openAiFeedback,
+  );
   StreamSubscription<FeedEvent>? _events;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    unawaited(_load());
-  }
-
-  Future<void> _load() async {
-    await _viewModel.load();
-    // 상세를 못 불러왔으면(404, 오류) 시트를 열지 않는다.
-    if (widget.openAiFeedback &&
-        mounted &&
-        _viewModel.state.status == FeedStatus.content) {
-      widget.aiFeedbackOpener(context, widget.target.postId);
-    }
+    _viewModel.addListener(_syncAiTarget);
+    unawaited(_viewModel.load());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_events?.cancel());
+    _viewModel.removeListener(_syncAiTarget);
+    _aiReview.dispose();
     _viewModel.dispose();
     super.dispose();
   }
@@ -81,6 +75,21 @@ class _FeedRouteState extends State<FeedRoute> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) _viewModel.onResumed();
+  }
+
+  /// 상세가 확정되고 내 게시물일 때만 AI 대상을 정한다(남의 게시물·확정 전은 null).
+  void _syncAiTarget() {
+    final state = _viewModel.state;
+    final content = state.content;
+    _aiReview.setTarget(
+      state.isConfirmed && content != null
+          ? AiReviewTarget.forPost(
+              postId: content.postId,
+              isMine: state.isMine,
+              topicDate: content.topicDate,
+            )
+          : null,
+    );
   }
 
   void _close() => unawaited(Navigator.of(context).maybePop());
@@ -94,6 +103,10 @@ class _FeedRouteState extends State<FeedRoute> with WidgetsBindingObserver {
         viewModel: _viewModel,
         onToast: (message) => toast.show(message.text),
         onClose: _close,
+        aiSlot: AiReviewPill(
+          session: _aiReview,
+          visible: ModalRoute.of(context)?.isCurrent ?? true,
+        ),
       ),
     );
   }

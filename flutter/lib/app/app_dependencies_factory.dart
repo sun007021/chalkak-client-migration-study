@@ -74,6 +74,7 @@ AppDependencies buildAppDependencies(
     main.preloadCache,
     LikeDataCleaner(likes: main.likeStore, postEvents: main.postEvents),
     main.recordCleaner,
+    main.homeAiReview,
   ]);
   final pushRegistrar = notification.registrar;
   final signatureRepository = ApiSignatureRepository(client: client);

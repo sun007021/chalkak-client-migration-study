@@ -307,6 +307,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       child: HomeScreen(
         viewModel: widget.home,
         aiCardBuilder: widget.aiCardBuilder,
+        aiCardVisible:
+            _selected == BottomDestination.home &&
+            (ModalRoute.of(context)?.isCurrent ?? true),
         scrollController: _homeScroll,
       ),
     ),
