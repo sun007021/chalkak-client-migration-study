@@ -143,10 +143,8 @@ void main() {
     expect(byId(DisplayTestIds.root), findsOneWidget);
     final display = h.homeFakes.displayRepository;
     const date = KstDate(2026, 10, 20);
-    expect([
-      ...display.callsFor(DisplaySort.recent, date: date),
-      ...display.callsFor(DisplaySort.popular, date: date),
-    ], isNotEmpty);
+    // 지난 날짜는 인기순 고정 아카이브다(display-feed.md 개요, REQ-DISP-018).
+    expect(display.callsFor(DisplaySort.popular, date: date), isNotEmpty);
   });
 
   widgetTest('TC-REC-024 TC-FEED-044 피드에서 삭제하면 돌아온 기록에서 그 사진이 사라진다', (
