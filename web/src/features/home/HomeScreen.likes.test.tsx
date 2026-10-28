@@ -2,8 +2,8 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import { t } from '../../copy/ko';
 import { createLikeServer } from '../../test/likeServer';
-import { OTHER } from '../../test/postRoutes';
-import { advance, idOf, openApp, toastText } from '../../test/postScreens';
+import { OTHER, TODAY, postsKey } from '../../test/postRoutes';
+import { advance, idOf, openApp, reflectLikes, toastText } from '../../test/postScreens';
 
 vi.setConfig({ testTimeout: 15_000 }); // 구현 전에는 findBy가 5초 뒤 단언 오류로 끝나게 한다
 
@@ -82,6 +82,7 @@ describe('홈 ↔ 전시 ↔ 상세 좋아요 동기 (TC-LIKE-025, REQ-HOME-033)
   it('홈에서 누른 좋아요는 전시의 같은 사진에 같은 값으로 보인다(전시가 새로 읽어도 되돌리지 않는다)', async () => {
     const { fixtures } = await openApp({ path: '/home' });
     const server = createLikeServer({ router: fixtures }, OTHER, { isLiked: false, likeCount: 38 });
+    reflectLikes(fixtures, { [postsKey(TODAY, 'recent')]: 'display/posts-list__recent-page1' }, OTHER, server); // 좋아요가 끝난 뒤의 읽기는 서버 값이 이긴다
     await loaded();
     fireEvent.click(tid(`home.popular-like-button-${OTHER}`));
     await waitFor(() => expect(server.inFlight).toBe(1));
@@ -95,6 +96,7 @@ describe('홈 ↔ 전시 ↔ 상세 좋아요 동기 (TC-LIKE-025, REQ-HOME-033)
   it('전시에서 누른 좋아요는 홈 랭킹에 같은 값으로 보인다', async () => {
     const { fixtures } = await openApp({ path: '/display' });
     const server = createLikeServer({ router: fixtures }, OTHER, { isLiked: false, likeCount: 38 });
+    reflectLikes(fixtures, { [postsKey(TODAY, 'popular')]: 'display/posts-list__popular-page1' }, OTHER, server);
     await screen.findByTestId(`display.like-button-${OTHER}`);
     fireEvent.click(tid(`display.like-button-${OTHER}`));
     await waitFor(() => expect(server.inFlight).toBe(1));

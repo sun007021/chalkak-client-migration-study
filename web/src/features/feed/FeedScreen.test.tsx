@@ -6,7 +6,7 @@ import { gated } from '../../test/displayAsserts';
 import { json } from '../../test/fixtureRouter';
 import { createLikeServer } from '../../test/likeServer';
 import { MINE, OTHER, TODAY, deleteKey, detailKey, likeKey, postId, postsKey, titleKey } from '../../test/postRoutes';
-import { advance, displayLoaded, idOf, openApp, toastText } from '../../test/postScreens';
+import { advance, displayLoaded, idOf, openApp, reflectLikes, toastText } from '../../test/postScreens';
 import { screenViews } from '../../test/screenViews';
 import type { PostSeed } from '../post/postModels';
 
@@ -191,6 +191,7 @@ describe('상세 화면 좋아요 (TC-LIKE-006, 009, 010, 025)', () => {
   it('TC-LIKE-025 상세에서 누른 좋아요는 돌아간 전시 카드에 즉시 같은 값으로 보인다', async () => {
     const { fixtures } = await openApp();
     const server = createLikeServer({ router: fixtures }, OTHER, { isLiked: false, likeCount: 38 });
+    reflectLikes(fixtures, { [postsKey(TODAY, 'recent')]: 'display/posts-list__recent-page1' }, OTHER, server); // 좋아요가 끝난 뒤의 읽기는 서버 값이 이긴다
     await displayLoaded();
     fireEvent.click(tid(`display.item-${OTHER}`));
     await confirmed();
@@ -387,19 +388,53 @@ describe('상세 화면 삭제 (TC-FEED-035~045)', () => {
     expect(await screen.findByTestId('feed.not-found-state')).toBeInTheDocument();
   });
 
-  it('TC-FEED-046 홈에서 연 오늘 게시물을 삭제하고 홈으로 돌아가면 히어로가 비고 랭킹에서도 빠진다 (TC-HOME-046)', async () => {
-    const { router } = await openApp({ path: '/home', routes: { [postsKey(TODAY, 'popular')]: 'home/posts-list__popular-8' } });
+  it('TC-HOME-046 홈 → 전시에서 연 내 오늘 게시물을 삭제하고 홈으로 돌아가면 히어로가 비고 랭킹에서도 빠진다', async () => {
+    // 홈 히어로 사진은 눌러도 이동하지 않는다(home.md, TC-HOME-006). 내 게시물은 전시 목록에서 연다.
+    const { router } = await openApp({ path: '/home' });
     await screen.findByTestId('home.hero-photo');
-    fireEvent.click(tid('home.hero-photo'));
-    await screen.findByTestId('feed.root');
+    fireEvent.click(tid('bottom-bar.tab-display'));
+    await displayLoaded();
+    fireEvent.click(tid(`display.item-${MINE}`));
     await confirmed();
     fireEvent.click(tid('feed.delete-button'));
     fireEvent.click(await screen.findByTestId('feed.delete-confirm-button'));
+    await screen.findByTestId('display.grid');
+    expect(toastText()).toBe(t('feed.delete.success'));
+    fireEvent.click(tid('bottom-bar.tab-home'));
     await screen.findByTestId('home.root');
     expect(router.state.location.pathname).toBe('/home');
     await waitFor(() => expect(screen.queryByTestId('home.hero-photo')).not.toBeInTheDocument());
-    expect(toastText()).toBe(t('feed.delete.success'));
     expect(screen.queryByTestId(`home.popular-item-${idOf(201)}`)).not.toBeInTheDocument();
+  });
+});
+
+describe('상세 화면 사진 확대 (TC-FEED-046, REQ-FEED-011)', () => {
+  const content = () => tid('feed.photo-content').style.transform;
+
+  it('TC-FEED-046 배율은 1x~4x로 clamp되고 손을 떼면 1x로 돌아온다', async () => {
+    await openApp({ path: withSeed(seedOther) });
+    await confirmed();
+    expect(content()).toContain('scale(1)');
+    fireEvent.wheel(tid('feed.photo'), { ctrlKey: true, deltaY: -50, clientX: 0, clientY: 0 });
+    const mid = Number(/scale\(([\d.]+)\)/.exec(content())![1]);
+    expect(mid).toBeGreaterThan(1);
+    expect(mid).toBeLessThan(4);
+    fireEvent.wheel(tid('feed.photo'), { ctrlKey: true, deltaY: -5000, clientX: 0, clientY: 0 });
+    expect(content()).toContain('scale(4)'); // 상한
+    fireEvent.wheel(tid('feed.photo'), { ctrlKey: true, deltaY: 50000, clientX: 0, clientY: 0 });
+    expect(content()).toContain('scale(1)'); // 하한
+    fireEvent.wheel(tid('feed.photo'), { ctrlKey: true, deltaY: -5000, clientX: 0, clientY: 0 });
+    expect(content()).toContain('scale(4)');
+    fireEvent.pointerDown(tid('feed.photo'), { pointerId: 1, clientX: 5, clientY: 5 });
+    fireEvent.pointerUp(tid('feed.photo'), { pointerId: 1, clientX: 5, clientY: 5 });
+    expect(content()).toBe('translate(0px, 0px) scale(1)'); // 놓으면 원래 크기·위치
+  });
+
+  it('Ctrl 없는 휠(일반 스크롤)은 확대하지 않는다', async () => {
+    await openApp({ path: withSeed(seedOther) });
+    await confirmed();
+    fireEvent.wheel(tid('feed.photo'), { deltaY: -500 });
+    expect(content()).toContain('scale(1)');
   });
 });
 

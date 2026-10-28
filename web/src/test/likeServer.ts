@@ -32,6 +32,7 @@ export function createLikeServer(h: Pick<PostHarness, 'router'>, postId: string,
       return requests.map((r) => r.method);
     },
     async succeed(): Promise<void> {
+      await settle(); // 요청은 인증 준비(auth.prepare) 뒤 비동기로 나간다
       const next = queue.shift();
       if (!next) throw new Error('대기 중인 요청이 없다');
       if (next.method === 'PUT' && !state.isLiked) {
@@ -47,6 +48,7 @@ export function createLikeServer(h: Pick<PostHarness, 'router'>, postId: string,
     },
     /** 서버 상태를 바꾸지 않고 응답만 보낸다(postId·값은 지정). */
     async respondWith(response: Response): Promise<void> {
+      await settle();
       const next = queue.shift();
       if (!next) throw new Error('대기 중인 요청이 없다');
       requests[requests.indexOf(requests.find((r) => !r.settled)!)]!.settled = true;

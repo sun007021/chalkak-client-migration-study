@@ -3,9 +3,9 @@ import { vi } from 'vitest';
 import type { VisibilityObserverFactory } from '../core/ui/VisibilityObserver';
 import { makeHarness, renderApp } from './appHarness';
 import type { Harness } from './appHarness';
-import { FixtureRouter } from './fixtureRouter';
+import { FixtureRouter, json } from './fixtureRouter';
 import type { RouteValue } from './fixtureRouter';
-import { guestSession, memberSession } from './fixtures';
+import { guestSession, loadFixture, memberSession } from './fixtures';
 import { MEMBER_ROUTES, GUEST_ROUTES } from './homeHarness';
 import { GUEST_POST_ROUTES, POST_ROUTES } from './postRoutes';
 
@@ -23,11 +23,11 @@ export interface OpenOptions {
 export async function openApp(options: OpenOptions = {}) {
   const mode = options.mode ?? 'member';
   const h = makeHarness({ session: mode === 'member' ? memberSession() : guestSession, visibilityObserver: options.visibilityObserver });
-  const fixtures = new FixtureRouter(h.ff, {
-    ...(mode === 'member' ? MEMBER_ROUTES : GUEST_ROUTES),
-    ...(mode === 'member' ? POST_ROUTES : GUEST_POST_ROUTES),
-    ...options.routes,
-  });
+  const home = mode === 'member' ? MEMBER_ROUTES : GUEST_ROUTES;
+  const posts = mode === 'member' ? POST_ROUTES : GUEST_POST_ROUTES;
+  const startsAtHome = typeof (options.path ?? '/display') === 'string' ? String(options.path ?? '/display').startsWith('/home') : false;
+  // 홈과 전시는 같은 키(어제·오늘 popular)를 서로 다른 fixture로 읽는다. 시작한 화면의 라우트가 이긴다.
+  const fixtures = new FixtureRouter(h.ff, { ...(startsAtHome ? { ...posts, ...home } : { ...home, ...posts }), ...options.routes });
   const path = options.path ?? '/display';
   const view = renderApp(h.container, path);
   const pathname = typeof path === 'string' ? path : path.pathname;
@@ -70,3 +70,18 @@ export function stubScroll() {
 }
 
 export const idOf = (n: string | number): string => `22222222-2222-4222-8222-222222222${n}`;
+
+/**
+ * 목록 응답이 좋아요 가짜 서버의 지금 상태를 반영하게 한다(정적 fixture는 좋아요 전 값을 준다).
+ * 정책(PostLikeStore.test): 좋아요가 끝난 뒤 시작한 읽기는 서버 값이 이긴다. 그래서 그 뒤 읽기에 답하는 서버는 좋아요 결과를 알고 있어야 한다.
+ * keys: 라우트 키 → 기본 목록 fixture 이름.
+ */
+export function reflectLikes(fixtures: FixtureRouter, keys: Record<string, string>, postId: string, server: { state: { isLiked: boolean; likeCount: number } }): void {
+  for (const [key, fixture] of Object.entries(keys)) {
+    fixtures.set(key, () => {
+      const base = loadFixture(`${fixture}.json`).json as { posts: { id: string }[] };
+      const posts = base.posts.map((p) => (p.id === postId ? { ...p, isLiked: server.state.isLiked, likeCount: server.state.likeCount } : p));
+      return json(200, { ...base, posts });
+    });
+  }
+}

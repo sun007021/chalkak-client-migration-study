@@ -1,6 +1,6 @@
 import { t } from '../../copy/ko';
 import { deferred } from '../../test/deferred';
-import { ids, openToday, ready, range } from '../../test/displayAsserts';
+import { gated, ids, openToday, ready, range } from '../../test/displayAsserts';
 import { json } from '../../test/fixtureRouter';
 import { finish, settle } from '../../test/homeHarness';
 import { loadFixture } from '../../test/fixtures';
@@ -132,10 +132,13 @@ describe('DisplayViewModel 빈 상태와 오류 (REQ-DISP-014, 032, D-20)', () =
     expect(vm.state.body).toEqual({ status: 'error', network: false });
     expect(vm.state.date).toBe(TODAY);
     expect(h.toasts.messages).toEqual([]);
-    h.router.set(RECENT_P1, 'display/posts-list__recent-page1');
+    const gate = deferred<void>();
+    h.router.set(RECENT_P1, gated(gate, 'display/posts-list__recent-page1'));
     const retry = vm.retry();
     await settle();
-    expect(vm.state.body).toEqual({ status: 'loading' });
+    expect(vm.state.body).toEqual({ status: 'loading' }); // 상태 표: 오류 → 다시 시도 → Loading
+    expect(vm.state.date).toBe(TODAY);
+    gate.resolve();
     await finish(h, retry);
     expect(ready(vm).posts).toHaveLength(20);
     expect(h.router.calls(topicKey(TODAY)).length).toBeGreaterThanOrEqual(1);
@@ -198,17 +201,25 @@ describe('DisplayViewModel 취소·계정 전환 (D-20, D-17)', () => {
     const vm = h.display();
     await openToday(h, vm);
     expect(ready(vm).posts[1]!.isLiked).toBe(true);
-    h.router.set(RECENT_P1, async () => {
-      await gate.promise;
-      return loadFixture('display/posts-list__recent-page1.json').toResponse();
-    });
+    // 첫 호출(A의 재검증)은 붙잡아 A의 값(203 좋아요)으로 늦게 답하고, 그 뒤 호출(B의 재로드)은 B의 값으로 답한다.
+    h.router.set(RECENT_P1, [
+      async () => {
+        await gate.promise;
+        return loadFixture('display/posts-list__recent-page1.json').toResponse();
+      },
+      'display/posts-list__guest-page1',
+    ]);
     void vm.onShown();
     await settle();
     vm.resetForAccountChange();
-    expect(vm.state.body).toEqual({ status: 'loading' });
-    gate.resolve();
+    // 화면이 보이는 중이므로 곧바로 새 계정으로 다시 불러온다(W5 홈과 같은 규칙).
     await settle();
-    expect(vm.state.body.status).not.toBe('ready');
+    gate.resolve();
+    await finish(h, Promise.resolve());
+    await settle();
+    expect(vm.state.body.status).toBe('ready');
+    expect(ready(vm).posts.every((p) => !p.isLiked)).toBe(true); // A의 isLiked가 B 화면에 보이지 않는다
+    expect(h.router.calls(RECENT_P1)).toHaveLength(2);
   });
 
   it('TC-DISP-049 reset 뒤 다시 보이면 캐시 없이 새로 불러오고 새 계정의 값으로 채운다', async () => {

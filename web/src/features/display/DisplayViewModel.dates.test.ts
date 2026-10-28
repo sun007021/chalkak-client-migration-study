@@ -150,7 +150,7 @@ describe('DisplayViewModel 날짜 이동 (REQ-DISP-009, 010, 011, 012)', () => {
 
   it('TC-DISP-046 날짜 A→B로 이동한 뒤 A의 느린 응답이 와도 B를 덮지 않는다', async () => {
     const gate = deferred<void>();
-    const h = createPostHarness({ routes: { [postsKey(YESTERDAY, 'popular')]: gated(gate, 'display/posts-list__popular-page1') } });
+    const h = createPostHarness({ routes: { ...dateRoutes('2026-10-20', 'popular', 'display/posts-list__popular-page1'), [postsKey(YESTERDAY, 'popular')]: gated(gate, 'display/posts-list__popular-page1') } });
     const vm = h.display();
     await openToday(h, vm);
     const toA = vm.selectPreviousDate();
