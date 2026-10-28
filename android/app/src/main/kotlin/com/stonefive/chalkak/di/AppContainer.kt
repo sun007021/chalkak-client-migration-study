@@ -130,7 +130,6 @@ import kr.chalkak.core.data.settings.DefaultNotificationSettingsRepository
 import kr.chalkak.core.data.settings.FeedbackRepository
 import kr.chalkak.core.data.settings.NotificationSettingsRepository
 import kr.chalkak.feature.auth.AccountActions
-import kr.chalkak.feature.auth.HomeMode
 import kr.chalkak.feature.onboarding.SignatureCardStateHolder
 import kr.chalkak.feature.onboarding.SignatureChangeStateHolder
 import kr.chalkak.feature.settings.FeedbackStateHolder

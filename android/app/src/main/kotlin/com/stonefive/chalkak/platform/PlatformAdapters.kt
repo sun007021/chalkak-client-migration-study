@@ -69,6 +69,7 @@ class PlatformAdapters(
                 BuildConfig.FAKE_SOCIAL_LOGIN && BuildConfig.DEBUG -> FakeSocialLoginClient()
                 else -> KakaoSocialLoginClient(KakaoSdkFactory.create(app, BuildConfig.KAKAO_NATIVE_APP_KEY, activity))
             }
+            val pushPlatform = PushPlatform.android(app)
             return PlatformAdapters(
                 socialLogin = socialLogin,
                 updateChecker = ConfiguredUpdateChecker(BuildConfig.FORCE_UPDATE_CHECK_ENABLED, PlayUpdateChecker(PlayUpdateSourceAdapter(playManager))),
@@ -86,8 +87,8 @@ class PlatformAdapters(
                 upload = UploadAdapters.android(app, activity, photoBridge, copy, SystemClock),
                 calendarSaver = AndroidCalendarImageSaver(app),
                 calendarRenderer = { loader -> AndroidCalendarImageRenderer(app, copy, loader) },
-                pushPlatform = PushPlatform.android(app),
-                deviceNotifications = AndroidDeviceNotificationSettings(app),
+                pushPlatform = pushPlatform,
+                deviceNotifications = AndroidDeviceNotificationSettings.android(app, pushPlatform),
             )
         }
 
