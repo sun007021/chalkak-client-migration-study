@@ -26,6 +26,8 @@ public enum MainRoute: Sendable, Equatable {
     case upload(topicDate: KSTDate)
     case changeSignature
     case changeSignaturePreview
+    /// 알림 상세(`GET /notifications/{id}`). 알림 id로 연다(공지 sourceId가 아니다).
+    case notificationDetail(notificationId: UUID)
 }
 
 /// 홈 "더 보기" 같은 곳에서 전시 탭에 전하는 요청. 전시 탭이 `consumeDisplayRequest()`로 소비한다.
@@ -47,6 +49,22 @@ public struct RecordRequest: Sendable, Equatable {
     public init(id: Int, date: KSTDate?) {
         self.id = id
         self.date = date
+    }
+}
+
+/// 푸시·알림 이동이 홈에 전하는 요청(TOPIC: 맨 위로 스크롤 + 새로고침). 홈이 `consumeHomeRequest()`로 소비한다.
+public struct HomeRequest: Sendable, Equatable {
+    public let id: Int
+    public init(id: Int) { self.id = id }
+}
+
+/// AI 결과로 열기 요청(AI 푸시·알림). AIR 쪽 게시물 상세가 `consumeAIResultRequest()`로 소비한다.
+public struct AIResultRequest: Sendable, Equatable {
+    public let id: Int
+    public let postId: UUID
+    public init(id: Int, postId: UUID) {
+        self.id = id
+        self.postId = postId
     }
 }
 

@@ -12,10 +12,11 @@ import ChalkakData
 /// - 쌓임 화면(`path`)이 있으면 하단 바는 숨는다. 같은 화면 연타는 한 번만 쌓고(같은 게시물이면 교체) 뒤로 가면 직전 탭으로 돌아간다.
 /// - 게스트는 피드·알림함·피드백을 열 수 없다(토스트, 쌓임 없음, 네트워크 0건).
 /// - 앱 자체 딥링크는 없다. `handleExternalURL`은 어떤 화면 이동도 만들지 않는다(REQ-NAV-034).
+/// - 알림·푸시 목적지(`navigate(to:)`)는 D-11 표대로 홈 탭·게시물 상세·알림 상세·알림함으로 이동한다.
 /// - 로그아웃·계정 전환(`resetForNewSession`)은 홈 탭·빈 쌓임·요청 없음으로 되돌린다.
 @MainActor
 @Observable
-public final class MainShellViewModel: HomeNavigating {
+public final class MainShellViewModel: HomeNavigating, NotificationNavigating {
     public private(set) var access: MainAccess
     public private(set) var selectedTab: MainTab = .home
     public private(set) var path: [MainRoute] = []
@@ -23,6 +24,10 @@ public final class MainShellViewModel: HomeNavigating {
     public private(set) var displayRequest: DisplayRequest?
     /// 기록 탭이 소비할 요청(홈 주간 기록 칸·"보러가기").
     public private(set) var recordRequest: RecordRequest?
+    /// 홈이 소비할 요청(TOPIC 푸시: 맨 위 + 새로고침).
+    public private(set) var homeRequest: HomeRequest?
+    /// AI 결과 자동 열기 요청(AI 푸시·알림).
+    public private(set) var aiResultRequest: AIResultRequest?
     /// 업로드 게이트가 갱신 후에도 401을 돌려줘 로그인 화면으로 가야 한다.
     public private(set) var needsLogin = false
 
@@ -163,6 +168,51 @@ public final class MainShellViewModel: HomeNavigating {
 
     public func consumeNeedsLogin() { needsLogin = false }
 
+    /// 알림함 행 탭·푸시 탭의 목적지로 이동한다(D-11).
+    /// - `.home`: 쌓임을 비우고 홈 탭으로(이미 홈이면 더 쌓지 않음). `refreshing`이면 `homeRequest`를 새로 만든다.
+    /// - `.post`: 맨 위가 같은 게시물 상세면 교체, 아니면 `.feed(.mine(postId, nil))`을 쌓는다. `opensAIResult`면 `aiResultRequest`를 만든다.
+    /// - `.notificationDetail`: 같은 상세가 맨 위면 쌓지 않는다.
+    /// - `.inbox`: 이미 쌓여 있으면 그 위의 화면만 닫고, 없으면 쌓는다. 게스트는 토스트 `NavCopy.guestNotification`.
+    public func navigate(to destination: NotificationDestination) {
+        switch destination {
+        case let .home(refreshing):
+            selectedTab = .home
+            path = []
+            if refreshing {
+                // 이미 홈이어도 연속 탭마다 새 요청이 생겨 홈이 다시 새로고침한다.
+                requestSequence += 1
+                homeRequest = HomeRequest(id: requestSequence)
+            }
+        case let .post(postId, opensAIResult):
+            // 게스트 차단(토스트)과 같은 게시물 교체는 `openFeed`가 한다. 차단되면 AI 결과 요청도 만들지 않는다.
+            openFeed(.mine(postId: postId, thumbnailURL: nil))
+            if opensAIResult, !isGuest {
+                requestSequence += 1
+                aiResultRequest = AIResultRequest(id: requestSequence, postId: postId)
+            }
+        case let .notificationDetail(notificationId):
+            guard !isGuest else { return toast.show(NavCopy.guestNotification) }
+            push(.notificationDetail(notificationId: notificationId))
+        case .inbox:
+            guard !isGuest else { return toast.show(NavCopy.guestNotification) }
+            if let index = path.lastIndex(of: .notifications) {
+                path.removeSubrange((index + 1)...) // 알림함이 이미 있으면 그 위의 화면만 닫는다.
+            } else {
+                path.append(.notifications)
+            }
+        }
+    }
+
+    public func consumeHomeRequest() -> HomeRequest? {
+        defer { homeRequest = nil }
+        return homeRequest
+    }
+
+    public func consumeAIResultRequest() -> AIResultRequest? {
+        defer { aiResultRequest = nil }
+        return aiResultRequest
+    }
+
     /// 로그아웃·재인증·계정 전환·게스트→로그인: 홈 탭, 빈 쌓임, 요청 없음으로 되돌린다.
     public func resetForNewSession(access: MainAccess) {
         sessionGeneration += 1
@@ -172,6 +222,8 @@ public final class MainShellViewModel: HomeNavigating {
         path = []
         displayRequest = nil
         recordRequest = nil
+        homeRequest = nil
+        aiResultRequest = nil
         needsLogin = false
     }
 

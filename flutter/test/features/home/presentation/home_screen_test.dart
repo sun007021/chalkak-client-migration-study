@@ -22,10 +22,12 @@ Future<void> _pump(WidgetTester tester, HomeRig r, {bool load = true}) async {
       home: Scaffold(
         body: HomeScreen(
           viewModel: r.home,
-          aiCardBuilder: (context, postId) => const TestId(
-            HomeTestIds.aiCard,
-            child: SizedBox(width: 10, height: 10),
-          ),
+          aiCardBuilder:
+              (context, postId, {required topicDate, required visible}) =>
+                  const TestId(
+                    HomeTestIds.aiCard,
+                    child: SizedBox(width: 10, height: 10),
+                  ),
         ),
       ),
     ),
