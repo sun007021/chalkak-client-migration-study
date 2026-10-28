@@ -69,7 +69,9 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.stonefive.chalkak
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: NO
-        CODE_SIGNING_ALLOWED: NO
+        # 서명이 없으면 키체인 저장이 -34018로 실패해 로그인 세션이 남지 않는다. 시뮬레이터는 ad-hoc 서명으로 빌드한다.
+        CODE_SIGNING_ALLOWED: YES
+        "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": "-"
     dependencies:
       - package: ChalkakKit
         product: ChalkakCore
