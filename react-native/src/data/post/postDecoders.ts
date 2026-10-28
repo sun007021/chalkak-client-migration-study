@@ -15,8 +15,10 @@ import type {
   CalendarEntry,
   CalendarMonth,
   CalendarStatus,
+  PostDetail,
   PostListPage,
   PostSummary,
+  TitleUpdateResult,
   TodayModerationStatus,
   TodayPost,
 } from './PostModels';
@@ -32,6 +34,7 @@ export function decodePostListPage(raw: unknown): PostListPage {
     currentPage: nonNegInt(o, 'currentPage'),
     pageSize: nonNegInt(o, 'pageSize'),
     hasNext: bool(o, 'hasNext'),
+    randomSeed: optStr(o, 'randomSeed'),
     posts: asArray(o.posts, 'posts').map(decodePostSummary),
   };
 }
@@ -89,4 +92,31 @@ function decodeCalendarEntry(raw: unknown): CalendarEntry {
     thumbnailImageUrl: optStr(o, 'thumbnailImageUrl'),
     status: oneOf(o, 'status', CALENDAR_STATUS),
   };
+}
+
+/** 필수 필드 누락·likeCount 문자열/음수·topic 누락이면 throw. thumbnailImageUrl은 null 허용. */
+export function decodePostDetail(raw: unknown): PostDetail {
+  const o = asObject(raw, 'post detail');
+  const topic = asObject(o.topic, 'topic');
+  return {
+    id: str(o, 'id'),
+    authorId: str(o, 'authorId'),
+    topic: {
+      id: str(topic, 'id'),
+      title: str(topic, 'title'),
+      topicDate: kstDate(topic, 'topicDate'),
+    },
+    originalImageUrl: str(o, 'originalImageUrl'),
+    thumbnailImageUrl: optStr(o, 'thumbnailImageUrl'),
+    signatureOriginalImageUrl: str(o, 'signatureOriginalImageUrl'),
+    title: optStr(o, 'title'),
+    likeCount: nonNegInt(o, 'likeCount'),
+    isLiked: bool(o, 'isLiked'),
+  };
+}
+
+/** `{postId, title}`; title은 null 허용. */
+export function decodeTitleUpdate(raw: unknown): TitleUpdateResult {
+  const o = asObject(raw, 'title update');
+  return { postId: str(o, 'postId'), title: optStr(o, 'title') };
 }

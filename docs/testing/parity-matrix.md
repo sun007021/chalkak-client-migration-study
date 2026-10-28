@@ -15,9 +15,9 @@
 | NAV | [navigation.md](catalog/navigation.md) | 50 | 0 | 0 | 30/50 | 39/50 | 29/50 | 0/50 | 25/50 |
 | HOME | [home.md](catalog/home.md) | 60 | 2 | 2 | 52/60 | 54/60 | 53/60 | 54/60 | 0/60 |
 | BANR | [home.md](catalog/home.md) | 31 | 1 | 1 | 27/31 | 25/31 | 28/31 | 27/31 | 0/31 |
-| DISP | [display-feed.md](catalog/display-feed.md) | 62 | 1 | 1 | 56/62 | 56/62 | 55/62 | 0/62 | 0/62 |
-| FEED | [display-feed.md](catalog/display-feed.md) | 58 | 2 | 2 | 45/58 | 47/58 | 50/58 | 0/58 | 0/58 |
-| LIKE | [display-feed.md](catalog/display-feed.md) | 35 | 1 | 1 | 32/35 | 33/35 | 34/35 | 0/35 | 0/35 |
+| DISP | [display-feed.md](catalog/display-feed.md) | 62 | 1 | 1 | 56/62 | 56/62 | 55/62 | 58/62 | 0/62 |
+| FEED | [display-feed.md](catalog/display-feed.md) | 58 | 2 | 2 | 45/58 | 47/58 | 50/58 | 51/58 | 0/58 |
+| LIKE | [display-feed.md](catalog/display-feed.md) | 35 | 1 | 1 | 32/35 | 33/35 | 34/35 | 34/35 | 0/35 |
 | UPL | [upload-edit.md](catalog/upload-edit.md) | 92 | 3 | 3 | 0/92 | 81/92 | 3/92 | 0/92 | 0/92 |
 | EDIT | [upload-edit.md](catalog/upload-edit.md) | 51 | 4 | 4 | 0/51 | 41/51 | 0/51 | 0/51 | 0/51 |
 | AIR | [ai-review.md](catalog/ai-review.md) | 61 | 2 | 2 | 0/61 | 53/61 | 0/61 | 0/61 | 0/61 |

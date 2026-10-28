@@ -6,6 +6,9 @@ const parsed = KstDate.parse(FIRST_TOPIC_DATE);
 if (!parsed) throw new Error(`invalid FIRST_TOPIC_DATE: ${FIRST_TOPIC_DATE}`);
 const FIRST_DATE: KstDate = parsed;
 
+/** 최초 전시일(D-12)을 KstDate로. */
+export const FIRST_TOPIC_KST_DATE: KstDate = FIRST_DATE;
+
 export function isBeforeFirstTopicDate(date: KstDate): boolean {
   return date.compare(FIRST_DATE) < 0;
 }

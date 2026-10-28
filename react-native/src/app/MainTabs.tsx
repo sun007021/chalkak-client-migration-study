@@ -1,9 +1,11 @@
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, type BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { View } from 'react-native';
 
 import { useViewModelState } from '../core/state/useViewModelState';
+import { KstDate } from '../core/time/KstDate';
+import { DisplayScreen } from '../features/display/DisplayScreen';
 import { HomeScreen } from '../features/home/HomeScreen';
 import { PlaceholderScreen } from '../features/placeholder/PlaceholderScreen';
 import { useAppContainer } from './AppContainerContext';
@@ -41,6 +43,37 @@ function HomeTab() {
   return <HomeScreen viewModel={viewModel} />;
 }
 
-const DisplayTab = () => <PlaceholderScreen label="전시" />;
+/**
+ * 전시 탭. ViewModel은 소유자(displayOwner)가 메인에 들어올 때 만들고 로그아웃 때 버린다(탭을 오가도 캐시·시드가 남는다).
+ * 홈 랭킹 더보기·기록·업로드 성공이 싣고 온 날짜(와 정렬)는 화면을 그리기 전에 ViewModel에 전하고 파라미터를 비운다
+ * (비우지 않으면 탭에 돌아올 때마다 다시 그 날짜로 열린다). 이미 전시를 보는 중에 전시 탭을 다시 누르면 맨 위로 + 재검증이다.
+ */
+function DisplayTab({ route, navigation }: BottomTabScreenProps<TabParamList, 'Display'>) {
+  const { displayOwner, analytics } = useAppContainer();
+  const { viewModel } = useViewModelState(displayOwner);
+  const focused = useIsFocused();
+  const requestedDate = route.params?.date;
+  const requestedSort = route.params?.sort;
+  useFocusEffect(useCallback(() => analytics.screenView('display'), [analytics]));
+
+  useEffect(() => {
+    if (!viewModel || !requestedDate) return;
+    const date = KstDate.parse(requestedDate);
+    if (date) void viewModel.openDate(date, requestedSort);
+    navigation.setParams({ date: undefined, sort: undefined });
+  }, [viewModel, requestedDate, requestedSort, navigation]);
+
+  useEffect(
+    () =>
+      navigation.addListener('tabPress', () => {
+        // 다른 탭에서 올 때도 이 이벤트가 오므로 이미 포커스일 때(재선택)만 처리한다.
+        if (navigation.isFocused() && viewModel) void viewModel.onTabReselected();
+      }),
+    [navigation, viewModel],
+  );
+
+  if (!viewModel || !focused || requestedDate) return <View style={{ flex: 1 }} />;
+  return <DisplayScreen viewModel={viewModel} />;
+}
 const RecordTab = () => <PlaceholderScreen label="기록" />;
 const SettingsTab = () => <PlaceholderScreen label="설정" />;
