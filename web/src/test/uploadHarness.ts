@@ -147,3 +147,11 @@ export function createGateHarness(options: { mode?: SessionMode; routes?: Record
 }
 
 export type GateHarness = ReturnType<typeof createGateHarness>;
+
+/** 응답이 오지 않아 응답 타임아웃(15초)이 나는 서버. 가짜 시계가 16초 지나야 풀린다. */
+export const hangingServer =
+  (clock: { sleep(ms: number): Promise<void> }) =>
+  async (): Promise<Response> => {
+    await clock.sleep(16_000);
+    return new Response(null, { status: 200 });
+  };
