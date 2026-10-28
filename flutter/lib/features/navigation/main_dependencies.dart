@@ -1,5 +1,7 @@
 import '../../core/post_events/post_event_bus.dart';
 import '../../core/ui/toast/toast_controller.dart';
+import '../ai_review/domain/ai_review_repository.dart';
+import '../ai_review/domain/ai_review_session.dart';
 import '../banner/domain/banner_link_launcher.dart';
 import '../banner/domain/banner_repository.dart';
 import '../banner/presentation/banner_web_view_builder.dart';
@@ -29,6 +31,8 @@ class MainDependencies {
     required this.bannerWebViewBuilder,
     required this.externalLinks,
     required this.aiCardBuilder,
+    required this.aiReviewRepository,
+    required this.homeAiReview,
     required this.displayRepository,
     required this.postRepository,
     required this.likeStore,
@@ -50,6 +54,11 @@ class MainDependencies {
   final BannerWebViewBuilder bannerWebViewBuilder;
   final BannerLinkLauncher externalLinks;
   final HomeAiCardBuilder aiCardBuilder;
+
+  /// AI 피드백. 상세는 화면마다 세션을 만들고, 홈 카드는 앱에 하나인 [homeAiReview]를 쓴다
+  /// (계정 전환 때 `clearAll`).
+  final AiReviewRepository aiReviewRepository;
+  final AiReviewSession homeAiReview;
   final DisplayRepository displayRepository;
   final PostRepository postRepository;
 

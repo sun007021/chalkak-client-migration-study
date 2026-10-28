@@ -28,7 +28,12 @@ class _Shell {
       home: rig.home,
       navigator: navigator,
       toast: toast,
-      aiCardBuilder: (context, postId) => const SizedBox.shrink(),
+      aiCardBuilder: (
+        context,
+        postId, {
+        required topicDate,
+        required visible,
+      }) => const SizedBox.shrink(),
     ),
   );
 }
