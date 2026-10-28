@@ -19,7 +19,18 @@ import com.stonefive.chalkak.testing.postId
 import com.stonefive.chalkak.testing.todayFailure
 import com.stonefive.chalkak.testing.todayFixture
 import kotlinx.coroutines.CompletableDeferred
+import com.stonefive.chalkak.testing.TODAY
+import com.stonefive.chalkak.testing.YESTERDAY
+import com.stonefive.chalkak.testing.popularQuery
+import com.stonefive.chalkak.testing.recentQuery
+import java.time.LocalDate
+import kr.chalkak.core.common.DateFormats
+import kr.chalkak.core.network.ApiResult
+import kr.chalkak.core.data.post.testing.gated
+import kr.chalkak.core.data.post.PostSort
+import kr.chalkak.core.data.post.testing.POST_MINE
 import kr.chalkak.core.data.post.testing.PostFixtures
+import kr.chalkak.feature.display.FeedEntry
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -127,20 +138,20 @@ class MainHostTest {
     }
 
     @Test
-    fun `TC-NAV-008 전시 탭을 다시 누르면 전시 화면에 맨 위로 스크롤 신호가 한 번 간다`() {
+    fun `TC-NAV-008 전시 탭을 다시 누르면 전시 화면이 다시 확인하고 화면과 선택은 그대로이다`() {
         launch()
         tap("bottom-bar.tab-display")
-        rule.waitForIdle()
-        assertEquals(0, rig.displaySignals.last(), "selecting the tab is not a scroll request")
+        rule.awaitTag("display.grid")
+        val first = rig.posts.posts.calls.size
         tap("bottom-bar.tab-display")
-        assertEquals(1, rig.displaySignals.last())
-        tap("bottom-bar.tab-display")
-        assertEquals(2, rig.displaySignals.last())
+        rule.waitUntil(2_000) { rig.posts.posts.calls.size > first }
         node("display.root").assertExists()
+        assertSelectedTab(Tab.Display)
+        assertEquals(1, rig.displayRequests.size, "re-selecting keeps the holder")
     }
 
     @Test
-    fun `TC-NAV-008 설정 탭을 다시 눌러도 화면은 그대로이고 전시 신호도 없다`() {
+    fun `TC-NAV-008 설정 탭을 다시 눌러도 화면은 그대로이고 전시는 다시 확인하지 않는다`() {
         launch()
         tap("bottom-bar.tab-settings")
         val screens = rig.analytics.screens.toList()
@@ -148,7 +159,8 @@ class MainHostTest {
         node("settings.root").assertExists()
         assertSelectedTab(Tab.Settings)
         assertEquals(screens, rig.analytics.screens.toList())
-        assertTrue(rig.displaySignals.isEmpty())
+        assertTrue(rig.displayRequests.isEmpty())
+        assertTrue(rig.posts.posts.calls.isEmpty())
     }
 
     @Test
@@ -436,5 +448,174 @@ class MainHostTest {
         tap("home.hero-photo")
         rule.awaitTag("feed.root")
         assertEquals(postId("201"), (rig.nav.top as Route.Feed).postId)
+    }
+
+    // ---- display tab / feed wiring (A4) ----------------------------------------------------------------------------------------------
+
+    private val firstToday get() = PostFixtures.pageFor(recentQuery()).posts.first()
+
+    /** `setup` for [launch]: the detail answer for the user's own approved post (the home hero). */
+    private val ownPost: MainRig.() -> Unit = {
+        posts.details.always(POST_MINE, PostFixtures.detailResult("feed/posts-detail__mine-today.json"))
+    }
+
+    @Test
+    fun `전시 탭은 실제 전시 화면을 보여 주고 목록을 불러온다`() {
+        launch()
+        tap("bottom-bar.tab-display")
+        rule.awaitTag("display.grid")
+        node("display.root").assertIsDisplayed()
+        node("bottom-bar.root").assertIsDisplayed()
+        assertEquals(listOf<Pair<LocalDate?, PostSort?>>(null to null), rig.displayRequests.toList())
+        assertTrue(rig.posts.posts.calls.contains(recentQuery()))
+        assertEquals(listOf("home", "display"), rig.analytics.screens.toList())
+        assertEquals(listOf("display"), rig.postAnalytics.screens.toList())
+    }
+
+    @Test
+    fun `전시 목록의 사진을 누르면 그 항목을 시드로 게시물 상세가 열리고 하단바가 사라진다`() {
+        launch()
+        tap("bottom-bar.tab-display")
+        rule.awaitTag("display.grid")
+        val post = firstToday
+        tap("display.item-${post.id}")
+        rule.awaitTag("feed.root")
+        node("bottom-bar.root").assertDoesNotExist()
+        assertEquals(Route.Feed(post.id, FeedSource.Display), rig.nav.top)
+        assertEquals(listOf<FeedEntry>(FeedEntry.FromDisplay(post)), rig.feedEntries.toList())
+        systemBack()
+        node("feed.root").assertDoesNotExist()
+        node("display.root").assertIsDisplayed()
+        assertSelectedTab(Tab.Display)
+    }
+
+    @Test
+    fun `홈 랭킹 사진을 누르면 홈 항목을 시드로 게시물 상세가 열린다`() {
+        launch()
+        scrollTo("home.ranking-item-${postId("261")}")
+        tap("home.ranking-item-${postId("261")}")
+        rule.awaitTag("feed.root")
+        val entry = rig.feedEntries.single()
+        assertTrue(entry is FeedEntry.FromDisplay && entry.post.id == postId("261"), "seeded from the home card: $entry")
+        assertEquals(Route.Feed(postId("261"), FeedSource.Display), rig.nav.top)
+    }
+
+    @Test
+    fun `홈 히어로로 연 게시물 상세는 시드 없이 ID로 불러온다`() {
+        launch(setup = ownPost)
+        tap("home.hero-photo")
+        rule.awaitTag("feed.root")
+        assertEquals(listOf<FeedEntry>(FeedEntry.FromPush(postId("201"))), rig.feedEntries.toList())
+        rule.waitUntil(2_000) { rig.posts.details.calls.isNotEmpty() }
+        assertEquals(postId("201"), rig.posts.details.calls.first())
+    }
+
+    @Test
+    fun `게스트가 전시 목록의 사진을 누르면 안내 토스트이고 상세는 열리지 않는다`() {
+        launch(AccessMode.Guest)
+        tap("bottom-bar.tab-display")
+        rule.awaitTag("display.grid")
+        tap("display.item-${firstToday.id}")
+        assertToast(copy["nav.guest.feed"])
+        node("feed.root").assertDoesNotExist()
+        assertTrue(rig.feedEntries.isEmpty())
+        assertTrue(rig.posts.details.calls.isEmpty())
+    }
+
+    @Test
+    fun `내 게시물을 삭제하면 상세가 닫히고 삭제 토스트가 뜨며 목록에서 사라진다`() {
+        launch(setup = ownPost)
+        rig.posts.deletes.enqueue(POST_MINE, ApiResult.Success(Unit))
+        tap("home.hero-photo")
+        rule.awaitTag("feed.delete-button")
+        tap("feed.delete-button")
+        tap("feed.delete-confirm-button")
+        rule.waitUntil(2_000) { !rule.hasNode("feed.root") }
+        assertEquals(1, rig.posts.deletes.calls.size)
+        assertToast(copy["nav.post-deleted"])
+        assertEquals(Route.TabRoot(Tab.Home), rig.nav.top)
+        node("bottom-bar.root").assertIsDisplayed()
+        assertTrue(rig.changes.isRemoved(POST_MINE))
+    }
+
+    @Test
+    fun `삭제 요청이 진행 중일 때 시스템 뒤로 가기는 상세를 닫지 않는다`() {
+        launch(setup = ownPost)
+        val gate = gated<ApiResult<Unit>>(ApiResult.Success(Unit))
+        rig.posts.deletes.enqueue(POST_MINE, gate)
+        tap("home.hero-photo")
+        rule.awaitTag("feed.delete-button")
+        tap("feed.delete-button")
+        tap("feed.delete-confirm-button")
+        rule.awaitTag("feed.deleting")
+        systemBack()
+        node("feed.root").assertIsDisplayed()
+        gate.release()
+        rule.waitUntil(2_000) { !rule.hasNode("feed.root") }
+        assertToast(copy["nav.post-deleted"])
+    }
+
+    @Test
+    fun `홈의 더보기는 그 날짜를 인기순으로 연 전시를 보여 준다`() {
+        launch()
+        scrollTo("home.ranking-more-link")
+        tap("home.ranking-more-link")
+        rule.awaitTag("display.grid")
+        assertSelectedTab(Tab.Display)
+        assertEquals(listOf<Pair<LocalDate?, PostSort?>>(YESTERDAY to PostSort.POPULAR), rig.displayRequests.toList())
+        node("display.date-label").assertTextEquals(DateFormats.monthDay(YESTERDAY))
+        assertTrue(rig.posts.posts.calls.contains(popularQuery(YESTERDAY)))
+    }
+
+    @Test
+    fun `홈에서 더보기를 두 번 누르면 매번 요청한 날짜로 새로 연다`() {
+        launch()
+        scrollTo("home.ranking-more-link")
+        tap("home.ranking-more-link")
+        rule.awaitTag("display.grid")
+        tap("bottom-bar.tab-home")
+        scrollTo("home.popular-more-link")
+        tap("home.popular-more-link")
+        rule.awaitTag("display.grid")
+        assertEquals(
+            listOf<Pair<LocalDate?, PostSort?>>(YESTERDAY to PostSort.POPULAR, TODAY to PostSort.POPULAR),
+            rig.displayRequests.toList(),
+        )
+        node("display.date-label").assertTextEquals(DateFormats.monthDay(TODAY))
+    }
+
+    @Test
+    fun `업로드 성공 확인이 요청한 날짜를 전시가 한 번 받아 그 날짜를 연다`() {
+        launch()
+        rule.runOnUiThread {
+            rig.nav.open(Route.PhotoUpload)
+            rig.nav.onUploadSubmitted(YESTERDAY)
+            rig.nav.onUploadSuccessConfirmed()
+        }
+        rule.awaitTag("display.grid")
+        assertSelectedTab(Tab.Display)
+        node("display.date-label").assertTextEquals(DateFormats.monthDay(YESTERDAY))
+        assertEquals(null, rig.nav.displayDateRequest, "the request is consumed once the display applied it")
+        assertTrue(rig.posts.posts.calls.contains(popularQuery(YESTERDAY)))
+    }
+
+    @Test
+    fun `다른 화면이 위에 쌓였다 돌아와도 같은 상세 홀더가 이어지고 닫으면 다음에는 새 홀더이다`() {
+        launch(setup = ownPost)
+        tap("home.hero-photo")
+        rule.awaitTag("feed.root")
+        rule.runOnUiThread { rig.nav.open(Route.Notifications) }
+        rule.waitForIdle()
+        node("feed.root").assertDoesNotExist()
+        node("notifications.root").assertExists()
+        systemBack()
+        rule.awaitTag("feed.root")
+        assertEquals(1, rig.feedEntries.size, "the covered feed keeps its holder")
+
+        systemBack()
+        node("feed.root").assertDoesNotExist()
+        tap("home.hero-photo")
+        rule.awaitTag("feed.root")
+        assertEquals(2, rig.feedEntries.size, "a popped feed is finished; opening again builds a new holder")
     }
 }

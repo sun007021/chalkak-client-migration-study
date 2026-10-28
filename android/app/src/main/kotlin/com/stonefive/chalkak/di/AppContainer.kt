@@ -48,11 +48,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import coil3.ImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import com.stonefive.chalkak.ui.components.CoilPhotoImage
 import com.stonefive.chalkak.ui.components.CoilRemoteImage
 import com.stonefive.chalkak.ui.issue.IssueWebView
 import com.stonefive.chalkak.ui.main.MainDependencies
 import com.stonefive.chalkak.ui.main.UploadEntryGate
 import kr.chalkak.core.common.analytics.AnalyticsTracker
+import kr.chalkak.core.data.post.CurrentUser
 import kr.chalkak.core.data.post.DefaultPostRepository
 import kr.chalkak.core.data.post.LikeController
 import kr.chalkak.core.data.post.PostChanges
@@ -64,6 +66,15 @@ import kr.chalkak.feature.home.ExternalLinkOpener
 import kr.chalkak.feature.home.HomeStateHolder
 import kr.chalkak.feature.home.LikeControllerToggler
 import kr.chalkak.feature.navigation.AccessMode
+import kr.chalkak.core.common.KstCalendar
+import kr.chalkak.core.network.Session
+import kr.chalkak.core.network.StoredSession
+import kr.chalkak.feature.display.DisplayStateHolder
+import kr.chalkak.feature.display.FeedEntry
+import kr.chalkak.feature.display.FeedStateHolder
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+import kr.chalkak.core.data.post.PostSort
 import kr.chalkak.core.network.ApiBaseUrl
 import kr.chalkak.core.network.ApiBaseUrlResult
 import kr.chalkak.core.network.ApiClient
@@ -101,7 +112,10 @@ class AppContainer(
     }
 
     private val persistentSessionStore = PersistentSessionStore(secureStorage)
-    val sessionStore: SessionStore get() = persistentSessionStore
+
+    /** The stored session, remembering the user id of the last read/write so [currentUser] can answer without suspending. */
+    private val trackedSessionStore = UserTrackingSessionStore(persistentSessionStore)
+    val sessionStore: SessionStore get() = trackedSessionStore
     val guestFlagStore: GuestFlagStore get() = persistentSessionStore
 
     // A SharedFlow, not a Channel: BootGate and the navigation shell both collect, and every collector must see every event
@@ -175,6 +189,24 @@ class AppContainer(
             postChanges.reset()
         }
     }
+
+    /** Who is logged in (`null` = guest / unknown yet). Primed from secure storage in the background, then kept by every session read/write. */
+    val currentUser: CurrentUser by lazy {
+        applicationScope.launch { runCatching { trackedSessionStore.read() } }
+        CurrentUser { trackedSessionStore.userId }
+    }
+
+    private val kstCalendar: KstCalendar by lazy { KstCalendar(clock) }
+
+    /** Holder for the exhibition tab; [scope] is the owner's (ViewModel) scope. */
+    fun newDisplayHolder(scope: CoroutineScope, initialDate: LocalDate? = null, initialSort: PostSort? = null): DisplayStateHolder =
+        DisplayStateHolder(
+            scope, postRepository, likeController, postChanges, currentUser, kstCalendar, platform.analytics, initialDate, initialSort,
+        )
+
+    /** Holder for one post detail. */
+    fun newFeedHolder(scope: CoroutineScope, entry: FeedEntry): FeedStateHolder =
+        FeedStateHolder(scope, postRepository, likeController, postChanges, currentUser, kstCalendar, platform.analytics, entry)
 
     /** BootGate state is touched on the main thread only (its contract). Created on first use. */
     private val mainScope: CoroutineScope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
@@ -251,10 +283,17 @@ class AppContainer(
             postChanges = postChanges,
             uploadGate = UploadEntryGate { enterUploadGate() },
             issueOpener = ExternalLinkOpener(platform.linkBrowser),
+            newDisplayHolder = ::newDisplayHolder,
+            newFeedHolder = ::newFeedHolder,
             image = if (loader == null) {
                 { _, _ -> }
             } else {
                 { url, modifier -> CoilRemoteImage(loader, url, modifier) }
+            },
+            photo = if (loader == null) {
+                { _, _ -> }
+            } else {
+                { url, modifier -> CoilPhotoImage(loader, url, modifier) }
             },
             issueWeb = { url, onNavigate, onLoaded, onFailed -> IssueWebView(url, onNavigate, onLoaded, onFailed, Modifier.fillMaxSize()) },
         )
@@ -288,5 +327,48 @@ class AppContainer(
                 .components { add(OkHttpNetworkFetcherFactory(callFactory = { base })) }
                 .build(),
         )
+    }
+}
+
+/**
+ * Decorates the session store with a synchronous view of the signed-in user id (`CurrentUser` is not suspending).
+ * A `read()` that was already running when a `write()` / `clear()` happened returns the older state; it must not overwrite the newer
+ * user id (logout during a token-refresh read would otherwise leave the old user "signed in"), so each change bumps [generation]
+ * and a read tracks its result only if none happened meanwhile.
+ */
+internal class UserTrackingSessionStore(private val delegate: SessionStore) : SessionStore {
+    @Volatile
+    var userId: String? = null
+        private set
+
+    private val generation = java.util.concurrent.atomic.AtomicInteger()
+    private val lock = Any()
+
+    override suspend fun read(): StoredSession {
+        val started = generation.get()
+        val stored = delegate.read()
+        synchronized(lock) {
+            if (generation.get() == started) userId = (stored as? StoredSession.User)?.session?.userId
+        }
+        return stored
+    }
+
+    override suspend fun write(session: Session) {
+        generation.incrementAndGet()
+        delegate.write(session)
+        set(session.userId)
+    }
+
+    override suspend fun clear() {
+        try {
+            delegate.clear()
+        } finally {
+            set(null)
+        }
+    }
+
+    private fun set(id: String?) = synchronized(lock) {
+        generation.incrementAndGet()
+        userId = id
     }
 }
