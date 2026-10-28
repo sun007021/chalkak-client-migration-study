@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.serialization) apply false
+    alias(libs.plugins.android.application) apply false
 }
 
 // Shared convention for pure Kotlin/JVM modules (no build-logic module on purpose).
