@@ -12,6 +12,8 @@ import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import com.stonefive.chalkak.copy.Copy
+import com.stonefive.chalkak.platform.PhotoPreviewLoader
+import com.stonefive.chalkak.platform.UploadPlatform
 import com.stonefive.chalkak.ui.components.ToastLayer
 import com.stonefive.chalkak.ui.components.ToastUi
 import com.stonefive.chalkak.ui.main.MainDependencies
@@ -96,6 +98,13 @@ class MainRig(val mode: AccessMode = AccessMode.Member) {
     val displayRequests = CopyOnWriteArrayList<Pair<LocalDate?, PostSort?>>()
     val feedEntries = CopyOnWriteArrayList<FeedEntry>()
 
+    // Upload flow: the real holder over fakes; the system picker / camera stand-in, editor session and edit painter are scripted here.
+    val uploadAcquirer = FakePhotoAcquirer()
+    val uploadCodec = FakeUploadCodec()
+    val uploadEditSource = FakeEditSource()
+    val uploadPainter = RecordingEditPainter()
+    val uploadPlatform = UploadPlatform(uploadAcquirer, PhotoPreviewLoader { previewOf() }, uploadEditSource, uploadPainter)
+
     init {
         posts.autoRespond()
         posts.likeHandler = { put, id -> likeServer.handle(put, id) }
@@ -109,6 +118,8 @@ class MainRig(val mode: AccessMode = AccessMode.Member) {
         postChanges = changes,
         uploadGate = gate,
         issueOpener = ExternalLinkOpener(browser),
+        newUploadHolder = { scope, topicDate -> fakeUploadHolder(scope, uploadCodec, topicDate) },
+        uploadPlatform = uploadPlatform,
         image = images.slot,
         newDisplayHolder = { scope, date, sort ->
             displayRequests += date to sort

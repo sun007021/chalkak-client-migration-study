@@ -55,7 +55,15 @@ import com.stonefive.chalkak.ui.main.MainDependencies
 import com.stonefive.chalkak.ui.main.UploadEntryGate
 import kr.chalkak.core.common.analytics.AnalyticsTracker
 import kr.chalkak.core.data.post.CurrentUser
+import kr.chalkak.core.common.SystemMonotonicClock
 import kr.chalkak.core.data.post.DefaultPostRepository
+import kr.chalkak.core.data.upload.DefaultPostCreationRepository
+import kr.chalkak.core.data.upload.PostCreationRepository
+import kr.chalkak.core.data.upload.PostCreations
+import kr.chalkak.core.data.upload.PostImageUploader
+import kr.chalkak.core.data.upload.PresignedPostImageUploader
+import kr.chalkak.feature.upload.PhotoUploadStateHolder
+import kr.chalkak.feature.upload.image.PostImageEncoder
 import kr.chalkak.core.data.post.LikeController
 import kr.chalkak.core.data.post.PostChanges
 import kr.chalkak.core.data.post.PostRepository
@@ -169,6 +177,11 @@ class AppContainer(
     val homeRepository: HomeRepository by lazy { DefaultHomeRepository(apiClient) }
     val bannerRepository: BannerRepository by lazy { DefaultBannerRepository(apiClient) }
     val postRepository: PostRepository by lazy { DefaultPostRepository(apiClient) }
+    val postCreationRepository: PostCreationRepository by lazy { DefaultPostCreationRepository(apiClient) }
+    val postImageUploader: PostImageUploader by lazy { PresignedPostImageUploader(apiClient, uploadOkHttp) }
+
+    /** "A post was created" announcements for home, record and the exhibition (REQ-UPL-063). Nothing stored, nothing to reset. */
+    val postCreations = PostCreations()
 
     /** Removals and title edits every list must honour; cleared on account change together with [likeController]. */
     val postChanges = PostChanges()
@@ -285,6 +298,27 @@ class AppContainer(
             issueOpener = ExternalLinkOpener(platform.linkBrowser),
             newDisplayHolder = ::newDisplayHolder,
             newFeedHolder = ::newFeedHolder,
+            // screen_view comes from the navigation controller only (D-22): the upload holder's own would double it.
+            newUploadHolder = { scope, topicDate ->
+                val upload = platform.upload
+                PhotoUploadStateHolder(
+                    scope = scope,
+                    topicDate = topicDate,
+                    home = homeRepository,
+                    creation = postCreationRepository,
+                    uploader = postImageUploader,
+                    encoder = PostImageEncoder(upload.codec, upload.compressor),
+                    codec = upload.codec,
+                    files = upload.files,
+                    gallery = upload.gallery,
+                    toaster = upload.toaster,
+                    camera = upload.camera,
+                    monotonic = SystemMonotonicClock,
+                    creations = postCreations,
+                    analytics = NoScreenViews,
+                )
+            },
+            uploadPlatform = platform.upload.platform,
             image = if (loader == null) {
                 { _, _ -> }
             } else {
@@ -316,13 +350,18 @@ class AppContainer(
             return create(context, cipher, base)
         }
 
-        private fun create(context: Context, cipher: SecretCipher, base: OkHttpClient): AppContainer = AppContainer(
-            copy = Copy.load(context),
+        private fun create(context: Context, cipher: SecretCipher, base: OkHttpClient): AppContainer {
+            val copy = Copy.load(context)
+            return create(context, cipher, base, copy)
+        }
+
+        private fun create(context: Context, cipher: SecretCipher, base: OkHttpClient, copy: Copy): AppContainer = AppContainer(
+            copy = copy,
             okHttpBase = base,
             apiBaseUrlRaw = BuildConfig.API_BASE_URL,
             clock = SystemClock,
             secureStorage = KeystoreRecordStorage(context, cipher),
-            platform = PlatformAdapters.android(context),
+            platform = PlatformAdapters.android(context, copy),
             imageLoader = ImageLoader.Builder(context)
                 .components { add(OkHttpNetworkFetcherFactory(callFactory = { base })) }
                 .build(),

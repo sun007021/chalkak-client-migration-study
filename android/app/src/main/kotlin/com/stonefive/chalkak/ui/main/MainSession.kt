@@ -3,6 +3,7 @@ package com.stonefive.chalkak.ui.main
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.stonefive.chalkak.ui.upload.UploadResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -18,7 +19,8 @@ import java.time.LocalDate
 /**
  * What the main area keeps across configuration changes (held by `rememberStateHolder`, so it lives in a ViewModel): the scope the
  * upload gate runs in (a rotation must not cancel a gate the controller still counts as running), the "scroll to top" requests,
- * the banner whose web page is open, the display entry requested from home and the feed holders of the stacked feed routes.
+ * the banner whose web page is open, the display entry requested from home, the feed holders of the stacked feed routes and the
+ * upload visit (topic date, serial, result for the success screen).
  */
 class MainSession(val scope: CoroutineScope) {
     val homeScroll = ScrollToTopSignal()
@@ -54,6 +56,15 @@ class MainSession(val scope: CoroutineScope) {
     val feedSeeds = HashMap<String, PostSummary>()
 
     val feeds = FeedSlots()
+
+    /** `topicDate` the upload gate opened the upload screen for (pinned for the whole visit, REQ-UPL-008). */
+    var uploadTopicDate: LocalDate? = null
+
+    /** Counts opened upload screens: each visit gets its own holder (a finished one cannot be reused). */
+    var uploadSerial: Int = 0
+
+    /** What the success screen shows; set when the submit succeeded. */
+    var uploadResult: UploadResult? = null
 }
 
 class DisplayEntry(val seq: Int, val date: LocalDate?, val sort: PostSort?)

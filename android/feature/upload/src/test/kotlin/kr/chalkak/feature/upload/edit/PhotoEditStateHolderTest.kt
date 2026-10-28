@@ -375,6 +375,22 @@ class PhotoEditStateHolderTest {
     }
 
     @Test
+    fun `TC-EDIT-023 the strength slider sets the auto strength clamped to 0 to 1 and keeps touched rows`() = runTest {
+        val rig = editorRig()
+        rig.start()
+        rig.holder.onAdjustValueChanged(AdjustItem.EXPOSURE, 0.3)
+        rig.holder.onAutoStrengthChanged(0.5)
+        assertEquals(0.5, rig.s.adjustments.autoStrength, tol)
+        assertEquals(0.3, rig.s.adjustments.effective(AdjustItem.EXPOSURE), tol, "touched row stays")
+        assertEquals(0.1, rig.s.adjustments.effective(AdjustItem.CONTRAST), tol, "auto 0.2 x 0.5")
+        rig.holder.onAutoStrengthChanged(1.7)
+        assertEquals(1.0, rig.s.adjustments.autoStrength, tol)
+        rig.holder.onAutoStrengthChanged(-0.4)
+        assertEquals(0.0, rig.s.adjustments.autoStrength, tol)
+        assertEquals(0.2, rig.s.edit.adjustments.auto.getValue(AdjustItem.CONTRAST), tol, "analysis stays")
+    }
+
+    @Test
     fun `TC-EDIT-032 auto fills every row with analysis times strength, touched rows stay`() = runTest {
         val rig = editorRig()
         rig.start()
