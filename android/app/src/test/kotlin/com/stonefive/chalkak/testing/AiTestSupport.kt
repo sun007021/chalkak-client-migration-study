@@ -1,8 +1,5 @@
 package com.stonefive.chalkak.testing
 
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.semantics.getOrNull
-import androidx.compose.ui.test.SemanticsMatcher
 import kr.chalkak.core.common.KstCalendar
 import kr.chalkak.core.common.testing.FakeClock
 import kr.chalkak.core.common.testing.FakeMonotonicClock
@@ -33,7 +30,3 @@ class AiHarness(userId: String? = USER_A_ID) {
 
     fun close() = scopes.close()
 }
-
-/** Any node whose test tag starts with [prefix] (list items such as `ai-result-sheet.criteria-item-{key}`). */
-fun hasTestTagPrefix(prefix: String) =
-    SemanticsMatcher("testTag starts with $prefix") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith(prefix) == true }
