@@ -131,7 +131,8 @@ fun DisplayScreen(
                             ChalkakButton(copy["display.retry"], callbacks.onRetry, Modifier.testTag("display.retry-button"))
                         }
                     }
-                    DisplayStatus.Content -> Content(state, callbacks, remoteImage)
+                    // A new date starts at the top (the grid must not keep its anchor on a post that is in both lists).
+                    DisplayStatus.Content -> androidx.compose.runtime.key(state.date) { Content(state, callbacks, remoteImage) }
                 }
                 if (state.isRefreshing) {
                     LinearProgressIndicator(
