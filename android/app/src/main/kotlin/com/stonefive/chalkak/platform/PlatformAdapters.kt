@@ -27,6 +27,8 @@ class PlatformAdapters(
     val updateChecker: UpdateChecker,
     val updateLauncher: UpdateLauncher,
     val externalBrowser: ExternalBrowser,
+    /** Banner links opened outside the app (home feature port). */
+    val linkBrowser: kr.chalkak.feature.home.ExternalBrowser,
     val signatureEncoder: SignatureImageEncoder,
     val analytics: AnalyticsTracker,
     val push: PushRegistrar,
@@ -53,6 +55,7 @@ class PlatformAdapters(
                 updateChecker = ConfiguredUpdateChecker(BuildConfig.FORCE_UPDATE_CHECK_ENABLED, PlayUpdateChecker(PlayUpdateSourceAdapter(playManager))),
                 updateLauncher = PlayUpdateLauncher(playManager, activity, bridge, StoreOpener(app)),
                 externalBrowser = AndroidExternalBrowser(app),
+                linkBrowser = AndroidLinkBrowser(app),
                 signatureEncoder = AndroidSignatureEncoder(),
                 analytics = LogAnalyticsTracker(),
                 push = NoopPushRegistrar,
@@ -68,6 +71,7 @@ class PlatformAdapters(
             updateChecker = { UpdateCheckResult.UpToDate },
             updateLauncher = { UpdateFlowResult.Cancelled },
             externalBrowser = { false },
+            linkBrowser = { kr.chalkak.feature.home.BrowserOpenResult.NoBrowser },
             signatureEncoder = AndroidSignatureEncoder(),
             analytics = object : AnalyticsTracker {
                 override fun screenView(screen: String) = Unit
