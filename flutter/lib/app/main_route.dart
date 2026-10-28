@@ -15,9 +15,14 @@ import '../features/like/domain/toast_message.dart' as like;
 import '../features/navigation/main_composition.dart';
 import '../features/navigation/presentation/main_shell.dart';
 import '../features/navigation/presentation/main_shell_navigator.dart';
+import '../features/navigation/presentation/settings_tab.dart';
+import '../features/onboarding/presentation/legal_document_view_model.dart';
+import '../features/settings/settings_composition.dart';
 import 'app_dependencies.dart';
 import 'app_routes.dart';
+import 'change_signature_route.dart' as change;
 import 'feed_route.dart';
+import 'feedback_route.dart';
 import 'notification_routes.dart';
 import 'upload_route.dart';
 
@@ -34,6 +39,7 @@ class MainRouteHost extends StatefulWidget {
 
 class _MainRouteHostState extends State<MainRouteHost> {
   MainComposition? _parts;
+  SettingsComposition? _settings;
   late final _RouterNavigator _navigator = _RouterNavigator(
     context,
     widget.dependencies,
@@ -82,13 +88,24 @@ class _MainRouteHostState extends State<MainRouteHost> {
     _likeToasts = main.likeStore.toasts.listen(
       (message) => main.toast.show(message.text),
     );
-    setState(
-      () => _parts = MainComposition.create(
-        dependencies: widget.dependencies.main,
-        analytics: widget.dependencies.analytics,
+    final dependencies = widget.dependencies;
+    setState(() {
+      _parts = MainComposition.create(
+        dependencies: dependencies.main,
+        analytics: dependencies.analytics,
         isGuest: guest,
-      ),
-    );
+      );
+      _settings = SettingsComposition.create(
+        dependencies: dependencies.settings,
+        signatureRepository: dependencies.signatureRepository,
+        logout: dependencies.logout,
+        withdraw: dependencies.withdraw,
+        leaveGuest: dependencies.leaveGuest,
+        toast: dependencies.main.toast,
+        analytics: dependencies.analytics,
+        isGuest: guest,
+      );
+    });
     final notification = widget.dependencies.notification;
     final home = _parts!.home;
     notification.navigator.attach(this, _notificationNavigator);
@@ -118,8 +135,26 @@ class _MainRouteHostState extends State<MainRouteHost> {
     notification.navigator.detach(this);
     notification.unread.detach(this);
     unawaited(_likeToasts?.cancel());
+    _settings?.dispose();
     _parts?.dispose();
     super.dispose();
+  }
+
+  SettingsTab? _settingsTab() {
+    final settings = _settings;
+    if (settings == null) return null;
+    final dependencies = widget.dependencies;
+    return SettingsTab(
+      viewModel: settings.viewModel,
+      documentViewModelFactory: (document) => LegalDocumentViewModel(
+        document: document,
+        launcher: dependencies.externalLinkLauncher,
+        analytics: dependencies.analytics,
+      ),
+      webViewBuilder: dependencies.legalWebViewBuilder,
+      onOpenFeedback: _navigator.openFeedback,
+      onChangeSignature: _navigator.openChangeSignature,
+    );
   }
 
   @override
@@ -130,6 +165,7 @@ class _MainRouteHostState extends State<MainRouteHost> {
       shell: parts.shell,
       home: parts.home,
       record: parts.record,
+      settings: _settingsTab(),
       navigator: _navigator,
       toast: widget.dependencies.main.toast,
       aiCardBuilder: widget.dependencies.main.aiCardBuilder,
@@ -237,6 +273,23 @@ class _RouterNavigator implements MainShellNavigator {
     } finally {
       coordinator.setBlocked(_uploadBlocker, blocked: false);
     }
+  }
+
+  /// 설정 탭의 피드백 보내기. 화면이 닫힐 때까지 기다린다.
+  Future<void> openFeedback() async {
+    if (!_context.mounted) return;
+    await Navigator.of(_context).push<void>(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (context) => FeedbackRoute(dependencies: _dependencies),
+      ),
+    );
+  }
+
+  /// 설정 탭의 사인 변경 흐름. 변경에 성공했으면 true.
+  Future<bool> openChangeSignature() async {
+    if (!_context.mounted) return false;
+    return change.openChangeSignature(_context, _dependencies);
   }
 
   @override

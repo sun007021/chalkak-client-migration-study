@@ -60,3 +60,8 @@ jobs:
           retention-days: 7
       - name: Debug APK
         run: ./gradlew :app:assembleDebug
+      # The real Kakao adapter (src/kakaoOn, com.kakao.sdk:v2-user) is only compiled with -PkakaoNativeAppKey, and its Maven repository
+      # (devrepo.kakao.com) is unreachable from some sandboxes. The runner has open network, so compile it here. The key is a dummy:
+      # nothing runs, and a real key is never committed or stored as a secret for this job.
+      - name: Compile the Kakao adapter (kakaoOn source set)
+        run: ./gradlew :app:compileDebugKotlin -PkakaoNativeAppKey=ci-dummy

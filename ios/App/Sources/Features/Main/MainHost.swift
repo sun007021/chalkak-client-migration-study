@@ -97,7 +97,7 @@ struct MainView: View {
         case .display:
             DisplayHost(container: container, session: session)
         case .record:
-            PlaceholderView(title: NavCopy.label(for: .record), identifier: "record")
+            RecordHost(container: container, session: session)
         case .settings:
             PlaceholderView(title: NavCopy.label(for: .settings), identifier: "settings")
         }
@@ -118,8 +118,8 @@ struct MainView: View {
             PlaceholderView(title: AnalyticsScreen.notificationDetail.rawValue, identifier: "notification-detail", onBack: { shell.pop() })
         case .feedback:
             PlaceholderView(title: AnalyticsScreen.feedback.rawValue, identifier: "feedback", onBack: { shell.pop() })
-        case .upload:
-            PlaceholderView(title: AnalyticsScreen.photoUpload.rawValue, identifier: "upload", onBack: { shell.pop() })
+        case .upload(let topicDate):
+            UploadScreen(container: container, session: session, topicDate: topicDate)
         case .changeSignature:
             PlaceholderView(title: AnalyticsScreen.changeSignature.rawValue, identifier: "change-signature", onBack: { shell.pop() })
         case .changeSignaturePreview:

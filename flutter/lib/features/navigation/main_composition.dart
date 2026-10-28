@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../core/analytics/analytics_constants.dart';
 import '../../core/analytics/analytics_tracker.dart';
 import '../banner/domain/banner_list_controller.dart';
 import '../display/domain/display_models.dart';
@@ -48,6 +49,8 @@ class MainComposition {
       analytics: analytics,
       uploadGate: UploadEntryGate(todayPost: dependencies.todayPostRepository),
       toast: dependencies.toast,
+      // 설정 탭은 설정 ViewModel이 screen_view를 보낸다(TC-SET-052).
+      selfReportedScreens: {BottomDestination.settings},
     );
     final record = RecordViewModel(
       repository: dependencies.recordRepository,

@@ -150,6 +150,9 @@ class _NoopNotificationPermission implements NotificationPermission {
 
   @override
   Future<OsPermissionStatus> request() async => OsPermissionStatus.denied;
+
+  @override
+  Future<void> openSystemSettings() async {}
 }
 
 class _NoopLocalNotificationPresenter implements LocalNotificationPresenter {
@@ -244,6 +247,10 @@ class _DeferredPermission implements NotificationPermission {
   @override
   Future<OsPermissionStatus> request() async =>
       (await _platform).permission.request();
+
+  @override
+  Future<void> openSystemSettings() async =>
+      (await _platform).permission.openSystemSettings();
 }
 
 class _DeferredPresenter implements LocalNotificationPresenter {

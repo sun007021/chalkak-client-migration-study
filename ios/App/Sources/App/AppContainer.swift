@@ -67,6 +67,8 @@ final class MainSession {
     @ObservationIgnored private(set) var display: DisplayViewModel?
     /// 전시 ViewModel을 만들 때 시드로 쓴 요청 id(같은 요청을 다시 적용하지 않는다).
     @ObservationIgnored private var displaySeedRequestID: Int?
+    /// 기록 탭 ViewModel. 처음 열 때 만든다.
+    @ObservationIgnored private(set) var record: RecordViewModel?
 
     init(shell: MainShellViewModel, home: HomeViewModel, container: AppContainer) {
         self.shell = shell
@@ -81,6 +83,14 @@ final class MainSession {
         let viewModel = container.makeDisplayViewModel(initialDate: request?.date, initialSort: request?.sort)
         display = viewModel
         displaySeedRequestID = request?.id
+        return viewModel
+    }
+
+    /// 기록 탭 ViewModel(없으면 만든다). 탭을 오가도 월 캐시·선택 날짜를 유지하려고 세션이 쥔다.
+    func recordViewModel() -> RecordViewModel {
+        if let record { return record }
+        let viewModel = container.makeRecordViewModel(access: shell.access, navigator: shell)
+        record = viewModel
         return viewModel
     }
 
@@ -126,6 +136,11 @@ final class AppContainer {
     private let signUpRepository: any SignUpRepository
     private let postChangeLedger: PostChangeLedger
     private let signatureEncoder = CoreGraphicsSignatureEncoder()
+    private let postCreationRepository: any PostCreationRepository
+    private let recordRepository: any RecordCalendarRepository
+    private let photoLibrarySaver = PhotoLibraryImageSaver()
+    /// 사진 선택·편집·WebP 준비를 맡는 하나의 처리기. 업로드 화면과 편집기가 같은 원본·미리보기를 본다.
+    let photoPipeline = PhotoPipeline()
 
     init(configuration: AppConfiguration) throws {
         #if DEBUG
@@ -195,6 +210,8 @@ final class AppContainer {
             client: client, sessionStore: sessionStore, guestFlags: guestFlags, authRepository: authRepository, clock: clock
         )
         self.postChangeLedger = PostChangeLedger(viewer: viewer)
+        self.postCreationRepository = APIPostCreationRepository(client: client)
+        self.recordRepository = APIRecordCalendarRepository(client: client)
     }
 
     /// 로그인 화면이 나타날 때마다 새 ViewModel을 쓴다(완료 상태가 남아 재로그인이 막히지 않도록).
@@ -252,6 +269,30 @@ final class AppContainer {
 
     func makeIssueWebViewModel(url: URL) -> IssueWebViewModel {
         IssueWebViewModel(url: url, toast: toast, screens: screenTracker)
+    }
+
+    // MARK: 업로드 · 사진 편집 · 기록
+
+    func makeUploadViewModel(topicDate: KSTDate) -> UploadViewModel {
+        UploadViewModel(
+            topicDate: topicDate, topics: topicRepository, creation: postCreationRepository, today: homeRepositories.today,
+            photoLoader: photoPipeline, preparer: photoPipeline, gallery: photoLibrarySaver,
+            globalNotices: ToastGlobalNoticePoster(toast: toast), clock: clock, screenTracker: screenTracker
+        )
+    }
+
+    func makePhotoEditViewModel(request: UploadViewModel.EditorRequest) -> PhotoEditViewModel {
+        PhotoEditViewModel(
+            photo: request.photo, initialEdit: request.initialEdit, isFirstSelection: request.isFirstSelection,
+            preparer: photoPipeline, autoAdjuster: photoPipeline
+        )
+    }
+
+    func makeRecordViewModel(access: MainAccess, navigator: any RecordNavigating) -> RecordViewModel {
+        RecordViewModel(
+            access: access, repository: recordRepository, clock: clock, toast: toast, navigator: navigator,
+            renderer: CalendarImageRenderer(), saver: photoLibrarySaver, ledger: postChangeLedger, screens: screenTracker
+        )
     }
 
     // MARK: 온보딩(약관 → 사인 그리기 → 미리보기)

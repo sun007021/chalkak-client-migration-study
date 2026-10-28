@@ -1,17 +1,22 @@
 import 'package:chalkak/app/app_dependencies.dart';
 import 'package:chalkak/app/chalkak_app.dart';
 import 'package:chalkak/core/auth/session.dart';
+import 'package:chalkak/core/push/notification_permission.dart';
 import 'package:chalkak/features/auth/data/api_auth_repository.dart';
 import 'package:chalkak/features/auth/domain/login_use_case.dart';
 import 'package:chalkak/features/auth/domain/session_use_cases.dart';
 import 'package:chalkak/features/auth/domain/user_data_cleaner.dart';
 import 'package:chalkak/features/boot/domain/auth_gate.dart';
 import 'package:chalkak/features/boot/domain/update_gate.dart';
+import 'package:chalkak/features/feedback/data/api_feedback_repository.dart';
 import 'package:chalkak/features/notification/data/push_platform.dart';
 import 'package:chalkak/features/notification/notification_dependencies.dart';
 import 'package:chalkak/features/onboarding/data/api_sign_up_repository.dart';
 import 'package:chalkak/features/onboarding/domain/sign_up_context.dart';
 import 'package:chalkak/features/onboarding/domain/sign_up_use_case.dart';
+import 'package:chalkak/features/settings/data/api_notification_settings_repository.dart';
+import 'package:chalkak/features/settings/presentation/settings_data_cleaner.dart';
+import 'package:chalkak/features/settings/settings_dependencies.dart';
 import 'package:chalkak/features/signature/data/api_signature_repository.dart';
 import 'package:chalkak/features/signature/data/api_signature_uploader.dart';
 import 'package:chalkak/features/signature/domain/change_signature_use_case.dart';
@@ -36,7 +41,7 @@ class AppHarness {
       enabled: updateGateEnabled,
     );
     final repository = ApiAuthRepository(client: http.client);
-    final cleaner = CompositeUserDataCleaner([userData]);
+    final cleaner = CompositeUserDataCleaner([userData, settingsCleaner]);
     final signatureRepository = ApiSignatureRepository(client: http.client);
     final signatureUploader = ApiSignatureUploader(client: http.client);
     dependencies = AppDependencies(
@@ -95,6 +100,15 @@ class AppHarness {
         promptFlag: FakePermissionFlag(),
         toast: homeFakes.dependencies.toast,
       ),
+      settings: SettingsDependencies(
+        notificationSettings: ApiNotificationSettingsRepository(
+          client: http.client,
+        ),
+        feedback: ApiFeedbackRepository(client: http.client),
+        permission: osPermission,
+        dataCleaner: settingsCleaner,
+        appVersion: appVersion,
+      ),
     );
   }
 
@@ -108,6 +122,13 @@ class AppHarness {
       FakeNotificationRepository();
   final FakePushDeviceRepository pushDevices = FakePushDeviceRepository();
   final FakeUserDataCleaner userData = FakeUserDataCleaner();
+  final SettingsDataCleaner settingsCleaner = SettingsDataCleaner();
+  final FakeNotificationPermission osPermission = FakeNotificationPermission(
+    OsPermissionStatus.granted,
+  );
+
+  /// 설정 탭 "버전정보"에 보이는 값.
+  static const appVersion = '1.1.1';
   final FakeSocialLoginClient kakao = FakeSocialLoginClient();
   final FakeAnalyticsTracker analytics = FakeAnalyticsTracker();
   final SignUpContext signUpContext = SignUpContext();
