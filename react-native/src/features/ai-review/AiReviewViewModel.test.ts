@@ -159,6 +159,7 @@ describe('AiReviewViewModel 알약 상태 (REQ-AIR-008~017)', () => {
       kind: 'failed',
       title: t('ai.failed.title'),
       reason: t('ai.failed.no-more'),
+      canRetry: false,
       confirmLabel: t('ai.failed.confirm'),
     });
   });
@@ -553,6 +554,15 @@ describe('AiReviewViewModel 푸시 진입 자동 오픈 (TC-AIR-058, D-11)', () 
     const h = await setup({ entry: 'push', routes: { [GET_AI]: fixture } });
     await h.shown();
     expect(h.state().sheet).toBeNull();
+  });
+
+  it('TC-AIR-058 푸시로 열린 실패 시트가 재요청 가능이면 사유 없이 재요청 버튼이 있고 누르면 재요청 시트로 이어진다', async () => {
+    const h = await setup({ entry: 'push', routes: { [GET_AI]: FAILED_RETRY } });
+    await h.shown();
+    expect(h.state().sheet).toMatchObject({ kind: 'failed', reason: null, canRetry: true });
+    h.viewModel.onFailedSheetRetry();
+    expect(h.state().sheet).toMatchObject({ kind: 'start', retry: true });
+    expect(h.timesOf(POST_AI)).toHaveLength(0);
   });
 
   it('TC-AIR-058 일반 진입에서는 자동으로 열리지 않는다', async () => {
