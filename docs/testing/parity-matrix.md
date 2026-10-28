@@ -10,7 +10,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | BOOT | [boot-auth.md](catalog/boot-auth.md) | 39 | 2 | 2 | 30/39 | 27/39 | 34/39 | 33/39 | 17/39 |
 | AUTH | [boot-auth.md](catalog/boot-auth.md) | 65 | 5 | 5 | 48/65 | 52/65 | 56/65 | 53/65 | 54/65 |
-| ONB | [onboarding-signature.md](catalog/onboarding-signature.md) | 52 | 3 | 2 | 44/52 | 43/52 | 46/52 | 49/52 | 0/52 |
+| ONB | [onboarding-signature.md](catalog/onboarding-signature.md) | 52 | 3 | 2 | 44/52 | 44/52 | 46/52 | 49/52 | 0/52 |
 | SIGN | [onboarding-signature.md](catalog/onboarding-signature.md) | 45 | 2 | 2 | 38/45 | 41/45 | 42/45 | 43/45 | 0/45 |
 | NAV | [navigation.md](catalog/navigation.md) | 50 | 0 | 0 | 0/50 | 0/50 | 0/50 | 0/50 | 25/50 |
 | HOME | [home.md](catalog/home.md) | 60 | 2 | 2 | 0/60 | 54/60 | 0/60 | 54/60 | 0/60 |
@@ -22,8 +22,8 @@
 | EDIT | [upload-edit.md](catalog/upload-edit.md) | 51 | 4 | 4 | 0/51 | 0/51 | 0/51 | 0/51 | 0/51 |
 | AIR | [ai-review.md](catalog/ai-review.md) | 61 | 2 | 2 | 0/61 | 0/61 | 0/61 | 0/61 | 0/61 |
 | REC | [record.md](catalog/record.md) | 45 | 2 | 2 | 0/45 | 0/45 | 0/45 | 0/45 | 0/45 |
-| NOTI | [notification-push.md](catalog/notification-push.md) | 57 | 2 | 2 | 0/57 | 0/57 | 0/57 | 0/57 | 0/57 |
-| PUSH | [notification-push.md](catalog/notification-push.md) | 77 | 4 | 6 | 0/77 | 0/77 | 0/77 | 0/77 | 0/77 |
+| NOTI | [notification-push.md](catalog/notification-push.md) | 57 | 2 | 2 | 0/57 | 48/57 | 0/57 | 0/57 | 0/57 |
+| PUSH | [notification-push.md](catalog/notification-push.md) | 77 | 4 | 6 | 0/77 | 67/77 | 0/77 | 0/77 | 0/77 |
 | SET | [settings-feedback.md](catalog/settings-feedback.md) | 56 | 3 | 3 | 0/56 | 47/56 | 0/56 | 0/56 | 0/56 |
 | FDBK | [settings-feedback.md](catalog/settings-feedback.md) | 37 | 2 | 2 | 0/37 | 31/37 | 1/37 | 0/37 | 0/37 |
 | NET | [common-infra.md](catalog/common-infra.md) | 62 | 2 | 2 | 55/62 | 55/62 | 56/62 | 56/62 | 59/62 |
