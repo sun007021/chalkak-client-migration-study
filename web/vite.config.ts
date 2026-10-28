@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => {
   // PROXY_TARGET은 공개 개발 서버 주소이며 비밀이 아니다(.env.example 참고).
   const proxyTarget = env.PROXY_TARGET ?? 'https://chalkak-dev.pysun.kr';
   const uploadExtraHosts = (env.UPLOAD_PROXY_ALLOWED_HOSTS ?? '').split(',').map((h) => h.trim()).filter(Boolean);
+  const uploadLoopbackPorts = (env.UPLOAD_PROXY_ALLOWED_LOOPBACK_PORTS || '4010').split(',').map((p) => Number(p.trim())).filter((p) => Number.isInteger(p) && p > 0);
   const proxy = {
     '/api': { target: proxyTarget, changeOrigin: true, secure: true },
   };
@@ -19,7 +20,7 @@ export default defineConfig(({ mode }) => {
   return {
     define: { __DEV_SESSION_ENABLED__: JSON.stringify(devSessionEnabled) },
     // presigned PUT은 S3로 직접 가면 버킷 CORS에 막힐 수 있다. 개발·preview 서버만 /__upload-proxy/<호스트>/... 를 그 호스트로 중계한다(배포 빌드 산출물에는 영향 없음).
-    plugins: [react(), uploadProxyPlugin({ extraHosts: uploadExtraHosts })],
+    plugins: [react(), uploadProxyPlugin({ extraHosts: uploadExtraHosts, loopbackPorts: uploadLoopbackPorts, previewEnabled: env.VITE_UPLOAD_PROXY === 'true' })],
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
     // shared/(constants.json, copy/ko.json)를 레포 루트에서 읽는다.
     server: { port: 5173, proxy, fs: { allow: ['..'] } },
@@ -28,7 +29,7 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       globals: true,
       setupFiles: ['./src/test/setup.ts'],
-      include: ['src/**/*.test.{ts,tsx}'],
+      include: ['src/**/*.test.{ts,tsx}', 'vite/**/*.test.ts'],
       restoreMocks: true,
     },
   };

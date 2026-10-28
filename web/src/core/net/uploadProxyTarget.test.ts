@@ -21,6 +21,11 @@ describe('resolveUploadProxyTarget', () => {
     expect(resolveUploadProxyTarget('/api/v1/x')).toBeNull();
   });
   it('추가 허용 호스트는 https로 푼다', () => {
-    expect(resolveUploadProxyTarget('/__upload-proxy/files.example/x', ['files.example'])).toEqual({ origin: 'https://files.example', path: '/x' });
+    expect(resolveUploadProxyTarget('/__upload-proxy/files.example/x', { extraHosts: ['files.example'] })).toEqual({ origin: 'https://files.example', path: '/x' });
+  });
+  it('loopback은 허용 포트만 푼다(기본 4010, 포트 없음·다른 포트는 null)', () => {
+    expect(resolveUploadProxyTarget('/__upload-proxy/localhost/x')).toBeNull();
+    expect(resolveUploadProxyTarget('/__upload-proxy/localhost:5173/x')).toBeNull();
+    expect(resolveUploadProxyTarget('/__upload-proxy/localhost:9000/x', { loopbackPorts: [9000] })?.origin).toBe('http://localhost:9000');
   });
 });
