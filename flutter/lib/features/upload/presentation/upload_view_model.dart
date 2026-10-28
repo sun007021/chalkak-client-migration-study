@@ -524,7 +524,13 @@ class UploadViewModel extends ChangeNotifier {
         title: PostTitle.normalize(_state.title),
         cancelToken: token,
       );
-      if (_disposed) return;
+      if (_disposed) {
+        // 화면이 닫힌 뒤 끝난 제출이 남긴 준비물(네트워크 실패 등)의 임시 파일을 지운다.
+        if (outcome case SubmitFailed(:final retained?)) {
+          unawaited(preparer.discard(retained));
+        }
+        return;
+      }
       switch (outcome) {
         case SubmitSucceeded(:final moderationStatus):
           _prepared = null;

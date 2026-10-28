@@ -75,7 +75,7 @@ class _MainRouteHostState extends State<MainRouteHost> {
   void _onUploaded(KstDate date) {
     final parts = _parts;
     if (_disposed || parts == null) return;
-    parts.shell.openDisplay(date: date, popular: false);
+    parts.shell.openDisplay(date: date, popular: false, revalidate: true);
     unawaited(parts.home.refresh());
     unawaited(parts.record.enter());
   }
