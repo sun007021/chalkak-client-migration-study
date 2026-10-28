@@ -24,8 +24,11 @@ export type RootStackParamList = {
     seed?: FeedSeed | null;
     entry?: FeedEntry;
     thumbnailUrl?: string | null;
+    /** 푸시 AI 리뷰 탭: 상세를 열며 AI 피드백 시트를 한 번 자동으로 연다(D-11). AI 리뷰 PR이 해석한다. */
+    openAiSheet?: boolean;
   };
   Notifications: undefined;
+  NotificationDetail: { notificationId: string };
   IssueWeb: { url: string };
   /** 게이트가 고정해 넘긴 주제 날짜(yyyy-MM-dd, REQ-UPL-008). */
   Upload: { topicDate: string };

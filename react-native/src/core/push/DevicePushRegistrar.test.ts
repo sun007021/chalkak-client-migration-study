@@ -54,7 +54,7 @@ describe('DevicePushRegistrar 요청', () => {
     await h.registrar.registerDevice();
     expect(puts(h)).toHaveLength(1);
     expect(bodyOf(puts(h)[0])).toEqual({ fcmToken: 'fcm-1' });
-    expect(puts(h)[0].headers.authorization).toBe(`Bearer ${WITH_SESSION}`);
+    expect(puts(h)[0].headers.Authorization).toBe(`Bearer ${WITH_SESSION}`);
   });
 
   it('TC-PUSH-018 FCM 토큰이 아직 없으면 요청 0건이고, 토큰이 준비되면(start 구독) 등록한다', async () => {
@@ -119,7 +119,9 @@ describe('DevicePushRegistrar 트리거와 중복 제거', () => {
   });
 
   it('REQ-PUSH-008 앱이 포그라운드로 올 때 등록을 시도한다(이미 성공한 쌍이면 요청 없음, 실패했으면 다시)', async () => {
-    const h = await setup({ routes: { [PUT]: [networkFailure(), NO_CONTENT] } });
+    const h = await setup({
+      routes: { [PUT]: [networkFailure(), networkFailure(), networkFailure(), NO_CONTENT] },
+    });
     const stop = h.registrar.start();
     await h.registrar.registerDevice();
     const failed = puts(h).length;
@@ -222,7 +224,7 @@ describe('DevicePushRegistrar session_id 확인', () => {
     await h.registrar.registerDevice();
     expect(h.router.calls(REFRESH)).toHaveLength(1);
     expect(puts(h)).toHaveLength(1);
-    expect(puts(h)[0].headers.authorization).toBe(`Bearer ${WITH_SESSION}`);
+    expect(puts(h)[0].headers.Authorization).toBe(`Bearer ${WITH_SESSION}`);
   });
 
   it('TC-PUSH-024 갱신한 JWT에도 session_id가 없으면 등록 0건이고 로그인은 유지된다', async () => {

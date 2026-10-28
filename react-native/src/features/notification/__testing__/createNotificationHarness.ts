@@ -1,6 +1,7 @@
 import { createNetHarness, refreshOk } from '../../../core/http/__testing__/createNetHarness';
 import { FakeToastPresenter } from '../../../core/toast/__testing__/FakeToastPresenter';
 import { FakeAnalyticsTracker } from '../../../core/analytics/__testing__/FakeAnalyticsTracker';
+import { fixtureResponse } from '../../../core/http/__testing__/loadFixture';
 import { FixtureRouter, type RouteValue } from '../../../data/__testing__/FixtureRouter';
 import { NotificationRepository } from '../../../data/notification/NotificationRepository';
 import { FakeAuthFlowNavigator } from '../../auth/__testing__/FakeAuthFlowNavigator';
@@ -96,10 +97,8 @@ export function deferredRoute(fixture: string): { value: RouteValue; release: ()
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  // fixtureResponse를 지연 로드하지 않도록 라우트 함수 안에서 가져온다.
   const value: RouteValue = async () => {
     await gate;
-    const { fixtureResponse } = await import('../../../core/http/__testing__/loadFixture');
     return fixtureResponse(fixture);
   };
   return { value, release };

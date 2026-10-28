@@ -230,3 +230,19 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
   - `fireEvent`는 이미 `act`로 감싸져 있어 그 바깥을 또 `act`로 감싸면 "overlapping act" 경고가 난다.
   - `FakeCalendarImageSaver`처럼 즉시 끝나는 가짜로는 `await fireEvent.press` 두 번이 "연타"가 아니다(첫 저장이 이미 끝난다). 연타 검증은 저장을 붙잡아 둔다.
   - 기록 흐름 테스트의 기준 시각(10-27)보다 미래인 10-31 사진으로 전시를 열면 전시가 오늘로 맞춰 열린다(전시는 날짜를 오늘 이하로 자른다).
+
+## 알림·푸시 (`src/features/notification`, `src/features/push`, `src/core/push`, `src/data/notification`)
+
+- **구성**: 알림함(`NotificationInboxViewModel`, 마운트 = `onShown`, 언마운트 = `onHidden`)과 상세(`NotificationDetailViewModel`)는 순수 TS ViewModel이다. 알림함 행 탭과 푸시 탭은 같은 `planNotificationTap`(D-11 목적지 표)과 `NotificationTapProcessor`를 지난다(읽음 처리 -> 홈 `onPushReceived` -> 이동). 읽음 API 실패는 네트워크면 안내 토스트 후 이동, 그 밖(404 등)은 `noti.gone` 토스트 + 알림함 새로고침이다. 401은 `AuthErrorPolicy`(키 `notification-read`).
+- **푸시 포트**: `core/push`의 인터페이스(`PushPermissionGateway`, `PushTokenProvider`, `NotificationResponseSource`, `PushMessageSource`, `PushNotificationPresenter`, `PushPromptFlagStore`)를 ViewModel/조정자가 쓰고, 실제 어댑터는 `core/push/expo/`(expo-notifications)에 얇게 둔다(매핑 함수만 테스트). `AppContainer.startPush()`가 `App.tsx`의 `useEffect`에서 불려 등록기·권한 조정자·포그라운드 핸들러·탭 라우터를 시작하고 정리 함수를 돌려준다(StrictMode 안전).
+- **기기 등록**: `DevicePushRegistrar`가 `PUT /push-devices/current {fcmToken}`을 보낸다. 토큰은 JWT에 세션 ID가 있어야 보내고(없으면 한 번 갱신), 같은 (사용자, 토큰)은 다시 보내지 않으며, 세션 세대가 바뀌었으면 성공을 기록하지 않는다. 실패는 reject하지 않고 로그만 남긴다.
+- **탭 처리**: `PushTapRouter`가 부팅 단계로 정한다. 스플래시·업데이트 필요 -> 보류(`PendingPushStore`에 저장), 로그인 -> 폐기, 가입 -> 인증 상태면 보류, 메인 회원 -> 처리(업로드·피드백 화면에서는 `PushTapBlocker`가 막음), 메인 게스트 -> 폐기. 계정이 바뀌면 보류분을 버린다.
+- **확인 필요(백엔드·기획)**
+  1. **iOS 토큰 종류**: `getDevicePushTokenAsync`는 iOS에서 APNs 토큰을 준다. 서버는 `fcmToken`이므로 iOS는 현재 토큰을 보내지 않는다(`fcmTokenFrom`은 Android만). iOS를 지원하려면 Firebase messaging SDK로 FCM 토큰을 얻거나 서버가 APNs 토큰을 받도록 해야 한다.
+  2. **스펙 충돌 2(권한 대화상자)**: 스펙은 OS 대화상자만 말하는 곳과 iOS 앱 내 사전 안내(`push-permission.*` testid, `noti.perm.title/body`)를 말하는 곳이 있다. OS 대화상자만 구현했고 사전 안내 testid는 쓰지 않았다.
+  3. **스펙 충돌 3(포그라운드 AI 푸시)**: 포그라운드에서 받은 원격 푸시는 OS 배너를 끄고(`setNotificationHandler`) 앱이 직접 로컬 알림으로 보여 주며 AI 푸시도 억제하지 않는다.
+  4. **프롬프트 플래그 저장**: `PushPromptFlagStore`/`PendingPushStore`는 AsyncStorage라 앱 삭제 후 재설치하면 초기화된다(키체인이 아님).
+  5. **포그라운드 로컬 알림 탭**: 앱이 보여 준 로컬 알림에도 `data`를 실어 탭하면 같은 경로로 이동한다.
+  6. **Android 채널**: `moderation_push`(기본 채널, `app.config.ts` 플러그인 `defaultChannel`). 채널 이름/중요도 확정 필요.
+  7. **Firebase 설정**: `GOOGLE_SERVICES_JSON` 환경 변수가 있으면 `android.googleServicesFile`로 쓴다. 실기기 푸시 E2E에는 이 파일(과 iOS APNs 키)이 필요하다.
+- **테스트 함정**: `ApiClient`가 멱등 요청(GET/PUT)의 5xx·네트워크 오류를 최대 3번 시도하므로, 배열 라우트로 "실패 후 성공"을 만들 때 실패 단계를 3번 반복해야 한다. 헤더 키는 `Authorization`(대문자)이다.

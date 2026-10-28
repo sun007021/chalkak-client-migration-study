@@ -68,6 +68,8 @@ describe('NotificationInboxScreen', () => {
       routes: {
         [LIST_P1]: [
           'notification/notifications__internal-error',
+          'notification/notifications__internal-error',
+          'notification/notifications__internal-error',
           'notification/notifications__page1',
         ],
       },

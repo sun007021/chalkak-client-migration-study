@@ -55,6 +55,9 @@ function AppShell() {
   const container = useAppContainer();
   const { bootViewModel, updateDialogViewModel } = container;
 
+  // 푸시 수신(기기 등록 트리거, 권한 요청, 탭 라우팅, 포그라운드 표시). 효과의 정리 함수가 모두 해제하므로 StrictMode의 재마운트에도 안전하다.
+  useEffect(() => container.startPush(), [container]);
+
   useEffect(() => {
     void bootViewModel.start();
     // iOS 계열: 앱이 다시 활성화될 때 강제 업데이트 재확인(REQ-BOOT). Android의 온라인 복귀 재확인은 연결 상태 모듈이 생기면 붙인다.
