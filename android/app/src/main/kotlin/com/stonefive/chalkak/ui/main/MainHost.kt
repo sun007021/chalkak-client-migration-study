@@ -1,10 +1,26 @@
 package com.stonefive.chalkak.ui.main
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import com.stonefive.chalkak.copy.LocalCopy
+import com.stonefive.chalkak.ui.home.HomeRoute
+import com.stonefive.chalkak.ui.issue.IssueWebRoute
+import com.stonefive.chalkak.viewmodel.rememberStateHolder
 import com.stonefive.chalkak.ui.home.RemoteImage
 import com.stonefive.chalkak.ui.issue.IssueWebContent
 import kotlinx.coroutines.CoroutineScope
@@ -13,7 +29,9 @@ import kr.chalkak.core.data.post.PostChanges
 import kr.chalkak.feature.auth.HomeMode
 import kr.chalkak.feature.home.ExternalLinkOpener
 import kr.chalkak.feature.home.HomeStateHolder
+import kr.chalkak.feature.navigation.AccessMode
 import kr.chalkak.feature.navigation.NavigationController
+import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
 
 /**
@@ -37,6 +55,15 @@ class ScrollToTopSignal {
 /** Tab content of the tabs this PR does not build (display, record, settings): a box tagged `<tab>.root`. */
 @Composable
 fun TabPlaceholder(tab: Tab, modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxSize().testTag("${tab.analyticsName}.root"), contentAlignment = Alignment.Center) {
+        Text(text = LocalCopy.current[tab.labelCopyKey], style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+/** Presence-only stand-in for a screen a later PR builds. */
+@Composable
+private fun RoutePlaceholder(tag: String, modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxSize().testTag(tag))
 }
 
 /**
@@ -59,25 +86,12 @@ class MainDependencies(
 )
 
 /**
- * Main area host (everything behind the boot gate except login / sign-up screens). STUB (TDD step 1): renders nothing yet.
+ * Main area host (everything behind the boot gate except login / sign-up screens): collects `nav.state`, renders [MainShell] and lets
+ * [MainCoordinator] execute every `NavOutcome` and home effect. System back goes to `nav.onSystemBack()`; `ExitApp` calls [onExitApp].
+ * Screens other than home and the banner web page are presence-only placeholders until their PRs land.
  *
- * Collects `nav.state` and renders [MainShell]; executes every `NavOutcome` of the controller:
- * - tab tap -> `nav.onTabSelected`. `Blocked(key)` -> `showToast(copy[key])` (no tab change). `ScrollToTop(Display)` ->
- *   the display tab's [ScrollToTopSignal].request(). Re-tapping HOME while home is selected scrolls home to the top
- *   (TC-NAV-009; the controller answers Ignored for it). Re-tapping record/settings does nothing.
- * - upload button / hero upload (`HomeEffect.OpenUpload`) -> `nav.onUploadButton()`; `Blocked` -> toast; `StartUploadGate` -> run
- *   `deps.uploadGate.enter()` exactly once (further taps while it runs are Ignored by the controller) -> `nav.onUploadGateFinished(opened)`.
- * - system back (BackHandler inside the host) -> `nav.onSystemBack()`; `ExitApp` -> [onExitApp].
- * - routes: TabRoot(Home) -> HomeRoute (home.root); other TabRoot -> `deps.otherTab`; Notifications -> `notifications.root`,
- *   Feed -> `feed.root`, PhotoUpload -> `upload.root`, PhotoUploadSuccess -> `upload-success.root`, NotificationDetail ->
- *   `notification-detail.root`, Feedback -> `feedback.root` (placeholders, presence only); BannerWeb -> IssueWebRoute (`issue.root`) for
- *   the banner of the last `HomeEffect.OpenIssue`.
- * - HomeEffect: ShowToast -> `showToast(copy[key])`; OpenFeed -> `nav.open(Feed(postId, Display))`; OpenNotifications ->
- *   `nav.open(Notifications)`; OpenIssue -> `nav.open(BannerWeb)`; OpenDisplay / OpenRecord -> tab selection; `Blocked` -> toast.
- * - the host NEVER sends `screen_view` / analytics itself (the controller does).
- * - likes: on every home list load merge the ranking/popular posts into `deps.likes` (`merge(id, LikeSnapshot, revision taken before the load)`),
- *   show the displayed like state from `deps.likes.states`, collect `deps.likes.events`: `Failed` -> toast `copy[failure.copyKey]`;
- *   `PostGone` -> the post disappears from both home rows (also via `deps.postChanges.removed`).
+ * [sessionKey] changes when a new login starts (see `RootSession`), so a new account never sees the previous account's home holder.
+ * The host never sends analytics itself.
  */
 @Composable
 fun MainHost(
@@ -86,5 +100,71 @@ fun MainHost(
     showToast: (String) -> Unit,
     onExitApp: () -> Unit,
     modifier: Modifier = Modifier,
+    sessionKey: Int = 0,
 ) {
+    val copy = LocalCopy.current
+    val navState by nav.state.collectAsState()
+    val session = rememberStateHolder("main-$sessionKey") { scope -> MainSession(scope) }
+    val latestToast by rememberUpdatedState(showToast)
+    val latestExit by rememberUpdatedState(onExitApp)
+    val coordinator = remember(nav, deps, session, copy) {
+        MainCoordinator(nav, deps, session, copy, showToast = { latestToast(it) }, exitApp = { latestExit() })
+    }
+    val homeList = rememberLazyListState()
+    val idleSignal = remember { ScrollToTopSignal() }
+
+    BackHandler(onBack = coordinator::onSystemBack)
+    val homeScrollCount = session.homeScroll.count
+    LaunchedEffect(homeScrollCount) {
+        if (homeScrollCount != session.homeScrollHandled) {
+            session.homeScrollHandled = homeScrollCount
+            homeList.animateScrollToItem(0)
+        }
+    }
+
+    MainShell(navState, onTabClick = coordinator::onTabClick, onUploadClick = coordinator::onUploadClick, modifier = modifier) { route ->
+        when (route) {
+            Route.TabRoot(Tab.Home) -> {
+                val mode = navState.accessMode
+                val holder = rememberStateHolder("home-$sessionKey-$mode") { scope -> deps.newHomeHolder(scope, mode.toHomeMode()) }
+                HomeRoute(
+                    holder = holder,
+                    likes = deps.likes,
+                    postChanges = deps.postChanges,
+                    listState = homeList,
+                    image = deps.image,
+                    showToast = { latestToast(it) },
+                    onEffect = coordinator::onHomeEffect,
+                    onWeekMore = coordinator::onWeekMore,
+                )
+            }
+            is Route.TabRoot -> deps.otherTab(route.tab, if (route.tab == Tab.Display) session.displayScroll else idleSignal)
+            Route.Notifications -> RoutePlaceholder("notifications.root")
+            is Route.Feed -> RoutePlaceholder("feed.root")
+            Route.PhotoUpload -> RoutePlaceholder("upload.root")
+            is Route.PhotoUploadSuccess -> RoutePlaceholder("upload-success.root")
+            is Route.NotificationDetail -> RoutePlaceholder("notification-detail.root")
+            Route.Feedback -> RoutePlaceholder("feedback.root")
+            Route.BannerWeb -> {
+                val banner = session.issueBanner
+                if (banner == null) {
+                    LaunchedEffect(Unit) { coordinator.onSystemBack() }
+                } else {
+                    IssueWebRoute(
+                        banner = banner,
+                        opener = deps.issueOpener,
+                        showToast = { latestToast(it) },
+                        onBack = coordinator::onSystemBack,
+                        web = deps.issueWeb,
+                    )
+                }
+            }
+            else -> Unit
+        }
+    }
+}
+
+private fun AccessMode.toHomeMode(): HomeMode = when (this) {
+    AccessMode.Member -> HomeMode.Member
+    AccessMode.Guest -> HomeMode.Guest
 }
