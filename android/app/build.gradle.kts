@@ -160,6 +160,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.play.app.update)
+    implementation(libs.androidx.exifinterface)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     if (kakaoSdkEnabled) implementation(libs.kakao.sdk.user)
