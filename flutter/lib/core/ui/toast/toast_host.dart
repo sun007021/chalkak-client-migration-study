@@ -26,7 +26,9 @@ class _ToastHostState extends State<ToastHost> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    widget.controller.cancelPending();
+    widget.controller
+      ..cancelPending()
+      ..screenVisible = true;
     super.dispose();
   }
 

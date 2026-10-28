@@ -5,15 +5,11 @@ import 'package:go_router/go_router.dart';
 
 import '../core/time/kst_date.dart';
 import '../core/ui/toast/toast_host.dart';
-import '../features/banner/domain/banner_list_controller.dart';
 import '../features/banner/domain/banner_models.dart';
 import '../features/banner/domain/banner_web_view_model.dart';
 import '../features/banner/presentation/banner_web_screen.dart';
 import '../features/home/domain/home_models.dart';
-import '../features/home/domain/home_view_model.dart';
-import '../features/navigation/domain/guest_guard.dart';
-import '../features/navigation/domain/main_shell_view_model.dart';
-import '../features/navigation/domain/upload_entry_gate.dart';
+import '../features/navigation/main_composition.dart';
 import '../features/navigation/presentation/main_shell.dart';
 import '../features/navigation/presentation/main_shell_navigator.dart';
 import 'app_dependencies.dart';
@@ -31,7 +27,11 @@ class MainRouteHost extends StatefulWidget {
 }
 
 class _MainRouteHostState extends State<MainRouteHost> {
-  _MainParts? _parts;
+  MainComposition? _parts;
+  late final _RouterNavigator _navigator = _RouterNavigator(
+    context,
+    widget.dependencies,
+  );
   bool _disposed = false;
 
   @override
@@ -48,7 +48,13 @@ class _MainRouteHostState extends State<MainRouteHost> {
       guest = false;
     }
     if (_disposed || !mounted) return;
-    setState(() => _parts = _MainParts(widget.dependencies, guest));
+    setState(
+      () => _parts = MainComposition.create(
+        dependencies: widget.dependencies.main,
+        analytics: widget.dependencies.analytics,
+        isGuest: guest,
+      ),
+    );
   }
 
   @override
@@ -65,41 +71,10 @@ class _MainRouteHostState extends State<MainRouteHost> {
     return MainShell(
       shell: parts.shell,
       home: parts.home,
-      navigator: _RouterNavigator(context, widget.dependencies),
+      navigator: _navigator,
       toast: widget.dependencies.main.toast,
       aiCardBuilder: widget.dependencies.main.aiCardBuilder,
     );
-  }
-}
-
-class _MainParts {
-  _MainParts(AppDependencies d, bool guest) {
-    final main = d.main;
-    banners = BannerListController(repository: main.bannerRepository);
-    home = HomeViewModel(
-      home: main.homeRepository,
-      todayPost: main.todayPostRepository,
-      banners: banners,
-      isGuest: guest,
-      toast: main.toast,
-      preloadCache: main.preloadCache,
-    );
-    shell = MainShellViewModel(
-      guard: GuestGuard(isGuest: guest, toast: main.toast),
-      analytics: d.analytics,
-      uploadGate: UploadEntryGate(todayPost: main.todayPostRepository),
-      toast: main.toast,
-    );
-  }
-
-  late final BannerListController banners;
-  late final HomeViewModel home;
-  late final MainShellViewModel shell;
-
-  void dispose() {
-    shell.dispose();
-    home.dispose();
-    banners.dispose();
   }
 }
 
