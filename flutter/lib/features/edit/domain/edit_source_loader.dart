@@ -1,6 +1,9 @@
+import '../../../core/constants/app_constants.dart';
+
 import 'dart:typed_data';
 
 import 'image_codec.dart';
+import 'photo_edit_constants.dart';
 import 'rgba_image.dart';
 
 /// 편집기에 넘기는 원본. [preview]는 EXIF 방향이 반영된 정방향 이미지로 긴 변 1440 px 이내이다.
@@ -31,5 +34,30 @@ class DecodingEditSourceLoader implements EditSourceLoader {
   final ImageDecoder decoder;
 
   @override
-  Future<EditSource> load(Uint8List bytes) => throw UnimplementedError();
+  Future<EditSource> load(Uint8List bytes) async {
+    final bounds = await decoder.readBounds(bytes);
+    final edit = _fit(
+      bounds.width,
+      bounds.height,
+      AppConstants.postImageMaxLongEdge,
+    );
+    final preview = _fit(edit.$1, edit.$2, PhotoEditConstants.previewLongEdge);
+    final image = await decoder.decode(
+      bytes,
+      width: preview.$1,
+      height: preview.$2,
+    );
+    return EditSource(preview: image, width: edit.$1, height: edit.$2);
+  }
+
+  /// 긴 변이 [limit] 이하가 되도록 줄인다(확대하지 않는다).
+  static (int, int) _fit(int width, int height, int limit) {
+    final longEdge = width > height ? width : height;
+    if (longEdge <= limit) return (width, height);
+    final scale = limit / longEdge;
+    return (
+      (width * scale).round().clamp(1, limit),
+      (height * scale).round().clamp(1, limit),
+    );
+  }
 }
