@@ -141,6 +141,56 @@ void main() {
       expect(r.home.state.hasUnread, isFalse);
     });
 
+    fakeTest('TC-NOTI-055 미읽음 조회가 401이면 세션 갱신 후 한 번 다시 보내 반영한다', (async) {
+      final r = HomeRig();
+      r.loadHome(async);
+      expect(r.home.state.hasUnread, isFalse);
+      r.api.refreshSucceeds();
+      r.api.unread([
+        fx('notification/unread-status__unauthorized.json'),
+        fx('notification/unread-status__true.json'),
+      ]);
+      final before = r.api.unreadCalls;
+      r.home.refreshUnread();
+      advance(async, _wait);
+      expect(r.http.adapter.count('POST', '$v1/auth/refresh'), 1);
+      expect(r.api.unreadCalls - before, 2, reason: '갱신 뒤 정확히 1회 재전송');
+      expect(r.home.state.hasUnread, isTrue);
+    });
+
+    fakeTest('TC-NOTI-055 갱신이 REAUTH면 세션이 지워지고 점은 그대로이며 토스트가 없다', (async) {
+      final r = HomeRig();
+      r.loadHome(async);
+      r.http.adapter.on('POST', '$v1/auth/refresh', [
+        fx('auth/refresh__reauthentication-required.json'),
+      ]);
+      r.api.unread([fx('notification/unread-status__unauthorized.json')]);
+      r.home.refreshUnread();
+      advance(async, _wait);
+      expect(r.http.clearedReasons, isNotEmpty, reason: '로그인 화면으로 가는 신호');
+      expect(r.home.state.hasUnread, isFalse);
+      expect(r.toast.messages, isEmpty);
+    });
+
+    fakeTest('TC-NOTI-053 화면(계정)이 사라진 뒤 늦게 온 미읽음 응답은 반영되지 않는다', (async) {
+      final r = HomeRig();
+      r.api.unread([fx('home/notifications-unread-status__true.json')]);
+      r.loadHome(async);
+      expect(r.home.state.hasUnread, isTrue);
+      r.api.unread([
+        fx(
+          'home/notifications-unread-status__false.json',
+          delay: const Duration(seconds: 2),
+        ),
+      ]);
+      r.home.refreshUnread();
+      settle(async);
+      final notified = r.homeStates.length;
+      r.home.dispose();
+      advance(async, _wait);
+      expect(r.homeStates.length, notified, reason: '폐기된 VM은 늦은 응답으로 갱신되지 않는다');
+    });
+
     fakeTest('TC-HOME-052 미읽음 조회가 실패하면 직전 값을 유지하고 토스트·오류가 없다', (async) {
       final r = HomeRig();
       r.api.unread([
