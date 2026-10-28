@@ -1,5 +1,6 @@
+import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 import type { PushPermissionGateway, PushPermissionStatus } from '../PushPermissionGateway';
 import { ensureAndroidChannel } from './expoNotificationSetup';
@@ -30,5 +31,24 @@ export class ExpoPushPermissionGateway implements PushPermissionGateway {
         ios: { allowAlert: true, allowBadge: true, allowSound: true },
       }),
     );
+  }
+
+  /**
+   * 시스템 설정을 연다. Android는 앱의 알림 설정 화면으로 바로 보내고(없는 기기나 실패하면),
+   * iOS와 그 밖에는 앱 설정(`Linking.openSettings()`)으로 보낸다.
+   */
+  async openSystemSettings(): Promise<void> {
+    const packageName = Constants.expoConfig?.android?.package;
+    if (Platform.OS === 'android' && packageName) {
+      try {
+        await Linking.sendIntent('android.settings.APP_NOTIFICATION_SETTINGS', [
+          { key: 'android.provider.extra.APP_PACKAGE', value: packageName },
+        ]);
+        return;
+      } catch {
+        // 알림 설정 화면을 열 수 없으면 일반 앱 설정으로 넘어간다.
+      }
+    }
+    await Linking.openSettings();
   }
 }

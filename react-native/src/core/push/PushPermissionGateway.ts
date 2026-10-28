@@ -8,4 +8,6 @@ export interface PushPermissionGateway {
   status(): Promise<PushPermissionStatus>;
   /** OS 권한 대화상자를 띄운다. 호출 자체가 실패하면 reject한다. */
   request(): Promise<PushPermissionStatus>;
+  /** 시스템 알림 설정 화면(앱 설정)을 연다. 설정 탭에서 권한이 꺼진 상태로 스위치를 켤 때 쓴다(REQ-SET-015). */
+  openSystemSettings(): Promise<void>;
 }

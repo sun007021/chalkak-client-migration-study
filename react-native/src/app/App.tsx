@@ -10,7 +10,7 @@ import { LoginScreen } from '../features/auth/LoginScreen';
 import { ConfigErrorScreen } from '../features/config/ConfigErrorScreen';
 import { RnLegalDocWebView } from '../features/onboarding/RnLegalDocWebView';
 import { SignUpRoute } from '../features/onboarding/SignUpRoute';
-import { AppContainer, type Dependencies } from './AppContainer';
+import { AppContainer, type ContainerOverrides } from './AppContainer';
 import { AppContainerProvider, useAppContainer } from './AppContainerContext';
 import { BootHost } from './BootHost';
 import { RootNavigator } from './RootNavigator';
@@ -20,7 +20,7 @@ type AppProps = {
   /** 앱 루트(`index.ts`)가 `readAppConfig()`로 읽은 결과. 이 컴포넌트는 전역을 읽지 않는다. */
   configResult: AppConfigResult;
   /** 앱 루트가 읽은 기능 플래그·앱 정보, 또는 테스트의 fake를 주입한다. */
-  overrides?: Partial<Dependencies>;
+  overrides?: ContainerOverrides;
 };
 
 export function App({ configResult, overrides }: AppProps) {

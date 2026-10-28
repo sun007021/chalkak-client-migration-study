@@ -21,9 +21,9 @@ const config: ExpoConfig = {
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'light',
-  ios: { bundleIdentifier: 'com.chalkak.study.rn', supportsTablet: false },
+  ios: { bundleIdentifier: 'com.stonefive.chalkak', supportsTablet: false },
   android: {
-    package: 'com.chalkak.study.rn',
+    package: 'com.stonefive.chalkak',
     // FCM 푸시: Firebase 콘솔의 google-services.json 경로를 환경변수로 준다(커밋 금지). 없으면 Android 푸시 토큰을 받지 못한다.
     ...(process.env.GOOGLE_SERVICES_JSON
       ? { googleServicesFile: process.env.GOOGLE_SERVICES_JSON }
