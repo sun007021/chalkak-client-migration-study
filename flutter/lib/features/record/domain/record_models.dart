@@ -25,3 +25,8 @@ class RecordPhoto {
   bool get isApproved => status == RecordPhotoStatus.approved;
   bool get isPending => status == RecordPhotoStatus.pending;
 }
+
+extension RecordMonthLabel on KstMonth {
+  /// 'yyyy년 M월'(예: 2026년 10월). 기록 헤더와 저장 이미지 제목이 같이 쓴다.
+  String get recordLabel => '$year년 $month월';
+}

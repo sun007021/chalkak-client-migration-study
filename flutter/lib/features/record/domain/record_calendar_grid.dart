@@ -11,7 +11,17 @@ class RecordCalendarGrid {
 
   final KstMonth month;
 
-  int get leadingBlanks => throw UnimplementedError();
-  int get rowCount => throw UnimplementedError();
-  List<KstDate?> get cells => throw UnimplementedError();
+  int get leadingBlanks => month.firstDate.weekdayIndex;
+
+  int get rowCount => ((leadingBlanks + month.daysInMonth) / 7).ceil();
+
+  List<KstDate?> get cells {
+    final days = month.daysInMonth;
+    return List<KstDate?>.generate(rowCount * 7, (index) {
+      final day = index - leadingBlanks + 1;
+      return day < 1 || day > days
+          ? null
+          : KstDate(month.year, month.month, day);
+    }, growable: false);
+  }
 }

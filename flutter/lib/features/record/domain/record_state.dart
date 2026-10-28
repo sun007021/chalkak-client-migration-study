@@ -61,21 +61,33 @@ class RecordState {
   final bool isPendingTooltipOpen;
 
   /// 선택한 달의 격자.
-  RecordCalendarGrid get grid => throw UnimplementedError();
+  RecordCalendarGrid get grid => RecordCalendarGrid(selectedMonth);
 
   /// 'yyyy년 M월'(예: 2026년 10월). 형식은 spec에 없어 구현 재량이다.
-  String get monthLabel => throw UnimplementedError();
+  String get monthLabel => selectedMonth.recordLabel;
 
   /// [content]가 [RecordReady]일 때 [date]의 사진, 아니면 null.
-  RecordPhoto? photoOn(KstDate date) => throw UnimplementedError();
+  RecordPhoto? photoOn(KstDate date) {
+    final content = this.content;
+    if (content is! RecordReady) return null;
+    for (final photo in content.photos) {
+      if (photo.topicDate == date) return photo;
+    }
+    return null;
+  }
 
-  RecordPhoto? get selectedPhoto => throw UnimplementedError();
+  RecordPhoto? get selectedPhoto {
+    final date = selectedDate;
+    return date == null ? null : photoOn(date);
+  }
 
   /// 선택지의 가장 오래된 달이면 false(REQ-REC-005).
-  bool get canGoPrevious => throw UnimplementedError();
+  bool get canGoPrevious =>
+      availableMonths.any((m) => m.compareTo(selectedMonth) < 0);
 
   /// 선택지의 가장 최신 달이면 false.
-  bool get canGoNext => throw UnimplementedError();
+  bool get canGoNext =>
+      availableMonths.any((m) => m.compareTo(selectedMonth) > 0);
 }
 
 /// 화면 밖(셸·라우터)에 요청하는 일회성 이동. 이동에서 돌아오면 화면이 [RecordViewModel.enter]로
