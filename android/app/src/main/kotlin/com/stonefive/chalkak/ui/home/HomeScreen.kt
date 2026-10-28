@@ -25,10 +25,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -385,7 +381,7 @@ private fun HeroEmpty(topic: String, onUpload: () -> Unit) {
                 .testTag("home.hero-upload-button"),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Filled.Add, contentDescription = null, tint = ChalkakTheme.colors.onActionPrimary, modifier = Modifier.size(24.dp))
+            Icon(painterResource(R.drawable.ic_plus), contentDescription = null, tint = ChalkakTheme.colors.onActionPrimary, modifier = Modifier.size(24.dp))
         }
     }
 }
@@ -593,7 +589,7 @@ private fun RankingCard(post: HomePost, prefix: String, callbacks: HomeCallbacks
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = if (post.isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    painter = painterResource(if (post.isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline),
                     contentDescription = null,
                     tint = if (post.isLiked) ChalkakTheme.colors.destructive else ChalkakTheme.colors.textInactive,
                     modifier = Modifier.size(16.dp),
