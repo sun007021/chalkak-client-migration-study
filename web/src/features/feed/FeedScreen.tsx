@@ -12,7 +12,7 @@ import { useScrollRestore } from '../../core/ui/useScrollRestore';
 import { LikeButton } from '../like/LikeButton';
 import type { FeedPost, FeedState, FeedViewModel } from './FeedViewModel';
 import { planFeedClose, readFeedSeed } from './feedNavigation';
-import { MAX_ZOOM, clampPan, clampZoomScale, pinchScale, releaseZoom, zoomAroundPoint } from './photoZoom';
+import { MAX_ZOOM, clampZoomScale, pinchScale, releaseZoom, zoomAroundPoint } from './photoZoom';
 import type { Point } from './photoZoom';
 
 /**
@@ -160,7 +160,7 @@ function ZoomablePhoto({ post }: { post: FeedPost }): ReactNode {
   const content: CSSProperties = {
     position: 'relative',
     transformOrigin: 'center',
-    transform: `translate(${clampPan(zoom.translate, zoom.scale, frameSize()).x}px, ${clampPan(zoom.translate, zoom.scale, frameSize()).y}px) scale(${Math.min(zoom.scale, MAX_ZOOM)})`,
+    transform: `translate(${zoom.translate.x}px, ${zoom.translate.y}px) scale(${Math.min(zoom.scale, MAX_ZOOM)})`,
   };
   return (
     <div

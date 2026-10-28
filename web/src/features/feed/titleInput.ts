@@ -2,9 +2,7 @@ import { POST_TITLE_MAX } from '../../constants';
 
 /** Unicode code point 수(결합 이모지는 구성 code point 수만큼, D-01). */
 export function countCodePoints(text: string): number {
-  let count = 0;
-  for (const _ of text) count += 1;
-  return count;
+  return Array.from(text).length;
 }
 
 /**
