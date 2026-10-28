@@ -29,6 +29,13 @@ export abstract class ViewModel<S> {
     for (const listener of [...this.listeners]) listener();
   }
 
+  /** 상태 전체를 바꾼다(판별 유니온에서 다른 갈래로 옮길 때 이전 갈래의 키가 남지 않게). */
+  protected replaceState(next: S): void {
+    this.current = next;
+    if (this.disposed) return;
+    for (const listener of [...this.listeners]) listener();
+  }
+
   /** 구독자·타이머 정리. */
   dispose(): void {
     this.disposed = true;
