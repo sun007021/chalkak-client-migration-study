@@ -10,6 +10,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.lifecycle.Lifecycle
 import com.stonefive.chalkak.testing.AiHarness
 import com.stonefive.chalkak.testing.TODAY
 import com.stonefive.chalkak.testing.TestApp
@@ -334,6 +335,34 @@ class AiReviewRouteTest {
         assertEquals(2, h.repo.getCount)
         assertEquals(0, h.repo.postCount)
         tag("feed.ai-request-button").assertIsDisplayed()
+    }
+
+    @Test
+    fun `TC-AIR-042 앱이 백그라운드로 가면 늦게 온 GET 응답은 버려지고 돌아오면 GET 부터 다시 시작한다`() {
+        val gate = CompletableDeferred<Unit>()
+        h.repo.scriptGet(FakeAiReviewRepository.Step(ok(AiReviews.completed()), gate))
+        val holder = h.holder()
+        show(holder)
+        rule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        gate.complete(Unit)
+        rule.waitForIdle()
+        assertNull(holder.state.value.review)
+        h.repo.script(ok(AiReviews.completed()))
+        rule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        rule.waitForIdle()
+        assertEquals(2, h.repo.getCount)
+        assertEquals(0, h.repo.postCount)
+        tag("feed.ai-result-button").assertIsDisplayed()
+    }
+
+    @Test
+    fun `TC-AIR-042 Activity 를 다시 만드는 회전은 숨김으로 치지 않아 GET 을 다시 보내지 않는다`() {
+        val holder = h.holder()
+        show(holder)
+        assertEquals(1, h.repo.getCount)
+        rule.activityRule.scenario.recreate()
+        rule.waitForIdle()
+        assertEquals(1, h.repo.getCount)
     }
 
     // ---- sheets and system back --------------------------------------------------------------------------------------------------

@@ -33,6 +33,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -255,7 +256,8 @@ private fun ResultSheet(content: AiResultUi, callbacks: AiReviewCallbacks) {
                         .testTag("ai-result-sheet.overall-score")
                         .semantics { contentDescription = copy.format(content.scoreA11yCopyKey, "X" to content.scoreText) },
                 )
-                Text("/ 10", style = MaterialTheme.typography.bodyMedium, color = colors.textNeutral, modifier = Modifier.padding(start = 6.dp))
+                // No ko.json key for the bare "/ 10" denominator; the score's own description already says "10점 만점", so hide it from TalkBack.
+                Text("/ 10", style = MaterialTheme.typography.bodyMedium, color = colors.textNeutral, modifier = Modifier.padding(start = 6.dp).clearAndSetSemantics {})
                 Spacer(Modifier.weight(1f))
                 Box(
                     Modifier

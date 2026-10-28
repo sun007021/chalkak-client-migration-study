@@ -1,6 +1,7 @@
 package com.stonefive.chalkak.ui.aireview
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -9,6 +10,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import com.stonefive.chalkak.ui.components.ScreenGoneEffect
 import kr.chalkak.feature.aireview.AiReviewEffect
 import kr.chalkak.feature.aireview.AiReviewStateHolder
@@ -46,6 +50,7 @@ fun AiReviewRoute(
         onDispose { }
     }
     LaunchedEffect(holder, target) { holder.setTarget(target) }
+    BackgroundEffect(holder)
     ScreenGoneEffect(holder) {
         holder.onScreenHidden()
         if (finishOnLeave) holder.onCleared()
@@ -64,4 +69,32 @@ fun AiReviewRoute(
         )
     }
     AiReviewSection(state, callbacks, modifier, layout)
+}
+
+/**
+ * The app going to the background counts as leaving (TC-AIR-042: polling stops, late answers are dropped) and coming back as
+ * entering again (GET first, TC-AIR-061). Not for a recreation of the Activity (rotation): the holder's in-flight work goes on.
+ */
+@Composable
+private fun BackgroundEffect(holder: AiReviewStateHolder) {
+    val activity = LocalActivity.current
+    val owner = activity as? LifecycleOwner ?: return
+    DisposableEffect(holder, owner) {
+        var stopped = false
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> if (activity?.isChangingConfigurations != true) {
+                    stopped = true
+                    holder.onScreenHidden()
+                }
+                Lifecycle.Event.ON_START -> if (stopped) {
+                    stopped = false
+                    holder.onScreenShown()
+                }
+                else -> Unit
+            }
+        }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
+    }
 }
