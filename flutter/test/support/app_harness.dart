@@ -8,6 +8,8 @@ import 'package:chalkak/features/auth/domain/user_data_cleaner.dart';
 import 'package:chalkak/features/boot/domain/auth_gate.dart';
 import 'package:chalkak/features/boot/domain/pending_navigation.dart';
 import 'package:chalkak/features/boot/domain/update_gate.dart';
+import 'package:chalkak/features/notification/data/push_platform.dart';
+import 'package:chalkak/features/notification/notification_dependencies.dart';
 import 'package:chalkak/features/onboarding/data/api_sign_up_repository.dart';
 import 'package:chalkak/features/onboarding/domain/sign_up_context.dart';
 import 'package:chalkak/features/onboarding/domain/sign_up_use_case.dart';
@@ -20,6 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'auth_fakes.dart';
 import 'fake_analytics_tracker.dart';
 import 'home_fakes.dart';
+import 'notification_fakes.dart';
 import 'onboarding_fakes.dart';
 
 export 'ui_helpers.dart';
@@ -88,6 +91,16 @@ class AppHarness {
       externalLinkLauncher: externalLinks,
       legalWebViewBuilder: fakeLegalWebView,
       main: homeFakes.dependencies,
+      notification: buildNotificationDependencies(
+        repository: notificationRepository,
+        devices: pushDevices,
+        sessions: http.sessions,
+        refresher: FakeSessionRefresher(),
+        platform: const PushPlatform.disabled(),
+        pendingStore: FakePendingPushStore(),
+        promptFlag: FakePermissionFlag(),
+        toast: homeFakes.dependencies.toast,
+      ),
     );
   }
 
@@ -97,6 +110,9 @@ class AppHarness {
   final FakeUpdateLauncher launcher = FakeUpdateLauncher();
   final FakeHomePreloader preloader = FakeHomePreloader();
   final FakePushRegistrar push = FakePushRegistrar();
+  final FakeNotificationRepository notificationRepository =
+      FakeNotificationRepository();
+  final FakePushDeviceRepository pushDevices = FakePushDeviceRepository();
   final FakeUserDataCleaner userData = FakeUserDataCleaner();
   final FakeSocialLoginClient kakao = FakeSocialLoginClient();
   final FakeAnalyticsTracker analytics = FakeAnalyticsTracker();

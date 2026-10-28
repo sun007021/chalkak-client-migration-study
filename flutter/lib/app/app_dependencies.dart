@@ -9,6 +9,7 @@ import '../features/boot/domain/home_preloader.dart';
 import '../features/boot/domain/pending_navigation.dart';
 import '../features/boot/domain/update_gate.dart';
 import '../features/navigation/main_dependencies.dart';
+import '../features/notification/notification_dependencies.dart';
 import '../features/onboarding/domain/legal_document.dart';
 import '../features/onboarding/domain/sign_up_context.dart';
 import '../features/onboarding/domain/sign_up_use_case.dart';
@@ -42,6 +43,7 @@ class AppDependencies {
     required this.externalLinkLauncher,
     required this.legalWebViewBuilder,
     required this.main,
+    required this.notification,
   });
 
   final SessionManager sessions;
@@ -65,4 +67,7 @@ class AppDependencies {
   final ExternalLinkLauncher externalLinkLauncher;
   final LegalWebViewBuilder legalWebViewBuilder;
   final MainDependencies main;
+
+  /// 알림함·푸시(탭 처리, 기기 등록, 수신). [pushRegistrar]는 `notification.registrar`다.
+  final NotificationDependencies notification;
 }

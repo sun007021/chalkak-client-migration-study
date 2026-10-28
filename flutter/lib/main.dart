@@ -5,8 +5,9 @@ import 'app/app_dependencies_factory.dart';
 import 'app/chalkak_app.dart';
 import 'core/config/app_config.dart';
 import 'core/copy/ko.g.dart';
+import 'features/notification/data/push_platform.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final AppConfig config;
   try {
@@ -16,8 +17,10 @@ void main() {
     runApp(const _ConfigErrorApp());
     return;
   }
-  KakaoSdk.init(nativeAppKey: config.kakaoNativeAppKey);
-  runApp(ChalkakApp(dependencies: buildAppDependencies(config)));
+  await KakaoSdk.init(nativeAppKey: config.kakaoNativeAppKey);
+  // Firebase 설정이 없거나 초기화가 실패하면 푸시가 꺼진 채로 뜬다(로그 한 번).
+  final push = await PushPlatform.initialize(config: config.firebase);
+  runApp(ChalkakApp(dependencies: buildAppDependencies(config, push: push)));
 }
 
 /// `--dart-define`이 빠졌을 때 보이는 화면. 원인은 로그에 남는다.

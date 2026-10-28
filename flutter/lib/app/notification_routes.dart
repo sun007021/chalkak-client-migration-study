@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/analytics/analytics_constants.dart';
 import '../core/ui/toast/toast_host.dart';
 import '../features/feed/domain/feed_target.dart';
-import '../features/navigation/domain/main_shell_view_model.dart';
 import '../features/navigation/main_composition.dart';
 import '../features/notification/domain/notification_navigator.dart';
 import '../features/notification/presentation/notification_detail_screen.dart';
@@ -157,23 +157,24 @@ class RouterNotificationNavigator implements NotificationNavigator {
   final MainComposition? Function() parts;
 
   /// 게시물 상세 라우트를 만든다(세션에서 userId를 읽는다). 만들 수 없으면 null.
-  final Future<Route<void>?> Function(
+  final Future<PageRoute<void>?> Function(
     FeedTarget target, {
     required bool openAiFeedback,
   })
   feedRouteBuilder;
 
   /// 스택에 있는 알림함 라우트.
-  Route<void>? _inbox;
+  PageRoute<void>? _inbox;
 
-  NavigatorState? get _navigator => context.mounted ? Navigator.of(context) : null;
+  NavigatorState? get _navigator =>
+      context.mounted ? Navigator.of(context) : null;
 
   /// 메인 셸 위에 쌓이는 화면의 이름. 맨 위 라우트가 같은 대상인지 알아보는 데 쓴다.
   static String feedName(String postId) => 'feed:$postId';
   static String detailName(String id) => 'notification-detail:$id';
   static const String inboxName = 'notifications';
 
-  Route<void> _inboxRoute() => MaterialPageRoute<void>(
+  PageRoute<void> _inboxRoute() => MaterialPageRoute<void>(
     settings: const RouteSettings(name: inboxName),
     builder: (_) => InboxRoute(dependencies: dependencies),
   );
@@ -230,7 +231,10 @@ class RouterNotificationNavigator implements NotificationNavigator {
   }) async {
     final navigator = _navigator;
     if (navigator == null) return;
-    final route = await feedRouteBuilder(target, openAiFeedback: openAiFeedback);
+    final route = await feedRouteBuilder(
+      target,
+      openAiFeedback: openAiFeedback,
+    );
     if (route == null || !context.mounted) return;
     _openAbove(navigator, route, name: feedName(target.postId));
   }
@@ -252,7 +256,7 @@ class RouterNotificationNavigator implements NotificationNavigator {
   /// 팝업을 닫고, 맨 위가 같은 대상이면 교체하고 아니면 쌓는다. 닫히면 알림함을 조용히 갱신한다.
   void _openAbove(
     NavigatorState navigator,
-    Route<void> route, {
+    PageRoute<void> route, {
     required String name,
   }) {
     navigator.popUntil((route) => route is PageRoute);
@@ -261,9 +265,7 @@ class RouterNotificationNavigator implements NotificationNavigator {
       top = route;
       return true;
     });
-    unawaited(
-      route.completed.then<void>((_) => _onReturned()),
-    );
+    unawaited(route.completed.then<void>((_) => _onReturned()));
     if (top?.settings.name == name) {
       unawaited(navigator.pushReplacement(route));
     } else {

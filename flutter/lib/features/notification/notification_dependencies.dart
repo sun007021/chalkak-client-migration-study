@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../../core/auth/session_manager.dart';
 import '../../core/ui/toast/toast_controller.dart';
+import '../feed/domain/feed_target.dart';
 import 'data/push_platform.dart';
 import 'domain/notification_navigator.dart';
 import 'domain/notification_permission_prompt.dart';
@@ -15,7 +16,6 @@ import 'domain/push_foreground_handler.dart';
 import 'domain/push_tap_coordinator.dart';
 import 'domain/session_refresher.dart';
 import 'domain/unread_refresher.dart';
-import '../feed/domain/feed_target.dart';
 
 /// 나중에 연결되는 호출 대상. 앱이 사는 동안 있는 객체(탭 처리기, 등록기)가 화면이 만드는 ViewModel을 부를 때 쓴다.
 /// [attach]한 소유자만 [detach]할 수 있어 늦게 닫히는 화면이 새 화면의 연결을 끊지 못한다.
@@ -146,9 +146,7 @@ class NotificationDependencies {
 
   /// 앱 시작·포그라운드 복귀 때. 실패는 무시한다.
   void registerDevice() {
-    unawaited(
-      registrar.registerCurrentDevice().catchError((Object _) {}),
-    );
+    unawaited(registrar.registerCurrentDevice().catchError((Object _) {}));
   }
 }
 
