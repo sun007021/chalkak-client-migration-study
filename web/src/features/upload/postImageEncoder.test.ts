@@ -37,7 +37,7 @@ describe('encodePostImage 품질 사다리 (REQ-UPL-030, TC-UPL-037)', () => {
   });
 
   it('TC-UPL-037 같은 라운드에서는 크기를 바꾸지 않고 품질만 낮춘다', async () => {
-    const compressor = laddered({ 40: 10 });
+    const compressor = laddered({ 40: 100 });
     await encodePostImage({ image: image(1600, 1200), compressor, maxBytes: MAX, signal: signal() });
     expect(compressor.attempts()).toEqual([
       [1600, 1200, 90],
@@ -73,14 +73,14 @@ describe('encodePostImage 크기 축소 라운드 (REQ-UPL-031, 032, TC-UPL-038,
   });
 
   it('TC-UPL-034 긴 변이 4096을 넘는 이미지는 첫 시도부터 4096 이하로 줄인 크기로 압축한다(8000×6000 → 4096×3072)', async () => {
-    const compressor = laddered({ 90: 10 });
+    const compressor = laddered({ 90: 100 });
     const result = await encodePostImage({ image: image(8000, 6000), compressor, maxBytes: MAX, signal: signal() });
     expect(compressor.calls[0]).toMatchObject({ width: 4096, height: 3072 });
     expect(result).toMatchObject({ width: 4096, height: 3072 });
   });
 
   it('TC-UPL-034 작은 이미지는 확대하지 않는다', async () => {
-    const compressor = laddered({ 90: 10 });
+    const compressor = laddered({ 90: 100 });
     await encodePostImage({ image: image(1000, 500), compressor, maxBytes: MAX, signal: signal() });
     expect(compressor.calls[0]).toMatchObject({ width: 1000, height: 500 });
   });
@@ -107,7 +107,7 @@ describe('encodePostImage 크기 축소 라운드 (REQ-UPL-031, 032, TC-UPL-038,
 
   it('TC-UPL-038 인코딩한 입력 이미지는 release하지 않는다(소유자가 놓는다)', async () => {
     const input = image();
-    await encodePostImage({ image: input, compressor: laddered({ 90: 10 }), maxBytes: MAX, signal: signal() });
+    await encodePostImage({ image: input, compressor: laddered({ 90: 100 }), maxBytes: MAX, signal: signal() });
     expect(input.released).toBe(false);
   });
 });
@@ -150,7 +150,7 @@ describe('encodePostImage 취소 (TC-UPL-046)', () => {
   it('TC-UPL-046 이미 취소된 signal이면 압축을 시작하지 않고 AbortError로 거절한다', async () => {
     const controller = new AbortController();
     controller.abort();
-    const compressor = laddered({ 90: 10 });
+    const compressor = laddered({ 90: 100 });
     await expect(encodePostImage({ image: image(), compressor, maxBytes: MAX, signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' });
     expect(compressor.compressCount).toBe(0);
   });
