@@ -21,6 +21,13 @@ class RootSession {
     var navigationVersion by mutableIntStateOf(0)
         private set
 
+    /**
+     * Identifies the main area's holders (home, ...). A new login starts a new value, so an account never sees the previous account's
+     * holders; boot straight into the main area keeps the initial value.
+     */
+    var mainEpoch by mutableIntStateOf(0)
+        private set
+
     /** New value per login attempt that ends in the terms screen: fresh terms, pad and signup holders (consent is memory-only, D-25). */
     var signupAttempt by mutableIntStateOf(0)
         private set
@@ -47,6 +54,11 @@ class RootSession {
         navigation = next
         next.start()
         navigationVersion++
+    }
+
+    /** The login screen is on: whatever main area follows belongs to a new session. */
+    fun newMainSession() {
+        mainEpoch++
     }
 
     fun beginSignupAttempt() {

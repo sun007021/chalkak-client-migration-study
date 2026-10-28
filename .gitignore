@@ -2,6 +2,8 @@
 *.xcconfig
 !*.example.xcconfig
 !ios/App/Config/App.xcconfig
+!flutter/ios/Flutter/Debug.xcconfig
+!flutter/ios/Flutter/Release.xcconfig
 local.properties
 GoogleService-Info.plist
 google-services.json
