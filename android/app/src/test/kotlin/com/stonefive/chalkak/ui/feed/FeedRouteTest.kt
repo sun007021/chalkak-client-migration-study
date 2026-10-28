@@ -241,11 +241,14 @@ class FeedRouteTest {
     fun `TC-FEED-035 삭제를 확인하면 진행 표시와 함께 요청이 한 번 나가고 성공하면 삭제 결과를 알린다`() {
         val gate = gated(ApiResult.Success(Unit))
         h.repo.deletes.enqueue(POST_MINE, gate)
-        showMine()
+        val holder = showMine()
         tag("feed.delete-button").performClick()
         rule.waitForIdle()
 
-        repeat(2) { tag("feed.delete-confirm-button").performClick() }
+        // The dialog closes with the first tap, so a second tap on the button is impossible; a second confirmation
+        // (a double event before the UI caught up) must still not send another request.
+        tag("feed.delete-confirm-button").performClick()
+        holder.onDeleteConfirmed()
         rule.waitForIdle()
 
         count("feed.delete-dialog").assertCountEquals(0)

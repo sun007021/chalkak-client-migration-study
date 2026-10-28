@@ -53,6 +53,7 @@ import com.stonefive.chalkak.ui.issue.IssueWebView
 import com.stonefive.chalkak.ui.main.MainDependencies
 import com.stonefive.chalkak.ui.main.UploadEntryGate
 import kr.chalkak.core.common.analytics.AnalyticsTracker
+import kr.chalkak.core.data.post.CurrentUser
 import kr.chalkak.core.data.post.DefaultPostRepository
 import kr.chalkak.core.data.post.LikeController
 import kr.chalkak.core.data.post.PostChanges
@@ -64,6 +65,15 @@ import kr.chalkak.feature.home.ExternalLinkOpener
 import kr.chalkak.feature.home.HomeStateHolder
 import kr.chalkak.feature.home.LikeControllerToggler
 import kr.chalkak.feature.navigation.AccessMode
+import kr.chalkak.core.common.KstCalendar
+import kr.chalkak.core.network.Session
+import kr.chalkak.core.network.StoredSession
+import kr.chalkak.feature.display.DisplayStateHolder
+import kr.chalkak.feature.display.FeedEntry
+import kr.chalkak.feature.display.FeedStateHolder
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+import kr.chalkak.core.data.post.PostSort
 import kr.chalkak.core.network.ApiBaseUrl
 import kr.chalkak.core.network.ApiBaseUrlResult
 import kr.chalkak.core.network.ApiClient
@@ -101,7 +111,10 @@ class AppContainer(
     }
 
     private val persistentSessionStore = PersistentSessionStore(secureStorage)
-    val sessionStore: SessionStore get() = persistentSessionStore
+
+    /** The stored session, remembering the user id of the last read/write so [currentUser] can answer without suspending. */
+    private val trackedSessionStore = UserTrackingSessionStore(persistentSessionStore)
+    val sessionStore: SessionStore get() = trackedSessionStore
     val guestFlagStore: GuestFlagStore get() = persistentSessionStore
 
     // A SharedFlow, not a Channel: BootGate and the navigation shell both collect, and every collector must see every event
@@ -175,6 +188,24 @@ class AppContainer(
             postChanges.reset()
         }
     }
+
+    /** Who is logged in (`null` = guest / unknown yet). Primed from secure storage in the background, then kept by every session read/write. */
+    val currentUser: CurrentUser by lazy {
+        applicationScope.launch { runCatching { trackedSessionStore.read() } }
+        CurrentUser { trackedSessionStore.userId }
+    }
+
+    private val kstCalendar: KstCalendar by lazy { KstCalendar(clock) }
+
+    /** Holder for the exhibition tab; [scope] is the owner's (ViewModel) scope. */
+    fun newDisplayHolder(scope: CoroutineScope, initialDate: LocalDate? = null, initialSort: PostSort? = null): DisplayStateHolder =
+        DisplayStateHolder(
+            scope, postRepository, likeController, postChanges, currentUser, kstCalendar, platform.analytics, initialDate, initialSort,
+        )
+
+    /** Holder for one post detail. */
+    fun newFeedHolder(scope: CoroutineScope, entry: FeedEntry): FeedStateHolder =
+        FeedStateHolder(scope, postRepository, likeController, postChanges, currentUser, kstCalendar, platform.analytics, entry)
 
     /** BootGate state is touched on the main thread only (its contract). Created on first use. */
     private val mainScope: CoroutineScope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
@@ -288,5 +319,31 @@ class AppContainer(
                 .components { add(OkHttpNetworkFetcherFactory(callFactory = { base })) }
                 .build(),
         )
+    }
+}
+
+/** Decorates the session store with a synchronous view of the signed-in user id (`CurrentUser` is not suspending). */
+internal class UserTrackingSessionStore(private val delegate: SessionStore) : SessionStore {
+    @Volatile
+    var userId: String? = null
+        private set
+
+    override suspend fun read(): StoredSession = delegate.read().also(::track)
+
+    override suspend fun write(session: Session) {
+        delegate.write(session)
+        userId = session.userId
+    }
+
+    override suspend fun clear() {
+        try {
+            delegate.clear()
+        } finally {
+            userId = null
+        }
+    }
+
+    private fun track(stored: StoredSession) {
+        userId = (stored as? StoredSession.User)?.session?.userId
     }
 }
