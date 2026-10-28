@@ -10,7 +10,7 @@ function setup() {
 }
 
 describe('ToastController', () => {
-  it('REQ-NET-030 TC-TIME-030 토스트는 2.5초 동안 보였다가 사라진다(실제로 기다리지 않는다)', async () => {
+  it('REQ-NET-030 TC-TIME-030 TC-NAV-025 토스트는 2.5초 동안 보였다가 사라진다(실제로 기다리지 않는다)', async () => {
     const { clock, toast } = setup();
     toast.show('저장했어요');
     expect(toast.state.toast?.message).toBe('저장했어요');
@@ -21,7 +21,7 @@ describe('ToastController', () => {
     expect(clock.pendingTimers).toBe(0);
   });
 
-  it('REQ-NET-030 같은 문구가 연달아 나와도 고유 ID가 달라 다시 표시되고 타이머가 처음부터 시작한다', async () => {
+  it('REQ-NET-030 TC-NAV-026 같은 문구가 연달아 나와도 고유 ID가 달라 다시 표시되고 타이머가 처음부터 시작한다', async () => {
     const { clock, toast } = setup();
     toast.show('같은 문구');
     const first = toast.state.toast!;
@@ -36,6 +36,18 @@ describe('ToastController', () => {
     expect(toast.state.toast).toBeNull();
   });
 
+  it('TC-NAV-027 떠 있는 토스트가 있을 때 다른 문구를 요청하면 교체되고 이전 문구의 타이머가 새 문구를 일찍 지우지 않는다', async () => {
+    const { clock, toast } = setup();
+    toast.show('첫 문구');
+    await clock.advance(2_000);
+    toast.show('다른 문구');
+    expect(toast.state.toast?.message).toBe('다른 문구');
+    await clock.advance(1_000); // 첫 문구 기준으로는 3초째
+    expect(toast.state.toast?.message).toBe('다른 문구');
+    await clock.advance(1_500);
+    expect(toast.state.toast).toBeNull();
+  });
+
   it('REQ-NET-030 구독자는 표시와 새 ID마다 알림을 받는다', () => {
     const { toast } = setup();
     const listener = vi.fn();
@@ -45,7 +57,7 @@ describe('ToastController', () => {
     expect(listener).toHaveBeenCalledTimes(2);
   });
 
-  it('REQ-NET-030 화면이 보이지 않을 때 온 토스트는 버리고, 보이게 된 뒤에는 다시 받는다', () => {
+  it('REQ-NET-030 TC-NAV-028 화면이 보이지 않을 때 온 토스트는 버리고, 보이게 된 뒤에는 다시 받는다', () => {
     const { toast } = setup();
     toast.setVisible(false);
     toast.show('숨김 중');

@@ -87,3 +87,8 @@ export function parseErrorResponse(status: number, bodyText: string): ApiError {
   if (typeof raw !== 'string') return new ApiError(status, null, message, null);
   return new ApiError(status, isKnownErrorCode(raw) ? raw : 'BUSINESS_ERROR', message, raw);
 }
+
+/** 로그에 남겨도 되는 오류 이름(메시지에 비밀이 섞일 수 있어 이름만). */
+export function errorName(error: unknown): string {
+  return error instanceof Error ? error.name : 'unknown';
+}
