@@ -12,6 +12,7 @@ export interface CompressCall {
   width: number;
   height: number;
   quality: number;
+  signal: AbortSignal;
 }
 
 export type CompressorMode =
@@ -57,7 +58,7 @@ export class FakeWebpCompressor implements WebpCompressor {
 
   async compress(image: DecodedImage, size: Size, quality: number, signal: AbortSignal): Promise<Blob> {
     if (signal.aborted && !this.ignoreAbort) throw new DOMException('The operation was aborted.', 'AbortError');
-    const call: CompressCall = { image, width: size.width, height: size.height, quality };
+    const call: CompressCall = { image, width: size.width, height: size.height, quality, signal };
     const index = this.calls.length;
     this.calls.push(call);
     if (this.mode === 'unsupported') throw new WebpUnsupportedError('no webp encoder');
