@@ -56,6 +56,12 @@ class MainSession(val scope: CoroutineScope) {
     /** List items handed over by the screen that opens a feed, by post id; taken when the feed route first shows (D-26). */
     val feedSeeds = HashMap<String, PostSummary>()
 
+    /** Thumbnail seeds of feeds opened from the record tab ("피드에서 보기"), by post id; taken like [feedSeeds]. */
+    val recordSeeds = HashMap<String, FeedEntry.FromRecord>()
+
+    /** Day the home week row asked the record tab to select; consumed once by the record route (REQ-REC-025). */
+    var recordRequestedDate: LocalDate? = null
+
     val feeds = FeedSlots()
 
     /** `topicDate` the upload gate opened the upload screen for (pinned for the whole visit, REQ-UPL-008). */
@@ -87,12 +93,23 @@ class FeedSlots {
     private val slots = HashMap<Int, FeedSlot>()
 
     /** The slot of the feed at stack [index]; created (seed taken from [seeds]) when none matches [route]. */
-    fun slotFor(index: Int, route: Route.Feed, seeds: MutableMap<String, PostSummary>): FeedSlot {
+    fun slotFor(
+        index: Int,
+        route: Route.Feed,
+        seeds: MutableMap<String, PostSummary>,
+        recordSeeds: MutableMap<String, FeedEntry.FromRecord> = HashMap(),
+    ): FeedSlot {
         slots[index]?.takeIf { it.route == route }?.let { return it }
         slots.remove(index)?.finish()
         val seed = if (route.source == FeedSource.Display) seeds[route.postId] else null
         seeds.remove(route.postId)
-        val entry = if (seed != null) FeedEntry.FromDisplay(seed) else FeedEntry.FromPush(route.postId)
+        val recordSeed = if (route.source == FeedSource.ById) recordSeeds[route.postId] else null
+        recordSeeds.remove(route.postId)
+        val entry = when {
+            seed != null -> FeedEntry.FromDisplay(seed)
+            recordSeed != null -> recordSeed
+            else -> FeedEntry.FromPush(route.postId)
+        }
         return FeedSlot(nextId++, route, entry).also { slots[index] = it }
     }
 

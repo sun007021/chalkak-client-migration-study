@@ -15,6 +15,9 @@ import { BannerRepository } from '../features/home/BannerRepository';
 import { HomeRepository } from '../features/home/HomeRepository';
 import { HomeViewModel } from '../features/home/HomeViewModel';
 import { GuestGate } from '../features/shell/GuestGate';
+import { LikeRepository } from '../features/like/LikeRepository';
+import { PostLikeStore } from '../features/like/PostLikeStore';
+import { PostChanges } from '../features/post/PostChanges';
 import type { SessionMode } from '../features/boot/authGate';
 
 /** 홈 테스트의 내 오늘 게시물(posts-today__posted-*.json의 postId). */
@@ -71,6 +74,8 @@ export function createHomeHarness(options: HomeHarnessOptions = {}) {
   const upload = new FakeUploadEntry();
   const bannerRepository = new BannerRepository({ api });
   const banners = options.bannerFeed ? options.bannerFeed(bannerRepository) : new BannerFeed({ repository: bannerRepository });
+  const changes = new PostChanges();
+  const likes = new PostLikeStore({ repository: new LikeRepository({ api }), changes, toast });
   const viewModel = new HomeViewModel({
     mode,
     clock: env.clock,
@@ -80,8 +85,10 @@ export function createHomeHarness(options: HomeHarnessOptions = {}) {
     guestGate: new GuestGate({ toast }),
     uploadEntry: upload,
     navigator,
+    likes,
+    changes,
   });
-  return { ...env, router, toast, toasts, navigator, upload, banners, viewModel };
+  return { ...env, router, toast, toasts, navigator, upload, banners, viewModel, likes, changes };
 }
 
 export type HomeHarness = ReturnType<typeof createHomeHarness>;
