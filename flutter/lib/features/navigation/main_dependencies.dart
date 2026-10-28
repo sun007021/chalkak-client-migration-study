@@ -14,6 +14,7 @@ import '../record/domain/record_calendar_image.dart';
 import '../record/domain/record_data_cleaner.dart';
 import '../record/domain/record_post_events.dart';
 import '../record/domain/record_repository.dart';
+import '../upload/upload_dependencies.dart';
 import 'domain/guest_flag.dart';
 
 /// 메인(홈·전시 탭·상세·배너·업로드 게이트)이 쓰는 의존성 묶음. `AppDependencies.main`으로 들어간다.
@@ -38,6 +39,7 @@ class MainDependencies {
     required this.recordImageSaver,
     required this.recordPostEvents,
     required this.recordCleaner,
+    this.upload,
   });
 
   final HomeRepository homeRepository;
@@ -62,4 +64,7 @@ class MainDependencies {
   final CalendarImageSaver recordImageSaver;
   final RecordPostEvents recordPostEvents;
   final RecordDataCleaner recordCleaner;
+
+  /// 업로드·사진 편집. 비어 있으면(업로드를 쓰지 않는 테스트 묶음) 업로드 화면으로 이동하지 않는다.
+  final UploadDependencies? upload;
 }

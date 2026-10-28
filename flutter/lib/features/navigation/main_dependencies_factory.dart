@@ -17,6 +17,7 @@ import '../record/data/gallery_calendar_image_saver.dart';
 import '../record/data/png_calendar_image_renderer.dart';
 import '../record/data/post_bus_record_events.dart';
 import '../record/domain/record_data_cleaner.dart';
+import '../upload/upload_dependencies_factory.dart';
 import 'domain/guest_flag.dart';
 import 'main_dependencies.dart';
 
@@ -26,12 +27,13 @@ MainDependencies buildMainDependencies(ApiClient client) {
   final home = ApiHomeRepository(client: client);
   final guestFlag = GuestFlag();
   final postEvents = PostEventBus();
+  final toast = ToastController();
   return MainDependencies(
     homeRepository: home,
     todayPostRepository: home,
     bannerRepository: ApiBannerRepository(client: client),
     preloadCache: HomePreloadCache(),
-    toast: ToastController(),
+    toast: toast,
     bannerWebViewBuilder: const WebViewBannerBuilder(),
     externalLinks: const UrlLauncherBannerLinkLauncher(),
     aiCardBuilder: (context, postId) => const SizedBox.shrink(),
@@ -49,5 +51,10 @@ MainDependencies buildMainDependencies(ApiClient client) {
     recordImageSaver: const GalleryCalendarImageSaver(),
     recordPostEvents: PostBusRecordEvents(postEvents),
     recordCleaner: RecordDataCleaner(),
+    upload: buildUploadDependencies(
+      client: client,
+      todayPost: home,
+      toast: toast,
+    ),
   );
 }
