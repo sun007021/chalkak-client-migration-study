@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:clock/clock.dart';
+
 import 'package:path_provider/path_provider.dart';
 
 import '../domain/photo_file_store.dart';
@@ -13,7 +15,7 @@ class TempPhotoFileStore implements PhotoFileStore {
   Future<StoredPhoto> write(Uint8List bytes) async {
     final dir = await getTemporaryDirectory();
     final file = File(
-      '${dir.path}/chalkak-upload-${DateTime.now().microsecondsSinceEpoch}.webp',
+      '${dir.path}/chalkak-upload-${clock.now().microsecondsSinceEpoch}.webp',
     );
     await file.writeAsBytes(bytes, flush: true);
     return _TempStoredPhoto(file);
