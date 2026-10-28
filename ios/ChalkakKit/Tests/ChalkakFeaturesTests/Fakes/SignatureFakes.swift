@@ -41,6 +41,8 @@ actor FakeSignatureRepository: SignatureRepository {
     private var lookupResults: [Result<SignatureLookup, any Error>]
     private var changeResults: [Result<Void, any Error>]
     private let lookupHold: Hold?
+    /// `lookupHold`를 먼저 기다린 뒤 이어서 `lookupHolds[호출 인덱스]`를 기다린다(호출 순서 기준). 없거나 모자란 호출은 그 단계에서 멈추지 않는다.
+    private let lookupHolds: [Hold?]
     private let changeHold: Hold?
     let lookupEntered = CallSignal()
     let changeEntered = CallSignal()
@@ -51,20 +53,25 @@ actor FakeSignatureRepository: SignatureRepository {
         lookupResults: [Result<SignatureLookup, any Error>] = [.success(.registrationRequired)],
         changeResults: [Result<Void, any Error>] = [.success(())],
         lookupHold: Hold? = nil,
+        lookupHolds: [Hold?] = [],
         changeHold: Hold? = nil
     ) {
         self.lookupResults = lookupResults
         self.changeResults = changeResults
         self.lookupHold = lookupHold
+        self.lookupHolds = lookupHolds
         self.changeHold = changeHold
     }
 
     func currentSignature() async throws -> SignatureLookup {
         lookupCount += 1
+        let index = lookupCount - 1
         await lookupEntered.fire()
         try await lookupHold?.wait()
+        if index < lookupHolds.count { try await lookupHolds[index]?.wait() }
         guard !lookupResults.isEmpty else { return .registrationRequired }
-        return try (lookupResults.count > 1 ? lookupResults.removeFirst() : lookupResults[0]).get()
+        // 호출 순서(진입 순서)대로 고른다. 모자라면 마지막 결과를 반복한다.
+        return try lookupResults[min(index, lookupResults.count - 1)].get()
     }
 
     func changeSignature(png: Data) async throws {
