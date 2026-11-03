@@ -37,6 +37,15 @@ class _ChalkakAppState extends State<ChalkakApp> with WidgetsBindingObserver {
     unawaited(widget.dependencies.notification.start());
   }
 
+  /// 앱 자체 딥링크는 없다(TC-NAV-045). 플랫폼이 알려 주는 URL(`chalkak://`, https 등)을
+  /// 라우터가 받기 전에 먼저 소비해 어떤 화면 이동도 일어나지 않게 한다. 푸시 탭은 별도 경로다.
+  /// 카카오 로그인 복귀 URL은 SDK가 네이티브에서 처리한다.
+  /// 라우터의 옵서버보다 먼저 등록돼야 하므로 라우터가 붙기 전인 initState에서 등록한다.
+  @override
+  Future<bool> didPushRouteInformation(
+    RouteInformation routeInformation,
+  ) async => true;
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // 포그라운드 복귀: 기기 등록 재시도(세션·토큰이 같으면 등록기가 요청을 보내지 않는다).
