@@ -2,6 +2,7 @@ import { POST_IMAGE_CONTENT_TYPE } from '../../constants';
 import { WebpUnsupportedError } from './imagePorts';
 import type { DecodedImage, WebpCompressor } from './imagePorts';
 import type { Size } from './imageSizing';
+import { stripWebpMetadata } from './webpMetadata';
 
 type Surface = OffscreenCanvas | HTMLCanvasElement;
 
@@ -30,7 +31,10 @@ async function encodeWebp(surface: Surface, quality: number): Promise<Blob | nul
     'convertToBlob' in surface
       ? await surface.convertToBlob({ type: POST_IMAGE_CONTENT_TYPE, quality: ratio })
       : await new Promise<Blob | null>((resolve) => surface.toBlob(resolve, POST_IMAGE_CONTENT_TYPE, ratio));
-  return blob && blob.type === POST_IMAGE_CONTENT_TYPE ? blob : null;
+  if (!blob || blob.type !== POST_IMAGE_CONTENT_TYPE) return null;
+  // Chromium은 canvas WebP에 sRGB ICC 프로필(ICCP)을 넣는다. 업로드 사진에는 메타데이터가 없어야 하므로 뺀다.
+  const stripped = stripWebpMetadata(new Uint8Array(await blob.arrayBuffer()));
+  return stripped ? new Blob([stripped as Uint8Array<ArrayBuffer>], { type: POST_IMAGE_CONTENT_TYPE }) : null;
 }
 
 /** 이 브라우저의 canvas가 image/webp로 인코딩하는지 1×1 canvas로 확인한다(Safari 등은 조용히 다른 형식을 돌려준다). */

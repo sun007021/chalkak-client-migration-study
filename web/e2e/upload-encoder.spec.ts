@@ -130,8 +130,13 @@ test.describe('업로드 사진 인코딩 (Chromium 실제 canvas)', () => {
   }
 
   test('TC-UPL-037 TC-UPL-038 TC-UPL-039 잡음이 많은 큰 사진은 품질을 낮추거나 줄여서 정책 크기 상한 이하가 된다', async ({ page }) => {
-    const maxBytes = 150_000;
-    const report = await run<Awaited<ReturnType<Fixture['encodeFile']>>>(page, `makeSource('png', 1600, 1200, true)`, 'encodeFile', maxBytes);
+    const make = `makeSource('png', 1600, 1200, true)`;
+    const unlimited = await run<Awaited<ReturnType<Fixture['encodeFile']>>>(page, make, 'encodeFile');
+    expect(unlimited.quality).toBe(90);
+    expect(unlimited.attempts).toBe(1);
+    // 품질 90 결과의 60%만 허용하면 사다리를 내려가야 한다(잡음 원본은 품질 90 → 40에서 절반 아래로 줄어든다).
+    const maxBytes = Math.floor(unlimited.size * 0.6);
+    const report = await run<Awaited<ReturnType<Fixture['encodeFile']>>>(page, make, 'encodeFile', maxBytes);
     expect(report.type).toBe('image/webp');
     expect(report.size).toBeLessThanOrEqual(maxBytes);
     expect(report.attempts).toBeGreaterThan(1);
