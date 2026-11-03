@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import type { VisibilityObserverFactory } from '../core/ui/VisibilityObserver';
 import { makeHarness, renderApp } from './appHarness';
@@ -8,6 +8,7 @@ import type { RouteValue } from './fixtureRouter';
 import { guestSession, loadFixture, memberSession } from './fixtures';
 import { MEMBER_ROUTES, GUEST_ROUTES } from './homeHarness';
 import { GUEST_POST_ROUTES, POST_ROUTES } from './postRoutes';
+import { advanceClock } from './settle';
 
 export interface OpenOptions {
   mode?: 'member' | 'guest';
@@ -38,11 +39,7 @@ export async function openApp(options: OpenOptions = {}) {
 
 export const toastText = (): string | null => screen.queryByTestId('toast.message')?.textContent ?? null;
 
-export const advance = async (h: Harness, ms: number): Promise<void> => {
-  await act(async () => {
-    await h.clock.advance(ms);
-  });
-};
+export const advance = async (h: Harness, ms: number): Promise<void> => advanceClock(h, ms);
 
 /** 전시 첫 로드가 끝날 때까지(로딩 표시가 사라지고 그리드가 보일 때까지) 기다린다. */
 export const displayLoaded = async (): Promise<void> => {

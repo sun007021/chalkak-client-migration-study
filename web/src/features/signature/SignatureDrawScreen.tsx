@@ -26,12 +26,10 @@ export function SignatureDrawScreen({ mode }: { mode: SignatureMode }): ReactNod
   const container = useContainer();
   const gate = useSignupGate(mode === 'onboarding');
   const allowed = gate.kind === 'ok';
-  const create = useCallback(() => {
-    if (!allowed) return null;
-    container.signatureDraft.clear(); // 빈 패드로 시작하므로 이전 PNG도 남기지 않는다.
-    return container.createSignatureDrawViewModel(mode);
-  }, [container, mode, allowed]);
-  const vm = useOwnedViewModel(create);
+  const create = useCallback(() => (allowed ? container.createSignatureDrawViewModel(mode) : null), [container, mode, allowed]);
+  // 빈 패드로 시작하므로 이전 PNG도 남기지 않는다(생성이 아니라 마운트 효과에서).
+  const clearDraft = useCallback(() => container.signatureDraft.clear(), [container]);
+  const vm = useOwnedViewModel(create, clearDraft);
   if (gate.kind === 'redirect') return <Navigate to={gate.to} replace />;
   return vm ? <SignatureDrawView vm={vm} mode={mode} /> : null;
 }

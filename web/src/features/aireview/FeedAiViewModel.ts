@@ -44,17 +44,22 @@ export class FeedAiViewModel extends ViewModel<FeedAiState> {
   /** openAiReview 진입의 자동 열기를 이미 했거나 해당 없음으로 끝냈다. */
   private autoOpenDone: boolean;
   private readonly midnight: MidnightWatcher;
-  private readonly unsubscribe: () => void;
+  /** 생성자에서는 구독하지 않는다(렌더 중에 만들어질 수 있다). setPost·onShown에서 처음 한 번 붙인다. */
+  private unsubscribe: (() => void) | null = null;
 
   constructor(protected readonly deps: FeedAiViewModelDeps) {
     super({ pill: 'hidden', stalled: false, recheckVisible: false, sheet: { kind: 'none' }, criteriaOpen: false });
     this.autoOpenDone = !deps.openAiReview;
     this.midnight = new MidnightWatcher({ clock: deps.clock, onDateChanged: () => this.sync() });
-    this.unsubscribe = deps.store.subscribe(() => this.sync());
+  }
+
+  private listen(): void {
+    this.unsubscribe ??= this.deps.store.subscribe(() => this.sync());
   }
 
   setPost(post: FeedAiPost): void {
     if (this.gone) return;
+    this.listen();
     this.post = post;
     if (!post.isMine) {
       this.releaseWatch();
@@ -68,6 +73,7 @@ export class FeedAiViewModel extends ViewModel<FeedAiState> {
   async onShown(): Promise<void> {
     if (this.gone) return;
     this.shown = true;
+    this.listen();
     this.midnight.start();
     this.sync();
     await this.showWatch();
@@ -140,7 +146,8 @@ export class FeedAiViewModel extends ViewModel<FeedAiState> {
 
   override dispose(): void {
     this.gone = true;
-    this.unsubscribe();
+    this.unsubscribe?.();
+    this.unsubscribe = null;
     this.midnight.stop();
     this.releaseWatch();
     super.dispose();

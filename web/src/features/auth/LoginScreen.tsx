@@ -101,7 +101,15 @@ export function KakaoCallbackScreen(): ReactNode {
   useEffect(() => {
     if (search !== '') navigate(pathname, { replace: true });
   }, [navigate, pathname, search]);
-  const create = useCallback(() => container.createLoginViewModel(), [container]);
+  // 인가 코드는 1회용이라 복원은 한 번만 시작해야 한다. StrictMode의 가짜 언마운트가 지나간 뒤(마운트 효과 뒤)에 ViewModel을 만들어
+  // 복원 중인 ViewModel이 가짜 언마운트로 dispose(→ signal abort)되지 않게 한다.
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    // 마운트가 확정된 뒤의 첫 효과라 의도된 setState다.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setArmed(true);
+  }, []);
+  const create = useCallback(() => (armed ? container.createLoginViewModel() : null), [container, armed]);
   const vm = useOwnedViewModel(create);
   return vm ? <KakaoCallbackRun vm={vm} callbackUrl={callbackUrl} /> : <SplashView />;
 }

@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import type { VisibilityObserverFactory } from '../core/ui/VisibilityObserver';
 import { makeHarness, renderApp } from './appHarness';
 import type { Harness } from './appHarness';
@@ -8,6 +8,7 @@ import { loadFixture, memberSession } from './fixtures';
 import { MEMBER_ROUTES } from './homeHarness';
 import { NOTIFICATION_ROUTES, PAGE1, UNREAD_KEY, readKey } from './notificationHarness';
 import { POST_ROUTES } from './postRoutes';
+import { advanceClock } from './settle';
 
 type Opened<S> = { h: Harness; fixtures: FixtureRouter; server: S } & ReturnType<typeof renderApp>;
 
@@ -45,11 +46,7 @@ export async function openNotifications(options: OpenNotificationsOptions = {}):
 
 export const toastText = (): string | null => screen.queryByTestId('toast.message')?.textContent ?? null;
 
-export const advance = async (h: Harness, ms: number): Promise<void> => {
-  await act(async () => {
-    await h.clock.advance(ms);
-  });
-};
+export const advance = async (h: Harness, ms: number): Promise<void> => advanceClock(h, ms);
 
 /** 요청의 자동 재시도(0.5초·1초, D-21)를 끝까지 보낸다. 요청이 대기를 시작할 때까지 기다린 뒤 시계를 민다. */
 export const settleRetries = async (h: Harness): Promise<void> => {

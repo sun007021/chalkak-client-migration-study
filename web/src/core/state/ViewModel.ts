@@ -36,6 +36,11 @@ export abstract class ViewModel<S> {
     for (const listener of [...this.listeners]) listener();
   }
 
+  /** dispose된 뒤에는 다시 쓸 수 없다. useOwnedViewModel이 StrictMode 재실행에서 새로 만들지 판단하는 데 쓴다. */
+  get isDisposed(): boolean {
+    return this.disposed;
+  }
+
   /** 구독자·타이머 정리. */
   dispose(): void {
     this.disposed = true;

@@ -11,6 +11,7 @@ import { noti, PAGE1, PAGE2, readKey, SOURCE_POST } from '../../test/notificatio
 import { createNotificationServer, inboxLoaded, openNotifications, settleRetries, toastText } from '../../test/notificationScreens';
 import { screenViews } from '../../test/screenViews';
 import { readOpenAiReview } from '../aireview/aiEntry';
+import { advanceClock } from '../../test/settle';
 
 vi.setConfig({ testTimeout: 15_000 }); // 구현 전에는 findBy가 5초 뒤 단언 오류로 끝나게 한다(테스트 시간 초과로 가려지지 않게)
 
@@ -311,10 +312,8 @@ describe('다음 페이지 스크롤 (TC-NOTI-015, 016, 018)', () => {
   });
 });
 
-async function advance(h: { clock: { advance(ms: number): Promise<void> } }, ms: number) {
-  await act(async () => {
-    await h.clock.advance(ms);
-  });
+function advance(h: Parameters<typeof advanceClock>[0], ms: number) {
+  return advanceClock(h, ms);
 }
 
 describe('새로고침 버튼 (TC-NOTI-019, 020, REQ-NOTI-010)', () => {

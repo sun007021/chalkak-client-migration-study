@@ -67,10 +67,9 @@ export function PhotoEditorScreen({ source, initialEdit, onConfirm, onCancel, de
       onConfirm: (edit) => confirmRef.current(edit),
       onCancel: () => cancelRef.current(),
     });
-    vm.start();
     return vm;
   }, [source, initialEdit, deps]);
-  const vm = useOwnedViewModel(create);
+  const vm = useOwnedViewModel(create, startEditor);
   const vmRef = useRef<PhotoEditorViewModel | null>(null);
   useEffect(() => {
     vmRef.current = vm;
@@ -452,4 +451,8 @@ function FilterPanel({ vm, state }: { vm: PhotoEditorViewModel; state: PhotoEdit
       })}
     </div>
   );
+}
+
+function startEditor(vm: PhotoEditorViewModel): void {
+  vm.start();
 }

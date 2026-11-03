@@ -10,6 +10,7 @@ import { guestSession, memberSession } from './fixtures';
 import { MEMBER_ROUTES } from './homeHarness';
 import { POST_ROUTES } from './postRoutes';
 import { TODAY, TOPIC_DATE, UPLOAD_ROUTES } from './uploadHarness';
+import { advanceClock } from './settle';
 
 export interface UploadAppOptions {
   mode?: 'member' | 'guest';
@@ -72,10 +73,8 @@ export async function chooseAlbumPhoto(options: FakeImageOptions = {}): Promise<
 }
 
 /** 가짜 시계를 움직인다(재시도 백오프·타임아웃). */
-export async function advance(h: Harness, ms: number): Promise<void> {
-  await act(async () => {
-    await h.clock.advance(ms);
-  });
+export function advance(h: Harness, ms: number): Promise<void> {
+  return advanceClock(h, ms);
 }
 
 export { TODAY };

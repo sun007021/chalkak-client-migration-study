@@ -20,13 +20,13 @@ export function NotificationDetailScreen(): ReactNode {
   useScreenView('notification_detail');
   const goBack = useBackAction(planBackToInbox);
 
-  const create = useCallback(() => {
-    const created = container.createNotificationDetailViewModel({ notificationId });
-    void created.load();
-    return created;
-  }, [container, notificationId]);
-  const vm = useOwnedViewModel(create);
+  const create = useCallback(() => container.createNotificationDetailViewModel({ notificationId }), [container, notificationId]);
+  const vm = useOwnedViewModel(create, startDetail);
   return <DetailView vm={vm} onBack={goBack} />;
+}
+
+function startDetail(vm: NotificationDetailViewModel): void {
+  void vm.load();
 }
 
 const barStyle: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px' };

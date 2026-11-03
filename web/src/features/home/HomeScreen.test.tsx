@@ -12,6 +12,7 @@ import { FakeVisibilityObserver } from '../../test/FakeVisibilityObserver';
 import type { VisibilityObserverFactory } from '../../core/ui/VisibilityObserver';
 import { render } from '@testing-library/react';
 import { VisibilitySentinel } from '../../core/ui/VisibilitySentinel';
+import { advanceClock } from '../../test/settle';
 import {
   BANNERS_P1,
   CALENDAR_OCT,
@@ -53,11 +54,7 @@ async function loaded() {
   await waitFor(() => expect(screen.queryByTestId('home.hero-loading')).not.toBeInTheDocument());
 }
 
-const advance = async (h: Harness, ms: number) => {
-  await act(async () => {
-    await h.clock.advance(ms);
-  });
-};
+const advance = (h: Harness, ms: number) => advanceClock(h, ms);
 const toastText = () => screen.queryByTestId('toast.message')?.textContent ?? null;
 const id = (n: string) => `22222222-2222-4222-8222-222222222${n}`;
 
