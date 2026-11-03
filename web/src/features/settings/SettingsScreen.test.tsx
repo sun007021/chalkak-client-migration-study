@@ -15,9 +15,10 @@ import { EMPTY_SESSION } from '../../core/auth/SessionStore';
 
 type RouteOptions = Parameters<typeof routeSettings>[1];
 
-async function openSettings(o: { session?: StoredSession; strict?: boolean; version?: string; routes?: RouteOptions; path?: string } = {}) {
+async function openSettings(o: { session?: StoredSession; strict?: boolean; version?: string; routes?: RouteOptions; path?: string; before?: (h: Harness) => void } = {}) {
   const h = makeHarness({ session: o.session ?? memberSession(), appVersion: o.version });
   if ((o.session ?? memberSession()).tokens) routeSettings(h.ff, o.routes);
+  o.before?.(h);
   const toasts = recordToasts(h.container.toast);
   const view = renderApp(h.container, o.path ?? '/settings', { strict: o.strict });
   await screen.findByTestId('settings.root');
@@ -133,6 +134,9 @@ describe('설정 사인 카드', () => {
     fireEvent.click(retry);
     fireEvent.click(retry);
     fireEvent.click(retry);
+    // 요청은 토큰 준비(비동기) 뒤에 나가므로 4번째가 나갈 때까지 기다린 뒤, 더 늘지 않는지 본다.
+    await waitFor(() => expect(h.ff.callsTo(CARD_GET)).toHaveLength(4));
+    await act(async () => void (await h.clock.advance(100)));
     expect(h.ff.callsTo(CARD_GET)).toHaveLength(4);
     gate.resolve(resp('signature/users-me-signature__get-success.json'));
     await screen.findByTestId('settings.signature-image');
@@ -179,8 +183,11 @@ describe('설정 사인 카드', () => {
   });
 
   it('TC-SET-012 사인 조회가 REAUTHENTICATION_REQUIRED(401)면 로그인 화면으로 간다', async () => {
-    const { h, router } = await openSettings({ routes: { signature: [fx('signature/users-me-signature__get-unauthorized.json')] } });
-    h.ff.route('POST /auth/refresh', fx('auth/refresh__reauthentication-required.json'));
+    // 조회는 화면이 보이자마자 나가므로 refresh 응답은 화면을 그리기 전에 등록한다.
+    const { router } = await openSettings({
+      routes: { signature: [fx('signature/users-me-signature__get-unauthorized.json')] },
+      before: (h) => h.ff.route('POST /auth/refresh', fx('auth/refresh__reauthentication-required.json')),
+    });
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
   });
 

@@ -56,6 +56,10 @@ export const webOnlyCopy = {
   'feed.preview-alt': '사진',
   /** 상세: 삭제 요청 중 표시. */
   'feed.deleting': '삭제 중',
+  /** 설정: 사인 카드 이미지의 대체 텍스트, 사인·푸시 설정을 읽는 중 표시. */
+  'settings.signature-alt': '현재 사인',
+  'settings.signature-loading': '사인을 불러오는 중',
+  'settings.push-loading': '알림 설정을 불러오는 중',
 } as const;
 
 export type WebOnlyCopyKey = keyof typeof webOnlyCopy;

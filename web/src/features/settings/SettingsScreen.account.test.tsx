@@ -216,6 +216,7 @@ describe('회원탈퇴', () => {
     await screen.findByTestId('settings.signature-image');
     await openDialog('withdraw');
     fireEvent.click(pick('withdraw', 'confirm'));
+    await settle(h); // DELETE는 멱등이라 가짜 시계로 재시도 대기(0.5초, 1초)를 넘긴다
     await waitFor(() => expect(toasts.messages).toEqual([t('auth.withdraw.error')]));
     await waitFor(() => expect(screen.queryByTestId('settings.withdraw-dialog')).not.toBeInTheDocument());
     expect(toasts.messages[0]).toBe('요청을 처리하지 못했어요. 다시 시도해 주세요.');
@@ -227,11 +228,14 @@ describe('회원탈퇴', () => {
   it('TC-SET-046 실패한 뒤 다시 회원탈퇴를 눌러 재시도할 수 있다', async () => {
     const h = makeHarness({ session: memberSession() });
     routeSettings(h.ff);
-    h.ff.route(WITHDRAW, fx('auth/users-me__delete-internal-error.json'), fx('auth/users-me__delete-no-content.json'));
+    // 멱등 DELETE는 500을 3번(최초 + 재시도 2회) 받아야 실패로 끝난다. 그 뒤 두 번째 시도가 성공한다.
+    const serverError = fx('auth/users-me__delete-internal-error.json');
+    h.ff.route(WITHDRAW, serverError, serverError, serverError, fx('auth/users-me__delete-no-content.json'));
     renderApp(h.container, '/settings');
     await screen.findByTestId('settings.signature-image');
     await openDialog('withdraw');
     fireEvent.click(pick('withdraw', 'confirm'));
+    await settle(h); // 멱등 DELETE의 재시도 대기를 가짜 시계로 넘긴다
     await waitFor(() => expect(screen.queryByTestId('settings.withdraw-dialog')).not.toBeInTheDocument());
     await openDialog('withdraw');
     fireEvent.click(pick('withdraw', 'confirm'));
