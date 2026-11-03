@@ -3,10 +3,9 @@ import type { ApiClient } from '../../core/net/ApiClient';
 import { d } from '../../core/net/decode';
 import type { Decoder } from '../../core/net/decode';
 import { ApiError, InvalidResponseError } from '../../core/net/errors';
-import { path } from '../../core/net/url';
 import { parseDateString } from '../../core/time/kst';
 import type { DateString } from '../../core/time/kst';
-import type { AiReviewSummary, CalendarEntry, HomeTopic, PostSummary, TodayPost } from './homeModels';
+import type { CalendarEntry, HomeTopic, PostSummary, TodayPost } from './homeModels';
 
 /** 본문의 errorCode까지 읽은 404(서버가 만든 "없음")만 값으로 바꾼다. 게이트웨이 HTML 같은 본문 없는 404는 오류로 둔다. */
 const isBusiness404 = (error: unknown): boolean => error instanceof ApiError && error.status === 404 && error.errorCode === 'BUSINESS_ERROR';
@@ -69,19 +68,9 @@ const decodeCalendar = d.object({
 
 const decodeUnread = d.object({ hasUnread: d.boolean() });
 
-const decodeAiReview = d.object({
-  status: oneOf(['NONE', 'PROCESSING', 'COMPLETED', 'FAILED']),
-  canRequestAgain: d.nullable(d.boolean()),
-});
-
-const toAiSummary = (body: { status: AiReviewSummary['status']; canRequestAgain: boolean | null }): AiReviewSummary => ({
-  status: body.status,
-  canRequestAgain: body.canRequestAgain ?? false,
-});
-
 /**
- * 홈이 쓰는 읽기 API(API §1.3, §1.4, §1.5, §4.2). 던지는 것은 ApiClient와 같다(ApiError, NetworkError, InvalidResponseError, 취소는 AbortError).
- * 404를 "없음"으로 바꾸는 곳만 값으로 돌려준다: fetchTopic(null), fetchPopularPosts([]), fetchAiReview(null), fetchTodayPost('no-open-topic').
+ * 홈이 쓰는 읽기 API(API §1.3, §1.4, §1.5). 던지는 것은 ApiClient와 같다(ApiError, NetworkError, InvalidResponseError, 취소는 AbortError).
+ * 404를 "없음"으로 바꾸는 곳만 값으로 돌려준다: fetchTopic(null), fetchPopularPosts([]), fetchTodayPost('no-open-topic').
  */
 export class HomeRepository {
   constructor(protected readonly deps: { api: ApiClient }) {}
@@ -144,20 +133,5 @@ export class HomeRepository {
   async fetchUnreadStatus(signal?: AbortSignal): Promise<boolean> {
     const body = await this.deps.api.request({ method: 'GET', path: '/notifications/unread-status', signal }, decodeUnread);
     return body.hasUnread;
-  }
-
-  /** GET /posts/{postId}/ai-review. 404 → null. */
-  async fetchAiReview(postId: string, signal?: AbortSignal): Promise<AiReviewSummary | null> {
-    try {
-      return toAiSummary(await this.deps.api.request({ method: 'GET', path: path`/posts/${postId}/ai-review`, signal }, decodeAiReview));
-    } catch (error) {
-      if (isBusiness404(error)) return null;
-      throw error;
-    }
-  }
-
-  /** POST /posts/{postId}/ai-review(본문 없음, 자동 재시도 없음). 202·200 모두 본문의 status를 돌려준다. */
-  async requestAiReview(postId: string, signal?: AbortSignal): Promise<AiReviewSummary> {
-    return toAiSummary(await this.deps.api.request({ method: 'POST', path: path`/posts/${postId}/ai-review`, signal }, decodeAiReview));
   }
 }
