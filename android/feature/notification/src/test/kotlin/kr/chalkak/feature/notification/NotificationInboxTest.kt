@@ -470,7 +470,7 @@ class NotificationInboxStateHolderTest {
     }
 
     @Test
-    fun `TC-NOTI-033 TC-NOTI-010 a 404 on read toasts gone, reloads the list and unread and does not navigate`() = runTest {
+    fun `TC-NOTI-033 a 404 on read toasts gone, reloads the list and unread and does not navigate`() = runTest {
         val r = opened(page(PAGE1), page("notification/notifications__30day-boundary.json"))
         r.repo.readResults += httpFail(404)
         r.holder.onRowClicked(nid(1))
