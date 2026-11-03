@@ -25,8 +25,10 @@ import { UploadScreen } from '../features/upload/UploadScreen';
 import { UploadSuccessScreen } from '../features/upload/UploadSuccessScreen';
 import { SignatureDrawScreen } from '../features/signature/SignatureDrawScreen';
 import { SignaturePreviewScreen } from '../features/signature/SignaturePreviewScreen';
+import { FeedbackScreen } from '../features/feedback/FeedbackScreen';
+import { SettingsScreen } from '../features/settings/SettingsScreen';
 import { MemberOnly } from '../features/shell/MemberOnly';
-import { BottomBarSlotContext, MainShell, TabGate, TabPlaceholder } from '../features/shell/MainShell';
+import { BottomBarSlotContext, MainShell, TabGate } from '../features/shell/MainShell';
 import type { TabRouteHandle } from '../features/shell/MainShell';
 import { ContainerProvider } from './AppContext';
 import type { AppContainer } from './container';
@@ -136,7 +138,7 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
                 </TabGate>
               ),
             },
-            { path: ROUTES.settings, handle: settingsHandle, element: <TabPlaceholder tab="settings" testId="settings.root" /> },
+            { path: ROUTES.settings, handle: settingsHandle, element: <SettingsScreen /> },
           ],
         },
         // 알림함·알림 상세. 탭 셸 밖이라 하단 바가 없고 회원만 들어온다(게스트는 홈으로).
@@ -158,6 +160,11 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
             { path: ROUTES.upload, element: <UploadScreen /> },
             { path: ROUTES.uploadSuccess, element: <UploadSuccessScreen /> },
           ],
+        },
+        // 피드백: 회원만, 탭 셸 밖(하단 바 없음). 게스트가 URL로 오면 홈으로 + nav.guest.feedback 토스트.
+        {
+          element: <RequireSession container={container}>{(mode) => <MemberOnly mode={mode} action="feedback"><Outlet /></MemberOnly>}</RequireSession>,
+          children: [{ path: ROUTES.feedback, element: <FeedbackScreen /> }],
         },
         ...devSessionRoutes(container),
         { path: '*', element: <Navigate to={ROUTES.boot} replace /> },

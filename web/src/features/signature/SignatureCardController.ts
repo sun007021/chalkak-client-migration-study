@@ -39,6 +39,15 @@ export class SignatureCardController extends ViewModel<SignatureCardState> imple
     return run;
   }
 
+  /**
+   * 사인 변경이 성공한 뒤의 재조회(TC-SET-009, 011). 변경 전에 시작돼 아직 진행 중인 조회가 있어도 그 응답을 쓰지 않고(무효화) 새 GET을 보내 그 결과로 바꾼다.
+   * refresh와 달리 진행 중 요청에 올라타지 않는다. 실패 처리는 refresh와 같다.
+   */
+  refreshAfterChange(): Promise<void> {
+    this.inflight = null;
+    return this.refresh();
+  }
+
   /** idle로 되돌리고 진행 중 응답을 무효화한다. */
   clear(): void {
     this.guard.invalidate();

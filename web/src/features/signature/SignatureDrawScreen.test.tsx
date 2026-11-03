@@ -1,10 +1,11 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import { SIGNATURE_MAX_BYTES } from '../../constants';
 import { t } from '../../copy/ko';
 import { makeHarness, renderApp } from '../../test/appHarness';
 import { guestSession, memberSession } from '../../test/fixtures';
 import { screenViews } from '../../test/screenViews';
+import { CARD_GET, SETTINGS_GET, routeSettings } from '../../test/settingsHarness';
 import { drawStroke, stubCanvasRect } from '../../test/signatureDrawing';
 
 const CREDENTIAL = { idToken: 'fake-id-token-1', rawNonce: 'fake-raw-nonce-1' };
@@ -198,10 +199,14 @@ describe('사인 그리기 이동·가드·분석', () => {
 
   it('변경 모드의 뒤로 버튼은 설정으로 돌아가고 서버 호출은 0건이다(TC-SIGN-042)', async () => {
     const { h, path } = await openDraw('change');
+    routeSettings(h.ff); // 설정 화면이 열리며 사인·푸시 설정을 읽는다
     fireEvent.click(screen.getByTestId('signature.back-button'));
     await waitFor(() => expect(path()).toBe('/settings'));
     expect(await screen.findByTestId('settings.root')).toBeInTheDocument();
-    expect(h.ff.calls).toHaveLength(0);
+    await screen.findByTestId('settings.signature-image');
+    await act(async () => void (await h.clock.advance(1_000)));
+    // 변경 흐름의 서버 호출은 0건이고 설정이 열릴 때의 조회(사인, 푸시)가 한 번씩만 있다.
+    expect(h.ff.calls.map((c) => `${c.method} ${c.path}`)).toEqual([CARD_GET, SETTINGS_GET]);
   });
 
   it('가입 컨텍스트가 없으면(새로고침) 그리기 화면 대신 로그인으로 replace 이동한다', async () => {
