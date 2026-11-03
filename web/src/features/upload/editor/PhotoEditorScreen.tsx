@@ -182,7 +182,7 @@ function ErrorDialog({ onRetry }: { onRetry: () => void }): ReactNode {
         {t('edit.error.render')}
       </p>
       <button ref={retryRef} type="button" data-testid="photo-edit.error-retry-button" style={{ minHeight: 48 }} onClick={onRetry}>
-        {webOnlyCopy['edit.error.retry']}
+        {t('common.retry')}
       </button>
     </div>
   );
@@ -217,7 +217,7 @@ function CropArea({ vm, state }: { vm: PhotoEditorViewModel; state: PhotoEditorS
   const areaRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<DragStart | null>(null);
   const { cropRect: rect } = state;
-  const begin = (handle: CropHandle) => (event: ReactPointerEvent<HTMLElement>) => {
+  const begin = (handle: CropHandle, event: ReactPointerEvent<HTMLElement>) => {
     event.stopPropagation();
     dragRef.current = { handle, pointerId: event.pointerId, x: event.clientX, y: event.clientY, rect: vm.state.cropRect };
     event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -231,7 +231,6 @@ function CropArea({ vm, state }: { vm: PhotoEditorViewModel; state: PhotoEditorS
   const end = (event: ReactPointerEvent<HTMLElement>) => {
     if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
   };
-  const handlers = (handle: CropHandle) => ({ onPointerDown: begin(handle), onPointerMove: move, onPointerUp: end, onPointerCancel: end });
   return (
     <div
       ref={areaRef}
@@ -256,12 +255,12 @@ function CropArea({ vm, state }: { vm: PhotoEditorViewModel; state: PhotoEditorS
           boxShadow: '0 0 0 9999px #0009',
         }}
       >
-        <div data-handle="move" aria-hidden="true" {...handlers('move')} style={{ position: 'absolute', inset: 0, cursor: 'move', touchAction: 'none' }} />
+        <div data-handle="move" aria-hidden="true" onPointerDown={(event) => begin('move', event)} onPointerMove={move} onPointerUp={end} onPointerCancel={end} style={{ position: 'absolute', inset: 0, cursor: 'move', touchAction: 'none' }} />
         {GRID_LINES.map((line, index) => (
           <div key={index} data-grid-line="" aria-hidden="true" style={{ position: 'absolute', background: '#fff8', pointerEvents: 'none', ...line }} />
         ))}
         {CORNERS.map(({ handle, style }) => (
-          <div key={handle} data-handle={handle} aria-hidden="true" {...handlers(handle)} style={{ position: 'absolute', width: HANDLE_SIZE, height: HANDLE_SIZE, display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none', ...style }}>
+          <div key={handle} data-handle={handle} aria-hidden="true" onPointerDown={(event) => begin(handle, event)} onPointerMove={move} onPointerUp={end} onPointerCancel={end} style={{ position: 'absolute', width: HANDLE_SIZE, height: HANDLE_SIZE, display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none', ...style }}>
             <div style={{ width: 16, height: 16, borderRadius: 8, background: '#fff', pointerEvents: 'none' }} />
           </div>
         ))}

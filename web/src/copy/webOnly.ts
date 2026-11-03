@@ -40,8 +40,6 @@ export const webOnlyCopy = {
   'edit.rendering': '사진을 준비하는 중',
   'edit.crop.area': '자르기 영역',
   'edit.ratio.label': '자르기 비율',
-  /** 오류 알림의 "다시 시도" 버튼(testids.md photo-edit.error-retry-button). */
-  'edit.error.retry': '다시 시도',
   /** 상세: 삭제 요청 중 표시. */
   'feed.deleting': '삭제 중',
 } as const;

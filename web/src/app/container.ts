@@ -74,11 +74,13 @@ import type { UploadEntry } from '../features/shell/UploadEntry';
 import { BrowserImageDecoder, BrowserWebpCompressor } from '../features/upload/browserImage';
 import { BrowserCameraCaptureSupport } from '../features/upload/CameraCaptureSupport';
 import type { CameraCaptureSupport } from '../features/upload/CameraCaptureSupport';
-import { IdentityEditRenderer } from '../features/upload/imagePorts';
 import type { EditRenderer, ImageDecoder, WebpCompressor } from '../features/upload/imagePorts';
 import { PhotoPreparer } from '../features/upload/PhotoPreparer';
 import type { PhotoEditorComponent } from '../features/upload/photoEditor';
+import { CanvasAutoAnalyzer, CanvasPreviewRenderer } from '../features/upload/editor/canvasPorts';
+import { CanvasEditRenderer, createCanvasPixelSurface } from '../features/upload/editor/CanvasEditRenderer';
 import type { AutoAnalyzer, PixelSurfaceFactory, PreviewRenderer } from '../features/upload/editor/editorPorts';
+import { createPhotoEditor } from '../features/upload/editor/PhotoEditorScreen';
 import { UploadGate } from '../features/upload/UploadGate';
 import { AttachableUploadNavigator } from '../features/upload/UploadNavigator';
 import { UploadRepository } from '../features/upload/UploadRepository';
@@ -129,7 +131,7 @@ export interface AppContainerOptions {
   imageDecoder?: ImageDecoder;
   /** WebP 한 번 압축. 기본 BrowserWebpCompressor(canvas, 안 되면 WASM). */
   webpCompressor?: WebpCompressor;
-  /** 편집값 적용. 기본 IdentityEditRenderer(W7b 전). */
+  /** 편집값 적용. 기본 CanvasEditRenderer(pixelSurface 위). */
   editRenderer?: EditRenderer;
   /** 카메라 버튼 표시 판정. 기본 BrowserCameraCaptureSupport. */
   cameraCapture?: CameraCaptureSupport;
@@ -335,10 +337,21 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
   const uploadResults = new UploadResultStore();
   const uploadRepository = new UploadRepository({ api });
   const homeRepository = new HomeRepository({ api });
-  const editRenderer = options.editRenderer ?? new IdentityEditRenderer();
+  const imageDecoder = options.imageDecoder ?? new BrowserImageDecoder();
+  const blobUrls = options.blobUrls ?? new ObjectUrlFactory();
+  const pixelSurface = options.pixelSurface ?? createCanvasPixelSurface;
+  const editRenderer = options.editRenderer ?? new CanvasEditRenderer({ createSurface: pixelSurface });
+  const photoEditor =
+    options.photoEditor === undefined
+      ? createPhotoEditor({
+          decoder: imageDecoder,
+          preview: options.previewRenderer ?? new CanvasPreviewRenderer({ createSurface: pixelSurface, blobUrls }),
+          analyzer: options.autoAnalyzer ?? new CanvasAutoAnalyzer({ createSurface: pixelSurface }),
+        })
+      : options.photoEditor;
   const photoPreparer = new PhotoPreparer({
     repository: uploadRepository,
-    decoder: options.imageDecoder ?? new BrowserImageDecoder(),
+    decoder: imageDecoder,
     compressor: options.webpCompressor ?? new BrowserWebpCompressor(),
     renderer: editRenderer,
     clock,
@@ -388,7 +401,7 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     photoPreparer,
     uploadResults,
     cameraCapture: options.cameraCapture ?? new BrowserCameraCaptureSupport(),
-    photoEditor: options.photoEditor ?? null,
+    photoEditor,
     editRenderer,
     crossTabSync,
     presignedUploader,
@@ -396,7 +409,7 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     visibilityObserver: options.visibilityObserver === undefined ? createIntersectionVisibilityObserver() : options.visibilityObserver,
     signatureDraft: new SignatureDraft(),
     signatureRasterizer: options.signatureRasterizer ?? new CanvasSignatureRasterizer({ createSurface: createCanvasSurface }),
-    blobUrls: options.blobUrls ?? new ObjectUrlFactory(),
+    blobUrls,
     signatureRepository,
     signatureCard,
     homeRepository,
