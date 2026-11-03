@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 
 import { networkFailure } from '../../core/http/__testing__/FakeTransport';
 import { fixtureResponse } from '../../core/http/__testing__/loadFixture';
@@ -293,5 +294,52 @@ describe('DisplayScreen 좋아요', () => {
     await fireEvent.press(screen.getByTestId(`display.like-button-${ID('02')}`));
     expect(h.toast.messages).toEqual([t('guest.like')]);
     expect(h.likes.toggled).toEqual([]);
+  });
+});
+
+describe('DisplayScreen 메이슨리 (D-13 플랫폼 관례)', () => {
+  it('TC-DISP-057 사진 비율이 스타일에 그대로 반영되고, 이미지를 읽어도 타일이 열을 옮기지 않는다', async () => {
+    const h = await createDisplayHarness();
+    h.router.set(RECENT, 'display/posts-list__mixed-ratio');
+    await renderDisplay(h);
+    const columnIds = () =>
+      [0, 1].map((column) =>
+        within(screen.getByTestId(`display.column-${column}`))
+          .queryAllByTestId(/^display\.item-.*-photo$/)
+          .map((tile) => tile.props.testID as string),
+      );
+    const before = columnIds();
+    // fixture의 원본 파일명(original-3x4.webp)이 사진 비율이다. 이미지를 읽은 순간 그 비율이 전달된다.
+    const posts = h.viewModel.getSnapshot().photos;
+    const ratios = new Map<string, number>();
+    for (const post of posts) {
+      const [w, hgt] =
+        /original-(\d+)x(\d+)/.exec(post.originalImageUrl)?.slice(1).map(Number) ?? [];
+      ratios.set(post.id, w / hgt);
+      await act(async () => {
+        fireEvent(screen.getByTestId(`display.item-${post.id}-photo`), 'load', {
+          nativeEvent: { source: { width: w * 100, height: hgt * 100 } },
+        });
+      });
+    }
+    for (const tile of screen.getAllByTestId(/^display\.item-.*-photo$/)) {
+      const aspect = StyleSheet.flatten(tile.props.style).aspectRatio as number;
+      const id = (tile.props.testID as string).replace(/^display\.item-|-photo$/g, '');
+      expect(aspect).toBeCloseTo(ratios.get(id) as number, 5);
+    }
+    // 로드 후에도 각 타일은 처음 놓인 열·순서 그대로다(점프·스크롤 위치 흔들림 없음).
+    expect(columnIds()).toEqual(before);
+    expect(before.flat().length).toBe(posts.length);
+  });
+});
+
+describe('DisplayScreen 탭 재선택', () => {
+  it('TC-NAV-008 전시 탭 재선택이 끝나면 목록을 맨 위로 스크롤한다', async () => {
+    const h = await createDisplayHarness();
+    await renderDisplay(h);
+    const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo');
+    await act(async () => h.viewModel.onTabReselected());
+    expect(scrollTo).toHaveBeenCalledWith({ y: 0, animated: true });
+    scrollTo.mockRestore();
   });
 });

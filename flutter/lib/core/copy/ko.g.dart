@@ -619,6 +619,9 @@ abstract final class Copy {
   /// `home.weekly.title`
   static const homeWeeklyTitle = '이번 주 기록';
 
+  /// `like.a11y.count`
+  static const likeA11yCount = '좋아요 {n}개';
+
   /// `like.error.banned`
   static const likeErrorBanned = '이용이 제한되어 좋아요를 누를 수 없어요.';
 
@@ -942,6 +945,12 @@ abstract final class Copy {
 
   /// `time.notification-format`
   static const timeNotificationFormat = 'M월 d일 HH:mm';
+
+  /// `upload.album.a11y`
+  static const uploadAlbumA11y = '앨범에서 사진 고르기';
+
+  /// `upload.camera.a11y`
+  static const uploadCameraA11y = '카메라로 사진 찍기';
 
   /// `upload.camera.save-failed`
   static const uploadCameraSaveFailed = '사진을 갤러리에 저장하지 못했어요.';

@@ -283,16 +283,41 @@ class BootGateTest {
     }
 
     @Test
-    fun `TC-BOOT-031 cancelled or failed update flow keeps the gate closed and can be retried`() = runTest {
+    fun `TC-BOOT-031 REQ-BOOT-009 cancelled or failed update exits the app`() = runTest {
         val r = rig(memberStore(), checker = ScriptedUpdateChecker(UpdateCheckResult.UpdateRequired))
         advanceUntilIdle()
+        val exits = collectAll(r.gate.exitRequests)
         for (result in listOf(UpdateFlowResult.Cancelled, UpdateFlowResult.Failed)) {
             r.launcher.result = result
             r.gate.onUpdateClicked(); advanceUntilIdle()
-            assertEquals(BootState.UpdateRequired, r.gate.state.value)
         }
-        assertEquals(2, r.launcher.calls)
+        assertEquals(2, exits.size)
         assertEquals(0, r.push.calls)
+    }
+
+    @Test
+    fun `TC-BOOT-031 REQ-BOOT-009 completed update does not exit and the gate stays closed`() = runTest {
+        val r = rig(memberStore(), checker = ScriptedUpdateChecker(UpdateCheckResult.UpdateRequired))
+        advanceUntilIdle()
+        val exits = collectAll(r.gate.exitRequests)
+        r.launcher.result = UpdateFlowResult.Completed
+        r.gate.onUpdateClicked(); advanceUntilIdle()
+        assertTrue(exits.isEmpty())
+        assertEquals(BootState.UpdateRequired, r.gate.state.value)
+        r.gate.onUpdateClicked(); advanceUntilIdle()
+        assertEquals(2, r.launcher.calls)
+        assertTrue(exits.isEmpty())
+    }
+
+    @Test
+    fun `TC-BOOT-031 REQ-BOOT-009 cancel button exits the app without launching the update`() = runTest {
+        val r = rig(memberStore(), checker = ScriptedUpdateChecker(UpdateCheckResult.UpdateRequired))
+        advanceUntilIdle()
+        val exits = collectAll(r.gate.exitRequests)
+        r.gate.onCancelClicked(); advanceUntilIdle()
+        assertEquals(1, exits.size)
+        assertEquals(0, r.launcher.calls)
+        assertEquals(BootState.UpdateRequired, r.gate.state.value)
     }
 
     // ---- re-authentication ----------------------------------------------------------------------

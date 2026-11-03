@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -20,6 +21,8 @@ type Ids = {
   error: string;
   retry: string;
   item: (postId: string) => string;
+  image: (postId: string) => string;
+  imageError: (postId: string) => string;
   likeButton: (postId: string) => string;
   likeCount: (postId: string) => string;
 };
@@ -33,6 +36,8 @@ const IDS: Record<RankingKey, Ids> = {
     error: 'home.ranking-error',
     retry: 'home.ranking-retry-button',
     item: (id) => `home.ranking-item-${id}`,
+    image: (id) => `home.ranking-image-${id}`,
+    imageError: (id) => `home.ranking-image-error-${id}`,
     likeButton: (id) => `home.ranking-like-button-${id}`,
     likeCount: (id) => `home.ranking-like-count-${id}`,
   },
@@ -43,6 +48,8 @@ const IDS: Record<RankingKey, Ids> = {
     error: 'home.popular-error',
     retry: 'home.popular-retry-button',
     item: (id) => `home.popular-item-${id}`,
+    image: (id) => `home.popular-image-${id}`,
+    imageError: (id) => `home.popular-image-error-${id}`,
     likeButton: (id) => `home.popular-like-button-${id}`,
     likeCount: (id) => `home.popular-like-count-${id}`,
   },
@@ -109,6 +116,7 @@ export function RankingRow({
               key={post.id}
               post={post}
               ids={ids}
+              title={title}
               onPress={() => onItemPress(post.id)}
               onLikePress={() => onLikePress(post.id)}
             />
@@ -122,15 +130,21 @@ export function RankingRow({
 function RankingItem({
   post,
   ids,
+  title,
   onPress,
   onLikePress,
 }: {
   post: PostSummary;
   ids: Ids;
+  title: string;
   onPress: () => void;
   onLikePress: () => void;
 }) {
   const uri = post.thumbnailImageUrl ?? post.originalImageUrl;
+  // 이 항목의 이미지만 불러오지 못하면 그 자리에 안내 문구를 둔다(D-20). 다른 항목·좋아요는 그대로다.
+  // 같은 항목의 URL이 바뀌면(새로고침) 실패 기록을 버리고 다시 시도한다.
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  const failed = failedUri === uri;
   return (
     <Pressable
       testID={ids.item(post.id)}
@@ -138,7 +152,21 @@ function RankingItem({
       onPress={onPress}
       style={styles.item}
     >
-      <Image source={{ uri }} style={styles.photo} resizeMode="cover" />
+      {failed ? (
+        <View style={[styles.photo, styles.photoFallback]}>
+          <Text testID={ids.imageError(post.id)} style={styles.fallbackText}>
+            {format(t('home.ranking.error'), { '섹션 제목': title })}
+          </Text>
+        </View>
+      ) : (
+        <Image
+          testID={ids.image(post.id)}
+          source={{ uri }}
+          style={styles.photo}
+          resizeMode="cover"
+          onError={() => setFailedUri(uri)}
+        />
+      )}
       <Pressable
         testID={ids.likeButton(post.id)}
         accessibilityRole="button"
@@ -175,6 +203,8 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.lg, gap: spacing.sm },
   item: { width: 132, gap: spacing.xs },
   photo: { width: 132, height: 132, borderRadius: 12, backgroundColor: colors.surface },
+  photoFallback: { alignItems: 'center', justifyContent: 'center', padding: spacing.sm },
+  fallbackText: { fontSize: 12, textAlign: 'center', color: colors.textSecondary },
   like: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   likeIcon: { fontSize: 16, color: colors.textSecondary },
   liked: { color: colors.accent },

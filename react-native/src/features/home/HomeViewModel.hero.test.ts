@@ -342,7 +342,7 @@ describe('HomeViewModel AI 피드백 카드 노출 (D-03, REQ-HOME-034)', () => 
 });
 
 describe('HomeViewModel 게스트 (D-05)', () => {
-  it('TC-HOME-012 REQ-HOME-047 게스트는 개인 API를 부르지 않고 히어로 empty, 주간은 빈 7칸이며 랭킹·배너만 부른다', async () => {
+  it('TC-HOME-012 TC-NAV-014 REQ-HOME-047 게스트는 개인 API를 부르지 않고 히어로 empty, 주간은 빈 7칸이며 랭킹·배너만 부른다', async () => {
     const h = await createHomeHarness({ mode: 'guest' });
     await h.viewModel.onShown();
 
@@ -371,7 +371,7 @@ describe('HomeViewModel 게스트 (D-05)', () => {
     expect(h.transport.requests).toHaveLength(before);
   });
 
-  it('TC-HOME-049 REQ-HOME-046 게스트의 알림 버튼은 토스트만, 미읽음 조회도 없다', async () => {
+  it('TC-HOME-049 TC-NAV-020 TC-NOTI-051 REQ-HOME-046 게스트의 알림 버튼은 토스트만, 미읽음 조회도 점도 없다', async () => {
     const h = await createHomeHarness({ mode: 'guest' });
     await h.viewModel.onShown();
     h.viewModel.onNotificationPress();
@@ -379,9 +379,10 @@ describe('HomeViewModel 게스트 (D-05)', () => {
     expect(h.toast.messages).toEqual(['로그인 후 알림을 확인할 수 있어요']);
     expect(h.navigator.calls).toEqual([]);
     expect(h.transport.requestsTo('GET', '/notifications/unread-status')).toHaveLength(0);
+    expect(h.viewModel.getSnapshot().hasUnread).toBe(false);
   });
 
-  it('TC-HOME-022 REQ-HOME-032 게스트가 랭킹 사진을 누르면 토스트만 뜨고 이동·상세 요청이 없다', async () => {
+  it('TC-HOME-022 TC-NAV-018 REQ-HOME-032 게스트가 랭킹 사진을 누르면 토스트만 뜨고 이동·상세 요청이 없다', async () => {
     const h = await createHomeHarness({ mode: 'guest' });
     await h.viewModel.onShown();
     const first = firstPostId(h.viewModel.getSnapshot().popular);
@@ -390,7 +391,7 @@ describe('HomeViewModel 게스트 (D-05)', () => {
     expect(h.navigator.calls).toEqual([]);
   });
 
-  it('REQ-HOME-033 게스트가 하트를 누르면 컨트롤러에 위임하지 않고 토스트만 뜬다', async () => {
+  it('REQ-HOME-033 TC-NAV-019 게스트가 하트를 누르면 컨트롤러에 위임하지 않고 토스트만 뜬다', async () => {
     const h = await createHomeHarness({ mode: 'guest' });
     await h.viewModel.onShown();
     h.viewModel.onRankingLikePress('popular', firstPostId(h.viewModel.getSnapshot().popular));

@@ -52,6 +52,7 @@ import kr.chalkak.core.data.post.LikeController
 import kr.chalkak.core.data.post.PostChanges
 import kr.chalkak.core.data.post.PostSort
 import kr.chalkak.feature.aireview.AiReviewStateHolder
+import kr.chalkak.feature.auth.AccountEffect
 import kr.chalkak.feature.auth.HomeMode
 import kr.chalkak.feature.display.DisplayStateHolder
 import kr.chalkak.feature.display.FeedEntry
@@ -235,6 +236,19 @@ private fun MainHostContent(
         homeUnread?.attach(homeHolder)
         onDispose { homeUnread?.detach(homeHolder) }
     }
+    // Logout / withdrawal end the session wherever the user is by then: the settings route may have left the composition meanwhile.
+    // The holders are the settings route's own (same key), built here as soon as the host composes.
+    deps.newSettingsHolders?.let { create ->
+        val mode = navState.accessMode
+        val holders = rememberStateHolder("settings-$sessionKey-$mode") { scope -> create(scope, mode.toHomeMode()) }
+        LaunchedEffect(holders.account, coordinator) {
+            holders.account.effects.collect { effect ->
+                when (effect) {
+                    AccountEffect.GoToLogin -> coordinator.onAccountEnded()
+                }
+            }
+        }
+    }
     val homeList = rememberLazyListState()
     val idleSignal = remember { ScrollToTopSignal() }
 
@@ -328,7 +342,6 @@ private fun MainHostContent(
                         onChangeSignature = coordinator::onOpenChangeSignature,
                         onShowDocument = coordinator::onShowDocument,
                         onOpenSystemNotificationSettings = { deps.openSystemNotificationSettings() },
-                        onAccountEnded = coordinator::onAccountEnded,
                         onLoginRequired = { }, // the 401 also ends the session through AuthEvent.GoToLogin (as for feed)
                     )
                     if (route is Route.TermsDocument) {
