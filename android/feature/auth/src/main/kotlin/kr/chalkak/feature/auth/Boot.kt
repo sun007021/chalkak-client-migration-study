@@ -78,10 +78,25 @@ class BootGate(
         scope.launch(start = CoroutineStart.UNDISPATCHED) { if (checkUpdate() == UpdateCheckResult.UpdateRequired) closeForUpdate() }
     }
 
-    /** Dialog button. Concurrent clicks launch once; Cancelled/Failed keep the gate closed. */
+    private val _exitRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    /** Emits when the update flow was cancelled or failed: the host closes the app (REQ-BOOT-009). */
+    val exitRequests: SharedFlow<Unit> = _exitRequests
+
+    /** Dialog button. Concurrent clicks launch once; Cancelled/Failed ask the host to exit, Completed keeps the gate closed. */
     fun onUpdateClicked() {
         if (updateJob?.isActive == true) return
-        updateJob = scope.launch(start = CoroutineStart.UNDISPATCHED) { guarded(Unit) { updateLauncher.launch() } }
+        updateJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            when (guarded(UpdateFlowResult.Failed) { updateLauncher.launch() }) {
+                UpdateFlowResult.Completed -> Unit
+                UpdateFlowResult.Cancelled, UpdateFlowResult.Failed -> _exitRequests.tryEmit(Unit)
+            }
+        }
+    }
+
+    /** Dialog cancel button: leaves the app like a cancelled update flow (REQ-BOOT-009). */
+    fun onCancelClicked() {
+        _exitRequests.tryEmit(Unit)
     }
 
     private suspend fun checkUpdate(): UpdateCheckResult = guarded(UpdateCheckResult.Unavailable) { updateChecker.check() }

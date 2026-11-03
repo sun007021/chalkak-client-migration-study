@@ -37,10 +37,8 @@ class PlatformAdapters(
     val signatureEncoder: SignatureImageEncoder,
     val analytics: AnalyticsTracker,
     val preloader: HomePreloader,
-    /** Foreground Activity (Kakao login, Play update). `MainActivity` registers itself here. */
+    /** Foreground Activity (Kakao login). `MainActivity` registers itself here. */
     val currentActivity: CurrentActivity = CurrentActivity(),
-    /** Result channel of Play's immediate update flow, wired by `MainActivity`. */
-    val updateFlowBridge: UpdateFlowBridge = UpdateFlowBridge(),
     /** Result channel of the Photo Picker / camera, wired by `MainActivity`. */
     val photoPickBridge: PhotoPickBridge = PhotoPickBridge(),
     /** Photo upload and editing ports (picker, camera, codec, WebP, temp files, gallery, edit preview). */
@@ -57,7 +55,6 @@ class PlatformAdapters(
         fun android(context: Context, copy: Copy = Copy.load(context)): PlatformAdapters {
             val app = context.applicationContext
             val activity = CurrentActivity()
-            val bridge = UpdateFlowBridge()
             val photoBridge = PhotoPickBridge()
             val playManager = AppUpdateManagerFactory.create(app)
             val socialLogin: SocialLoginClient = when {
@@ -69,14 +66,13 @@ class PlatformAdapters(
             return PlatformAdapters(
                 socialLogin = socialLogin,
                 updateChecker = ConfiguredUpdateChecker(BuildConfig.FORCE_UPDATE_CHECK_ENABLED, PlayUpdateChecker(PlayUpdateSourceAdapter(playManager))),
-                updateLauncher = PlayUpdateLauncher(playManager, activity, bridge, StoreOpener(app)),
+                updateLauncher = StoreUpdateLauncher(StoreOpener(app)),
                 externalBrowser = AndroidExternalBrowser(app),
                 linkBrowser = AndroidLinkBrowser(app),
                 signatureEncoder = AndroidSignatureEncoder(),
                 analytics = LogAnalyticsTracker(),
                 preloader = ReadyHomePreloader,
                 currentActivity = activity,
-                updateFlowBridge = bridge,
                 photoPickBridge = photoBridge,
                 upload = UploadAdapters.android(app, activity, photoBridge, copy, SystemClock),
                 calendarSaver = AndroidCalendarImageSaver(app),
