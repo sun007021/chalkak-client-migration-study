@@ -4,7 +4,7 @@ import { t } from '../../copy/ko';
 import { deferred } from '../../test/deferred';
 import { gated } from '../../test/displayAsserts';
 import { toastText } from '../../test/postScreens';
-import { OTHER, TODAY, dateRoutes, detailKey } from '../../test/postRoutes';
+import { OTHER, TODAY, dateRoutes, deleteKey, detailKey } from '../../test/postRoutes';
 import { OCT, OCT_20, SEP, SEP_17, monthResponse, recPostId, recordRequests, thumbOf } from '../../test/recordRoutes';
 import { openRecordApp, recordLoaded } from '../../test/recordScreens';
 import { screenViews } from '../../test/screenViews';
@@ -164,6 +164,22 @@ describe('기록 → 피드·전시 (TC-REC-034)', () => {
     expect(tid('record.day-2026-10-20')).toHaveAttribute('aria-selected', 'true');
     expect(tid('record.month-label')).toHaveTextContent('2026년 10월');
     await waitFor(() => expect(fixtures.calls(OCT).length).toBeGreaterThanOrEqual(2));
+  });
+
+  it('TC-REC-034 TC-FEED-004 기록에서 연 상세에서 그 게시물을 직접 삭제하면 기록으로 돌아와 칸이 비고 선택이 옮겨 간다', async () => {
+    const { router, fixtures } = await openRecordApp({ routes: { [OCT]: approvedToday, [deleteKey(OTHER)]: 'feed/posts-delete__204' } });
+    await recordLoaded();
+    click('record.day-2026-10-27');
+    click('record.view-feed-button');
+    await screen.findByTestId('feed.root');
+    await waitFor(() => expect(maybe('feed.delete-button')).toBeInTheDocument()); // 작성자가 다른 사람이어도 기록에서 연 것은 내 게시물이다
+    click('feed.delete-button');
+    fireEvent.click(await screen.findByTestId('feed.delete-confirm-button'));
+    await screen.findByTestId('record.calendar-grid');
+    expect(router.state.location.pathname).toBe('/record');
+    expect(fixtures.calls(deleteKey(OTHER))).toHaveLength(1);
+    expect(maybe('record.day-photo-2026-10-27')).not.toBeInTheDocument();
+    expect(tid('record.day-2026-10-20')).toHaveAttribute('aria-selected', 'true'); // 같은 달의 남은 가장 늦은 사진
   });
 
   it('TC-REC-034 REQ-REC-035 "전시 보러가기"는 그 사진의 topicDate 전시를 push하고 뒤로 가면 기록으로 돌아온다', async () => {

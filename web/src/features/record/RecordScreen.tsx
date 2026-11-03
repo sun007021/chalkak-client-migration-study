@@ -113,7 +113,7 @@ function MonthHeader({ vm, state }: { vm: RecordViewModel; state: RecordState })
             setPickerOpen(true);
           }}
         >
-          <span data-testid="record.month-label">{monthLabel(state.month)}</span>
+          <span data-testid="record.month-label" aria-live="polite">{monthLabel(state.month)}</span>
         </button>
         <button type="button" data-testid="record.next-month-button" aria-label={webOnlyCopy['record.nav.next']} disabled={!state.canGoNext} onClick={() => void vm.selectNextMonth()}>
           <span aria-hidden="true">›</span>
@@ -211,7 +211,7 @@ function Calendar({ vm, state, posts }: { vm: RecordViewModel; state: RecordStat
         ))}
       </div>
       {/* 칸이 격자의 직접 자식이어야 해서(7열) 행(row) 래퍼 없이 gridcell을 나열한다. 초점은 선택된 사진 날 하나만 받는다(roving tabindex). */}
-      <div ref={gridRef} data-testid="record.calendar-grid" role="grid" aria-label={monthLabel(state.month)} style={gridStyle} onKeyDown={onKeyDown}>
+      <div ref={gridRef} data-testid="record.calendar-grid" role="grid" aria-label={monthLabel(state.month)} aria-busy={state.body.status === 'ready' && state.body.revalidating} style={gridStyle} onKeyDown={onKeyDown}>
         {cells.map((day, index) => {
           if (day === null) return <div key={`blank-${index}`} role="gridcell" aria-hidden="true" />;
           const date = formatDateString(year, month, day);
@@ -277,20 +277,28 @@ function SelectedPhoto({ vm, state, post }: { vm: RecordViewModel; state: Record
     <section data-testid="record.selected-photo" style={{ position: 'relative', padding: '12px 16px' }}>
       <img src={post.thumbnailImageUrl} alt={webOnlyCopy['record.selected-photo-alt']} crossOrigin="anonymous" style={{ display: 'block', width: '100%', borderRadius: 8, background: '#e5e5e5' }} />
       {pending ? (
-        <div style={{ position: 'absolute', top: 20, left: 24 }}>
+        <div
+          style={{ position: 'absolute', top: 20, left: 24 }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && state.pendingHintOpen) {
+              event.stopPropagation();
+              vm.togglePendingHint();
+            }
+          }}
+        >
           <button
             type="button"
             data-testid="record.pending-badge"
-            aria-label={state.pendingHintOpen ? t('record.pending.hint-close') : t('record.pending.hint-open')}
+            aria-label={`${t('record.pending.badge')}, ${state.pendingHintOpen ? t('record.pending.hint-close') : t('record.pending.hint-open')}`}
             aria-expanded={state.pendingHintOpen}
-            aria-controls={state.pendingHintOpen ? tooltipId : undefined}
+            aria-describedby={state.pendingHintOpen ? tooltipId : undefined}
             style={{ ...plainButton, padding: '4px 8px', borderRadius: 12, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: 12 }}
             onClick={() => vm.togglePendingHint()}
           >
             {t('record.pending.badge')}
           </button>
           {state.pendingHintOpen ? (
-            <p id={tooltipId} role="tooltip" data-testid="record.pending-tooltip" style={{ margin: '4px 0 0', padding: 8, borderRadius: 8, background: '#fff', border: '1px solid #e5e5e5', fontSize: 12, whiteSpace: 'pre-line' }}>
+            <p id={tooltipId} data-testid="record.pending-tooltip" style={{ margin: '4px 0 0', padding: 8, borderRadius: 8, background: '#fff', border: '1px solid #e5e5e5', fontSize: 12, whiteSpace: 'pre-line' }}>
               {t('record.pending.tooltip')}
             </p>
           ) : null}
@@ -312,7 +320,7 @@ function SelectedPhoto({ vm, state, post }: { vm: RecordViewModel; state: Record
 function ErrorView({ kind, onRetry, onLogin }: { kind: RecordErrorKind; onRetry: () => void; onLogin: () => void }): ReactNode {
   if (kind === 'unauthorized') {
     return (
-      <div data-testid="record.login-required-state" style={{ padding: 16, textAlign: 'center' }}>
+      <div role="alert" data-testid="record.login-required-state" style={{ padding: 16, textAlign: 'center' }}>
         <p>{t('record.err.401')}</p>
         <button type="button" data-testid="record.login-button" onClick={onLogin}>
           {t('record.guest.login')}
@@ -322,13 +330,13 @@ function ErrorView({ kind, onRetry, onLogin }: { kind: RecordErrorKind; onRetry:
   }
   if (kind === 'invalid-month') {
     return (
-      <p data-testid="record.invalid-month-message" style={{ padding: 16, textAlign: 'center' }}>
+      <p role="alert" data-testid="record.invalid-month-message" style={{ padding: 16, textAlign: 'center' }}>
         {t('record.err.400')}
       </p>
     );
   }
   return (
-    <div data-testid="record.error-state" style={{ padding: 16, textAlign: 'center' }}>
+    <div role="alert" data-testid="record.error-state" style={{ padding: 16, textAlign: 'center' }}>
       <p data-testid="record.error-message">{kind === 'network' ? t('common.error.network') : t('record.err.other')}</p>
       <button type="button" data-testid="record.retry-button" onClick={onRetry}>
         {t('common.retry')}

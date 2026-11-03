@@ -1,6 +1,10 @@
 import { vi } from 'vitest';
-import { fireEvent, screen, within } from '@testing-library/react';
-import { openRecordApp, recordLoaded } from '../../test/recordScreens';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { t } from '../../copy/ko';
+import { deferred } from '../../test/deferred';
+import { gated } from '../../test/displayAsserts';
+import { OCT } from '../../test/recordRoutes';
+import { advanceApp, openRecordApp, recordLoaded } from '../../test/recordScreens';
 
 vi.setConfig({ testTimeout: 15_000 });
 
@@ -84,5 +88,47 @@ describe('월 선택 시트 접근성', () => {
     fireEvent.keyDown(tid('record.month-picker-item-2026-10'), { key: 'End' });
     expect(document.activeElement).toBe(tid('record.month-picker-item-2026-09'));
     expect(list).toBeInTheDocument();
+  });
+});
+
+describe('배지 안내와 상태 알림 접근성', () => {
+  it('배지의 접근성 이름은 보이는 글자를 포함하고, 열리면 aria-describedby로 안내와 이어지며 Esc로 닫힌다', async () => {
+    await openRecordApp();
+    await recordLoaded();
+    fireEvent.click(tid('record.day-2026-10-27'));
+    const badge = tid('record.pending-badge');
+    expect(badge).toHaveAccessibleName(`${t('record.pending.badge')}, ${t('record.pending.hint-open')}`);
+    expect(badge).not.toHaveAttribute('aria-describedby');
+    fireEvent.click(badge);
+    const tooltip = tid('record.pending-tooltip');
+    expect(tooltip).not.toHaveAttribute('role', 'tooltip');
+    expect(badge).toHaveAttribute('aria-describedby', tooltip.id);
+    expect(badge).toHaveAccessibleName(`${t('record.pending.badge')}, ${t('record.pending.hint-close')}`);
+    fireEvent.keyDown(badge, { key: 'Escape' });
+    expect(screen.queryByTestId('record.pending-tooltip')).not.toBeInTheDocument();
+  });
+
+  it('월 라벨은 aria-live=polite이고 재검증 중에는 달력이 aria-busy이다', async () => {
+    const gate = deferred<void>();
+    await openRecordApp({ routes: { [OCT]: ['record/posts-calendar__2026-10', gated(gate, 'record/posts-calendar__2026-10')] } });
+    await recordLoaded();
+    expect(tid('record.month-label')).toHaveAttribute('aria-live', 'polite');
+    expect(tid('record.calendar-grid')).toHaveAttribute('aria-busy', 'false');
+    fireEvent.click(tid('bottom-bar.tab-record'));
+    await waitFor(() => expect(tid('record.calendar-grid')).toHaveAttribute('aria-busy', 'true'));
+    await act(async () => gate.resolve());
+    await waitFor(() => expect(tid('record.calendar-grid')).toHaveAttribute('aria-busy', 'false'));
+  });
+
+  it('오류 화면은 role=alert로 알린다', async () => {
+    const { h, fixtures } = await openRecordApp({ routes: { [OCT]: 'record/posts-calendar__500-server-error' }, waitFor: null });
+    await waitFor(() => expect(fixtures.calls(OCT).length).toBeGreaterThan(0));
+    await advanceApp(h, 2000);
+    expect(await screen.findByRole('alert')).toBe(tid('record.error-state'));
+  });
+
+  it('조회할 수 없는 연월과 로그인 필요 화면도 role=alert이다', async () => {
+    await openRecordApp({ routes: { [OCT]: 'record/posts-calendar__400-invalid-month' }, waitFor: null });
+    expect(await screen.findByRole('alert')).toBe(tid('record.invalid-month-message'));
   });
 });

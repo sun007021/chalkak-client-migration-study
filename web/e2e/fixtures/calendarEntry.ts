@@ -66,5 +66,5 @@ export async function renderCalendar(ym: { year: number; month: number }, specs:
 /** 그린 PNG를 실제 `<a download>`로 내려받게 한다(브라우저의 download 이벤트는 테스트가 기다린다). */
 export async function downloadCalendar(ym: { year: number; month: number }, specs: PostSpec[], name: string): Promise<void> {
   const blob = await render(ym, specs);
-  await new AnchorFileDownloader({ blobUrls: new ObjectUrlFactory() }).download({ name, blob });
+  await new AnchorFileDownloader({ blobUrls: new ObjectUrlFactory(), clock: new SystemClock() }).download({ name, blob });
 }
