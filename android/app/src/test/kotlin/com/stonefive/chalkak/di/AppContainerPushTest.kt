@@ -2,7 +2,6 @@ package com.stonefive.chalkak.di
 
 import com.stonefive.chalkak.copy.Copy
 import com.stonefive.chalkak.platform.AndroidSignatureEncoder
-import com.stonefive.chalkak.platform.NoopPushRegistrar
 import com.stonefive.chalkak.platform.PlatformAdapters
 import com.stonefive.chalkak.platform.ReadyHomePreloader
 import com.stonefive.chalkak.platform.UnconfiguredKakaoSdk
@@ -50,8 +49,6 @@ class AppContainerPushTest {
         linkBrowser = { BrowserOpenResult.NoBrowser },
         signatureEncoder = AndroidSignatureEncoder(),
         analytics = analytics,
-        push = NoopPushRegistrar,
-        deviceRegistrar = NoopPushRegistrar,
         preloader = ReadyHomePreloader,
         pushPlatform = push.platform,
     )
