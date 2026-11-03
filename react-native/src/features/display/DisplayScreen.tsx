@@ -19,7 +19,7 @@ import type { PostSort, PostSummary } from '../../data/post/PostModels';
 import { t } from '../../shared/copy';
 import { colors, spacing } from '../../shared/ui/theme';
 import { collapseProgress } from './displayDateRange';
-import { splitMasonry } from './masonry';
+import { type MasonryAssignment, sameAssignment, splitMasonry } from './masonry';
 import { DatePickerSheet } from './ui/DatePickerSheet';
 import { FeaturedPager } from './ui/FeaturedPager';
 import { PhotoTile } from './ui/PhotoTile';
@@ -51,6 +51,7 @@ export function DisplayScreen({ viewModel }: { viewModel: DisplayViewModel }) {
   const scrollRef = useRef<ScrollViewInstance>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [collapse, setCollapse] = useState(0);
+  const [placed, setPlaced] = useState<MasonryAssignment>(() => new Map());
   const [ratios, setRatios] = useState<Readonly<Record<string, number>>>({});
   const visible = useVisibleReport(viewModel, state.photos);
 
@@ -73,7 +74,9 @@ export function DisplayScreen({ viewModel }: { viewModel: DisplayViewModel }) {
   };
 
   const hasGrid = state.status === 'content';
-  const half = splitMasonry(state.photos, ratios);
+  // 한 번 놓인 사진은 열을 옮기지 않는다(이미지 로드 후 점프 방지). 렌더마다 같은 입력이면 같은 결과다.
+  const { columns: half, assignment } = splitMasonry(state.photos, ratios, placed);
+  if (!sameAssignment(placed, assignment)) setPlaced(assignment);
 
   return (
     <View testID="display.root" style={[styles.root, { paddingTop: insets.top }]}>

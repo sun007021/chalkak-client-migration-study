@@ -14,7 +14,6 @@ import {
   type DisplayHarness,
 } from './__testing__/createDisplayHarness';
 import { DisplayScreen } from './DisplayScreen';
-import { TILE_CAPTION_UNITS } from './masonry';
 
 const RECENT = q('2026-10-27', 'recent', 1);
 
@@ -299,10 +298,17 @@ describe('DisplayScreen 좋아요', () => {
 });
 
 describe('DisplayScreen 메이슨리 (D-13 플랫폼 관례)', () => {
-  it('TC-DISP-057 다른 비율의 사진은 비율을 유지한 채 두 열의 높이가 균형 있게 놓인다', async () => {
+  it('TC-DISP-057 사진 비율이 스타일에 그대로 반영되고, 이미지를 읽어도 타일이 열을 옮기지 않는다', async () => {
     const h = await createDisplayHarness();
     h.router.set(RECENT, 'display/posts-list__mixed-ratio');
     await renderDisplay(h);
+    const columnIds = () =>
+      [0, 1].map((column) =>
+        within(screen.getByTestId(`display.column-${column}`))
+          .queryAllByTestId(/^display\.item-.*-photo$/)
+          .map((tile) => tile.props.testID as string),
+      );
+    const before = columnIds();
     // fixture의 원본 파일명(original-3x4.webp)이 사진 비율이다. 이미지를 읽은 순간 그 비율이 전달된다.
     const posts = h.viewModel.getSnapshot().photos;
     const ratios = new Map<string, number>();
@@ -316,22 +322,13 @@ describe('DisplayScreen 메이슨리 (D-13 플랫폼 관례)', () => {
         });
       });
     }
-    const heights = [0, 1].map((column) => {
-      const tiles = within(screen.getByTestId(`display.column-${column}`)).queryAllByTestId(
-        /^display\.item-.*-photo$/,
-      );
-      return tiles.reduce((sum, tile) => {
-        const aspect = StyleSheet.flatten(tile.props.style).aspectRatio as number;
-        // 사진 비율이 그대로 스타일에 반영된다.
-        expect(ratios.get(tile.props.testID.replace(/^display\.item-|-photo$/g, ''))).toBeCloseTo(
-          aspect,
-          5,
-        );
-        return sum + 1 / aspect + TILE_CAPTION_UNITS;
-      }, 0);
-    });
-    const tallest = Math.max(...[...ratios.values()].map((r) => 1 / r + TILE_CAPTION_UNITS));
-    expect(Math.abs(heights[0] - heights[1])).toBeLessThan(tallest);
-    expect(screen.getAllByTestId(/^display\.item-.*-photo$/).length).toBe(posts.length);
+    for (const tile of screen.getAllByTestId(/^display\.item-.*-photo$/)) {
+      const aspect = StyleSheet.flatten(tile.props.style).aspectRatio as number;
+      const id = (tile.props.testID as string).replace(/^display\.item-|-photo$/g, '');
+      expect(aspect).toBeCloseTo(ratios.get(id) as number, 5);
+    }
+    // 로드 후에도 각 타일은 처음 놓인 열·순서 그대로다(점프·스크롤 위치 흔들림 없음).
+    expect(columnIds()).toEqual(before);
+    expect(before.flat().length).toBe(posts.length);
   });
 });

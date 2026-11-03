@@ -121,7 +121,7 @@ describe('ExpoImageEngine 라운드', () => {
     engine.releaseRound();
   });
 
-  it('TC-UPL-032 TC-UPL-041 편집이 없으면 네이티브에 WEBP 저장만 요청한다: 품질은 사다리 값/100이고 다시 그리지 않아 치수를 바꾸지 않는다(RIFF·PSNR은 기기 확인)', async () => {
+  it('편집이 없으면 네이티브에 WEBP 저장만 요청한다: 품질은 사다리 값/100이고 다시 그리지 않아 치수를 바꾸지 않는다(RIFF·PSNR은 기기 확인)', async () => {
     const engine = new ExpoImageEngine();
     const saved = await engine.encodeWebp(request(null, 80));
     expect(mock.saves).toEqual([{ format: 'webp', compress: 0.8 }]);
@@ -131,7 +131,7 @@ describe('ExpoImageEngine 라운드', () => {
     engine.releaseRound();
   });
 
-  it('TC-UPL-036 EXIF 방향은 네이티브 디코드가 적용하므로 편집이 없으면 앱이 따로 회전하지 않고, 90도 편집만 한 번 회전한다(8방향 마커는 기기 확인)', async () => {
+  it('EXIF 방향은 네이티브 디코드가 적용하므로 편집이 없으면 앱이 따로 회전하지 않고, 90도 편집만 한 번 회전한다(8방향 마커는 기기 확인)', async () => {
     const engine = new ExpoImageEngine();
     await engine.encodeWebp(request(null, 90));
     expect(mock.ops).toEqual([]);

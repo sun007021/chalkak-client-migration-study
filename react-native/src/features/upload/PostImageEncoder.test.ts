@@ -108,7 +108,7 @@ describe('PostImageEncoder - 축소 라운드', () => {
     ]);
   });
 
-  it('TC-UPL-040 maxBytes 1,000,000에서 압축 크기가 면적·품질에 비례하면 결과는 한도 이하이고 치수는 {1, 0.85, 0.85², 0.85³}배 중 하나다(TS 경계 모의 인코더)', async () => {
+  it('maxBytes 1,000,000에서 압축 크기가 면적·품질에 비례하면 결과는 한도 이하이고 치수는 {1, 0.85, 0.85², 0.85³}배 중 하나다(TS 경계 모의 인코더)', async () => {
     // 실제 WebP 속성(디코드 가능 등)은 네이티브 인코더라 기기에서만 확인한다(README 참고). 여기서는 사다리·축소 규칙만 본다.
     const h = setup({ width: 1024, height: 768 });
     h.engine.sizeFor = (r) =>
@@ -121,7 +121,7 @@ describe('PostImageEncoder - 축소 라운드', () => {
     expect(Math.abs(result.height / 768 - factor)).toBeLessThan(0.002);
   });
 
-  it('TC-UPL-041 한도 안이고 4096 이하인 사진은 줄이지 않아 출력 치수가 입력과 같다(PSNR·크기 5%는 기기 확인)', async () => {
+  it('한도 안이고 4096 이하인 사진은 줄이지 않아 출력 치수가 입력과 같다(PSNR·크기 5%는 기기 확인)', async () => {
     const h = setup({ width: 1600, height: 1200 });
     h.engine.sizeFor = () => 200_000;
     const result = await h.encoder.encode(h.input());
