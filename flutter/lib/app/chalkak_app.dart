@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/analytics/screen_return_reporter.dart';
 import '../core/copy/ko.g.dart';
 import 'app_dependencies.dart';
 import 'app_router.dart';
@@ -21,7 +22,11 @@ class ChalkakApp extends StatefulWidget {
 }
 
 class _ChalkakAppState extends State<ChalkakApp> with WidgetsBindingObserver {
-  late final GoRouter _router = createAppRouter(widget.dependencies);
+  final ScreenReturnObserver _returnObserver = ScreenReturnObserver();
+  late final GoRouter _router = createAppRouter(
+    widget.dependencies,
+    returnObserver: _returnObserver,
+  );
   late final SessionRedirector _redirector = SessionRedirector(
     sessions: widget.dependencies.sessions,
     cleaner: widget.dependencies.userDataCleaner,
@@ -67,12 +72,17 @@ class _ChalkakAppState extends State<ChalkakApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return AppScope(
       dependencies: widget.dependencies,
-      child: MaterialApp.router(
-        title: Copy.appName,
-        routerConfig: _router,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFFEE500)),
-          useMaterial3: true,
+      child: ScreenReturnScope(
+        observer: _returnObserver,
+        child: MaterialApp.router(
+          title: Copy.appName,
+          routerConfig: _router,
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFFFEE500),
+            ),
+            useMaterial3: true,
+          ),
         ),
       ),
     );

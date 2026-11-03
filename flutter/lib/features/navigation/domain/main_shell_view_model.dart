@@ -198,8 +198,10 @@ class MainShellViewModel extends ChangeNotifier {
   }
 
   void _logScreen(BottomDestination destination) {
-    _loggedWhileCovered = true;
+    // 탭 화면이 스스로 보내는 탭은 셸이 보내지 않았으므로 "덮인 사이 보고함"으로 치지 않는다.
+    // 그래야 위에 쌓인 화면이 닫힐 때 [onReturned]가 screen_view를 보낸다.
     if (selfReportedScreens.contains(destination)) return;
+    _loggedWhileCovered = true;
     _analytics.logEvent(AnalyticsEvent.screenView(destination.value));
   }
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:chalkak/app/feed_route.dart';
 import 'package:chalkak/core/analytics/analytics_constants.dart';
 import 'package:chalkak/features/display/domain/display_models.dart';
+import 'package:chalkak/features/edit/presentation/photo_edit_test_ids.dart';
 import 'package:chalkak/features/feedback/presentation/feedback_test_ids.dart';
 import 'package:chalkak/features/home/presentation/home_test_ids.dart';
 import 'package:chalkak/features/navigation/presentation/navigation_test_ids.dart';
@@ -10,6 +11,7 @@ import 'package:chalkak/features/notification/presentation/notification_test_ids
 import 'package:chalkak/features/onboarding/presentation/onboarding_test_ids.dart';
 import 'package:chalkak/features/settings/presentation/settings_test_ids.dart';
 import 'package:chalkak/features/signature/presentation/signature_test_ids.dart';
+import 'package:chalkak/features/upload/presentation/upload_test_ids.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -19,6 +21,7 @@ import '../support/net_harness.dart';
 import '../support/notification_fakes.dart';
 import '../support/onboarding_fakes.dart' show meSignaturePath;
 import '../support/settings_fakes.dart' show notificationSettingsPath;
+import '../support/upload_fakes.dart' show FakePhotoPicker, photoBytes;
 
 Future<AppHarness> _enterMain(WidgetTester tester, {bool guest = false}) async {
   final h = AppHarness(session: guest ? sessionGuest() : sessionAt());
@@ -105,6 +108,77 @@ void main() {
       expect(h.analytics.screenNames, hasLength(5));
     },
   );
+
+  widgetTest('TC-ANL-017 알림함에서 게시물 상세로 갔다가 뒤로 가면 알림함의 screen_view를 다시 보낸다', (
+    tester,
+  ) async {
+    final h = await _enterMain(tester);
+    h.homeFakes.postRepository.onDetail(myPostId, [
+      Reply.ok(detailFx(detailMineTodayFx)),
+    ]);
+    await _tap(tester, h, 'payload__unknown-type');
+    expect(byId(NotificationTestIds.inboxRoot), findsOneWidget);
+    await _tap(tester, h, 'payload__post-approved');
+    expect(find.byType(FeedRoute), findsOneWidget);
+    expect(h.analytics.screenNames, ['home', 'notifications', 'feed']);
+
+    await _back(tester, find.byType(FeedRoute));
+    expect(byId(NotificationTestIds.inboxRoot), findsOneWidget);
+    expect(h.analytics.screenNames, [
+      'home',
+      'notifications',
+      'feed',
+      'notifications',
+    ]);
+  });
+
+  widgetTest('TC-ANL-017 업로드에서 사진 편집기로 갔다가 뒤로 가면 업로드의 screen_view를 다시 보낸다', (
+    tester,
+  ) async {
+    final h = await _enterMain(tester);
+    h.homeFakes.api.today([fx('upload/posts-today__not-posted.json')]);
+    await tester.tap(byId(NavigationTestIds.uploadButton));
+    await _settle(tester, 20);
+    expect(byId(UploadTestIds.root), findsOneWidget);
+    expect(h.analytics.screenNames, ['home', 'photo_upload']);
+
+    h.homeFakes.uploadRig.picker.queueAlbum(
+      Future.value(FakePhotoPicker.album(photoBytes())),
+    );
+    await tester.tap(byId(UploadTestIds.albumButton));
+    await _settle(tester, 20);
+    expect(byId(PhotoEditTestIds.root), findsOneWidget);
+
+    await _back(tester, byId(PhotoEditTestIds.root));
+    expect(byId(UploadTestIds.root), findsOneWidget);
+    expect(h.analytics.screenNames, ['home', 'photo_upload', 'photo_upload']);
+  });
+
+  widgetTest('TC-ANL-017 사인 변경 미리보기에서 다시 그리기로 돌아오면 그리기의 screen_view를 다시 보낸다', (
+    tester,
+  ) async {
+    final h = await _enterMain(tester);
+    await tester.tap(byId(NavigationTestIds.tabSettings));
+    await _settle(tester);
+    await tester.tap(byId(SettingsTestIds.signatureChangeButton));
+    await _settle(tester);
+    await tester.drag(byId(SignatureTestIds.drawCanvas), const Offset(80, 30));
+    await tester.pump();
+    await tester.tap(byId(SignatureTestIds.drawSubmitButton));
+    await _settle(tester);
+    expect(byId(SignatureTestIds.previewRoot), findsOneWidget);
+
+    await tester.tap(byId(SignatureTestIds.previewRedrawButton));
+    await _settle(tester);
+    expect(byId(SignatureTestIds.drawRoot), findsOneWidget);
+    expect(h.analytics.screenNames, [
+      'home',
+      'settings',
+      'change_signature',
+      'change_signature_preview',
+      'change_signature',
+    ]);
+  });
 
   widgetTest(
     'TC-ANL-005 메인 탭 4개를 차례로 누르면 home, display, record, settings가 1회씩 전송된다',

@@ -21,10 +21,18 @@ import 'view_model_host.dart';
 ///   terms로 `go`). extra가 문자열이면 가입에서 돌아오며 넘긴 안내 문구로 보여 준다.
 /// - 가입 흐름 화면(`/terms/**`)은 `SignUpContext`가 비어 있으면 login으로 보낸다.
 /// - 강제 업데이트 중에는 splash 밖으로 나가지 않는다.
-GoRouter createAppRouter(AppDependencies dependencies) {
+///
+/// [returnObserver]는 이 라우터의 Navigator에만 붙는다. 라우터마다 새로 만들어 `ScreenReturnScope`로
+/// 내려야 한다. 콜드 스타트에서 OS가 준 초기 URL이 [AppRoutes.splash]를 덮지 못하게 한다(TC-NAV-045).
+GoRouter createAppRouter(
+  AppDependencies dependencies, {
+  required ScreenReturnObserver returnObserver,
+}) {
   return GoRouter(
-    observers: [screenReturnObserver],
+    observers: [returnObserver],
     initialLocation: AppRoutes.splash,
+    overridePlatformDefaultLocation: true,
+
     refreshListenable: dependencies.updateGate,
     redirect: (context, state) {
       final forced = dependencies.updateGate.status == UpdateGateStatus.forced;

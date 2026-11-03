@@ -198,6 +198,42 @@ void main() {
     },
   );
 
+  widgetTest('TC-ANL-017 사인 그리기에서 뒤로 가 약관으로 돌아오면 terms의 screen_view를 다시 보낸다', (
+    tester,
+  ) async {
+    final h = _harness();
+    await _loginToTerms(tester, h);
+    await _agreeAndNext(tester);
+    expect(h.analytics.screenNames.last, 'onboarding_signature');
+    final before = h.analytics.screenNames.length;
+
+    await tester.tap(byId(SignatureTestIds.drawBackButton));
+    await settleUi(tester, frames: 30);
+    expect(byId(OnboardingTestIds.termsRoot), findsOneWidget);
+    expect(h.analytics.screenNames.length, before + 1);
+    expect(h.analytics.screenNames.last, 'terms');
+  });
+
+  widgetTest(
+    'TC-ANL-017 가입 미리보기에서 다시 그리기로 돌아오면 onboarding_signature의 screen_view를 다시 보낸다',
+    (tester) async {
+      final h = _harness();
+      await _loginToTerms(tester, h);
+      await _agreeAndNext(tester);
+      await _drawAndPreview(tester);
+      expect(h.analytics.screenNames.last, 'onboarding_signature_preview');
+
+      await tester.tap(byId(SignatureTestIds.previewRedrawButton));
+      await settleUi(tester, frames: 30);
+      expect(byId(SignatureTestIds.drawRoot), findsOneWidget);
+      expect(h.analytics.screenNames.last, 'onboarding_signature');
+      expect(
+        h.analytics.screenNames.where((n) => n == 'onboarding_signature'),
+        hasLength(2),
+      );
+    },
+  );
+
   widgetTest('TC-ONB-017 약관에서 뒤로 가면 로그인으로 돌아가고 가입 컨텍스트는 폐기된다', (tester) async {
     final h = _harness();
     await _loginToTerms(tester, h);

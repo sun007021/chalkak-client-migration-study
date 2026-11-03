@@ -1,7 +1,9 @@
 import 'package:chalkak/core/auth/session_manager.dart';
 import 'package:chalkak/core/ui/test_ids.dart';
+import 'package:chalkak/features/boot/domain/update_gate.dart';
 import 'package:chalkak/features/feedback/presentation/feedback_test_ids.dart';
 import 'package:chalkak/features/navigation/presentation/navigation_test_ids.dart';
+import 'package:chalkak/features/onboarding/presentation/onboarding_test_ids.dart';
 import 'package:chalkak/features/settings/presentation/settings_test_ids.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -151,4 +153,25 @@ void main() {
       expect(find.textContaining('Exception'), findsNothing);
     });
   }
+
+  widgetTest('TC-NAV-045 콜드 스타트에서 OS가 준 초기 URL이 있어도 스플래시에서 시작한다', (
+    tester,
+  ) async {
+    tester.platformDispatcher.defaultRouteNameTestValue = '/terms';
+    addTearDown(tester.platformDispatcher.clearDefaultRouteNameTestValue);
+    final h = await _enterMain(tester, loggedIn: false);
+    expect(byId(TestIds.loginRoot), findsOneWidget);
+    expect(byId(OnboardingTestIds.termsRoot), findsNothing);
+    expect(h.updateGate.status, isNot(UpdateGateStatus.forced));
+  });
+
+  widgetTest('TC-NAV-045 콜드 스타트 초기 URL이 로그인이어도 부팅이 끝나면 로그인 상태에 맞게 이동한다', (
+    tester,
+  ) async {
+    tester.platformDispatcher.defaultRouteNameTestValue = '/login';
+    addTearDown(tester.platformDispatcher.clearDefaultRouteNameTestValue);
+    await _enterMain(tester);
+    expect(byId(TestIds.homeRoot), findsOneWidget);
+    expect(byId(TestIds.loginRoot), findsNothing);
+  });
 }

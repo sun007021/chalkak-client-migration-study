@@ -164,7 +164,7 @@ class FeedViewModel extends ChangeNotifier {
     required this._likes,
     required this._postEvents,
     required this._userId,
-    this._analytics,
+    required this._analytics,
     this._clock = const KstClock(),
   }) : _today = _clock.today() {
     final seed = _target.seed;
@@ -190,7 +190,7 @@ class FeedViewModel extends ChangeNotifier {
   final PostEventBus _postEvents;
   final String? _userId;
   final KstClock _clock;
-  final AnalyticsTracker? _analytics;
+  final AnalyticsTracker _analytics;
   bool _shown = false;
 
   final StreamController<FeedEvent> _events =
@@ -221,7 +221,7 @@ class FeedViewModel extends ChangeNotifier {
   void onShown() {
     if (_disposed || _shown) return;
     _shown = true;
-    _analytics?.logEvent(AnalyticsEvent.screenView(ScreenNames.feed));
+    _analytics.logEvent(AnalyticsEvent.screenView(ScreenNames.feed));
   }
 
   Future<void> load() async {
