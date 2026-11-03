@@ -253,7 +253,11 @@ describe('홈 이번 주 기록 (REQ-HOME-019~026)', () => {
     fireEvent.click(screen.getByText(t('home.weekly.more')));
     await screen.findByTestId('record.root');
     expect(path()).toBe('/record');
-    expect(router.state.location.search).toBe('');
+    // 기록 화면은 기본 선택 날짜를 ?date=로 replace해 쓴다(이 fixture의 가장 늦은 사진은 10/27).
+    await waitFor(() => expect(router.state.location.search).toBe('?date=2026-10-27'));
+    // replace라서 기록 진입이 기록을 두 번 쌓지 않는다: 한 번 뒤로 가면 홈이다.
+    await act(async () => void router.navigate(-1));
+    await waitFor(() => expect(path()).toBe('/home'));
   });
 
   it('TC-HOME-032 REQ-HOME-025 주간 조회 실패는 이 섹션만 "기록을 불러오지 못했어요" + 다시 시도이고, 다시 시도는 주간만 다시 부른다', async () => {

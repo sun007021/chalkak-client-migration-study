@@ -19,6 +19,8 @@ import { FakeImageDecoder } from './FakeImageDecoder';
 import { FakeAutoAnalyzer } from './FakeAutoAnalyzer';
 import { FakePreviewRenderer } from './FakePreviewRenderer';
 import { FakeWebpCompressor } from './FakeWebpCompressor';
+import { FakeCalendarImageExporter } from './FakeCalendarImageExporter';
+import { FakeFileDownloader } from './FakeFileDownloader';
 import type { PhotoEditorComponent } from '../features/upload/photoEditor';
 import { FakeSocialLoginClient } from './FakeSocialLoginClient';
 import { FakeFetch } from './fakeFetch';
@@ -53,6 +55,9 @@ export interface Harness {
   analyzer: FakeAutoAnalyzer;
   /** 카메라 버튼 표시 여부. 테스트가 바꾸면 이후 렌더에 반영된다. */
   camera: { supported: boolean };
+  /** 기록 탭 달력 이미지 렌더·파일 다운로드 Fake. */
+  calendarExporter: FakeCalendarImageExporter;
+  downloader: FakeFileDownloader;
 }
 
 /** 실제 구현을 엮되 시계·fetch·저장소·카카오·프리로드·분석만 Fake로 둔 앱 컨테이너. */
@@ -90,6 +95,8 @@ export function makeHarness(
   const preview = new FakePreviewRenderer();
   const analyzer = new FakeAutoAnalyzer();
   const camera = { supported: options.cameraSupported ?? false };
+  const calendarExporter = new FakeCalendarImageExporter();
+  const downloader = new FakeFileDownloader();
   const container = createAppContainer({
     env: { VITE_API_BASE_URL: MOCK_BASE, ...options.env },
     devSessionEnabled: options.devSession ?? false,
@@ -115,8 +122,10 @@ export function makeHarness(
     externalLinkOpener: opener,
     signatureRasterizer: rasterizer,
     blobUrls,
+    calendarImageExporter: calendarExporter,
+    fileDownloader: downloader,
   });
-  return { container, clock, ff, store, social, preloader, upload, tracker, logger, opener, rasterizer, blobUrls, decoder, renderer, compressor, preview, analyzer, camera };
+  return { container, clock, ff, store, social, preloader, upload, tracker, logger, opener, rasterizer, blobUrls, decoder, renderer, compressor, preview, analyzer, camera, calendarExporter, downloader };
 }
 
 /** 라우터를 만들어 그린다. router.state로 현재 경로·이동 방식(PUSH/REPLACE)을 확인한다. */
