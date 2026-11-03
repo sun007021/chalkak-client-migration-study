@@ -1,5 +1,7 @@
 import type { NotificationItem } from './notificationModels';
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** 읽음 처리 뒤에 열 화면. postId·notificationId는 소문자 정규형이다. */
 export type NotificationDestination =
   /** 게시물 상세(내 게시물). openAiReview면 location.state { openAiReview: true }로 AI 시트를 최신 GET 기준 한 번 자동으로 연다. */
@@ -20,6 +22,22 @@ export type RowTapPlan = { kind: 'ignore' } | { kind: 'home' } | { kind: 'read';
  * POST_REJECTED·NOTICE → 알림 상세(item.id가 UUID일 때만), TOPIC·REMINDER → home, 그 밖 → ignore. UUID는 대소문자를 구분하지 않고 결과는 소문자로 만든다.
  * 문구(title·body)는 보지 않는다(REQ-NOTI-004).
  */
-export function planRowTap(_item: Pick<NotificationItem, 'id' | 'type' | 'sourceType' | 'sourceId'>): RowTapPlan {
-  throw new Error('not implemented');
+export function planRowTap(item: Pick<NotificationItem, 'id' | 'type' | 'sourceType' | 'sourceId'>): RowTapPlan {
+  switch (item.type) {
+    case 'POST_APPROVED':
+    case 'AI_REVIEW_COMPLETED':
+    case 'AI_REVIEW_FAILED': {
+      if (item.sourceType !== 'POST' || item.sourceId === null || !UUID.test(item.sourceId)) return { kind: 'ignore' };
+      return { kind: 'read', destination: { kind: 'post', postId: item.sourceId.toLowerCase(), openAiReview: item.type !== 'POST_APPROVED' } };
+    }
+    case 'POST_REJECTED':
+    case 'NOTICE':
+      if (!UUID.test(item.id)) return { kind: 'ignore' };
+      return { kind: 'read', destination: { kind: 'detail', notificationId: item.id.toLowerCase() } };
+    case 'TOPIC':
+    case 'REMINDER':
+      return { kind: 'home' };
+    default:
+      return { kind: 'ignore' };
+  }
 }

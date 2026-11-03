@@ -1,4 +1,7 @@
+import { PAGE_SIZE } from '../../constants';
 import type { ApiClient } from '../../core/net/ApiClient';
+import { d } from '../../core/net/decode';
+import { ApiError } from '../../core/net/errors';
 import type { NotificationDetail, NotificationsPage } from './notificationModels';
 
 /**
@@ -12,18 +15,54 @@ import type { NotificationDetail, NotificationsPage } from './notificationModels
  *   originalImageUrl·rejectionReason·readAt은 null 또는 생략을 null로 읽는다.
  * - markRead(id): `PATCH /notifications/{id}/read`, 본문 없음, 204. 404·5xx 등은 ApiError로 던진다(분기는 ViewModel).
  */
+const decodePage = d.object({
+  currentPage: d.number(),
+  pageSize: d.number(),
+  hasNext: d.boolean(),
+  notifications: d.array(
+    d.object({
+      id: d.string(),
+      type: d.string(),
+      sourceType: d.nullable(d.string()),
+      sourceId: d.nullable(d.string()),
+      title: d.string(),
+      body: d.string(),
+      thumbnailImageUrl: d.nullable(d.string()),
+      readAt: d.nullable(d.instant()),
+      createdAt: d.instant(),
+    }),
+  ),
+});
+
+const decodeDetail = d.object({
+  id: d.string(),
+  type: d.string(),
+  title: d.string(),
+  body: d.string(),
+  originalImageUrl: d.nullable(d.string()),
+  rejectionReason: d.nullable(d.string()),
+  readAt: d.nullable(d.instant()),
+  createdAt: d.instant(),
+});
+
 export class NotificationRepository {
   constructor(protected readonly deps: { api: ApiClient }) {}
 
-  fetchPage(_page: number, _signal?: AbortSignal): Promise<NotificationsPage> {
-    throw new Error('not implemented');
+  async fetchPage(page: number, signal?: AbortSignal): Promise<NotificationsPage> {
+    if (!Number.isInteger(page) || page < 1) throw new RangeError(`page must be a positive integer: ${page}`);
+    return this.deps.api.request({ method: 'GET', path: '/notifications', query: { page, pageSize: PAGE_SIZE }, signal }, decodePage);
   }
 
-  fetchDetail(_id: string, _signal?: AbortSignal): Promise<NotificationDetail | null> {
-    throw new Error('not implemented');
+  async fetchDetail(id: string, signal?: AbortSignal): Promise<NotificationDetail | null> {
+    try {
+      return await this.deps.api.request({ method: 'GET', path: `/notifications/${encodeURIComponent(id.toLowerCase())}`, signal }, decodeDetail);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404 && error.errorCode === 'BUSINESS_ERROR') return null;
+      throw error;
+    }
   }
 
-  markRead(_id: string, _signal?: AbortSignal): Promise<void> {
-    throw new Error('not implemented');
+  async markRead(id: string, signal?: AbortSignal): Promise<void> {
+    await this.deps.api.requestVoid({ method: 'PATCH', path: `/notifications/${encodeURIComponent(id.toLowerCase())}/read`, signal });
   }
 }

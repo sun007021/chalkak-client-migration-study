@@ -1,8 +1,12 @@
+import { t } from '../../copy/ko';
+import { ApiError, isAbandoned, NetworkError } from '../../core/net/errors';
+import { RequestSlots } from '../../core/state/RequestSlots';
 import { ViewModel } from '../../core/state/ViewModel';
 import type { Clock } from '../../core/time/Clock';
 import type { ToastController } from '../../core/ui/ToastController';
 import type { NotificationItem } from './notificationModels';
 import type { NotificationNavigator } from './notificationNavigation';
+import { planRowTap } from './notificationTarget';
 import type { NotificationRepository } from './NotificationRepository';
 import type { NotificationSync } from './notificationSync';
 
@@ -70,39 +74,207 @@ export class NotificationInboxViewModel extends ViewModel<InboxState> {
     super({ body: { status: 'loading' }, refreshing: false, paging: false, pageFailures: 0 });
   }
 
-  onShown(): Promise<void> {
-    throw new Error('not implemented');
+  private readonly slots = new RequestSlots<'first' | 'more' | 'read'>();
+  /** 지금까지 받은 페이지 수(첫 페이지 = 1). */
+  private pagesLoaded = 0;
+  /** 목록 맨 앞에서 첫 페이지 응답이 차지하는 항목 수(조용한 재검증이 이 부분만 교체한다). */
+  private firstPageCount = 0;
+  /** 처리 중인 행 탭(읽음 요청 + 이동). 한 번에 하나만 처리한다. */
+  private pressing: object | null = null;
+
+  async onShown(): Promise<void> {
+    const status = this.state.body.status;
+    if (status === 'ready' || status === 'empty') return this.revalidate();
+    if (status === 'error') this.setState({ body: { status: 'loading' } });
+    return this.loadFirst();
   }
 
   onHidden(): void {
-    throw new Error('not implemented');
+    this.slots.cancelAll();
+    this.pressing = null;
+    this.setState({ refreshing: false, paging: false });
   }
 
-  retry(): Promise<void> {
-    throw new Error('not implemented');
+  async retry(): Promise<void> {
+    if (this.state.body.status !== 'error') return;
+    this.setState({ body: { status: 'loading' } });
+    return this.loadFirst();
   }
 
-  refresh(): Promise<void> {
-    throw new Error('not implemented');
+  async refresh(): Promise<void> {
+    const status = this.state.body.status;
+    if (status !== 'ready' && status !== 'empty') return;
+    this.slots.begin('more'); // 진행 중이던 다음 페이지 응답을 버린다
+    this.setState({ refreshing: true, paging: false });
+    const pass = this.slots.begin('first');
+    try {
+      const page = await this.deps.repository.fetchPage(1, pass.signal);
+      if (!pass.isCurrent()) return;
+      this.applyFirstPage(dedupe(page.notifications), page.hasNext);
+      this.setState({ refreshing: false });
+    } catch (error) {
+      if (!pass.isCurrent()) return;
+      this.setState({ refreshing: false });
+      if (isAbandoned(error) || isUnauthorized(error)) return;
+      this.deps.toast.show(t('noti.inbox.refresh-error'));
+    }
   }
 
-  revalidate(): Promise<void> {
-    throw new Error('not implemented');
+  async revalidate(): Promise<void> {
+    const body = this.state.body;
+    if ((body.status !== 'ready' && body.status !== 'empty') || this.state.refreshing) return;
+    const pass = this.slots.begin('first');
+    try {
+      const page = await this.deps.repository.fetchPage(1, pass.signal);
+      if (!pass.isCurrent()) return;
+      const fresh = dedupe(page.notifications);
+      const current = this.state.body;
+      if (current.status === 'ready' && this.pagesLoaded > 1) {
+        const freshIds = new Set(fresh.map((item) => item.id));
+        const rest = current.items.slice(this.firstPageCount).filter((item) => !freshIds.has(item.id));
+        const items = [...fresh, ...rest];
+        this.firstPageCount = fresh.length;
+        this.setState({ body: items.length === 0 ? { status: 'empty' } : { status: 'ready', items, hasNext: current.hasNext } });
+      } else {
+        this.applyFirstPage(fresh, page.hasNext);
+      }
+    } catch {
+      // 조용한 재검증: 실패해도 기존 목록을 유지하고 알리지 않는다.
+    }
   }
 
   onSentinelVisible(): Promise<void> {
-    throw new Error('not implemented');
+    return this.loadMore();
   }
 
-  onLastVisibleIndexChanged(_index: number): Promise<void> {
-    throw new Error('not implemented');
+  async onLastVisibleIndexChanged(index: number): Promise<void> {
+    const body = this.state.body;
+    if (body.status !== 'ready' || index < body.items.length - INBOX_SENTINEL_OFFSET) return;
+    return this.loadMore();
   }
 
-  onItemPress(_id: string): Promise<void> {
-    throw new Error('not implemented');
+  async onItemPress(id: string): Promise<void> {
+    const body = this.state.body;
+    if (body.status !== 'ready') return;
+    const item = body.items.find((candidate) => candidate.id === id);
+    if (!item) return;
+    const plan = planRowTap(item);
+    if (plan.kind === 'ignore') return;
+    if (plan.kind === 'home') {
+      this.deps.navigator.openHome();
+      return;
+    }
+    if (this.pressing) return;
+    const lock = {};
+    this.pressing = lock;
+    const pass = this.slots.begin('read');
+    const destination = plan.destination;
+    const open = () => {
+      if (destination.kind === 'post') this.deps.navigator.openPost({ postId: destination.postId, openAiReview: destination.openAiReview });
+      else this.deps.navigator.openDetail(destination.notificationId);
+    };
+    try {
+      try {
+        await this.deps.repository.markRead(item.id, pass.signal);
+      } catch (error) {
+        if (!pass.isCurrent() || isAbandoned(error) || isUnauthorized(error)) return;
+        if (error instanceof NetworkError) {
+          this.deps.toast.show(t('noti.read.error.network'));
+          open();
+          return;
+        }
+        this.deps.toast.show(t('noti.gone'));
+        void this.deps.sync.refreshUnread();
+        await this.revalidate();
+        return;
+      }
+      if (!pass.isCurrent()) return;
+      this.markLocallyRead(item.id);
+      void this.deps.sync.refreshUnread();
+      open();
+    } finally {
+      if (this.pressing === lock) this.pressing = null;
+    }
   }
 
   resetForAccountChange(): void {
-    throw new Error('not implemented');
+    this.slots.cancelAll();
+    this.pressing = null;
+    this.pagesLoaded = 0;
+    this.firstPageCount = 0;
+    this.replaceState({ body: { status: 'loading' }, refreshing: false, paging: false, pageFailures: 0 });
   }
+
+  override dispose(): void {
+    this.slots.cancelAll();
+    super.dispose();
+  }
+
+  // ---------------------------------------------------------------- 내부
+
+  private applyFirstPage(items: NotificationItem[], hasNext: boolean): void {
+    this.pagesLoaded = 1;
+    this.firstPageCount = items.length;
+    this.setState({ body: items.length === 0 ? { status: 'empty' } : { status: 'ready', items, hasNext } });
+  }
+
+  private async loadFirst(): Promise<void> {
+    const pass = this.slots.begin('first');
+    try {
+      const page = await this.deps.repository.fetchPage(1, pass.signal);
+      if (!pass.isCurrent()) return;
+      this.applyFirstPage(dedupe(page.notifications), page.hasNext);
+    } catch (error) {
+      if (!pass.isCurrent() || isAbandoned(error) || isUnauthorized(error)) return;
+      this.setState({ body: { status: 'error', network: error instanceof NetworkError } });
+    }
+  }
+
+  private async loadMore(): Promise<void> {
+    const body = this.state.body;
+    if (body.status !== 'ready' || !body.hasNext || this.state.paging || this.state.refreshing) return;
+    this.setState({ paging: true });
+    const pass = this.slots.begin('more');
+    const page = this.pagesLoaded + 1;
+    try {
+      const result = await this.deps.repository.fetchPage(page, pass.signal);
+      if (!pass.isCurrent()) return;
+      const current = this.state.body;
+      if (current.status !== 'ready') {
+        this.setState({ paging: false });
+        return;
+      }
+      const known = new Set(current.items.map((item) => item.id));
+      const added = dedupe(result.notifications).filter((item) => !known.has(item.id));
+      this.pagesLoaded = page;
+      this.setState({ body: { status: 'ready', items: [...current.items, ...added], hasNext: result.hasNext }, paging: false });
+    } catch (error) {
+      if (!pass.isCurrent()) return;
+      if (isAbandoned(error) || isUnauthorized(error)) {
+        this.setState({ paging: false });
+        return;
+      }
+      this.deps.toast.show(t('noti.inbox.more-error'));
+      this.setState({ paging: false, pageFailures: this.state.pageFailures + 1 });
+    }
+  }
+
+  private markLocallyRead(id: string): void {
+    const body = this.state.body;
+    if (body.status !== 'ready') return;
+    const now = this.deps.clock.nowMs();
+    const items = body.items.map((item) => (item.id === id && item.readAt === null ? { ...item, readAt: now } : item));
+    this.setState({ body: { ...body, items } });
+  }
+}
+
+const isUnauthorized = (error: unknown): boolean => error instanceof ApiError && error.status === 401;
+
+function dedupe(items: NotificationItem[]): NotificationItem[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
 }

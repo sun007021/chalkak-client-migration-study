@@ -1,3 +1,5 @@
+import { ApiError, isAbandoned, NetworkError } from '../../core/net/errors';
+import { RequestSlots } from '../../core/state/RequestSlots';
 import { ViewModel } from '../../core/state/ViewModel';
 import type { NotificationDetail } from './notificationModels';
 import type { NotificationRepository } from './NotificationRepository';
@@ -33,11 +35,34 @@ export class NotificationDetailViewModel extends ViewModel<DetailState> {
     super({ body: { status: 'loading' } });
   }
 
-  load(): Promise<void> {
-    throw new Error('not implemented');
+  private readonly slots = new RequestSlots<'detail'>();
+
+  async load(): Promise<void> {
+    const pass = this.slots.begin('detail');
+    try {
+      const detail = await this.deps.repository.fetchDetail(this.deps.notificationId, pass.signal);
+      if (!pass.isCurrent()) return;
+      if (detail === null) {
+        this.setState({ body: { status: 'gone' } });
+        await Promise.all([this.deps.sync.refreshInbox(), this.deps.sync.refreshUnread()]);
+        return;
+      }
+      this.setState({ body: { status: 'ready', detail } });
+    } catch (error) {
+      if (!pass.isCurrent() || isAbandoned(error)) return;
+      if (error instanceof ApiError && error.status === 401) return; // 세션 만료는 코어가 처리한다
+      this.setState({ body: { status: 'error', network: error instanceof NetworkError } });
+    }
   }
 
-  retry(): Promise<void> {
-    throw new Error('not implemented');
+  async retry(): Promise<void> {
+    if (this.state.body.status !== 'error') return;
+    this.setState({ body: { status: 'loading' } });
+    await this.load();
+  }
+
+  override dispose(): void {
+    this.slots.cancelAll();
+    super.dispose();
   }
 }

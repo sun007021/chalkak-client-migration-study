@@ -58,6 +58,6 @@ export function isSettingsBelow(location: { key: string; state: unknown }): bool
 export const HOME_BELOW_STATE = { homeBelow: true } as const;
 
 /** 알림 상세: `/notifications/{notificationId}`(소문자 UUID 그대로, 인코딩). */
-export function notificationDetailPath(_notificationId: string): string {
-  throw new Error('not implemented');
+export function notificationDetailPath(notificationId: string): string {
+  return `${ROUTES.notifications}/${encodeURIComponent(notificationId)}`;
 }
