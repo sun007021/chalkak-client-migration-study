@@ -45,7 +45,7 @@ async function setup(routes: Record<string, RouteValue> = {}, mode: MainMode = '
 }
 
 describe('UploadEntryGateViewModel', () => {
-  it('TC-UPL-001 게스트는 토스트만 띄우고 네트워크 요청 0건, 화면도 열리지 않는다(D-05)', async () => {
+  it('TC-UPL-001 TC-NAV-017 게스트는 토스트만 띄우고 네트워크 요청 0건, 화면도 열리지 않는다(D-05)', async () => {
     const h = await setup({}, 'guest');
     await h.viewModel.press();
     expect(h.toast.messages).toEqual([t('upload.gate.login-required')]);
@@ -167,7 +167,7 @@ describe('UploadEntryGateViewModel', () => {
     expect(h.navigator.calls).toEqual([]);
   });
 
-  it('TC-UPL-009 확인 중 연타해도 GET /posts/today는 1회만 나가고 checking이 켜진다', async () => {
+  it('TC-UPL-009 TC-NAV-007 확인 중 연타해도 GET /posts/today는 1회만 나가고 checking이 켜진다', async () => {
     const gate = deferred<void>();
     const h = await setup({
       [TODAY]: async () => {

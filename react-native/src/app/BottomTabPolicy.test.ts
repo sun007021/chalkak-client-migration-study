@@ -36,7 +36,7 @@ describe('BottomTabPolicy 탭 누름', () => {
     expect(h.analytics.events).toHaveLength(2);
   });
 
-  it('D-05 게스트가 기록 탭을 누르면 토스트 nav.guest.record만 보이고 막힌다(분석 없음)', () => {
+  it('D-05 TC-NAV-016 게스트가 기록 탭을 토스트 nav.guest.record만 보이고 막힌다(분석 없음)', () => {
     const h = setup('guest');
     expect(h.policy.onTabPress('Record')).toBe('blocked');
     expect(h.toast.messages).toEqual([t('nav.guest.record')]);
@@ -55,7 +55,7 @@ describe('BottomTabPolicy 탭 누름', () => {
 });
 
 describe('BottomTabPolicy 업로드 버튼', () => {
-  it('D-05 게스트는 토스트 nav.guest.upload만 보이고 업로드로 가지 않는다', () => {
+  it('D-05 TC-NAV-017 게스트는 토스트 nav.guest.upload만 보이고 업로드로 가지 않는다', () => {
     const h = setup('guest');
     expect(h.policy.onUploadPress()).toBe('blocked');
     expect(h.toast.messages).toEqual([t('nav.guest.upload')]);

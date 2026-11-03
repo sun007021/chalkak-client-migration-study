@@ -202,7 +202,7 @@ describe('BootViewModel 강제 업데이트 게이트', () => {
 });
 
 describe('BootViewModel 전환', () => {
-  it('TC-AUTH-056 세션 만료 이벤트(REAUTHENTICATION_REQUIRED)를 받으면 어느 화면에서든 로그인으로 간다', async () => {
+  it('TC-AUTH-056 TC-NAV-042 세션 만료 이벤트(REAUTHENTICATION_REQUIRED)를 받으면 어느 화면에서든 로그인으로 간다', async () => {
     const h = createBootHarness();
     await h.signIn();
     await h.viewModel.start();

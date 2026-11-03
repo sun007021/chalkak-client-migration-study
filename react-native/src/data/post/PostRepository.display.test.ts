@@ -95,7 +95,7 @@ describe('PostRepository.list (전시)', () => {
     expect(h.transport.requests).toHaveLength(0);
   });
 
-  it('TC-DISP-004 로그인 상태면 Authorization을 붙이고 게스트면 붙이지 않는다', async () => {
+  it('TC-DISP-004 TC-NAV-015 로그인 상태면 Authorization을 붙이고 게스트면 붙이지 않는다', async () => {
     const member = setup();
     await member.signIn();
     member.transport.script(fixtureResponse('display/posts-list__recent-page1'));
