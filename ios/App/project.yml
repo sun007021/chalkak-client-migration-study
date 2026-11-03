@@ -14,6 +14,9 @@ packages:
   KakaoSDK:
     url: https://github.com/kakao/kakao-ios-sdk
     from: 2.29.0
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: 11.0.0
   libwebp:
     url: https://github.com/SDWebImage/libwebp-Xcode
     from: 1.1.0
@@ -29,6 +32,9 @@ targets:
     sources:
       - Sources
       - Resources
+      # Firebase 설정 파일. 저장소에 없고(gitignore) 로컬·배포에서 주입한다. 없어도 빌드는 성공한다(ios/README.md 참고).
+      - path: Config/GoogleService-Info.plist
+        optional: true
     configFiles:
       Debug: Config/App.xcconfig
       Release: Config/App.xcconfig
@@ -39,6 +45,8 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIUserInterfaceStyle: Light
+        # APNs 토큰을 AppDelegate에서 Firebase에 직접 넘기므로 자동 프록시(스위즐링)는 끈다.
+        FirebaseAppDelegateProxyEnabled: false
         API_BASE_URL: $(API_BASE_URL)
         KAKAO_NATIVE_APP_KEY: $(KAKAO_NATIVE_APP_KEY)
         FORCE_UPDATE_ENABLED: $(FORCE_UPDATE_ENABLED)
@@ -58,7 +66,7 @@ targets:
           - Pretendard-Bold.otf
           - Pretendard-Regular.otf
           - Pretendard-SemiBold.otf
-    # 푸시 알림(APNs) 권한. 배포 서명 시 Xcode가 production으로 바꾼다. Firebase는 의존성에 없다(FCM 토큰은 자리표시자).
+    # 푸시 알림(APNs) 권한. 배포 서명 시 Xcode가 production으로 바꾼다.
     entitlements:
       path: Sources/Chalkak.entitlements
       properties:
@@ -85,6 +93,10 @@ targets:
         product: KakaoSDKAuth
       - package: KakaoSDK
         product: KakaoSDKUser
+      - package: Firebase
+        product: FirebaseMessaging
+      - package: Firebase
+        product: FirebaseAnalytics
       - package: libwebp
         product: libwebp
   ChalkakUITests:

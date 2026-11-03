@@ -1,4 +1,5 @@
 import UIKit
+import FirebaseMessaging
 import UserNotifications
 import ChalkakData
 import ChalkakFeatures
@@ -11,6 +12,8 @@ enum PushEvent: Sendable {
     case received
     /// APNs 기기 토큰(16진수).
     case apnsToken(String)
+    /// FCM 토큰이 발급·갱신됐다(REQ-PUSH-008: 토큰 변경 → 기기 재등록).
+    case fcmToken(String)
 }
 
 /// OS 진입점(UNUserNotificationCenter 델리게이트, AppDelegate)과 앱 구성(`PushEventHub`) 사이의 우체통.
@@ -85,6 +88,8 @@ final class PushNotificationCenterDelegate: NSObject, UNUserNotificationCenterDe
 /// 델리게이트 등록과 APNs 토큰 수신만 맡는 UIKit 앱 델리게이트.
 final class AppDelegate: NSObject, UIApplicationDelegate {
     private let pushDelegate = PushNotificationCenterDelegate()
+    /// `Messaging.delegate`는 약한 참조라 앱 델리게이트가 들고 있는다.
+    private let fcmRelay = FCMTokenRelay()
 
     func application(
         _ application: UIApplication,
@@ -92,10 +97,15 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     ) -> Bool {
         // 콜드 스타트에서 알림을 눌러 열린 경우를 놓치지 않으려면 launch가 끝나기 전에 설정해야 한다.
         UNUserNotificationCenter.current().delegate = pushDelegate
+        // 설정 파일이 있을 때만 Firebase를 켠다. 없으면 FCM 토큰이 없어 기기 등록을 건너뛴다.
+        if FirebaseBootstrap.configureIfAvailable() {
+            Messaging.messaging().delegate = fcmRelay
+        }
         return true
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        FirebaseAPNs.forward(deviceToken)
         let hex = deviceToken.map { String(format: "%02x", $0) }.joined()
         Task { await PushEntryPoint.shared.submit(.apnsToken(hex)) }
     }
