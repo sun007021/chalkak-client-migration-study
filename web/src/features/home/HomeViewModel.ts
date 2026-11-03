@@ -13,6 +13,7 @@ import type { PostChanges } from '../post/PostChanges';
 import type { PostChange } from '../post/postModels';
 import type { GuestGate } from '../shell/GuestGate';
 import type { UploadEntry } from '../shell/UploadEntry';
+import type { AiReviewStore } from '../aireview/AiReviewStore';
 import type { BannerFeed } from './BannerFeed';
 import type { HomeNavigator } from './HomeNavigator';
 import type { HomeRepository } from './HomeRepository';
@@ -58,6 +59,8 @@ export type AiCardState =
       requesting: boolean;
       /** 요청이 403(정지, D-08)으로 거절됐다. 이 카드의 요청 버튼은 비활성이고 다시 보내지 않는다(없으면 생략). */
       blocked?: true;
+      /** 폴링 창 300초가 끝났는데도 PROCESSING(W8, 저장소 entry.stalled). 카드는 "진행중" 문구를 유지한다(없으면 생략). */
+      stalled?: true;
     };
 
 export interface HomeState {
@@ -89,6 +92,11 @@ export interface HomeViewModelDeps {
   likes: PostLikeStore;
   /** 게시물 변경 이벤트(like·title·removed)를 받아 랭킹·히어로·주간 기록에 반영한다. */
   changes: PostChanges;
+  /**
+   * AI 피드백 공용 저장소(W8). 홈 카드의 상태·폴링·요청을 이 저장소로 옮긴다(상세 알약과 같은 상태를 본다).
+   * 옮긴 뒤에는 필수다. 옮기기 전에는 비워 두면 기존 로직(repository.fetchAiReview/requestAiReview)을 쓴다.
+   */
+  aiReviews?: AiReviewStore;
 }
 
 /** 랭킹에 담는 최대 개수(REQ-HOME-027). */
