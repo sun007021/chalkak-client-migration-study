@@ -6,10 +6,11 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../../edit/domain/rgba_image.dart';
 import '../domain/post_image_encoder.dart';
 import '../domain/webp_inspector.dart';
+import '../domain/webp_metadata_stripper.dart';
 
 /// `flutter_image_compress`의 네이티브 인코더로 손실 WebP를 만드는 [WebpCompressor].
 /// RGBA 픽셀을 PNG로 감싸 넘기고(무손실 중간 형식), EXIF 등 메타데이터는 넣지 않는다.
-/// 결과가 RIFF/WEBP 정지 이미지가 아니면 예외를 던진다(플랫폼이 다른 형식을 낼 때를 막는다).
+/// EXIF/XMP/ICCP 청크는 [WebpMetadataStripper]로 제거하고, 결과가 RIFF/WEBP 정지 이미지가 아니면 예외를 던진다(플랫폼이 다른 형식을 낼 때를 막는다).
 class FlutterWebpCompressor implements WebpCompressor {
   const FlutterWebpCompressor();
 
@@ -24,10 +25,16 @@ class FlutterWebpCompressor implements WebpCompressor {
       format: CompressFormat.webp,
       keepExif: false,
     );
-    if (out.isEmpty || !WebpInspector.inspect(out).isUploadable) {
-      throw StateError('WebP 인코딩 결과가 올바르지 않습니다');
+    // iOS 인코더는 VP8X+ICCP 등을 붙이므로 메타데이터 청크를 제거한 뒤 검사한다.
+    final stripped = WebpMetadataStripper.strip(out);
+    final info = WebpInspector.inspect(stripped);
+    if (stripped.isEmpty || !info.isUploadable) {
+      throw StateError(
+        'WebP 인코딩 결과가 올바르지 않습니다 '
+        '(chunkTypes=${info.chunkTypes}, riffSizeMatches=${info.riffSizeMatches})',
+      );
     }
-    return out;
+    return stripped;
   }
 
   Future<Uint8List> _toPng(RgbaImage image) async {

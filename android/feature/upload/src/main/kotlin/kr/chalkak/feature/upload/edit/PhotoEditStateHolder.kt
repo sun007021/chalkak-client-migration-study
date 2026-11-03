@@ -141,6 +141,11 @@ class PhotoEditStateHolder(
         }
     }
 
+    /** The auto-strength slider (REQ-EDIT-022): sets the strength directly, clamped to 0..1. User-touched rows are not changed. */
+    fun onAutoStrengthChanged(strength: Double) {
+        if (_state.value.ready && !strength.isNaN()) publish { it.copy(adjustments = it.adjustments.withAutoStrength(strength)) }
+    }
+
     fun onAdjustValueChanged(item: AdjustItem, value: Double) {
         if (_state.value.ready) publish { it.copy(adjustments = it.adjustments.withValue(item, value)) }
     }

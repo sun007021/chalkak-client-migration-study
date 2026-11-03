@@ -27,7 +27,7 @@ class PushPlatform {
     : isAvailable = false,
       messages = const _NoopPushMessageSource(),
       tokens = const _NoopPushTokenProvider(),
-      permission = const _NoopNotificationPermission(),
+      permission = const NoFirebaseNotificationPermission(),
       presenter = const _NoopLocalNotificationPresenter(),
       showsLocalNotification = false;
 
@@ -140,19 +140,6 @@ class _NoopPushTokenProvider implements PushTokenProvider {
 
   @override
   Stream<String> get tokenRefreshed => const Stream.empty();
-}
-
-class _NoopNotificationPermission implements NotificationPermission {
-  const _NoopNotificationPermission();
-
-  @override
-  Future<OsPermissionStatus> status() async => OsPermissionStatus.denied;
-
-  @override
-  Future<OsPermissionStatus> request() async => OsPermissionStatus.denied;
-
-  @override
-  Future<void> openSystemSettings() async {}
 }
 
 class _NoopLocalNotificationPresenter implements LocalNotificationPresenter {

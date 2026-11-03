@@ -334,11 +334,13 @@ describe('홈 어제 랭킹·오늘 인기 (REQ-HOME-027~032)', () => {
 
   it('TC-HOME-021 REQ-HOME-032 랭킹 사진을 누르면 /feed/{postId}로 가고 목록 항목이 시드로 넘어간다. 상세 API는 홈이 부르지 않는다', async () => {
     const { h, router, path } = await openHome();
-    fireEvent.click(await screen.findByTestId(`home.popular-item-${id('203')}`));
+    const card = await screen.findByTestId(`home.popular-item-${id('203')}`);
+    const detailCalls = () => h.ff.calls.filter((c) => c.path === `/posts/${id('203')}`).length;
+    expect(detailCalls()).toBe(0); // 홈은 상세를 부르지 않는다(상세 화면이 열린 뒤의 재검증은 상세 화면의 몫이다)
+    fireEvent.click(card);
     await screen.findByTestId('feed.root');
     expect(path()).toBe(`/feed/${id('203')}`);
     expect(router.state.location.state).toMatchObject({ seed: { id: id('203'), likeCount: 37, isLiked: true } });
-    expect(h.ff.calls.some((c) => c.path === `/posts/${id('203')}`)).toBe(false);
   });
 
   it('TC-HOME-022 REQ-HOME-032 게스트가 랭킹 사진을 누르면 토스트만 뜨고 이동·상세 요청이 없다', async () => {

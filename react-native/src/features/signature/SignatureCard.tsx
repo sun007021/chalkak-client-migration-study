@@ -10,7 +10,7 @@ import type { SignatureCardViewModel } from './SignatureCardViewModel';
  * 사인 PNG는 흰 획이라 어두운 바탕 위에 올린다. 이미지가 로드되지 않으면 이미지 자리만 비운다(카드는 유지).
  */
 export function SignatureCard({ viewModel }: { viewModel: SignatureCardViewModel }) {
-  const { imageUrl, loading } = useViewModelState(viewModel);
+  const { imageUrl, loading, loadError } = useViewModelState(viewModel);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const [wasLoading, setWasLoading] = useState(loading);
   // 다시 조회할 때마다 이미지 로드 실패 기록을 지운다(같은 URL도 다시 시도한다). 렌더 중 상태 보정 패턴.
@@ -32,6 +32,20 @@ export function SignatureCard({ viewModel }: { viewModel: SignatureCardViewModel
               onError={() => setFailedUrl(imageUrl)}
               style={styles.image}
             />
+          ) : null}
+          {loadError ? (
+            <View style={styles.errorBox}>
+              <Text testID="settings.signature-error" style={styles.errorText}>
+                {t('sign.load.error')}
+              </Text>
+              <Pressable
+                testID="settings.signature-retry-button"
+                accessibilityRole="button"
+                onPress={() => void viewModel.refresh()}
+              >
+                <Text style={styles.retryText}>{t('common.retry')}</Text>
+              </Pressable>
+            </View>
           ) : null}
           {loading ? (
             <ActivityIndicator testID="settings.signature-loading" color="#FFFFFF" />
@@ -62,6 +76,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   image: { width: '100%', height: '100%' },
+  errorBox: { alignItems: 'center', gap: 8, padding: 8 },
+  errorText: { color: '#FFFFFF', fontSize: 13, textAlign: 'center' },
+  retryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
   change: {
     height: 44,
     borderRadius: 12,

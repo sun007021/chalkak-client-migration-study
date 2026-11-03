@@ -1,7 +1,8 @@
 import { createNavigationContainerRef } from '@react-navigation/native';
 import { getRandomBytes } from 'expo-crypto';
 
-import { ConsoleAnalyticsTracker } from '../core/analytics/ConsoleAnalyticsTracker';
+import type { AnalyticsBackend } from '../core/analytics/AnalyticsBackend';
+import { createAnalyticsTracker } from '../core/analytics/createAnalyticsTracker';
 import type { AnalyticsTracker } from '../core/analytics/AnalyticsTracker';
 import { KakaoSocialLoginClient } from '../core/auth/KakaoSocialLoginClient';
 import { type NonceGenerator, SecureNonceGenerator } from '../core/auth/NonceGenerator';
@@ -15,10 +16,32 @@ import type { AppVisibility } from '../core/lifecycle/AppVisibility';
 import { ReactNativeAppVisibility } from '../core/lifecycle/ReactNativeAppVisibility';
 import type { ExternalLinkOpener } from '../core/linking/ExternalLinkOpener';
 import { LinkingExternalLinkOpener } from '../core/linking/LinkingExternalLinkOpener';
-import { NoopPushRegistrar } from '../core/push/NoopPushRegistrar';
+import { DevicePushRegistrar } from '../core/push/DevicePushRegistrar';
+import { AsyncStoragePushPromptFlagStore } from '../core/push/expo/AsyncStoragePushPromptFlagStore';
+import { ExpoNotificationResponseSource } from '../core/push/expo/ExpoNotificationResponseSource';
+import { ExpoPushMessageSource } from '../core/push/expo/ExpoPushMessageSource';
+import { ExpoPushNotificationPresenter } from '../core/push/expo/ExpoPushNotificationPresenter';
+import { ExpoPushPermissionGateway } from '../core/push/expo/ExpoPushPermissionGateway';
+import { ExpoPushTokenProvider } from '../core/push/expo/ExpoPushTokenProvider';
+import type { NotificationResponseSource } from '../core/push/NotificationResponseSource';
+import type { PushMessageSource } from '../core/push/PushMessageSource';
+import type { PushNotificationPresenter } from '../core/push/PushNotificationPresenter';
+import type { PushPermissionGateway } from '../core/push/PushPermissionGateway';
+import type { PushPromptFlagStore } from '../core/push/PushPromptFlagStore';
 import type { PushRegistrar } from '../core/push/PushRegistrar';
+import type { PushTokenProvider } from '../core/push/PushTokenProvider';
 import type { UserDataCache } from '../core/push/UserDataCache';
 import { UserDataCacheRegistry } from '../core/push/UserDataCacheRegistry';
+import { AppInfoVersionProvider } from '../core/config/AppVersionProvider';
+import { NotificationSettingsRepository } from '../data/settings/NotificationSettingsRepository';
+import { FeedbackRepository } from '../data/feedback/FeedbackRepository';
+import { AccountActionsViewModel } from '../features/auth/AccountActionsViewModel';
+import type { FeedbackNavigator } from '../features/feedback/FeedbackNavigator';
+import { FeedbackViewModel } from '../features/feedback/FeedbackViewModel';
+import { SettingsViewModel } from '../features/settings/SettingsViewModel';
+import { SettingsViewModelOwner } from '../features/settings/SettingsViewModelOwner';
+import { SignatureCardViewModel } from '../features/signature/SignatureCardViewModel';
+import { NavigationSettingsNavigator } from './NavigationSettingsNavigator';
 import { ToastCenter } from '../core/toast/ToastCenter';
 import type { ToastPresenter } from '../core/toast/ToastPresenter';
 import { AuthRepository, type PendingSignUp } from '../data/auth/AuthRepository';
@@ -81,6 +104,19 @@ import { UploadSuccessViewModel } from '../features/upload/UploadSuccessViewMode
 import type { UploadSuccessParams } from '../features/upload/UploadNavigator';
 import { NavigationUploadNavigator } from './NavigationUploadNavigator';
 import { NavigationHomeNavigator } from './NavigationHomeNavigator';
+import { NavigationNotificationNavigator } from './NavigationNotificationNavigator';
+import { NavigationPushTapBlocker } from './NavigationPushTapBlocker';
+import { NotificationDetailViewModel } from '../features/notification/NotificationDetailViewModel';
+import { NotificationEvents } from '../features/notification/NotificationEvents';
+import { NotificationInboxViewModel } from '../features/notification/NotificationInboxViewModel';
+import { NotificationTapProcessor } from '../features/notification/NotificationTapProcessor';
+import { AsyncStoragePendingPushStore } from '../features/push/AsyncStoragePendingPushStore';
+import { ForegroundPushHandler } from '../features/push/ForegroundPushHandler';
+import type { PendingPushStore } from '../features/push/PendingPushStore';
+import { PushPermissionCoordinator } from '../features/push/PushPermissionCoordinator';
+import { PushFeature } from '../features/push/PushFeature';
+import { PushTapRouter } from '../features/push/PushTapRouter';
+import type { PushTapBlocker } from '../features/push/PushTapBlocker';
 import { NavigationRecordNavigator } from './NavigationRecordNavigator';
 import { TabReturnHint } from './TabReturnHint';
 import type { RootStackParamList } from './navigation/routes';
@@ -150,7 +186,32 @@ export interface Dependencies {
    * (expo-image-picker, expo-image-manipulator, expo-media-library, expo-file-system)을 만든다. 테스트는 Fake를 넣는다.
    */
   readonly media?: MediaServices;
+  /** 푸시의 네이티브 경계. 없으면 expo-notifications 어댑터를 쓴다(테스트는 Fake를 넣는다). */
+  readonly push: PushPorts;
 }
+
+/** 푸시의 네이티브 경계 묶음(기기 등록용 토큰 공급자는 레지스트라가 이미 가진다). */
+type PushPorts = {
+  readonly permission: PushPermissionGateway;
+  readonly responses: NotificationResponseSource;
+  readonly messages: PushMessageSource;
+  readonly presenter: PushNotificationPresenter;
+  readonly promptFlags: PushPromptFlagStore;
+  readonly pendingStore: PendingPushStore;
+  /** 없으면 내비게이션의 현재 화면(업로드)으로 판단한다. */
+  readonly tapBlocker?: PushTapBlocker;
+};
+
+/** 테스트가 일부만 바꿀 수 있는 의존성. 푸시 포트는 필요한 것만 `push`에 넣고 토큰 공급자는 `pushTokens`다. */
+export type ContainerOverrides = Partial<Omit<Dependencies, 'push'>> & {
+  /**
+   * 분석 백엔드. 없으면 로그 출력 tracker다. 아직 운영 백엔드는 연결하지 않았다(Firebase Analytics는 google-services 설정이 필요한 후속).
+   * `analytics`(완성된 tracker)와 함께 주면 어느 쪽을 쓸지 모호하므로 `create`가 던진다.
+   */
+  analyticsBackend?: AnalyticsBackend | null;
+  push?: Partial<PushPorts>;
+  pushTokens?: PushTokenProvider;
+};
 
 function isUserDataCache(value: object): value is UserDataCache {
   return typeof (value as Partial<UserDataCache>).clearAll === 'function';
@@ -182,6 +243,8 @@ export class AppContainer {
   readonly displayOwner: DisplayViewModelOwner;
   /** 메인에 있는 동안 기록 ViewModel을 만들고 버린다. 기록 탭 화면은 이것을 구독해 받는다. */
   readonly recordOwner: RecordViewModelOwner;
+  /** 메인에 있는 동안 설정 ViewModel을 만들고 버린다. 설정 탭 화면은 이것을 구독해 받는다. */
+  readonly settingsOwner: SettingsViewModelOwner;
   /**
    * 기본 렌더러(view-shot)를 쓸 때만 있다. 기록 화면에 마운트하는 캡처 호스트가 이것으로 달력 뷰를 그려 캡처한다.
    * 테스트가 Fake 렌더러를 넣으면 null이라 호스트를 마운트하지 않는다.
@@ -221,6 +284,8 @@ export class AppContainer {
   /** 홈·업로드·피드 등이 함께 쓰는 저장소(요청 경로가 같아 하나만 만든다). */
   private postRepositoryInstance: PostRepository | null = null;
   private topicRepositoryInstance: TopicRepository | null = null;
+  private notificationSettingsRepositoryInstance: NotificationSettingsRepository | null = null;
+  private feedbackRepositoryInstance: FeedbackRepository | null = null;
   private readonly displayNavigator = new NavigationDisplayNavigator(this.navigationHandle);
   /** 기록에서 연 전시 탭이 뒤로 가기에서 기록으로 돌아오게 하는 힌트(MainTabs의 전시 탭이 읽는다). */
   readonly tabReturnHint = new TabReturnHint();
@@ -228,9 +293,18 @@ export class AppContainer {
     this.navigationHandle,
     this.tabReturnHint,
   );
+  private readonly settingsNavigator = new NavigationSettingsNavigator(this.navigationHandle);
   private readonly calendarImageRenderer: CalendarImageRenderer;
   private readonly calendarImageSaver: CalendarImageSaver;
   private readonly cacheRegistry = new UserDataCacheRegistry();
+  /** 알림 읽음·소멸을 알림함 화면에 전한다. */
+  readonly notificationEvents = new NotificationEvents();
+  private readonly notificationNavigator = new NavigationNotificationNavigator(
+    this.navigationHandle,
+  );
+  private readonly notificationProcessor: NotificationTapProcessor;
+  private readonly navigationBlocker = new NavigationPushTapBlocker(this.navigationHandle);
+  private readonly pushFeature: PushFeature;
 
   private constructor(dependencies: Dependencies, toastCenter: ToastCenter | null) {
     this.dependencies = dependencies;
@@ -268,6 +342,16 @@ export class AppContainer {
       pushRegistrar: this.pushRegistrar,
       events: this.events,
     });
+    this.notificationProcessor = new NotificationTapProcessor({
+      notifications: new NotificationRepository({ api: this.api }),
+      navigator: this.notificationNavigator,
+      home: () => this.homeOwner.getSnapshot().viewModel,
+      events: this.notificationEvents,
+      sessionStore: this.sessionStore,
+      toast: this.toast,
+      authFlow: this.bootViewModel,
+    });
+    this.pushFeature = this.createPushFeature();
     this.updateDialogViewModel = new UpdateDialogViewModel(dependencies.storeOpener);
     this.loginOwner = new LoginViewModelOwner(this.bootViewModel, () =>
       this.createLoginViewModel(),
@@ -324,10 +408,30 @@ export class AppContainer {
       create: (mode) => this.createRecordViewModel(mode),
       registerCache: (cache) => this.cacheRegistry.register(cache),
     });
+    this.settingsOwner = new SettingsViewModelOwner({
+      boot: this.bootViewModel,
+      create: (mode) => this.createSettingsViewModel(mode),
+      registerCache: (cache) => this.cacheRegistry.register(cache),
+    });
   }
 
   private get postRepository(): PostRepository {
     return (this.postRepositoryInstance ??= new PostRepository({ api: this.api }));
+  }
+
+  private get notificationSettingsRepository(): NotificationSettingsRepository {
+    return (this.notificationSettingsRepositoryInstance ??= new NotificationSettingsRepository({
+      api: this.api,
+    }));
+  }
+
+  private get feedbackRepository(): FeedbackRepository {
+    return (this.feedbackRepositoryInstance ??= new FeedbackRepository({ api: this.api }));
+  }
+
+  /** 사인 변경 흐름이 끝났을 때: 설정 탭이 살아 있으면 사인 카드를 GET으로 다시 조회한다(D-18). 없으면 아무것도 하지 않는다. */
+  async notifySignatureChanged(): Promise<void> {
+    await this.settingsOwner.getSnapshot().viewModel?.signatureCard.onSignatureChanged();
   }
 
   private get topicRepository(): TopicRepository {
@@ -394,6 +498,51 @@ export class AppContainer {
       analytics: this.analytics,
       navigator: this.uploadNavigator,
     });
+  }
+
+  /** 소유자(settingsOwner)만 부른다. 사인 카드·계정 동작은 설정 ViewModel이 소유하고 함께 버린다. */
+  private createSettingsViewModel(mode: MainMode): SettingsViewModel {
+    const toast = this.toast;
+    return new SettingsViewModel({
+      mode,
+      settings: this.notificationSettingsRepository,
+      signatureCard: new SignatureCardViewModel({
+        repository: this.signatureRepository,
+        toast,
+        navigator: this.settingsNavigator,
+        authFlow: this.bootViewModel,
+      }),
+      account: new AccountActionsViewModel({
+        authRepository: this.authRepository,
+        navigator: this.bootViewModel,
+        toast,
+      }),
+      permission: this.dependencies.push.permission,
+      appVersion: new AppInfoVersionProvider(this.dependencies.appInfo),
+      analytics: this.analytics,
+      linkOpener: this.linkOpener,
+      toast,
+      navigator: this.settingsNavigator,
+      authFlow: this.bootViewModel,
+    });
+  }
+
+  /**
+   * 피드백 라우트만 부른다(열 때 만들고 닫을 때 dispose). 로그아웃·계정 전환 때 전송 중 요청을 버리도록
+   * 캐시 레지스트리에 올리고, dispose하면 해제한다.
+   */
+  createFeedbackViewModel(navigator: FeedbackNavigator): FeedbackViewModel {
+    let unregister: (() => void) | null = null;
+    const viewModel = new FeedbackViewModel({
+      repository: this.feedbackRepository,
+      analytics: this.analytics,
+      toast: this.toast,
+      navigator,
+      authFlow: this.bootViewModel,
+      onDisposed: () => unregister?.(),
+    });
+    unregister = this.cacheRegistry.register(viewModel);
+    return viewModel;
   }
 
   /** 소유자(recordOwner)만 부른다. */
@@ -563,6 +712,78 @@ export class AppContainer {
     });
   }
 
+  /** 알림함 라우트(내비게이션)만 부른다. 화면을 열 때마다 만들고 닫을 때 dispose한다. */
+  createNotificationInboxViewModel(): NotificationInboxViewModel {
+    return new NotificationInboxViewModel({
+      notifications: new NotificationRepository({ api: this.api }),
+      processor: this.notificationProcessor,
+      events: this.notificationEvents,
+      toast: this.toast,
+      authFlow: this.bootViewModel,
+      analytics: this.analytics,
+    });
+  }
+
+  /** 알림 상세 라우트(내비게이션)만 부른다. */
+  createNotificationDetailViewModel(
+    notificationId: string,
+    navigator: { close(): void },
+  ): NotificationDetailViewModel {
+    return new NotificationDetailViewModel({
+      notificationId,
+      notifications: new NotificationRepository({ api: this.api }),
+      events: this.notificationEvents,
+      home: () => this.homeOwner.getSnapshot().viewModel,
+      toast: this.toast,
+      authFlow: this.bootViewModel,
+      analytics: this.analytics,
+      navigator: {
+        close: () => navigator.close(),
+        openInbox: () => this.notificationNavigator.openInbox(),
+      },
+    });
+  }
+
+  /**
+   * 푸시 수신 기능을 시작한다(기기 등록 트리거, 권한 요청, 탭 라우팅, 포그라운드 표시). 반환 함수로 해제한다.
+   * 앱 루트의 효과(effect)가 부른다. 기능 객체는 컨테이너당 하나라 StrictMode의 start -> stop -> start에서도
+   * 콜드 스타트 탭을 한 번만 소비한다.
+   */
+  startPush(): () => void {
+    return this.pushFeature.start();
+  }
+
+  /** NavigationContainer의 onReady: 준비 전에 보류된 푸시 탭을 다시 처리하게 한다. */
+  readonly onNavigationReady = (): void => this.navigationBlocker.notifyReady();
+
+  private createPushFeature(): PushFeature {
+    const p = this.dependencies.push;
+    const home = () => this.homeOwner.getSnapshot().viewModel;
+    return new PushFeature([
+      { start: () => this.pushRegistrar.start?.() },
+      new PushPermissionCoordinator({
+        boot: this.bootViewModel,
+        gateway: p.permission,
+        flags: p.promptFlags,
+        toast: this.toast,
+      }),
+      new ForegroundPushHandler({
+        messages: p.messages,
+        permission: p.permission,
+        presenter: p.presenter,
+        home,
+      }),
+      new PushTapRouter({
+        responses: p.responses,
+        boot: this.bootViewModel,
+        sessionStore: this.sessionStore,
+        blocker: p.tapBlocker ?? this.navigationBlocker,
+        store: p.pendingStore,
+        processor: this.notificationProcessor,
+      }),
+    ]);
+  }
+
   /** 웹뷰 라우트(내비게이션)만 부른다. */
   createIssueWebViewModel(url: string): IssueWebViewModel {
     return new IssueWebViewModel({
@@ -586,7 +807,10 @@ export class AppContainer {
   }
 
   /** `config`는 앱 루트가 `readAppConfig()`로 읽어 넘긴다. 나머지는 기본 구현이며 `overrides`로 바꾼다. */
-  static create(config: AppConfig, overrides: Partial<Dependencies> = {}): AppContainer {
+  static create(config: AppConfig, overrides: ContainerOverrides = {}): AppContainer {
+    if (overrides.analytics !== undefined && overrides.analyticsBackend != null) {
+      throw new Error('AppContainer.create: analytics와 analyticsBackend는 함께 줄 수 없다');
+    }
     const clock = overrides.clock ?? new SystemClock();
     const logger = new ConsoleNetworkLogger();
     const sessionStore =
@@ -616,9 +840,21 @@ export class AppContainer {
         clock,
         logger,
       });
+    const o = overrides.push ?? {};
+    const pushTokens = overrides.pushTokens ?? new ExpoPushTokenProvider();
     const featureFlags = overrides.featureFlags ?? readFeatureFlags(undefined);
     const appInfo = overrides.appInfo ?? DEFAULT_APP_INFO;
     const visibility = overrides.visibility ?? new ReactNativeAppVisibility();
+    const pushRegistrar =
+      overrides.pushRegistrar ??
+      new DevicePushRegistrar({
+        api,
+        sessionStore,
+        tokenRefresher,
+        tokens: pushTokens,
+        visibility,
+        logger,
+      });
     const toastCenter = overrides.toast
       ? null
       : new ToastCenter({ visibility, durationMs: TOAST_DURATION_MS });
@@ -631,12 +867,22 @@ export class AppContainer {
         api,
         featureFlags,
         appInfo,
-        analytics: overrides.analytics ?? new ConsoleAnalyticsTracker(),
+        analytics:
+          overrides.analytics ?? createAnalyticsTracker(overrides.analyticsBackend ?? null),
         socialLoginClient:
           overrides.socialLoginClient ??
           selectSocialLoginClient(featureFlags, new KakaoSocialLoginClient(new SeoulKakaoSdk())),
         nonceGenerator: overrides.nonceGenerator ?? new SecureNonceGenerator(getRandomBytes),
-        pushRegistrar: overrides.pushRegistrar ?? new NoopPushRegistrar(),
+        pushRegistrar,
+        push: {
+          permission: o.permission ?? new ExpoPushPermissionGateway(),
+          responses: o.responses ?? new ExpoNotificationResponseSource(),
+          messages: o.messages ?? new ExpoPushMessageSource(),
+          presenter: o.presenter ?? new ExpoPushNotificationPresenter(),
+          promptFlags: o.promptFlags ?? new AsyncStoragePushPromptFlagStore(),
+          pendingStore: o.pendingStore ?? new AsyncStoragePendingPushStore(),
+          tapBlocker: o.tapBlocker,
+        },
         homePreloader: overrides.homePreloader ?? new NoopHomePreloader(),
         updateChecker: overrides.updateChecker ?? createUpdateChecker(appInfo, transport),
         storeOpener: overrides.storeOpener ?? new LinkingStoreOpener(storeUrlFor(appInfo)),

@@ -38,6 +38,17 @@ import { BannerRepository } from '../features/home/BannerRepository';
 import { HomeRepository } from '../features/home/HomeRepository';
 import { AttachableHomeNavigator } from '../features/home/AttachableHomeNavigator';
 import { HomeViewModel } from '../features/home/HomeViewModel';
+import { DisplayRepository } from '../features/display/DisplayRepository';
+import { DisplayViewModel } from '../features/display/DisplayViewModel';
+import { FeedRepository } from '../features/feed/FeedRepository';
+import { FeedViewModel } from '../features/feed/FeedViewModel';
+import type { FeedNavigator } from '../features/feed/FeedViewModel';
+import { LikeRepository } from '../features/like/LikeRepository';
+import { PostLikeStore } from '../features/like/PostLikeStore';
+import { PostChanges } from '../features/post/PostChanges';
+import { AttachablePostNavigator } from '../features/post/postNavigation';
+import type { PostSeed } from '../features/post/postModels';
+import { ScrollMemory } from '../core/ui/ScrollMemory';
 import { WindowExternalLinkOpener } from '../features/onboarding/ExternalLinkOpener';
 import type { ExternalLinkOpener } from '../features/onboarding/ExternalLinkOpener';
 import { LegalDocumentLauncher } from '../features/onboarding/LegalDocument';
@@ -148,6 +159,15 @@ export interface AppContainer {
   bannerRepository: BannerRepository;
   signupService: SignupService;
   changeSignatureService: ChangeSignatureService;
+  displayRepository: DisplayRepository;
+  feedRepository: FeedRepository;
+  likeRepository: LikeRepository;
+  /** 게시물 변경 이벤트 통로(like·title·removed). 계정 전환 때 UserCaches가 삭제 기억을 비운다. */
+  postChanges: PostChanges;
+  /** 전시·홈 랭킹·상세가 공유하는 좋아요 상태(D-04). 계정 전환 때 UserCaches가 reset한다. */
+  likes: PostLikeStore;
+  /** 화면별 스크롤 위치(location.key) 기억. 홈·전시가 상세에 갔다 돌아올 때 복원한다. */
+  scrollMemory: ScrollMemory;
   /** 개발용 세션 주입 화면(동적 import)이 서비스를 만들 재료. devSessionEnabled가 false면 null. */
   devSessionDeps: { refresher: TokenRefresher; store: SessionStore; userCaches: UserCaches } | null;
   visibilityObserver: VisibilityObserverFactory | null;
@@ -163,6 +183,13 @@ export interface AppContainer {
    * 화면은 navigator.attach로 실제 이동 수단을 꽂고, 보이는 동안 viewModel.onShown/onHidden을 부른다.
    */
   homeSession(mode: SessionMode): { viewModel: HomeViewModel; navigator: AttachableHomeNavigator };
+  /**
+   * 전시 ViewModel도 모드별로 하나를 보관한다(상세에 갔다 와도 목록·정렬·날짜가 남는다). 다른 모드를 요청하면 이전 것은 dispose한다.
+   * 계정 전환·로그아웃 때는 UserCaches가 resetForAccountChange로 처음 상태로 돌린다. 화면은 navigator.attach로 실제 이동 수단을 꽂는다.
+   */
+  displaySession(mode: SessionMode): { viewModel: DisplayViewModel; navigator: AttachablePostNavigator };
+  /** 상세 화면이 마운트될 때마다 새 ViewModel을 만든다. 저장된 userId는 store에서 읽는다. */
+  createFeedViewModel(args: { postId: string; seed: PostSeed | null; assumeMine?: boolean; navigator: FeedNavigator }): FeedViewModel;
   /** 빈 패드(1024×512)로 시작한다. */
   createSignatureDrawViewModel(mode: SignatureMode): SignatureDrawViewModel;
   createSignaturePreviewViewModel(mode: SignatureMode, png: Blob): SignaturePreviewViewModel;
@@ -249,6 +276,17 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
   userCaches.register(signatureCard);
   let homeSession: { mode: SessionMode; viewModel: HomeViewModel; navigator: AttachableHomeNavigator } | null = null;
   userCaches.register({ clear: () => homeSession?.viewModel.resetForAccountChange() });
+  const postChanges = new PostChanges();
+  const likeRepository = new LikeRepository({ api });
+  const likes = new PostLikeStore({ repository: likeRepository, changes: postChanges, toast });
+  let displaySession: { mode: SessionMode; viewModel: DisplayViewModel; navigator: AttachablePostNavigator } | null = null;
+  userCaches.register({
+    clear: () => {
+      likes.reset();
+      postChanges.reset();
+      displaySession?.viewModel.resetForAccountChange();
+    },
+  });
   const container: AppContainer = {
     clock,
     logger,
@@ -279,6 +317,12 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     signatureRepository,
     signatureCard,
     homeRepository: new HomeRepository({ api }),
+    displayRepository: new DisplayRepository({ api }),
+    feedRepository: new FeedRepository({ api }),
+    likeRepository,
+    postChanges,
+    likes,
+    scrollMemory: new ScrollMemory(),
     bannerRepository: new BannerRepository({ api }),
     signupService: new SignupService({
       repository: new SignupRepository({ api, clock }),
@@ -326,10 +370,47 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
             guestGate: this.guestGate,
             uploadEntry: this.uploadEntry,
             navigator,
+            likes: this.likes,
+            changes: this.postChanges,
           }),
         };
       }
       return homeSession;
+    },
+    displaySession(mode) {
+      if (displaySession?.mode !== mode) {
+        displaySession?.viewModel.dispose();
+        const navigator = new AttachablePostNavigator();
+        displaySession = {
+          mode,
+          navigator,
+          viewModel: new DisplayViewModel({
+            mode,
+            clock: this.clock,
+            repository: this.displayRepository,
+            likes: this.likes,
+            changes: this.postChanges,
+            toast: this.toast,
+            guestGate: this.guestGate,
+            navigator,
+          }),
+        };
+      }
+      return displaySession;
+    },
+    createFeedViewModel(args) {
+      return new FeedViewModel({
+        postId: args.postId,
+        seed: args.seed,
+        assumeMine: args.assumeMine,
+        getUserId: async () => (await this.store.read()).userId,
+        clock: this.clock,
+        repository: this.feedRepository,
+        likes: this.likes,
+        changes: this.postChanges,
+        toast: this.toast,
+        navigator: args.navigator,
+      });
     },
     createSignatureDrawViewModel(mode) {
       return new SignatureDrawViewModel({

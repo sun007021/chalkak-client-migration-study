@@ -8,6 +8,9 @@ import { kstToday } from '../../core/time/kst';
 import type { DateString } from '../../core/time/kst';
 import type { ToastController } from '../../core/ui/ToastController';
 import type { SessionMode } from '../boot/authGate';
+import type { PostLikeStore } from '../like/PostLikeStore';
+import type { PostChanges } from '../post/PostChanges';
+import type { PostChange } from '../post/postModels';
 import type { GuestGate } from '../shell/GuestGate';
 import type { UploadEntry } from '../shell/UploadEntry';
 import type { BannerFeed } from './BannerFeed';
@@ -82,6 +85,10 @@ export interface HomeViewModelDeps {
   guestGate: GuestGate;
   uploadEntry: UploadEntry;
   navigator: HomeNavigator;
+  /** 랭킹·오늘 인기 좋아요(REQ-HOME-033): 전시·상세와 같은 공유 저장소. */
+  likes: PostLikeStore;
+  /** 게시물 변경 이벤트(like·title·removed)를 받아 랭킹·히어로·주간 기록에 반영한다. */
+  changes: PostChanges;
 }
 
 /** 랭킹에 담는 최대 개수(REQ-HOME-027). */
@@ -144,8 +151,11 @@ export class HomeViewModel extends ViewModel<HomeState> {
   /** 마지막으로 받은 /posts/today. 히어로는 이 값과 이번 주 기록(썸네일)에서 만든다. */
   private today: TodayPost | null = null;
 
+  private readonly unsubscribeChanges: () => void;
+
   constructor(protected readonly deps: HomeViewModelDeps) {
     super(HomeViewModel.initialState(deps));
+    this.unsubscribeChanges = deps.changes.subscribe((change) => this.applyChange(change));
   }
 
   /** ISSUE 배너 목록(화면이 구독한다). */
@@ -251,6 +261,7 @@ export class HomeViewModel extends ViewModel<HomeState> {
   }
 
   override dispose(): void {
+    this.unsubscribeChanges();
     this.gone = true;
     this.cancelAll();
     this.deps.banners.dispose();
@@ -341,6 +352,64 @@ export class HomeViewModel extends ViewModel<HomeState> {
     if (!seed) return;
     if (!this.deps.guestGate.requireMember(this.deps.mode, 'feed')) return;
     this.deps.navigator.openPostDetail({ postId, seed });
+  }
+
+  /**
+   * 랭킹 사진의 하트(home.ranking-like-button-{id}, home.popular-like-button-{id}). 게스트는 `nav.guest.like` 토스트(요청·상태 변화 없음),
+   * 회원은 likes.toggle(지금 보이는 항목)로 전시·상세와 같은 낙관적 갱신·롤백(REQ-HOME-033). 랭킹 항목의 isLiked·likeCount는 changes의 like 이벤트로 바뀌고,
+   * 랭킹 응답은 likes.beginRead/merge로 보정한다. removed는 랭킹에서 뺀다. 내 히어로 게시물이 removed면 히어로는 empty, 주간 기록 칸은 비운다(TC-HOME-046).
+   */
+  async onRankingLikePress(key: RankingKey, postId: string): Promise<void> {
+    const section = this.state[key];
+    if (section.status !== 'ready') return;
+    const post = section.posts.find((item) => item.id === postId);
+    if (!post) return;
+    if (!this.deps.guestGate.requireMember(this.deps.mode, 'like')) return;
+    await this.deps.likes.toggle(post);
+  }
+
+  /** 다른 화면·좋아요 저장소가 알린 게시물 변경을 랭킹·히어로·주간 기록에 반영한다. */
+  private applyChange(change: PostChange): void {
+    if (this.gone) return;
+    const mapPosts = (section: RankingSection, update: (posts: PostSummary[]) => PostSummary[]): RankingSection =>
+      section.status === 'ready' ? { status: 'ready', posts: update(section.posts) } : section;
+    const sameId = (post: PostSummary): boolean => post.id.toLowerCase() === change.postId.toLowerCase();
+    switch (change.type) {
+      case 'like':
+        this.setState({
+          yesterday: mapPosts(this.state.yesterday, (posts) => posts.map((post) => (sameId(post) ? { ...post, isLiked: change.isLiked, likeCount: change.likeCount } : post))),
+          popular: mapPosts(this.state.popular, (posts) => posts.map((post) => (sameId(post) ? { ...post, isLiked: change.isLiked, likeCount: change.likeCount } : post))),
+        });
+        return;
+      case 'title':
+        this.setState({
+          yesterday: mapPosts(this.state.yesterday, (posts) => posts.map((post) => (sameId(post) ? { ...post, title: change.title } : post))),
+          popular: mapPosts(this.state.popular, (posts) => posts.map((post) => (sameId(post) ? { ...post, title: change.title } : post))),
+        });
+        return;
+      case 'removed':
+        this.setState({
+          yesterday: mapPosts(this.state.yesterday, (posts) => posts.filter((post) => !sameId(post))),
+          popular: mapPosts(this.state.popular, (posts) => posts.filter((post) => !sameId(post))),
+        });
+        this.dropMyPost(change.postId);
+        return;
+    }
+  }
+
+  /** 내 오늘 게시물이 삭제됐다: 히어로는 비었음으로, 주간 기록 칸은 비우고, AI 카드는 숨긴다(TC-HOME-046). */
+  private dropMyPost(postId: string): void {
+    const same = (other: string): boolean => other.toLowerCase() === postId.toLowerCase();
+    const today = this.today;
+    if (today?.kind === 'posted' && same(today.postId)) {
+      this.today = { kind: 'not-posted', topicDate: today.topicDate };
+      this.setState({ hero: { kind: 'empty', banned: false }, ai: { kind: 'hidden' } });
+    }
+    const weekly = this.state.weekly;
+    if (weekly.status === 'ready' && weekly.days.some((day) => day.entry && same(day.entry.postId))) {
+      const days = weekly.days.map((day) => (day.entry && same(day.entry.postId) ? { ...day, entry: null } : day));
+      this.setState({ weekly: { status: 'ready', days, count: days.filter((day) => day.entry).length } });
+    }
   }
 
   /** 더 보기 → navigator.openDisplayPopular(해당 섹션 날짜: 어제 또는 오늘). */
@@ -486,9 +555,10 @@ export class HomeViewModel extends ViewModel<HomeState> {
   private async loadPopularFor(topic: HomeTopic): Promise<Failure[]> {
     const pass = this.begin('popular');
     try {
+      const stamp = this.deps.likes.beginRead();
       const posts = await this.deps.repository.fetchPopularPosts(topic.topicDate, pass.signal);
       if (!pass.isCurrent()) return [];
-      this.setState({ popular: { status: 'ready', posts: posts.slice(0, RANKING_LIMIT) } });
+      this.setState({ popular: { status: 'ready', posts: this.settleRanking(posts, stamp) } });
       return [];
     } catch (error) {
       if (!pass.isCurrent() || isCancel(error)) return [];
@@ -497,13 +567,19 @@ export class HomeViewModel extends ViewModel<HomeState> {
     }
   }
 
+  /** 읽기 응답을 삭제된 게시물은 빼고 읽기 이후의 좋아요 변경은 지키며 앞 5개로 자른다. */
+  private settleRanking(posts: PostSummary[], stamp: number): PostSummary[] {
+    return this.deps.likes.merge(this.deps.changes.withoutRemoved(posts), stamp).slice(0, RANKING_LIMIT);
+  }
+
   private async loadYesterday(dates: HomeDates): Promise<Failure[]> {
     const pass = this.begin('yesterday');
     try {
       const topic = await this.deps.repository.fetchTopic(dates.yesterday, pass.signal);
+      const stamp = this.deps.likes.beginRead();
       const posts = topic ? await this.deps.repository.fetchPopularPosts(topic.topicDate, pass.signal) : [];
       if (!pass.isCurrent()) return [];
-      this.setState({ yesterday: { status: 'ready', posts: posts.slice(0, RANKING_LIMIT) } });
+      this.setState({ yesterday: { status: 'ready', posts: this.settleRanking(posts, stamp) } });
       return [];
     } catch (error) {
       if (!pass.isCurrent() || isCancel(error)) return [];
@@ -526,7 +602,9 @@ export class HomeViewModel extends ViewModel<HomeState> {
       return [this.failureOf('hero', error)];
     }
     if (!pass.isCurrent()) return [];
-    this.today = today;
+    // 방금 삭제한 게시물이 늦은 응답으로 되살아나지 않게 한다.
+    this.today = today.kind === 'posted' && this.deps.changes.wasRemoved(today.postId) ? { kind: 'not-posted', topicDate: today.topicDate } : today;
+    today = this.today;
     this.publishHero();
     if (today.kind === 'posted' && today.moderationStatus === 'APPROVED' && today.topicDate === dates.today) {
       await this.loadAiCard(today.postId, pass);
@@ -602,7 +680,7 @@ export class HomeViewModel extends ViewModel<HomeState> {
       const months = await Promise.all(dates.months.map(({ year, month }) => this.deps.repository.fetchCalendar(year, month, pass.signal)));
       if (!pass.isCurrent()) return [];
       const byDate = new Map<DateString, CalendarEntry>();
-      for (const entry of months.flat()) byDate.set(entry.topicDate, entry);
+      for (const entry of months.flat()) if (!this.deps.changes.wasRemoved(entry.postId)) byDate.set(entry.topicDate, entry);
       const days: WeekDay[] = dates.week.map((date) => ({ date, entry: byDate.get(date) ?? null }));
       this.setState({ weekly: { status: 'ready', days, count: days.filter((day) => day.entry).length } });
       this.publishHero();

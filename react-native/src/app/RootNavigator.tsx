@@ -4,10 +4,14 @@ import {
 } from '@react-navigation/native-stack';
 
 import { useEffect, useMemo } from 'react';
+import { BackHandler } from 'react-native';
 
 import { KstDate } from '../core/time/KstDate';
+import { FeedbackScreen } from '../features/feedback/FeedbackScreen';
 import type { FeedTarget } from '../features/feed/FeedTarget';
-import { PlaceholderScreen } from '../features/placeholder/PlaceholderScreen';
+import { NotificationDetailScreen } from '../features/notification/NotificationDetailScreen';
+import { NotificationInboxScreen } from '../features/notification/NotificationInboxScreen';
+import { SignatureStep } from '../features/signature/SignatureStep';
 import { PhotoUploadScreen } from '../features/upload/PhotoUploadScreen';
 import { UploadSuccessScreen } from '../features/upload/UploadSuccessScreen';
 import { useAppContainer } from './AppContainerContext';
@@ -30,8 +34,16 @@ export function RootNavigator() {
         // 상세가 열린 채 다른 게시물로 이동하면 같은 화면을 재사용하지 않고 새 화면을 쌓는다.
         getId={({ params }) => params.postId}
       />
-      <Stack.Screen name="Notifications" component={NotificationsPlaceholder} />
+      <Stack.Screen name="Notifications" component={NotificationsScreenRoute} />
+      <Stack.Screen
+        name="NotificationDetail"
+        component={NotificationDetailScreenRoute}
+        // 다른 알림 상세로 이동하면 같은 화면을 재사용하지 않고 새로 쌓는다.
+        getId={({ params }) => params.notificationId}
+      />
       <Stack.Screen name="IssueWeb" component={IssueWebScreenRoute} />
+      <Stack.Screen name="Feedback" component={FeedbackScreenRoute} />
+      <Stack.Screen name="SignatureChange" component={SignatureChangeScreenRoute} />
       <Stack.Screen name="Upload" component={UploadScreenRoute} />
       <Stack.Screen
         name="UploadSuccess"
@@ -43,19 +55,49 @@ export function RootNavigator() {
   );
 }
 
-const NotificationsPlaceholder = () => <PlaceholderScreen label="알림함" />;
+/** 알림함 라우트: ViewModel은 이 라우트가 만들고 닫힐 때 dispose한다(StrictMode 안전, useOwnedViewModel). */
+function NotificationsScreenRoute({
+  navigation,
+}: NativeStackScreenProps<RootStackParamList, 'Notifications'>) {
+  const container = useAppContainer();
+  const viewModel = useOwnedViewModel(() => container.createNotificationInboxViewModel());
+  return viewModel ? (
+    <NotificationInboxScreen viewModel={viewModel} onBack={() => navigation.goBack()} />
+  ) : null;
+}
+
+function NotificationDetailScreenRoute({
+  route,
+  navigation,
+}: NativeStackScreenProps<RootStackParamList, 'NotificationDetail'>) {
+  const container = useAppContainer();
+  const { notificationId } = route.params;
+  const viewModel = useOwnedViewModel(() =>
+    container.createNotificationDetailViewModel(notificationId, {
+      close: () => navigation.goBack(),
+    }),
+  );
+  return viewModel ? <NotificationDetailScreen viewModel={viewModel} /> : null;
+}
 
 function PostDetailScreenRoute({
   route,
   navigation,
 }: NativeStackScreenProps<RootStackParamList, 'PostDetail'>) {
-  const { postId, seed, entry, thumbnailUrl } = route.params;
+  const { postId, seed, entry, thumbnailUrl, openAiSheet } = route.params;
   // 파라미터가 같은 동안 같은 target 객체를 쓴다(소유자가 ViewModel을 다시 만들지 않게).
   const target = useMemo<FeedTarget>(
     () => ({ postId, entry: entry ?? 'list', seed: seed ?? null, thumbnailUrl }),
     [postId, entry, seed, thumbnailUrl],
   );
-  return <PostDetailRoute target={target} onBack={() => navigation.goBack()} />;
+  return (
+    <PostDetailRoute
+      target={target}
+      onBack={() => navigation.goBack()}
+      openAiSheet={openAiSheet === true}
+      onAiSheetConsumed={() => navigation.setParams({ openAiSheet: undefined })}
+    />
+  );
 }
 
 function IssueWebScreenRoute({
@@ -63,6 +105,50 @@ function IssueWebScreenRoute({
   navigation,
 }: NativeStackScreenProps<RootStackParamList, 'IssueWeb'>) {
   return <IssueWebRoute url={route.params.url} onBack={() => navigation.goBack()} />;
+}
+
+/**
+ * 피드백 화면 라우트. 열 때 ViewModel을 만들고 닫을 때 dispose한다(전송 중 요청 취소). screen_view는 start()가 한 번 보낸다.
+ * 닫기는 goBack이라 설정 탭으로 돌아온다.
+ */
+function FeedbackScreenRoute({
+  navigation,
+}: NativeStackScreenProps<RootStackParamList, 'Feedback'>) {
+  const container = useAppContainer();
+  const viewModel = useOwnedViewModel(() =>
+    container.createFeedbackViewModel({ close: () => navigation.goBack() }),
+  );
+  useEffect(() => viewModel?.start(), [viewModel]);
+  return viewModel ? <FeedbackScreen viewModel={viewModel} /> : null;
+}
+
+/**
+ * 설정의 사인 변경 흐름 라우트(가입과 같은 그리기/미리보기 화면). 완료하면 닫고 설정의 사인 카드를 다시 조회한다.
+ * 안드로이드 하드웨어 뒤로는 흐름의 뒤로(미리보기 -> 그리기 -> 닫기)를 따른다.
+ */
+function SignatureChangeScreenRoute({
+  navigation,
+}: NativeStackScreenProps<RootStackParamList, 'SignatureChange'>) {
+  const container = useAppContainer();
+  const flow = useOwnedViewModel(() =>
+    container.createSignatureChangeFlow({
+      onCompleted: () => {
+        navigation.goBack();
+        void container.notifySignatureChanged();
+      },
+      onExit: () => navigation.goBack(),
+    }),
+  );
+  useEffect(() => {
+    flow?.start();
+    if (!flow) return undefined;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      flow.back();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [flow]);
+  return <SignatureStep flow={flow} />;
 }
 
 /**

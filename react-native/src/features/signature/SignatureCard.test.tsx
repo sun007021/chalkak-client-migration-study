@@ -19,6 +19,7 @@ async function setup(fixture: string) {
     repository: new SignatureRepository({ api: net.api }),
     toast: new FakeToastPresenter(),
     navigator,
+    authFlow: { toLogin: jest.fn() },
   });
   return { vm, navigator, net };
 }

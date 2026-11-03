@@ -23,6 +23,17 @@ describe('ApiClient 재시도', () => {
   const get = (signal?: AbortSignal) =>
     h.api.requestJson({ method: 'GET', path: '/notifications', signal }, identity);
 
+  it('ApiClientDeps.maxRetries가 0이면 멱등 요청도 재시도하지 않는다', async () => {
+    const noRetry = createNetHarness({ maxRetries: 0 });
+    await noRetry.signIn();
+    noRetry.transport.script(serverError(), ok());
+    await expect(
+      noRetry.api.requestJson({ method: 'GET', path: '/notifications' }, identity),
+    ).rejects.toBeInstanceOf(HttpError);
+    expect(noRetry.transport.requests).toHaveLength(1);
+    expect(noRetry.sleeper.calls).toEqual([]);
+  });
+
   describe('멱등 요청', () => {
     it.each([
       ['5xx', () => serverError()],

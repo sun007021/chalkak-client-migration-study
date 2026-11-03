@@ -17,3 +17,28 @@ jest.mock('react-native-webview', () => {
   WebView.lastProps = null as Record<string, unknown> | null;
   return { WebView, default: WebView };
 });
+
+// AsyncStorage는 네이티브 모듈이 없으면 던진다. 공식 메모리 mock을 쓴다.
+jest.mock('@react-native-async-storage/async-storage', () =>
+  jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
+
+// expo-notifications는 네이티브 모듈이 필요하다. 구독은 해제 가능한 객체를 돌려주고 나머지는 빈 값을 돌려준다.
+jest.mock('expo-notifications', () => {
+  const subscription = () => ({ remove: jest.fn() });
+  return {
+    DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
+    AndroidImportance: { HIGH: 4 },
+    addPushTokenListener: jest.fn(subscription),
+    addNotificationReceivedListener: jest.fn(subscription),
+    addNotificationResponseReceivedListener: jest.fn(subscription),
+    getLastNotificationResponse: jest.fn(() => null),
+    clearLastNotificationResponse: jest.fn(),
+    getDevicePushTokenAsync: jest.fn(async () => ({ type: 'android', data: 'jest-token' })),
+    getPermissionsAsync: jest.fn(async () => ({ status: 'granted', granted: true })),
+    requestPermissionsAsync: jest.fn(async () => ({ status: 'granted', granted: true })),
+    setNotificationHandler: jest.fn(),
+    setNotificationChannelAsync: jest.fn(async () => null),
+    scheduleNotificationAsync: jest.fn(async () => 'id'),
+  };
+});

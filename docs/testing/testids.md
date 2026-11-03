@@ -403,6 +403,7 @@
 | feedback | 보내기 버튼    | `feedback.submit-button`      | trim 후 0자이면 비활성, 전송 중 "보내는 중..." 비활성 |
 | feedback | 검증 메시지    | `feedback.validation-message` | "피드백은 1자 이상 1000자 이하로 입력해 주세요."      |
 | feedback | 오류 메시지    | `feedback.error-message`      | 전송 실패 문구                                        |
+| feedback | 안내 본문      | `feedback.guide-body`         | 안내 문구 아래 본문 (RN 추가)                         |
 
 ### 업로드 진입 게이트
 

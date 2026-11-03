@@ -7,7 +7,8 @@ import { useViewModelState } from '../core/state/useViewModelState';
 import { KstDate } from '../core/time/KstDate';
 import { DisplayScreen } from '../features/display/DisplayScreen';
 import { HomeScreen } from '../features/home/HomeScreen';
-import { PlaceholderScreen } from '../features/placeholder/PlaceholderScreen';
+import { RnLegalDocWebView } from '../features/onboarding/RnLegalDocWebView';
+import { SettingsScreen } from '../features/settings/SettingsScreen';
 import { RecordScreen } from '../features/record/RecordScreen';
 import { CalendarImageCaptureHost } from '../features/record/ui/CalendarImageCaptureHost';
 import { HomeAiCard } from './AiReviewHosts';
@@ -144,4 +145,15 @@ function RecordTab({ route, navigation }: BottomTabScreenProps<TabParamList, 'Re
     </View>
   );
 }
-const SettingsTab = () => <PlaceholderScreen label="설정" />;
+
+/**
+ * 설정 탭. ViewModel은 소유자(settingsOwner)가 메인에 들어올 때 만들고 로그아웃 때 버린다.
+ * 화면은 탭이 포커스일 때만 마운트한다(마운트 = onShown: 탭 복귀·피드백/사인 변경에서 돌아옴이 모두 "다시 보임").
+ */
+function SettingsTab() {
+  const { settingsOwner } = useAppContainer();
+  const { viewModel } = useViewModelState(settingsOwner);
+  const focused = useIsFocused();
+  if (!viewModel || !focused) return <View style={{ flex: 1 }} />;
+  return <SettingsScreen viewModel={viewModel} WebView={RnLegalDocWebView} />;
+}

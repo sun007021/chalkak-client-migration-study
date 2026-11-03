@@ -198,7 +198,10 @@ void main() {
       expect(logs, hasLength(1));
       expect(await platform.tokens.currentToken(), isNull);
       expect(await platform.messages.initialMessage(), isNull);
-      expect(await platform.permission.request(), OsPermissionStatus.denied);
+      expect(
+        await platform.permission.request(),
+        OsPermissionStatus.notRequired,
+      );
     });
 
     test('지원하지 않는 플랫폼은 꺼진다', () async {
@@ -275,8 +278,36 @@ void main() {
       );
       await p.ready;
       expect(p.isAvailable, isFalse);
-      expect(await p.permission.status(), OsPermissionStatus.denied);
+      expect(await p.permission.status(), OsPermissionStatus.notRequired);
       expect(await p.messages.initialMessage(), isNull);
+    });
+  });
+
+  group('Firebase 없는 권한 구현', () {
+    test(
+      'REQ-SET-015 REQ-SET-019 권한을 알 수 없어 거부로 가두지 않는다: 켜기를 허용하고 요청도 허용으로 답한다',
+      () async {
+        final p = NoFirebaseNotificationPermission(openSettings: () async {});
+        expect(await p.status(), OsPermissionStatus.notRequired);
+        expect(p.status().then((s) => s.allowsDelivery), completion(isTrue));
+        expect(await p.request(), OsPermissionStatus.notRequired);
+      },
+    );
+
+    test('REQ-SET-015 시스템 설정 열기는 OS 앱 설정을 연다', () async {
+      var opened = 0;
+      final p = NoFirebaseNotificationPermission(
+        openSettings: () async => opened++,
+      );
+      await p.openSystemSettings();
+      expect(opened, 1);
+    });
+
+    test('REQ-SET-015 꺼진 푸시 구성의 권한도 같은 구현이다', () {
+      expect(
+        const PushPlatform.disabled().permission,
+        isA<NoFirebaseNotificationPermission>(),
+      );
     });
   });
 }

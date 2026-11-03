@@ -123,13 +123,22 @@ export class AuthRepository {
     }
   }
 
-  /** DELETE /users/me. 204일 때만 로컬 세션·캐시를 정리한다. 실패는 throw하고 세션은 그대로다. */
+  /** DELETE /users/me. 204일 때만 로컬 세션·캐시를 정리한다(정리 단계의 실패는 삼킨다). 요청 실패는 throw하고 세션은 그대로다. */
   async withdraw(): Promise<void> {
     const { api, sessionStore } = this.deps;
     await api.requestVoid({ method: 'DELETE', path: '/users/me' });
     await sessionStore.clear();
-    await this.clearUserData();
-    this.deps.pushRegistrar.resetRegistrationCache();
+    // 서버에서는 이미 탈퇴됐다. 로컬 정리가 던져도 탈퇴 실패로 보고하지 않고(clearLocalSession과 같은 최선 노력) 나머지를 이어 간다.
+    try {
+      await this.clearUserData();
+    } catch (error) {
+      console.error('[AuthRepository] withdraw: clearUserData failed', error);
+    }
+    try {
+      this.deps.pushRegistrar.resetRegistrationCache();
+    } catch (error) {
+      console.error('[AuthRepository] withdraw: resetRegistrationCache failed', error);
+    }
   }
 
   private async clearUserData(): Promise<void> {

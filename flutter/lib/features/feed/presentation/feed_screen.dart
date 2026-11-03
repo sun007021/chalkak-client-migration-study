@@ -10,6 +10,7 @@ import '../../like/domain/toast_message.dart';
 import '../../like/presentation/like_button.dart';
 import 'feed_test_ids.dart';
 import 'feed_view_model.dart';
+import 'signed_photo.dart';
 import 'zoomable_photo.dart';
 
 /// 게시물 상세 화면(단독 위젯). 하단바 숨김·라우트 연결은 통합 단계에서 한다.
@@ -261,29 +262,10 @@ class _Content extends StatelessWidget {
               child: TestId(
                 FeedTestIds.photo,
                 child: ZoomablePhoto(
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      AppNetworkImage(
-                        url: content.originalImageUrl,
-                        fit: BoxFit.contain,
-                        semanticLabel: state.photoLabel,
-                      ),
-                      if (signatureUrl != null)
-                        Positioned(
-                          right: 12,
-                          bottom: 12,
-                          width: 96,
-                          child: TestId(
-                            FeedTestIds.signatureImage,
-                            child: AppNetworkImage(
-                              url: signatureUrl,
-                              fit: BoxFit.contain,
-                              omitOnError: true,
-                            ),
-                          ),
-                        ),
-                    ],
+                  child: SignedPhoto(
+                    photoUrl: content.originalImageUrl,
+                    signatureUrl: signatureUrl,
+                    semanticLabel: state.photoLabel,
                   ),
                 ),
               ),

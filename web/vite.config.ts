@@ -35,6 +35,8 @@ export default defineConfig(({ mode }) => {
       setupFiles: ['./src/test/setup.ts'],
       include: ['src/**/*.test.{ts,tsx}', 'vite/**/*.test.ts'],
       restoreMocks: true,
+      // 화면 테스트는 실제 렌더링을 기다린다. 다른 작업과 CPU를 나눠 쓸 때 기본 5초를 넘기는 경우가 있어 넉넉히 둔다.
+      testTimeout: 15000,
     },
   };
 });

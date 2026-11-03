@@ -11,6 +11,8 @@ import { useShellContext } from '../shell/MainShell';
 import type { BannerFeedState } from './BannerFeed';
 import { bannerSentinelIndex } from './BannerFeed';
 import type { HomeState, HomeViewModel, RankingKey, RankingSection } from './HomeViewModel';
+import { LikeButton } from '../like/LikeButton';
+import { useScrollRestore } from '../../core/ui/useScrollRestore';
 import { RouterHomeNavigator } from './RouterHomeNavigator';
 import { formatTopicHeaderDate } from './homeDates';
 import type { PostSummary } from './homeModels';
@@ -57,6 +59,7 @@ function HomeView({ vm, mode }: { vm: HomeViewModel; mode: 'member' | 'guest' })
   const container = useContainer();
   const state = useViewModel(vm);
   const banners = useViewModel(vm.banners);
+  useScrollRestore(state.topic.status !== 'loading');
   return (
     <div data-testid="home.root" data-mode={mode}>
       <div data-testid="home.scroll">
@@ -253,6 +256,8 @@ const RANKING_IDS = {
     error: 'home.ranking-error',
     retry: 'home.ranking-retry-button',
     item: (id: string) => `home.ranking-item-${id}`,
+    likeButton: (id: string) => `home.ranking-like-button-${id}`,
+    likeCount: (id: string) => `home.ranking-like-count-${id}`,
   },
   popular: {
     section: 'home.popular-section',
@@ -261,6 +266,8 @@ const RANKING_IDS = {
     error: 'home.popular-error',
     retry: 'home.popular-retry-button',
     item: (id: string) => `home.popular-item-${id}`,
+    likeButton: (id: string) => `home.popular-like-button-${id}`,
+    likeCount: (id: string) => `home.popular-like-count-${id}`,
   },
 } as const;
 
@@ -295,7 +302,15 @@ function Ranking({ vm, state, which }: { vm: HomeViewModel; state: HomeState; wh
       {section.status === 'ready' && section.posts.length > 0 ? (
         <ul style={{ display: 'flex', gap: 8, overflowX: 'auto', margin: 0, padding: 0, listStyle: 'none' }}>
           {section.posts.map((post) => (
-            <RankingItem key={post.id} testId={ids.item(post.id)} post={post} onPress={() => vm.onRankingItemPress(which, post.id)} />
+            <RankingItem
+              key={post.id}
+              testId={ids.item(post.id)}
+              likeButtonTestId={ids.likeButton(post.id)}
+              likeCountTestId={ids.likeCount(post.id)}
+              post={post}
+              onPress={() => vm.onRankingItemPress(which, post.id)}
+              onLikePress={() => void vm.onRankingLikePress(which, post.id)}
+            />
           ))}
         </ul>
       ) : null}
@@ -303,7 +318,21 @@ function Ranking({ vm, state, which }: { vm: HomeViewModel; state: HomeState; wh
   );
 }
 
-function RankingItem({ testId, post, onPress }: { testId: string; post: PostSummary; onPress: () => void }): ReactNode {
+function RankingItem({
+  testId,
+  likeButtonTestId,
+  likeCountTestId,
+  post,
+  onPress,
+  onLikePress,
+}: {
+  testId: string;
+  likeButtonTestId: string;
+  likeCountTestId: string;
+  post: PostSummary;
+  onPress: () => void;
+  onLikePress: () => void;
+}): ReactNode {
   const src = post.thumbnailImageUrl ?? post.originalImageUrl;
   return (
     <li style={{ flex: '0 0 40%' }}>
@@ -311,6 +340,7 @@ function RankingItem({ testId, post, onPress }: { testId: string; post: PostSumm
         <img src={src} alt={post.title ? '' : webOnlyCopy['home.ranking.photo-alt']} style={thumbStyle} />
         {post.title ? <span>{post.title}</span> : null}
       </button>
+      <LikeButton buttonTestId={likeButtonTestId} countTestId={likeCountTestId} isLiked={post.isLiked} likeCount={post.likeCount} onPress={onLikePress} />
     </li>
   );
 }

@@ -8,9 +8,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import com.stonefive.chalkak.ui.aireview.AiReviewRoute
 import com.stonefive.chalkak.ui.common.RemoteImage
 import com.stonefive.chalkak.ui.components.ScreenGoneEffect
 import kr.chalkak.feature.display.FeedEffect
+import kr.chalkak.feature.aireview.AiReviewStateHolder
+import kr.chalkak.feature.aireview.AiReviewTarget
 import kr.chalkak.feature.display.FeedStateHolder
 
 /**
@@ -31,6 +34,11 @@ fun FeedRoute(
     onLoginRequired: () -> Unit,
     modifier: Modifier = Modifier,
     finishOnLeave: Boolean = true,
+    /**
+     * AI feedback holder of this post (null = no AI area). The target is `AiReviewTarget(postId, topicDate)` only for my post
+     * whose detail is confirmed; otherwise null. Its lifecycle follows this route ([finishOnLeave] as for [holder]).
+     */
+    aiReview: AiReviewStateHolder? = null,
 ) {
     val state by holder.state.collectAsState()
     val back by rememberUpdatedState(onBack)
@@ -71,5 +79,20 @@ fun FeedRoute(
             onToastExpired = holder::onToastShown,
         )
     }
-    FeedScreen(state, callbacks, remoteImage, modifier)
+    if (aiReview == null) {
+        FeedScreen(state, callbacks, remoteImage, modifier)
+        return
+    }
+    val postId = state.content?.postId
+    val topicDate = state.content?.topicDate
+    val target = remember(state.isMine, state.confirmed, postId, topicDate) {
+        if (state.isMine && state.confirmed && postId != null && topicDate != null) AiReviewTarget(postId, topicDate) else null
+    }
+    AiReviewRoute(
+        holder = aiReview,
+        target = target,
+        onLoginRequired = { login() },
+        finishOnLeave = finishOnLeave,
+        layout = { pill, overlay -> FeedScreen(state, callbacks, remoteImage, modifier, aiPill = pill, aiOverlay = overlay) },
+    )
 }
