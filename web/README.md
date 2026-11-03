@@ -97,5 +97,14 @@ src/
 ### TODO(W7a 이후)
 
 - 앨범·카메라 버튼의 보이는 문구와 접근성 이름: `shared/copy/ko.json`에 키가 없어 지금은 아이콘 + 각 `<input>`의 `aria-label`(`copy/webOnly.ts`의 `upload.album.a11y`·`upload.camera.a11y`), 미리보기·성공 화면 사진 이름도 같은 파일의 Web 전용 문구다. shared에 키가 생기면 옮긴다.
-- 편집기(W7b): `container.photoEditor`가 null이면 고른 사진을 편집하지 않은 값으로 바로 확정한다. 편집기 컴포넌트와 실제 `EditRenderer`를 W7b에서 꽂는다.
+- 편집기: `container.photoEditor`가 null이면 고른 사진을 편집하지 않은 값으로 바로 확정한다(W7b에서 기본값이 실제 편집기로 바뀌었다. 아래 W7b 메모).
 - 실서버·실기기 확인(S3 PUT CORS, 실제 사진 EXIF 1~8, HEIC, 오프라인 제출): E2E/A 계층.
+
+## 사진 편집기(W7b) 구현 메모
+
+- **구성**: `features/upload/editor/`. 순수 연산(`adjustments`, `filters`, `colorPipeline`, `autoAdjust`, `cropGeometry`, `normalizeEdit`, `rulerScale`)은 `Uint8ClampedArray` RGBA를 제자리에서 바꾸고 상수는 `editConstants()` 한 곳이 근거다(shared/photo-edit이 생기면 대조 테스트를 더한다). `PhotoEditorViewModel`이 상태·미리보기·썸네일·자동 보정 분석을 맡고 `PhotoEditorScreen`은 그리기만 한다.
+- **조립**: `createAppContainer`가 `photoEditor`를 생략하면 실제 편집기(`createPhotoEditor`), `null`이면 편집기 없음. `pixelSurface`(기본 `createCanvasPixelSurface`)를 `CanvasEditRenderer`(업로드 준비)·`CanvasPreviewRenderer`(미리보기·썸네일, blob URL)·`CanvasAutoAnalyzer`가 함께 쓴다.
+- **편집 결과는 한 번만 그린다**: 편집기 "완료"는 `normalizeEdit`한 편집값만 넘기고(렌더 없음) 업로드 준비가 `CanvasEditRenderer`로 같은 값을 다시 그려 WebP 한 번으로 인코딩한다. 편집기가 다시 열릴 때 자르기 값은 사용자가 건드리기 전까지 저장값 그대로 둔다(`sameEdit` 유지).
+- **미리보기 형식**: 미리보기·썸네일 blob은 화면에만 쓰고 앱 사진 형식 상수(`POST_IMAGE_CONTENT_TYPE`)로 만든다(`noFallbackFormat.test.ts`가 업로드 폴더의 다른 형식 문자열을 금지한다). WebP 인코딩을 못 하는 브라우저는 canvas가 PNG를 주지만 `<img>`로는 문제없다.
+- **E2E**: `e2e/photo-edit.spec.ts`는 실제 Chromium canvas에서 회전·자르기·조정·필터 결과 픽셀을 순수 함수 기대값과 ±2 이내로 비교하고 미리보기·분석기·편집기 화면(포인터 끌기)을 확인한다. `upload-encoder.spec.ts`처럼 `e2e/fixtures/editorEntry.ts`를 vite로 따로 묶어 주입하므로 `dist`에는 테스트 코드가 없다.
+- **TODO**: 자르기 프레임의 키보드 조작(손잡이는 포인터 전용, 비율·90도 회전 버튼이 대체 수단), 눈금자 모양 슬라이더와 기준값 멈칫(`rulerScale`은 수치 함수만 있고 화면은 `input type=range`), 확대 미리보기, 실기기 시각 비교(TC-EDIT-048~051).

@@ -3,6 +3,7 @@ import type { DataRouter } from 'react-router';
 import { ConfigError } from '../core/net/errors';
 import { disableBrowserScrollRestoration } from '../core/ui/scrollRestoration';
 import { DevProxyUploadUrlRewriter } from '../core/net/UploadUrlRewriter';
+import { BrowserRenderScheduler } from '../features/upload/editor/BrowserRenderScheduler';
 import { createAppContainer } from './container';
 import type { AppEnv } from './container';
 import { createAppRoutes } from './routes';
@@ -16,7 +17,7 @@ const uploadUrlRewriter = (): DevProxyUploadUrlRewriter | undefined => (__UPLOAD
 export function bootstrapApp(env: AppEnv): Bootstrap {
   disableBrowserScrollRestoration();
   try {
-    return { kind: 'ready', router: createBrowserRouter(createAppRoutes(createAppContainer({ env, uploadUrlRewriter: uploadUrlRewriter() }))) };
+    return { kind: 'ready', router: createBrowserRouter(createAppRoutes(createAppContainer({ env, uploadUrlRewriter: uploadUrlRewriter(), renderScheduler: new BrowserRenderScheduler() }))) };
   } catch (error) {
     if (error instanceof ConfigError) return { kind: 'config_error' };
     throw error;

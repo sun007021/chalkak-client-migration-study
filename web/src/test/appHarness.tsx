@@ -16,6 +16,8 @@ import { FakeExternalLinkOpener } from './FakeExternalLinkOpener';
 import { FakeSignatureRasterizer } from './FakeSignatureRasterizer';
 import { FakeEditRenderer } from './FakeEditRenderer';
 import { FakeImageDecoder } from './FakeImageDecoder';
+import { FakeAutoAnalyzer } from './FakeAutoAnalyzer';
+import { FakePreviewRenderer } from './FakePreviewRenderer';
 import { FakeWebpCompressor } from './FakeWebpCompressor';
 import type { PhotoEditorComponent } from '../features/upload/photoEditor';
 import { FakeSocialLoginClient } from './FakeSocialLoginClient';
@@ -46,6 +48,9 @@ export interface Harness {
   decoder: FakeImageDecoder;
   renderer: FakeEditRenderer;
   compressor: FakeWebpCompressor;
+  /** 편집기 미리보기·자동 보정 분석 Fake(realEditor일 때 컨테이너가 쓴다). */
+  preview: FakePreviewRenderer;
+  analyzer: FakeAutoAnalyzer;
   /** 카메라 버튼 표시 여부. 테스트가 바꾸면 이후 렌더에 반영된다. */
   camera: { supported: boolean };
 }
@@ -64,6 +69,8 @@ export function makeHarness(
     cameraSupported?: boolean;
     /** 편집기 화면(W7b). 기본 null = 편집기 없음. */
     photoEditor?: PhotoEditorComponent | null;
+    /** true면 photoEditor를 생략해 컨테이너의 실제 편집기(Fake 디코더·미리보기·분석기 위)를 쓴다. */
+    realEditor?: boolean;
   } = {},
 ): Harness {
   const clock = new FakeClock(NOW);
@@ -80,6 +87,8 @@ export function makeHarness(
   const decoder = new FakeImageDecoder();
   const renderer = new FakeEditRenderer();
   const compressor = new FakeWebpCompressor(clock);
+  const preview = new FakePreviewRenderer();
+  const analyzer = new FakeAutoAnalyzer();
   const camera = { supported: options.cameraSupported ?? false };
   const container = createAppContainer({
     env: { VITE_API_BASE_URL: MOCK_BASE, ...options.env },
@@ -100,12 +109,14 @@ export function makeHarness(
     webpCompressor: compressor,
     editRenderer: renderer,
     cameraCapture: { supported: () => camera.supported },
-    photoEditor: options.photoEditor ?? null,
+    ...(options.realEditor ? {} : { photoEditor: options.photoEditor ?? null }),
+    previewRenderer: preview,
+    autoAnalyzer: analyzer,
     externalLinkOpener: opener,
     signatureRasterizer: rasterizer,
     blobUrls,
   });
-  return { container, clock, ff, store, social, preloader, upload, tracker, logger, opener, rasterizer, blobUrls, decoder, renderer, compressor, camera };
+  return { container, clock, ff, store, social, preloader, upload, tracker, logger, opener, rasterizer, blobUrls, decoder, renderer, compressor, preview, analyzer, camera };
 }
 
 /** 라우터를 만들어 그린다. router.state로 현재 경로·이동 방식(PUSH/REPLACE)을 확인한다. */
