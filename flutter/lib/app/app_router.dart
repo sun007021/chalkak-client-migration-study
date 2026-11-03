@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/analytics/screen_return_reporter.dart';
 import '../features/auth/domain/signup_credentials.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/login_view_model.dart';
@@ -22,6 +23,7 @@ import 'view_model_host.dart';
 /// - 강제 업데이트 중에는 splash 밖으로 나가지 않는다.
 GoRouter createAppRouter(AppDependencies dependencies) {
   return GoRouter(
+    observers: [screenReturnObserver],
     initialLocation: AppRoutes.splash,
     refreshListenable: dependencies.updateGate,
     redirect: (context, state) {

@@ -86,6 +86,7 @@ class MainShellViewModel extends ChangeNotifier {
   BottomDestination _selected = BottomDestination.home;
   bool _isCheckingUpload = false;
   bool _started = false;
+  bool _loggedWhileCovered = false;
   bool _disposed = false;
   RecordTarget? _recordTarget;
   DisplayTarget? _displayTarget;
@@ -101,6 +102,16 @@ class MainShellViewModel extends ChangeNotifier {
     if (_started) return;
     _started = true;
     _logScreen(_selected);
+  }
+
+  /// 탭 화면 위에 다른 화면이 쌓였다(그 사이 탭 전환 없이 돌아오면 [onReturned]가 다시 보고한다).
+  void onCovered() => _loggedWhileCovered = false;
+
+  /// 위에 쌓인 화면이 닫혀 탭 화면이 다시 보인다. 그 사이 이 셸이 이미 `screen_view`를 보냈다면
+  /// (예: 업로드 성공 뒤 전시 탭으로 이동) 중복해서 보내지 않는다(REQ-ANL-004).
+  void onReturned() {
+    if (_disposed || !_started || _loggedWhileCovered) return;
+    _analytics.logEvent(AnalyticsEvent.screenView(_selected.value));
   }
 
   void selectTab(BottomDestination destination) {
@@ -187,6 +198,7 @@ class MainShellViewModel extends ChangeNotifier {
   }
 
   void _logScreen(BottomDestination destination) {
+    _loggedWhileCovered = true;
     if (selfReportedScreens.contains(destination)) return;
     _analytics.logEvent(AnalyticsEvent.screenView(destination.value));
   }

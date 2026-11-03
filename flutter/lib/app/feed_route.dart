@@ -46,6 +46,7 @@ class _FeedRouteState extends State<FeedRoute> with WidgetsBindingObserver {
     likes: widget.dependencies.main.likeStore,
     postEvents: widget.dependencies.main.postEvents,
     userId: widget.userId,
+    analytics: widget.dependencies.analytics,
   );
   late final AiReviewSession _aiReview = AiReviewSession(
     repository: widget.dependencies.main.aiReviewRepository,
@@ -59,6 +60,7 @@ class _FeedRouteState extends State<FeedRoute> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _viewModel.addListener(_syncAiTarget);
+    _viewModel.onShown();
     unawaited(_viewModel.load());
   }
 

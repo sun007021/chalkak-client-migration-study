@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/analytics/screen_return_reporter.dart';
 import '../core/time/kst_date.dart';
 import '../core/ui/toast/toast_host.dart';
 import '../features/banner/domain/banner_models.dart';
@@ -161,6 +162,14 @@ class _MainRouteHostState extends State<MainRouteHost> {
   Widget build(BuildContext context) {
     final parts = _parts;
     if (parts == null) return const Scaffold(body: SizedBox.shrink());
+    return ScreenReturnReporter(
+      onCovered: parts.shell.onCovered,
+      onReturn: parts.shell.onReturned,
+      child: _buildShell(parts),
+    );
+  }
+
+  Widget _buildShell(MainComposition parts) {
     return MainShell(
       shell: parts.shell,
       home: parts.home,
