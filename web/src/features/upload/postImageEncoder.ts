@@ -1,12 +1,9 @@
 import { POST_IMAGE_CONTENT_TYPE, POST_IMAGE_MAX_LONG_EDGE, WEBP_DOWNSCALE_MAX_ATTEMPTS, WEBP_QUALITY_LADDER } from '../../constants';
+import { throwIfAborted } from '../../core/abort';
 import { NotWebpError, SizeLimitExceededError } from './imagePorts';
 import type { DecodedImage, WebpCompressor } from './imagePorts';
 import { fitLongEdge, roundSizes } from './imageSizing';
-import { ascii4, readWebpChunks } from './webpMetadata';
-
-function abortError(): DOMException {
-  return new DOMException('The operation was aborted.', 'AbortError');
-}
+import { ascii4, blobBytes, readWebpChunks } from './webpMetadata';
 
 export interface EncodedPostImage {
   blob: Blob;
@@ -32,10 +29,10 @@ export async function encodePostImage(input: { image: DecodedImage; compressor: 
   let attempts = 0;
   for (const size of roundSizes(base, WEBP_DOWNSCALE_MAX_ATTEMPTS)) {
     for (const quality of WEBP_QUALITY_LADDER) {
-      if (signal.aborted) throw abortError();
+      throwIfAborted(signal);
       attempts += 1;
       const blob = await compressor.compress(image, size, quality, signal);
-      if (signal.aborted) throw abortError();
+      throwIfAborted(signal);
       await assertStillWebp(blob);
       if (blob.size <= maxBytes) return { blob, width: size.width, height: size.height, quality, attempts };
     }
@@ -45,7 +42,7 @@ export async function encodePostImage(input: { image: DecodedImage; compressor: 
 
 async function assertStillWebp(blob: Blob): Promise<void> {
   if (blob.type !== POST_IMAGE_CONTENT_TYPE) throw new NotWebpError(`blob type ${blob.type || '(empty)'}`);
-  const inspection = inspectWebp(new Uint8Array(await blob.arrayBuffer()));
+  const inspection = inspectWebp(await blobBytes(blob));
   if (!inspection.ok) throw new NotWebpError(inspection.reason);
 }
 

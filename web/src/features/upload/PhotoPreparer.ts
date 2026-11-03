@@ -1,10 +1,12 @@
 import { POST_IMAGE_CONTENT_TYPE, POST_IMAGE_MAX_LONG_EDGE } from '../../constants';
+import { throwIfAborted } from '../../core/abort';
 import { ApiError, isAbandoned, NetworkError } from '../../core/net/errors';
 import type { Clock } from '../../core/time/Clock';
 import { MonotonicDeadline } from '../../core/time/MonotonicDeadline';
 import { isIdentityEdit } from './editModel';
 import type { PhotoEdit } from './editModel';
 import type { DecodedImage, EditRenderer, ImageDecoder, WebpCompressor } from './imagePorts';
+import { fitLongEdge } from './imageSizing';
 import type { Size } from './imageSizing';
 import { encodePostImage } from './postImageEncoder';
 import type { UploadPolicy, UploadRepository } from './UploadRepository';
@@ -67,21 +69,16 @@ export class PhotoPreparer {
   constructor(protected readonly deps: PhotoPreparerDeps) {}
 
   /**
-   * 선택한 사진이 읽을 수 있는 이미지인지 확인하고 보이는 방향의 크기를 돌려준다(디코드 후 곧바로 release, 네트워크 요청 없음).
-   * 0바이트·손상·지원하지 않는 형식은 PrepareError('prepare'). 디코드 옵션의 maxLongEdge는 POST_IMAGE_MAX_LONG_EDGE.
+   * 선택한 사진이 읽을 수 있는 이미지인지 확인하고 보이는 방향의 크기를 돌려준다(decoder.probe: 전체 해상도 디코드 없음, 네트워크 요청 없음).
+   * 크기는 긴 변 POST_IMAGE_MAX_LONG_EDGE 이하로 맞춘다. 0바이트·손상·지원하지 않는 형식은 PrepareError('prepare').
    */
   async inspect(photo: Blob, signal: AbortSignal): Promise<Size> {
-    let image: DecodedImage;
     try {
-      image = await this.deps.decoder.decode(photo, { maxLongEdge: POST_IMAGE_MAX_LONG_EDGE }, signal);
+      const natural = await this.deps.decoder.probe(photo, signal);
+      throwIfAborted(signal);
+      return fitLongEdge(natural, POST_IMAGE_MAX_LONG_EDGE);
     } catch (error) {
       throw classifyLocalFailure(error);
-    }
-    try {
-      throwIfAborted(signal);
-      return { width: image.width, height: image.height };
-    } finally {
-      image.release();
     }
   }
 
@@ -149,14 +146,14 @@ export class PhotoPreparer {
   }
 }
 
-function throwIfAborted(signal: AbortSignal): void {
-  if (signal.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
+/** PrepareError는 그대로, 그 밖의 오류는 prepare로 감싼다. */
+export function toPrepareError(error: unknown): PrepareError {
+  return error instanceof PrepareError ? error : new PrepareError('prepare', error);
 }
 
 /** 디코드·편집·인코딩 실패: 취소는 그대로, 그 밖은 모두 prepare. */
 function classifyLocalFailure(error: unknown): unknown {
-  if (isAbandoned(error) || error instanceof PrepareError) return error;
-  return new PrepareError('prepare', error);
+  return isAbandoned(error) ? error : toPrepareError(error);
 }
 
 function classifyPolicyFailure(error: unknown): unknown {

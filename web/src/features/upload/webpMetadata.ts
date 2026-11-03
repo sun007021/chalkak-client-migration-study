@@ -1,3 +1,5 @@
+import { POST_IMAGE_CONTENT_TYPE } from '../../constants';
+
 /**
  * canvas가 만든 WebP에서 메타데이터 청크(ICCP·EXIF·XMP)를 제거한다(REQ-UPL-033).
  * Chromium의 canvas 출력은 항상 sRGB ICC 프로필 청크(ICCP)를 넣는데, 업로드 사진은 메타데이터가 없어야 한다. canvas는 sRGB로 그리므로 프로필을 빼도 색이 달라지지 않는다.
@@ -71,4 +73,18 @@ export function stripWebpMetadata(bytes: Uint8Array): Uint8Array | null {
     position += chunk.length;
   }
   return out;
+}
+
+const KNOWN_BYTES = new WeakMap<Blob, Uint8Array>();
+
+/** 바이트로 만든 image/webp Blob. 만든 쪽이 바이트를 알고 있으므로 이후 검사에서 arrayBuffer()를 다시 읽지 않는다. */
+export function webpBlob(bytes: Uint8Array): Blob {
+  const blob = new Blob([bytes as Uint8Array<ArrayBuffer>], { type: POST_IMAGE_CONTENT_TYPE });
+  KNOWN_BYTES.set(blob, bytes);
+  return blob;
+}
+
+/** Blob의 바이트. webpBlob으로 만든 것은 읽지 않고 돌려준다. */
+export async function blobBytes(blob: Blob): Promise<Uint8Array> {
+  return KNOWN_BYTES.get(blob) ?? new Uint8Array(await blob.arrayBuffer());
 }

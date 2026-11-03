@@ -52,6 +52,21 @@ export async function decodeSize(source: Blob, maxLongEdge: number): Promise<{ w
   return size;
 }
 
+/** probe(전체 디코드 없이 크기 확인)로 읽은 보이는 크기. */
+export async function probeSize(source: Blob): Promise<{ width: number; height: number }> {
+  return new BrowserImageDecoder().probe(source, new AbortController().signal);
+}
+
+/** probe 실패 이름(ImageDecodeError 등). 성공하면 null. */
+export async function probeFailure(source: Blob): Promise<string | null> {
+  try {
+    await new BrowserImageDecoder().probe(source, new AbortController().signal);
+    return null;
+  } catch (error) {
+    return (error as Error).name;
+  }
+}
+
 /** 디코드 실패 이름(ImageDecodeError 등). 성공하면 null. */
 export async function decodeFailure(source: Blob): Promise<string | null> {
   try {
@@ -69,6 +84,20 @@ export async function canvasProducesWebp(source: Blob): Promise<string> {
   try {
     const blob = await new CanvasWebpCompressor().compress(image, { width: 16, height: 16 }, 80, controller.signal);
     return blob.type;
+  } finally {
+    image.release();
+  }
+}
+
+/** CanvasWebpCompressor가 거절한 오류 이름(canvas가 WebP를 못 만드는 환경 확인용). 성공하면 'resolved'. */
+export async function canvasProducesWebpFailure(source: Blob): Promise<string> {
+  const controller = new AbortController();
+  const image = await new BrowserImageDecoder().decode(source, { maxLongEdge: 4096 }, controller.signal);
+  try {
+    await new CanvasWebpCompressor().compress(image, { width: 16, height: 16 }, 80, controller.signal);
+    return 'resolved';
+  } catch (error) {
+    return (error as Error).name;
   } finally {
     image.release();
   }

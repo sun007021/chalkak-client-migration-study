@@ -1,14 +1,18 @@
 import { POST_IMAGE_CONTENT_TYPE, POST_IMAGE_MAX_LONG_EDGE } from '../../constants';
+import { abortError, throwIfAborted } from '../../core/abort';
 import { CanvasWebpCompressor, probeCanvasWebp } from './CanvasWebpCompressor';
 import { ImageDecodeError, WebpUnsupportedError } from './imagePorts';
-import type { DecodedImage, DecodeOptions, ImageDecoder, WebpCompressor } from './imagePorts';
+import type { DecodedImage, DecodeOptions, ImageDecoder, WasmWebpEncoder, WebpCompressor } from './imagePorts';
 import { fitLongEdge } from './imageSizing';
 import type { Size } from './imageSizing';
 import { selectWebpBackend } from './postImageEncoder';
+import { JsquashWebpEncoder } from './WasmWebpEncoder';
 
-function abortError(): DOMException {
-  return new DOMException('The operation was aborted.', 'AbortError');
-}
+/**
+ * createImageBitmap을 쓰지 못하는 브라우저의 대체 경로(<img> 전체를 메모리에 디코드해 canvas에 그린다)에서 받아 줄 최대 화소 수.
+ * 1억 화소(예: 12000×8333)는 RGBA로 약 400MB라 모바일 탭이 죽는 경계라서 넘으면 디코드 실패로 처리한다. createImageBitmap 경로는 디코드 단계에서 줄여 읽으므로 제한하지 않는다.
+ */
+export const MAX_FALLBACK_PIXELS = 100_000_000;
 
 /** 브라우저 디코더가 돌려주는 핸들. 압축기가 그릴 수 있는 원본(ImageBitmap 또는 이미 목표 크기로 그린 canvas)을 들고 있다. */
 export class BrowserDecodedImage implements DecodedImage {
@@ -53,13 +57,39 @@ function loadElement(source: Blob, signal: AbortSignal): Promise<{ element: HTML
   });
 }
 
+/** createImageBitmap이 resize 옵션을 받지 못하는 경우(옵션 미지원). 이때만 <img> 대체 경로로 간다. 디코드 실패(InvalidStateError 등)는 대체하지 않고 실패시킨다. */
+function isResizeUnsupported(error: unknown): boolean {
+  if (error instanceof TypeError || error instanceof RangeError) return true;
+  return error instanceof DOMException && (error.name === 'NotSupportedError' || error.name === 'IndexSizeError');
+}
+
 /**
  * createImageBitmap(imageOrientation: 'from-image', resizeWidth/Height)로 디코드 단계에서 목표 크기만 만든다(전체 해상도 비트맵을 만들지 않는다, REQ-UPL-027).
  * createImageBitmap이 없거나 옵션을 받지 못하면 <img>를 목표 크기 canvas에 그려 대신한다. 움직이는 이미지는 첫 프레임만 쓴다.
  */
 export class BrowserImageDecoder implements ImageDecoder {
+  /** <img>의 naturalWidth/Height(EXIF 방향 반영)와 decode() 성공으로 읽을 수 있는 이미지인지 확인한다. 전체 해상도 비트맵을 만들지 않는다. */
+  async probe(source: Blob, signal: AbortSignal): Promise<Size> {
+    throwIfAborted(signal);
+    if (source.size === 0) throw new ImageDecodeError('empty file');
+    const { element, revoke } = await loadElement(source, signal);
+    try {
+      try {
+        await element.decode();
+      } catch {
+        throw new ImageDecodeError('image cannot be decoded');
+      }
+      throwIfAborted(signal);
+      const size: Size = { width: element.naturalWidth, height: element.naturalHeight };
+      if (size.width < 1 || size.height < 1) throw new ImageDecodeError('image has no size');
+      return size;
+    } finally {
+      revoke();
+    }
+  }
+
   async decode(source: Blob, options: DecodeOptions, signal: AbortSignal): Promise<DecodedImage> {
-    if (signal.aborted) throw abortError();
+    throwIfAborted(signal);
     if (source.size === 0) throw new ImageDecodeError('empty file');
     const { element, revoke } = await loadElement(source, signal);
     try {
@@ -72,13 +102,14 @@ export class BrowserImageDecoder implements ImageDecoder {
         throw abortError();
       }
       if (bitmap) return new BrowserDecodedImage(bitmap, bitmap.width, bitmap.height);
+      if (natural.width * natural.height > MAX_FALLBACK_PIXELS) throw new ImageDecodeError('image is too large for the fallback decoder');
       return new BrowserDecodedImage(this.drawToCanvas(element, target), target.width, target.height);
     } finally {
       revoke();
     }
   }
 
-  /** 지원하지 않거나 실패하면 null(호출한 쪽이 <img> + canvas로 대신한다). */
+  /** createImageBitmap이 없거나 resize 옵션을 받지 못하면 null(호출한 쪽이 <img> + canvas로 대신한다). 디코드 자체가 실패하면 ImageDecodeError. */
   private async decodeBitmap(source: Blob, natural: Size, target: Size): Promise<ImageBitmap | null> {
     if (typeof createImageBitmap !== 'function') return null;
     const shrink = target.width !== natural.width || target.height !== natural.height;
@@ -90,8 +121,9 @@ export class BrowserImageDecoder implements ImageDecoder {
         return null;
       }
       return bitmap;
-    } catch {
-      return null;
+    } catch (error) {
+      if (isResizeUnsupported(error)) return null;
+      throw new ImageDecodeError(error instanceof Error ? error.message : 'createImageBitmap failed');
     }
   }
 
@@ -107,36 +139,20 @@ export class BrowserImageDecoder implements ImageDecoder {
   }
 }
 
-/**
- * WASM WebP 인코더 자리(TODO: 의존성을 더하지 않고 인터페이스만 둔다). available()이 false인 환경에서는 canvas도 안 되면 "인코딩 불가"로 끝난다.
- * PNG/JPEG로 대신하는 경로는 없다(REQ-UPL-032~033).
- */
-export interface WasmWebpEncoder extends WebpCompressor {
-  available(): boolean;
-}
-
-export class UnavailableWasmWebpEncoder implements WasmWebpEncoder {
-  available(): boolean {
-    return false;
-  }
-  compress(): Promise<Blob> {
-    return Promise.reject(new WebpUnsupportedError('wasm webp encoder is not available'));
-  }
-}
-
-/** 기본 WebP 압축기: canvas가 image/webp를 만들면 canvas, 아니면 WASM, 둘 다 안 되면 WebpUnsupportedError. 지원 여부는 한 번만 확인한다. */
+/** 기본 WebP 압축기: canvas가 image/webp를 만들면 canvas, 아니면 WASM, 둘 다 안 되면 WebpUnsupportedError. canvas 지원은 확인에 성공한 뒤로는 다시 확인하지 않는다. */
 export class BrowserWebpCompressor implements WebpCompressor {
-  private support: Promise<boolean> | null = null;
+  /** canvas가 WebP를 만든다고 확인된 뒤에만 기억한다(실패는 일시적일 수 있어 다음에 다시 확인). */
+  private canvasWebp = false;
 
   constructor(
     private readonly canvas: WebpCompressor = new CanvasWebpCompressor(),
-    private readonly wasm: WasmWebpEncoder = new UnavailableWasmWebpEncoder(),
+    private readonly wasm: WasmWebpEncoder = new JsquashWebpEncoder(),
     private readonly probe: () => Promise<boolean> = probeCanvasWebp,
   ) {}
 
   async compress(image: DecodedImage, size: Size, quality: number, signal: AbortSignal): Promise<Blob> {
-    this.support ??= this.probe();
-    const backend = selectWebpBackend({ canvasWebp: await this.support, wasm: this.wasm.available() });
+    if (!this.canvasWebp) this.canvasWebp = await this.probe();
+    const backend = selectWebpBackend({ canvasWebp: this.canvasWebp, wasm: this.wasm.available() });
     if (backend === 'canvas') return this.canvas.compress(image, size, quality, signal);
     if (backend === 'wasm') return this.wasm.compress(image, size, quality, signal);
     throw new WebpUnsupportedError(`cannot encode ${POST_IMAGE_CONTENT_TYPE} (max long edge ${POST_IMAGE_MAX_LONG_EDGE})`);

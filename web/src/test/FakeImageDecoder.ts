@@ -65,6 +65,13 @@ export class FakeImageDecoder implements ImageDecoder {
     return this.calls.length;
   }
 
+  /** 크기만 확인한다: decode와 같은 경로로 읽고 곧바로 놓는다(원본 크기가 아니라 4096 상한을 적용한 보이는 크기). */
+  async probe(source: Blob, signal: AbortSignal): Promise<{ width: number; height: number }> {
+    const image = await this.decode(source, { maxLongEdge: 4096 }, signal);
+    image.release();
+    return { width: image.width, height: image.height };
+  }
+
   async decode(source: Blob, options: DecodeOptions, signal: AbortSignal): Promise<DecodedImage> {
     this.calls.push({ source, maxLongEdge: options.maxLongEdge });
     const gate = this.gates.get(source);

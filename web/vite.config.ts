@@ -25,6 +25,8 @@ export default defineConfig(({ mode }) => {
     },
     // presigned PUT은 S3로 직접 가면 버킷 CORS에 막힐 수 있다. 개발·preview 서버만 /__upload-proxy/<호스트>/... 를 그 호스트로 중계한다(배포 빌드 산출물에는 영향 없음).
     plugins: [react(), uploadProxyPlugin({ extraHosts: uploadExtraHosts, loopbackPorts: uploadLoopbackPorts, previewEnabled: env.VITE_UPLOAD_PROXY === 'true' })],
+    // @jsquash/webp는 WASM을 import.meta.url 기준으로 찾으므로 개발 서버가 미리 묶지 않게 한다.
+    optimizeDeps: { exclude: ['@jsquash/webp'] },
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
     // shared/(constants.json, copy/ko.json)를 레포 루트에서 읽는다.
     server: { port: 5173, proxy, fs: { allow: ['..'] } },

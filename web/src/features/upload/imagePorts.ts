@@ -21,6 +21,11 @@ export interface DecodeOptions {
 
 export interface ImageDecoder {
   /**
+   * 크기만 확인한다(사진 선택 직후 검사용). 전체 해상도 비트맵을 만들지 않는다: 읽을 수 있는 이미지인지(헤더·디코드 가능 여부)와
+   * EXIF 방향을 반영한 원본의 보이는 크기를 돌려준다. 읽을 수 없으면 ImageDecodeError, signal abort는 AbortError.
+   */
+  probe(source: Blob, signal: AbortSignal): Promise<Size>;
+  /**
    * EXIF 방향을 반영해 디코드한다. 움직이는 이미지는 첫 프레임만. 비어 있거나 읽을 수 없거나 지원하지 않는 형식이면 ImageDecodeError.
    * signal이 abort되면 AbortError로 거절한다.
    */
@@ -38,6 +43,11 @@ export interface EditRenderer {
  */
 export interface WebpCompressor {
   compress(image: DecodedImage, size: Size, quality: number, signal: AbortSignal): Promise<Blob>;
+}
+
+/** canvas가 image/webp를 못 만들 때 쓰는 WASM 인코더. available()이 false면 선택되지 않는다. */
+export interface WasmWebpEncoder extends WebpCompressor {
+  available(): boolean;
 }
 
 export class ImageDecodeError extends Error {

@@ -9,7 +9,8 @@ import { clampTitleInput, countCodePoints, titlePayload } from '../feed/titleInp
 import type { PostChanges } from '../post/PostChanges';
 import { IDENTITY_EDIT, sameEdit } from './editModel';
 import type { PhotoEdit } from './editModel';
-import { PrepareError } from './PhotoPreparer';
+import { toPrepareError } from './PhotoPreparer';
+import type { PrepareError } from './PhotoPreparer';
 import type { PhotoPreparer, PreparedUpload, ReusableFile } from './PhotoPreparer';
 import type { TodayPostSource } from './UploadGate';
 import type { CreatedModerationStatus, UploadRepository } from './UploadRepository';
@@ -313,7 +314,7 @@ export class UploadViewModel extends ViewModel<UploadState> {
           this.patch({ preparation: 'failed' });
           return { kind: 'abandoned' };
         }
-        const failure = error instanceof PrepareError ? error : new PrepareError('prepare', error);
+        const failure = toPrepareError(error);
         this.prep = null;
         this.patch({ preparation: 'failed' });
         this.showPrepareFailure(failure);
@@ -362,7 +363,7 @@ export class UploadViewModel extends ViewModel<UploadState> {
       prepared = fresh;
     } catch (error) {
       if (this.closed || isAbandoned(error)) return { kind: 'cancelled' };
-      const failure = error instanceof PrepareError ? error : new PrepareError('prepare', error);
+      const failure = toPrepareError(error);
       this.showPrepareFailure(failure);
       return failure.kind === 'unauthorized' ? { kind: 'login' } : { kind: 'stay' };
     }
