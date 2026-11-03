@@ -71,7 +71,7 @@ describe('AuthRepository.socialLoginKakao', () => {
     );
   });
 
-  it('TC-AUTH-010 SIGN_UP_REQUIRED는 토큰을 저장하지 않고 idToken·rawNonce를 다음 단계에 넘긴다', async () => {
+  it('TC-AUTH-009 TC-AUTH-010 SIGN_UP_REQUIRED는 토큰을 저장하지 않고 idToken·rawNonce를 다음 단계에 넘긴다', async () => {
     const h = createAuthHarness();
     h.routes({ 'POST /auth/social-login': 'auth/social-login__sign-up-required' });
 

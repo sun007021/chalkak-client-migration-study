@@ -62,7 +62,7 @@ describe('DisplayViewModel 날짜 이동', () => {
     },
   );
 
-  it('TC-DISP-031 이전 날짜의 /topics가 404이면 직전 전시와 날짜를 복원하고 최초 전시일을 바꾸지 않으며 안내 토스트를 띄운다', async () => {
+  it('TC-DISP-031 TC-TIME-010 이전 날짜의 /topics가 404이면 직전 전시와 날짜를 복원하고 최초 전시일을 바꾸지 않으며 안내 토스트를 띄운다', async () => {
     const h = await createDisplayHarness({ routes: { 'GET /topics?date=2026-10-26': NOT_FOUND } });
     await h.viewModel.onShown();
     const before = h.viewModel.getSnapshot().photos;
@@ -96,7 +96,7 @@ describe('DisplayViewModel 날짜 이동', () => {
     expect(h.toast.messages).toEqual([t('common.error.network')]);
   });
 
-  it('TC-DISP-034 범위 밖 날짜(2026-09-01, 내일)를 고르면 범위 끝으로 맞춰 불러온다', async () => {
+  it('TC-DISP-034 TC-TIME-007 범위 밖 날짜(2026-09-01, 내일)를 고르면 범위 끝으로 맞춰 불러온다', async () => {
     const h = await createDisplayHarness();
     await h.viewModel.onShown();
     await h.viewModel.pickDate(d('2026-09-01'));
@@ -179,5 +179,31 @@ describe('DisplayViewModel 날짜 이동', () => {
     expect(s.today.toString()).toBe('2026-10-28');
     expect(s.date.toString()).toBe('2026-10-27');
     expect(s).toMatchObject({ mode: 'archive', sort: 'popular', canGoNext: true });
+  });
+
+  it('TC-TIME-008 기기 시계가 KST보다 앞서 서버가 400 "미래의 주제는 조회할 수 없습니다."를 주면 크래시 없이 기존 전시를 유지하고 오류 토스트를 보인다', async () => {
+    const h = await createDisplayHarness({
+      now: '2026-10-27T14:30:00Z',
+      routes: { 'GET /topics?date=2026-10-28': 'time/topics__future-400' },
+    });
+    await h.viewModel.onShown();
+    h.viewModel.onHidden();
+    h.clock.set('2026-10-27T15:30:00Z'); // 기기 시계만 1시간 빠르다고 가정(서버는 아직 10/27)
+    await h.viewModel.onShown();
+    const before = h.viewModel.getSnapshot().photos;
+
+    await h.viewModel.goNext();
+
+    const s = h.viewModel.getSnapshot();
+    expect(s).toMatchObject({ status: 'content', refreshing: false });
+    expect(s.date.toString()).toBe('2026-10-27');
+    expect(s.photos).toEqual(before);
+    expect(h.toast.messages).toEqual([t('display.error')]);
+  });
+
+  it('TC-TIME-006 전시 요청의 date 쿼리는 KST 오늘이다(기기 시계가 UTC로는 전날이어도)', async () => {
+    const h = await createDisplayHarness({ now: '2026-10-26T15:00:00Z' }); // UTC 10/26 15:00 = KST 10/27 00:00
+    await h.viewModel.onShown();
+    expect(topicRequests(h)[0]).toBe('2026-10-27');
   });
 });

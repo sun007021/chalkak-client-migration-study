@@ -4,6 +4,7 @@ import { Observable } from '../../core/state/Observable';
 import { CancelledError, HttpError, NetworkError } from '../../core/http/ApiError';
 import type { ToastPresenter } from '../../core/toast/ToastPresenter';
 import type { Clock } from '../../core/time/Clock';
+import type { MidnightScheduler } from '../../core/time/MidnightScheduler';
 import type { KstDate } from '../../core/time/KstDate';
 import { monthsSpanned, todayKst, weekOf } from '../../core/time/kst';
 import type { NotificationRepository } from '../../data/notification/NotificationRepository';
@@ -25,6 +26,8 @@ export type HomeViewModelDeps = {
   /** 회원/게스트. 게스트는 개인 API(/posts/today, /posts/calendar, AI, 미읽음)를 부르지 않는다(D-05). */
   mode: MainMode;
   clock: Clock;
+  /** 홈이 보이는 동안 KST 자정을 넘기면 알려 준다(REQ-TIME-007). */
+  midnight: Pick<MidnightScheduler, 'watch'>;
   topics: TopicRepository;
   posts: PostRepository;
   notifications: NotificationRepository;
@@ -81,6 +84,7 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
   private stopVisibility: (() => void) | null = null;
   private stopLikes: (() => void) | null = null;
   private stopChanges: (() => void) | null = null;
+  private stopMidnight: (() => void) | null = null;
   /** 제목 변경 순서. 요청을 보낸 뒤의 변경만 그 응답에 덧입힌다. */
   private changeSeq = 0;
   private readonly titleChanges = new Map<string, { title: string | null; seq: number }>();
@@ -123,6 +127,7 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
     this.stopVisibility ??= this.deps.visibility.subscribe((state) => this.onVisibility(state));
     this.stopLikes ??= this.deps.likes.subscribe((change) => this.onLikeChange(change));
     this.stopChanges ??= this.deps.changes.subscribe((change) => this.onPostChange(change));
+    this.stopMidnight ??= this.deps.midnight.watch(() => this.onMidnight());
     return this.quietReload();
   }
 
@@ -135,6 +140,8 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
     this.stopLikes = null;
     this.stopChanges?.();
     this.stopChanges = null;
+    this.stopMidnight?.();
+    this.stopMidnight = null;
     this.invalidate();
     this.setState((s) => (s.refreshing ? { ...s, refreshing: false } : s));
     this.deps.bannerFeed.cancelPending();
@@ -308,6 +315,11 @@ export class HomeViewModel extends Observable<HomeState> implements UserDataCach
     this.ensureCurrentDay();
     if (this.refreshInFlight) return this.refreshInFlight;
     return this.reload(this.beginRequests()).then(() => undefined);
+  }
+
+  /** 홈이 보이는 중 KST 자정이 지났다: 날짜 변경 판정(ensureCurrentDay)을 거쳐 새 날짜로 전체를 다시 불러온다. */
+  private onMidnight(): void {
+    if (this.shown) void this.quietReload();
   }
 
   private onVisibility(state: 'foreground' | 'background'): void {

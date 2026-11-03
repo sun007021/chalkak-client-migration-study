@@ -13,7 +13,7 @@ const OK = {
 } as const;
 
 describe('SignatureFlowViewModel (change 모드)', () => {
-  it('TC-SIGN-043 변경 화면 진입 시 screen_view가 change_signature, change_signature_preview 순으로 한 번씩 전송된다', async () => {
+  it('TC-SIGN-043 TC-ANL-004 변경 화면 진입 시 screen_view가 change_signature, change_signature_preview 순으로 한 번씩 전송된다', async () => {
     const h = createChangeHarness();
     await h.reachPreview();
     expect(h.analytics.screenNames).toEqual(['change_signature', 'change_signature_preview']);
