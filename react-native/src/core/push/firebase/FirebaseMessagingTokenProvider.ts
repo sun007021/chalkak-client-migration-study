@@ -3,7 +3,6 @@ import type { PushTokenProvider } from '../PushTokenProvider';
 /** `@react-native-firebase/messaging`에서 쓰는 모듈러 API 부분. */
 export type FirebaseMessagingModule = {
   getMessaging(): unknown;
-  registerDeviceForRemoteMessages(messaging: never): Promise<void>;
   getToken(messaging: never): Promise<string>;
   onTokenRefresh(messaging: never, listener: (token: string) => void): () => void;
 };
@@ -27,8 +26,8 @@ export class FirebaseMessagingTokenProvider implements PushTokenProvider {
     try {
       const m = this.load();
       const messaging = m.getMessaging() as never;
-      // 자동 등록이 기본이지만 꺼져 있거나 늦었을 때를 위해 APNs 등록을 보장한다(이미 등록돼 있으면 무해).
-      await m.registerDeviceForRemoteMessages(messaging);
+      // APNs 등록은 RNFB가 앱 시작 때 자동으로 한다(firebase.json의 messaging_ios_auto_register_for_remote_messages 기본 true).
+      // registerDeviceForRemoteMessages를 또 부르면 RNFB가 경고만 내므로 부르지 않는다. APNs 토큰이 아직 없으면 getToken이 던져 null이 되고 다음 트리거에 다시 시도한다.
       const token = await m.getToken(messaging);
       return typeof token === 'string' && token.trim() !== '' ? token : null;
     } catch (error) {

@@ -61,7 +61,8 @@ const config: ExpoConfig = {
     // 강제 업데이트 다이얼로그가 여는 App Store 앱 숫자 id.
     appStoreId: process.env.APP_STORE_ID,
     // iOS FCM 토큰 경로 사용 여부(JS가 FirebaseMessagingTokenProvider를 고르는 기준).
-    iosFcmEnabled,
+    // 꺼져 있을 땐 키를 넣지 않아 기존 설정과 같다.
+    iosFcmEnabled: iosFcmEnabled ? true : undefined,
   },
   plugins: [
     // D-21: Android OkHttp의 자동 재시도(비멱등 요청 포함)를 끈다.

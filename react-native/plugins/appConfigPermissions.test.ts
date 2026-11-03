@@ -59,12 +59,12 @@ describe('app.config iOS FCM(opt-in)', () => {
   it('환경변수가 없으면 Firebase 플러그인·파일·플래그가 모두 빠진다', () => {
     const c = load();
     expect(c.ios?.googleServicesFile).toBeUndefined();
-    expect(c.extra?.iosFcmEnabled).toBe(false);
+    expect(c.extra?.iosFcmEnabled).toBeUndefined();
     expect(names(c).join()).not.toMatch(/firebase|build-properties/);
   });
 
   it('공백뿐인 값도 꺼진 것으로 본다', () => {
-    expect(load('  ').extra?.iosFcmEnabled).toBe(false);
+    expect(load('  ').extra?.iosFcmEnabled).toBeUndefined();
   });
 
   it('GOOGLE_SERVICES_PLIST가 있으면 파일·RNFB 플러그인·dynamic frameworks·플래그를 켠다', () => {

@@ -7,7 +7,6 @@ function fakeModule(overrides: Partial<FirebaseMessagingModule> = {}) {
   const refreshListeners = new Set<(token: string) => void>();
   const module: FirebaseMessagingModule = {
     getMessaging: jest.fn(() => ({ id: 'messaging' })),
-    registerDeviceForRemoteMessages: jest.fn(async () => undefined),
     getToken: jest.fn(async () => 'fcm-ios-1'),
     onTokenRefresh: jest.fn((_m: unknown, listener: (token: string) => void) => {
       refreshListeners.add(listener);
@@ -34,14 +33,14 @@ describe('FirebaseMessagingTokenProvider (iOS FCM 토큰)', () => {
     expect(load).not.toHaveBeenCalled();
   });
 
-  it('TC-PUSH-019 APNs 등록 뒤 FCM 토큰 문자열을 돌려준다', async () => {
+  it('FCM 토큰 문자열을 돌려준다', async () => {
     const f = fakeModule();
     const provider = new FirebaseMessagingTokenProvider(() => f.module);
     await expect(provider.getToken()).resolves.toBe('fcm-ios-1');
-    expect(f.module.registerDeviceForRemoteMessages).toHaveBeenCalledTimes(1);
+    expect(f.module.getToken).toHaveBeenCalledTimes(1);
   });
 
-  it('TC-PUSH-018 getToken이 던지면 null이고 토큰 원문·오류 메시지를 로그에 내지 않는다(REQ-PUSH-018)', async () => {
+  it('getToken이 던지면 null이고 토큰 원문·오류 메시지를 로그에 내지 않는다(REQ-PUSH-018)', async () => {
     const f = fakeModule({
       getToken: jest.fn(async () => {
         throw new Error('secret-apns-detail');
@@ -52,16 +51,7 @@ describe('FirebaseMessagingTokenProvider (iOS FCM 토큰)', () => {
     expect(JSON.stringify((console.warn as jest.Mock).mock.calls)).not.toContain('secret-apns');
   });
 
-  it('TC-PUSH-018 APNs 등록이 실패해도 던지지 않고 null이다', async () => {
-    const f = fakeModule({
-      registerDeviceForRemoteMessages: jest.fn(async () => {
-        throw new Error('no apns');
-      }),
-    });
-    await expect(new FirebaseMessagingTokenProvider(() => f.module).getToken()).resolves.toBeNull();
-  });
-
-  it('TC-PUSH-018 빈 토큰은 null이다', async () => {
+  it('빈 토큰은 null이다(등록 건너뜀)', async () => {
     const f = fakeModule({ getToken: jest.fn(async () => '') });
     await expect(new FirebaseMessagingTokenProvider(() => f.module).getToken()).resolves.toBeNull();
   });
@@ -73,7 +63,7 @@ describe('FirebaseMessagingTokenProvider (iOS FCM 토큰)', () => {
     await expect(provider.getToken()).resolves.toBeNull();
   });
 
-  it('TC-PUSH-015 토큰 갱신(onTokenRefresh)을 새 토큰으로 전달하고 해제하면 끊는다', () => {
+  it('토큰 갱신(onTokenRefresh)을 새 토큰으로 전달하고 해제하면 끊는다', () => {
     const f = fakeModule();
     const provider = new FirebaseMessagingTokenProvider(() => f.module);
     const listener = jest.fn();
