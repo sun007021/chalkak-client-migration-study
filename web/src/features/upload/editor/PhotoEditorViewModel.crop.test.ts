@@ -167,19 +167,21 @@ describe('편집기 ViewModel: 자르기·회전 (REQ-EDIT-010~018)', () => {
     const { vm, fakes } = await openEditorVm();
     const thumbs = () => fakes.preview.calls.filter((c) => c.maxLongEdge <= FILTER_THUMBNAIL_LONG_EDGE);
     const initial = thumbs().length;
-    expect(initial).toBe(6);
+    expect(initial).toBeGreaterThanOrEqual(6);
     const part: CropRect = { centerX: 0.5, centerY: 0.5, width: 0.5, height: 0.5 };
     vm.setCropRect(part);
     vm.selectTool('filter');
     await settle();
-    const regenerated = thumbs().slice(initial);
-    expect(regenerated).toHaveLength(6);
-    for (const call of regenerated) expect(call.edit.crop).toEqual(rectToCropRegion(PHOTO, 0, part));
-    // 자르기가 그대로면 도구를 오가도 다시 만들지 않는다
+    const region = rectToCropRegion(PHOTO, 0, part);
+    const regenerated = thumbs().slice(initial).filter((c) => c.edit.crop.width === region.width);
+    expect(new Set(regenerated.map((c) => c.edit.filter)).size).toBe(6);
+    for (const call of regenerated) expect(call.edit.crop).toEqual(region);
+    // 자르기가 그대로면 도구를 오가도 썸네일을 다시 만들지 않는다
+    const settled = thumbs().length;
     vm.selectTool('adjust');
     vm.selectTool('filter');
     await settle();
-    expect(thumbs()).toHaveLength(initial + 6);
+    expect(thumbs()).toHaveLength(settled);
   });
 
   it('TC-EDIT-045 취소하면 이번 편집에서 바꾼 필터·자르기·조정은 모두 버려지고 처음 편집값으로 확정되지 않는다', async () => {

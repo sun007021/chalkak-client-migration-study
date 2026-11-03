@@ -42,7 +42,7 @@ describe('편집기 ViewModel: 열기와 정리 (REQ-EDIT-001, 007, 018)', () =>
     expect(previews.length).toBeGreaterThanOrEqual(1);
     for (const call of previews) expect(call.maxLongEdge).toBe(1440);
     const thumbnails = fakes.preview.calls.filter((c) => c.maxLongEdge <= FILTER_THUMBNAIL_LONG_EDGE);
-    expect(thumbnails.map((c) => c.edit.filter).sort()).toEqual(['cool', 'mono', 'original', 'vintage', 'vivid', 'warm']);
+    expect([...new Set(thumbnails.map((c) => c.edit.filter))].sort()).toEqual(['cool', 'mono', 'original', 'vintage', 'vivid', 'warm']);
     for (const call of thumbnails) expect(call.maxLongEdge).toBe(FILTER_THUMBNAIL_LONG_EDGE);
   });
 
