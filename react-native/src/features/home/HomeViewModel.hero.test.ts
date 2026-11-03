@@ -371,7 +371,7 @@ describe('HomeViewModel 게스트 (D-05)', () => {
     expect(h.transport.requests).toHaveLength(before);
   });
 
-  it('TC-HOME-049 REQ-HOME-046 게스트의 알림 버튼은 토스트만, 미읽음 조회도 없다', async () => {
+  it('TC-HOME-049 TC-NOTI-051 REQ-HOME-046 게스트의 알림 버튼은 토스트만, 미읽음 조회도 점도 없다', async () => {
     const h = await createHomeHarness({ mode: 'guest' });
     await h.viewModel.onShown();
     h.viewModel.onNotificationPress();
@@ -379,6 +379,7 @@ describe('HomeViewModel 게스트 (D-05)', () => {
     expect(h.toast.messages).toEqual(['로그인 후 알림을 확인할 수 있어요']);
     expect(h.navigator.calls).toEqual([]);
     expect(h.transport.requestsTo('GET', '/notifications/unread-status')).toHaveLength(0);
+    expect(h.viewModel.getSnapshot().hasUnread).toBe(false);
   });
 
   it('TC-HOME-022 REQ-HOME-032 게스트가 랭킹 사진을 누르면 토스트만 뜨고 이동·상세 요청이 없다', async () => {

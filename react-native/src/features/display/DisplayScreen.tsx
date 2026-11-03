@@ -19,6 +19,7 @@ import type { PostSort, PostSummary } from '../../data/post/PostModels';
 import { t } from '../../shared/copy';
 import { colors, spacing } from '../../shared/ui/theme';
 import { collapseProgress } from './displayDateRange';
+import { splitMasonry } from './masonry';
 import { DatePickerSheet } from './ui/DatePickerSheet';
 import { FeaturedPager } from './ui/FeaturedPager';
 import { PhotoTile } from './ui/PhotoTile';
@@ -72,7 +73,7 @@ export function DisplayScreen({ viewModel }: { viewModel: DisplayViewModel }) {
   };
 
   const hasGrid = state.status === 'content';
-  const half = [0, 1].map((column) => state.photos.filter((_, index) => index % 2 === column));
+  const half = splitMasonry(state.photos, ratios);
 
   return (
     <View testID="display.root" style={[styles.root, { paddingTop: insets.top }]}>
@@ -197,7 +198,7 @@ export function DisplayScreen({ viewModel }: { viewModel: DisplayViewModel }) {
           ) : null}
           <View style={styles.columns} onLayout={visible.onColumnsLayout}>
             {half.map((posts, column) => (
-              <View key={column} style={styles.column}>
+              <View key={column} testID={`display.column-${column}`} style={styles.column}>
                 {posts.map((post) => (
                   <PhotoTile
                     key={post.id}

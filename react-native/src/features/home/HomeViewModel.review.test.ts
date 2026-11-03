@@ -18,7 +18,7 @@ describe('HomeViewModel 남은 401 UNAUTHORIZED (REQ-NET-023, boot-auth 확인 �
     return h;
   }
 
-  it('임시 동작: 세션은 지우지 않고 로그인 화면으로 보낸다(요청이 여러 개 401이어도 한 번)', async () => {
+  it('TC-NOTI-055 임시 동작: refresh가 REAUTH면(unread-status 401 포함) 세션은 지우지 않고 로그인 화면으로 보낸다(요청이 여러 개 401이어도 한 번)', async () => {
     const h = await expiredRefreshHarness();
     h.router
       .set('GET /posts/today', unauthorized)

@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import { networkFailure } from '../../core/http/__testing__/FakeTransport';
 import { fixtureResponse } from '../../core/http/__testing__/loadFixture';
@@ -13,6 +14,7 @@ import {
   type DisplayHarness,
 } from './__testing__/createDisplayHarness';
 import { DisplayScreen } from './DisplayScreen';
+import { TILE_CAPTION_UNITS } from './masonry';
 
 const RECENT = q('2026-10-27', 'recent', 1);
 
@@ -293,5 +295,43 @@ describe('DisplayScreen 좋아요', () => {
     await fireEvent.press(screen.getByTestId(`display.like-button-${ID('02')}`));
     expect(h.toast.messages).toEqual([t('guest.like')]);
     expect(h.likes.toggled).toEqual([]);
+  });
+});
+
+describe('DisplayScreen 메이슨리 (D-13 플랫폼 관례)', () => {
+  it('TC-DISP-057 다른 비율의 사진은 비율을 유지한 채 두 열의 높이가 균형 있게 놓인다', async () => {
+    const h = await createDisplayHarness();
+    h.router.set(RECENT, 'display/posts-list__mixed-ratio');
+    await renderDisplay(h);
+    // fixture의 원본 파일명(original-3x4.webp)이 사진 비율이다. 이미지를 읽은 순간 그 비율이 전달된다.
+    const posts = h.viewModel.getSnapshot().photos;
+    const ratios = new Map<string, number>();
+    for (const post of posts) {
+      const [w, hgt] =
+        /original-(\d+)x(\d+)/.exec(post.originalImageUrl)?.slice(1).map(Number) ?? [];
+      ratios.set(post.id, w / hgt);
+      await act(async () => {
+        fireEvent(screen.getByTestId(`display.item-${post.id}-photo`), 'load', {
+          nativeEvent: { source: { width: w * 100, height: hgt * 100 } },
+        });
+      });
+    }
+    const heights = [0, 1].map((column) => {
+      const tiles = within(screen.getByTestId(`display.column-${column}`)).queryAllByTestId(
+        /^display\.item-.*-photo$/,
+      );
+      return tiles.reduce((sum, tile) => {
+        const aspect = StyleSheet.flatten(tile.props.style).aspectRatio as number;
+        // 사진 비율이 그대로 스타일에 반영된다.
+        expect(ratios.get(tile.props.testID.replace(/^display\.item-|-photo$/g, ''))).toBeCloseTo(
+          aspect,
+          5,
+        );
+        return sum + 1 / aspect + TILE_CAPTION_UNITS;
+      }, 0);
+    });
+    const tallest = Math.max(...[...ratios.values()].map((r) => 1 / r + TILE_CAPTION_UNITS));
+    expect(Math.abs(heights[0] - heights[1])).toBeLessThan(tallest);
+    expect(screen.getAllByTestId(/^display\.item-.*-photo$/).length).toBe(posts.length);
   });
 });

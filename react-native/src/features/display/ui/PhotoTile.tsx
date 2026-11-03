@@ -41,6 +41,7 @@ export function PhotoTile({
         onPress={onPress}
       >
         <Image
+          testID={`${ids.item}${post.id}-photo`}
           source={{ uri }}
           style={[styles.photo, { aspectRatio: ratio }]}
           resizeMode="cover"
