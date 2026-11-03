@@ -24,8 +24,8 @@
 | REC | [record.md](catalog/record.md) | 45 | 2 | 2 | 38/45 | 42/45 | 41/45 | 41/45 | 42/45 |
 | NOTI | [notification-push.md](catalog/notification-push.md) | 57 | 2 | 2 | 44/57 | 54/57 | 53/57 | 54/57 | 54/57 |
 | PUSH | [notification-push.md](catalog/notification-push.md) | 77 | 4 | 6 | 64/77 | 68/77 | 68/77 | 72/77 | 1/77 |
-| SET | [settings-feedback.md](catalog/settings-feedback.md) | 56 | 3 | 3 | 33/56 | 51/56 | 51/56 | 51/56 | 0/56 |
-| FDBK | [settings-feedback.md](catalog/settings-feedback.md) | 37 | 2 | 2 | 29/37 | 32/37 | 34/37 | 32/37 | 0/37 |
+| SET | [settings-feedback.md](catalog/settings-feedback.md) | 56 | 3 | 3 | 33/56 | 51/56 | 51/56 | 51/56 | 51/56 |
+| FDBK | [settings-feedback.md](catalog/settings-feedback.md) | 37 | 2 | 2 | 29/37 | 32/37 | 34/37 | 32/37 | 33/37 |
 | NET | [common-infra.md](catalog/common-infra.md) | 62 | 2 | 2 | 55/62 | 55/62 | 58/62 | 58/62 | 59/62 |
 | TIME | [common-infra.md](catalog/common-infra.md) | 30 | 0 | 0 | 17/30 | 23/30 | 29/30 | 30/30 | 22/30 |
 | ANL | [common-infra.md](catalog/common-infra.md) | 25 | 0 | 0 | 11/25 | 23/25 | 23/25 | 23/25 | 16/25 |
