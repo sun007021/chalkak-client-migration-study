@@ -9,7 +9,7 @@ import { useViewModel } from '../../core/state/useViewModel';
 import { notificationTimeLabel } from '../../core/time/format';
 import { EmptyState, ErrorState } from '../../core/ui/StateViews';
 import { useScrollRestore } from '../../core/ui/useScrollRestore';
-import { VisibilitySentinel } from '../home/HomeScreen';
+import { VisibilitySentinel } from '../../core/ui/VisibilitySentinel';
 import type { NotificationItem } from './notificationModels';
 import { planInboxClose, RouterNotificationNavigator } from './notificationNavigation';
 import { INBOX_SENTINEL_OFFSET } from './NotificationInboxViewModel';
@@ -104,8 +104,9 @@ function InboxView({ vm }: { vm: NotificationInboxViewModel }): ReactNode {
 
 function InboxList({ vm, state, items, hasNext, observe }: { vm: NotificationInboxViewModel; state: InboxState; items: NotificationItem[]; hasNext: boolean; observe: ReturnType<typeof useContainer>['visibilityObserver'] }): ReactNode {
   // 다음 페이지 요청이 실패한 뒤에는 사용자가 다시 스크롤할 때까지 센티넬을 세우지 않는다(여전히 보이는 센티넬이 곧바로 재요청 반복을 일으키지 않게).
-  const [armedAt, setArmedAt] = useState(0);
   const failures = state.pageFailures;
+  // 상세에서 돌아와 다시 그려져도 죽은 채로 시작하지 않게 현재 실패 횟수로 시작한다.
+  const [armedAt, setArmedAt] = useState(failures);
   useEffect(() => {
     if (armedAt === failures) return;
     const arm = () => setArmedAt(failures);

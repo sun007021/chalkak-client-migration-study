@@ -250,7 +250,38 @@ describe('다음 페이지 스크롤 (TC-NOTI-015, 016, 018)', () => {
     await waitFor(() => expect(toastText()).toBe(t('noti.inbox.more-error')));
     expect(itemIds()).toHaveLength(20);
     fixtures.set(PAGE2, 'notification/notifications__page2-last');
+    fireEvent.scroll(window); // 사용자가 다시 스크롤하면 센티넬이 다시 서고
     await act(async () => observer.show());
+    await waitFor(() => expect(itemIds()).toHaveLength(25));
+    expect(fixtures.calls(PAGE2)).toHaveLength(1);
+    expect(fixtures.calls(PAGE2)[0]!.query.get('page')).toBe('2');
+  });
+
+  it('TC-NOTI-018 다음 페이지가 실패한 뒤에는 센티넬이 여전히 보여도(immediate 관찰자) 스크롤 전까지 다시 요청하지 않는다', async () => {
+    const observer = new FakeVisibilityObserver({ immediate: true });
+    const { h, fixtures } = await openNotifications({ visibilityObserver: observer.factory, routes: { [PAGE2]: 'notification/notifications__internal-error' } });
+    await inboxLoaded();
+    await waitFor(() => expect(fixtures.calls(PAGE2).length).toBeGreaterThan(0));
+    await waitFor(async () => {
+      await advance(h, 1_500);
+      expect(toastText()).toBe(t('noti.inbox.more-error'));
+    });
+    const calls = fixtures.calls(PAGE2).length;
+    await advance(h, 5_000);
+    expect(fixtures.calls(PAGE2)).toHaveLength(calls);
+    expect(itemIds()).toHaveLength(20);
+  });
+
+  it('TC-NOTI-018 실패 뒤 창을 스크롤하면 센티넬이 다시 서서 같은 page=2를 다시 요청한다', async () => {
+    const observer = new FakeVisibilityObserver({ immediate: true });
+    const { h, fixtures } = await openNotifications({ visibilityObserver: observer.factory, routes: { [PAGE2]: 'notification/notifications__internal-error' } });
+    await inboxLoaded();
+    await waitFor(async () => {
+      await advance(h, 1_500);
+      expect(toastText()).toBe(t('noti.inbox.more-error'));
+    });
+    fixtures.set(PAGE2, 'notification/notifications__page2-last');
+    fireEvent.scroll(window);
     await waitFor(() => expect(itemIds()).toHaveLength(25));
     expect(fixtures.calls(PAGE2)).toHaveLength(1);
     expect(fixtures.calls(PAGE2)[0]!.query.get('page')).toBe('2');
