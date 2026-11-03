@@ -2,6 +2,7 @@ import { POST_IMAGE_CONTENT_TYPE, POST_IMAGE_MAX_LONG_EDGE, WEBP_DOWNSCALE_MAX_A
 import { NotWebpError, SizeLimitExceededError } from './imagePorts';
 import type { DecodedImage, WebpCompressor } from './imagePorts';
 import { fitLongEdge, roundSizes } from './imageSizing';
+import { ascii4, readWebpChunks } from './webpMetadata';
 
 function abortError(): DOMException {
   return new DOMException('The operation was aborted.', 'AbortError');
@@ -64,33 +65,17 @@ export type WebpInspection =
  */
 export function inspectWebp(bytes: Uint8Array): WebpInspection {
   if (bytes.length < 12) return { ok: false, reason: 'too-short' };
-  if (ascii(bytes, 0) !== 'RIFF') return { ok: false, reason: 'not-riff' };
-  if (ascii(bytes, 8) !== 'WEBP') return { ok: false, reason: 'not-webp' };
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  if (view.getUint32(4, true) !== bytes.length - 8) return { ok: false, reason: 'size-mismatch' };
-
-  const chunks: string[] = [];
-  let animated = false;
-  let offset = 12;
-  while (offset + 8 <= bytes.length) {
-    const id = ascii(bytes, offset);
-    const size = view.getUint32(offset + 4, true);
-    if (chunks.length === 0) {
-      if (id !== 'VP8 ' && id !== 'VP8L' && id !== 'VP8X') return { ok: false, reason: 'no-image-chunk' };
-      if (id === 'VP8X' && size > 0 && offset + 8 < bytes.length && ((bytes[offset + 8] ?? 0) & 0x02) !== 0) animated = true;
-    }
-    if (id === 'ANIM' || id === 'ANMF') animated = true;
-    chunks.push(id);
-    offset += 8 + size + (size % 2);
-  }
-  if (chunks.length === 0) return { ok: false, reason: 'no-image-chunk' };
-  if (animated) return { ok: false, reason: 'animated' };
+  if (ascii4(bytes, 0) !== 'RIFF') return { ok: false, reason: 'not-riff' };
+  if (ascii4(bytes, 8) !== 'WEBP') return { ok: false, reason: 'not-webp' };
+  const found = readWebpChunks(bytes);
+  if (!found) return { ok: false, reason: 'size-mismatch' };
+  const chunks = found.map((chunk) => chunk.id);
+  const first = found[0];
+  if (!first || (first.id !== 'VP8 ' && first.id !== 'VP8L' && first.id !== 'VP8X')) return { ok: false, reason: 'no-image-chunk' };
+  const animatedFlag = first.id === 'VP8X' && first.size > 0 && (bytes[first.start + 8]! & 0x02) !== 0;
+  if (animatedFlag || chunks.some((id) => id === 'ANIM' || id === 'ANMF')) return { ok: false, reason: 'animated' };
   if (chunks.some((id) => id === 'EXIF' || id === 'XMP ' || id === 'ICCP')) return { ok: false, reason: 'metadata' };
   return { ok: true, chunks };
-}
-
-function ascii(bytes: Uint8Array, offset: number): string {
-  return String.fromCharCode(bytes[offset]!, bytes[offset + 1]!, bytes[offset + 2]!, bytes[offset + 3]!);
 }
 
 export type WebpBackend = 'canvas' | 'wasm';

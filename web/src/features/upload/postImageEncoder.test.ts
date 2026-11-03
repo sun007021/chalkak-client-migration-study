@@ -248,3 +248,50 @@ describe('selectWebpBackend (upload-edit.md 플랫폼별 허용 차이)', () => 
     expect(selectWebpBackend({ canvasWebp: false, wasm: false })).toBeNull();
   });
 });
+
+describe('inspectWebp 방어 (리뷰 4)', () => {
+  const header = (size: number, total: number) => {
+    const out = new Uint8Array(total);
+    out.set([0x52, 0x49, 0x46, 0x46, size & 0xff, (size >> 8) & 0xff, 0, 0, 0x57, 0x45, 0x42, 0x50]);
+    return out;
+  };
+
+  it('리뷰 4 청크 크기가 남은 입력을 넘으면(잘린 입력) size-mismatch다', () => {
+    const full = webpBytes(100);
+    const truncated = full.slice(0, 60);
+    // RIFF 선언 크기를 잘린 길이에 맞춰도 청크 크기(80)가 남은 바이트를 넘는다.
+    truncated[4] = 60 - 8;
+    expect(inspectWebp(truncated)).toEqual({ ok: false, reason: 'size-mismatch' });
+  });
+
+  it('리뷰 4 두 번째 청크의 크기가 RIFF 선언 범위를 넘으면 size-mismatch다', () => {
+    const bytes = webpFromChunks([{ id: 'VP8 ', payload: 20 }, { id: 'JUNK', payload: 8 }]);
+    bytes[44] = 0xff; // JUNK 청크 크기 필드를 크게
+    expect(inspectWebp(bytes)).toEqual({ ok: false, reason: 'size-mismatch' });
+  });
+
+  it('리뷰 4 가운데 청크의 홀수 패딩이 빠지면 size-mismatch다(마지막 청크는 허용)', () => {
+    const ok = webpFromChunks([{ id: 'VP8 ', payload: 21 }, { id: 'JUNK', payload: 8 }]);
+    expect(inspectWebp(ok).ok).toBe(true);
+    // 첫 청크(홀수 21)의 패딩 1바이트를 뺀다.
+    const noPad = new Uint8Array([...ok.slice(0, 12 + 8 + 21), ...ok.slice(12 + 8 + 22)]);
+    new DataView(noPad.buffer).setUint32(4, noPad.length - 8, true);
+    expect(inspectWebp(noPad)).toEqual({ ok: false, reason: 'size-mismatch' });
+  });
+
+  it('리뷰 4 마지막 청크 뒤에 청크 머리보다 짧은 바이트가 남으면 size-mismatch다', () => {
+    const base = webpFromChunks([{ id: 'VP8 ', payload: 20 }]);
+    const extra = new Uint8Array([...base, 1, 2, 3]);
+    new DataView(extra.buffer).setUint32(4, extra.length - 8, true);
+    expect(inspectWebp(extra)).toEqual({ ok: false, reason: 'size-mismatch' });
+  });
+
+  it('리뷰 4 RIFF 선언 크기 뒤에 붙은 바이트도 size-mismatch다', () => {
+    const base = webpBytes(100);
+    expect(inspectWebp(new Uint8Array([...base, 0, 0, 0, 0]))).toEqual({ ok: false, reason: 'size-mismatch' });
+  });
+
+  it('리뷰 4 이미지 청크 없이 머리만 있는 12바이트는 no-image-chunk다', () => {
+    expect(inspectWebp(header(4, 12))).toEqual({ ok: false, reason: 'no-image-chunk' });
+  });
+});

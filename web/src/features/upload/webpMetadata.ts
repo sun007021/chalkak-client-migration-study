@@ -6,29 +6,59 @@
 const STRIPPED = new Set(['ICCP', 'EXIF', 'XMP ']);
 const VP8X_METADATA_FLAGS = 0x20 | 0x08 | 0x04;
 
-const ascii = (bytes: Uint8Array, offset: number): string => String.fromCharCode(bytes[offset]!, bytes[offset + 1]!, bytes[offset + 2]!, bytes[offset + 3]!);
+export const ascii4 = (bytes: Uint8Array, offset: number): string => String.fromCharCode(bytes[offset]!, bytes[offset + 1]!, bytes[offset + 2]!, bytes[offset + 3]!);
+
+export interface WebpChunk {
+  id: string;
+  /** 청크 머리(id) 위치. */
+  start: number;
+  /** 내용 크기(패딩 제외). */
+  size: number;
+  /** 다음 청크 위치(홀수 크기의 패딩 포함, 마지막 청크의 패딩이 없으면 입력 끝). */
+  end: number;
+}
+
+/**
+ * RIFF/WEBP 헤더 12바이트 뒤의 청크를 엄격하게 순회한다. RIFF 선언 크기가 전체 길이 - 8이어야 하고(뒤에 붙은 바이트 거부),
+ * 청크 크기가 남은 입력을 넘거나, 가운데 청크의 홀수 패딩이 없거나, 청크 머리보다 짧은 바이트가 남으면 null이다.
+ * 마지막 청크의 홀수 패딩이 없는 것만 허용한다(일부 인코더 출력).
+ */
+export function readWebpChunks(bytes: Uint8Array): WebpChunk[] | null {
+  if (bytes.length < 12 || ascii4(bytes, 0) !== 'RIFF' || ascii4(bytes, 8) !== 'WEBP') return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (view.getUint32(4, true) !== bytes.length - 8) return null;
+  const chunks: WebpChunk[] = [];
+  let offset = 12;
+  while (offset < bytes.length) {
+    if (offset + 8 > bytes.length) return null;
+    const size = view.getUint32(offset + 4, true);
+    const contentEnd = offset + 8 + size;
+    if (contentEnd > bytes.length) return null;
+    const padded = contentEnd + (size % 2);
+    if (padded > bytes.length && contentEnd !== bytes.length) return null;
+    const end = Math.min(padded, bytes.length);
+    chunks.push({ id: ascii4(bytes, offset), start: offset, size, end });
+    offset = end;
+  }
+  return chunks;
+}
 
 export function stripWebpMetadata(bytes: Uint8Array): Uint8Array | null {
-  if (bytes.length < 12 || ascii(bytes, 0) !== 'RIFF' || ascii(bytes, 8) !== 'WEBP') return null;
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const chunks = readWebpChunks(bytes);
+  if (!chunks) return null;
   const kept: Uint8Array[] = [];
   let removed = false;
-  let offset = 12;
-  while (offset + 8 <= bytes.length) {
-    const id = ascii(bytes, offset);
-    const size = view.getUint32(offset + 4, true);
-    const end = Math.min(bytes.length, offset + 8 + size + (size % 2));
+  for (const { id, start, end } of chunks) {
     if (STRIPPED.has(id)) {
       removed = true;
-    } else {
-      const chunk = bytes.slice(offset, end);
-      if (id === 'VP8X' && chunk.length > 8 && (chunk[8]! & VP8X_METADATA_FLAGS) !== 0) {
-        chunk[8] = chunk[8]! & ~VP8X_METADATA_FLAGS;
-        removed = true;
-      }
-      kept.push(chunk);
+      continue;
     }
-    offset = end;
+    const chunk = bytes.slice(start, end);
+    if (id === 'VP8X' && chunk.length > 8 && (chunk[8]! & VP8X_METADATA_FLAGS) !== 0) {
+      chunk[8] = chunk[8]! & ~VP8X_METADATA_FLAGS;
+      removed = true;
+    }
+    kept.push(chunk);
   }
   if (!removed) return bytes;
   const bodyLength = kept.reduce((sum, chunk) => sum + chunk.length, 0);
