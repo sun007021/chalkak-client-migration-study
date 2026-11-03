@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { t } from '../../copy/ko';
 import { makeHarness, renderApp } from '../../test/appHarness';
 import type { Harness } from '../../test/appHarness';
@@ -9,6 +9,7 @@ import { screenViews } from '../../test/screenViews';
 import { SETTINGS_GET, SIGNATURE_URL, routeSettings } from '../../test/settingsHarness';
 import { CARD_GET, CHANGE_CONFIRM, CHANGE_PUT, CHANGE_UPLOADS, SIGNUP_CONFIRM, SIGNUP_PUT, SIGNUP_UPLOADS, fx, routeChange, routeSignup, sequence } from '../../test/signatureRoutes';
 
+import { advanceClock } from '../../test/settle';
 const CREDENTIAL = { idToken: 'fake-id-token-1', rawNonce: 'fake-raw-nonce-1' };
 const pendingFx = fx('onboarding/signup__signature-processing-pending.json');
 
@@ -23,7 +24,7 @@ async function openPreview(mode: 'onboarding' | 'change', options: { strict?: bo
 const confirm = () => screen.getByTestId('signature-preview.confirm-button');
 const redraw = () => screen.getByTestId('signature-preview.redraw-button');
 const toastText = () => screen.queryByTestId('toast.message')?.textContent ?? null;
-const tick = (h: Harness, ms: number) => act(async () => h.clock.advance(ms));
+const tick = (h: Harness, ms: number) => advanceClock(h, ms);
 
 describe('미리보기 화면 구성', () => {
   it('TC-ONB-048 가입 모드: "이렇게 보여요", "다시 그리기", "시작하기"가 보이고 변경 안내는 없다', async () => {

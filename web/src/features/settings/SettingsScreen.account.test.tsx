@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { t } from '../../copy/ko';
 import { EMPTY_SESSION } from '../../core/auth/SessionStore';
@@ -9,6 +9,7 @@ import { recordToasts } from '../../test/toastLog';
 import type { Responder } from '../../test/fakeFetch';
 import { PUSH_TOGGLE_IDS, fx, resp, routeSettings, toastText } from '../../test/settingsHarness';
 
+import { advanceClock } from '../../test/settle';
 const LOGOUT = 'POST /auth/logout';
 const WITHDRAW = 'DELETE /users/me';
 const logoutOk = () => loadFixture('auth/logout__no-content.json').toResponse();
@@ -36,7 +37,7 @@ async function openDialog(name: 'logout' | 'withdraw') {
   fireEvent.click(row(name));
   return screen.findByTestId(dialogIds[name].dialog);
 }
-const settle = (h: Awaited<ReturnType<typeof openAccount>>['h']) => act(async () => void (await h.clock.advance(5_000)));
+const settle = (h: Awaited<ReturnType<typeof openAccount>>['h']) => advanceClock(h, 5_000);
 
 describe('확인 대화상자 구성', () => {
   it('TC-SET-041 로그아웃 행: "정말 로그아웃 하시겠습니까?"와 확인/취소가 있다', async () => {

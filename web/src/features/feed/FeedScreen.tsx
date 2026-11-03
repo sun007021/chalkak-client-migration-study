@@ -50,13 +50,9 @@ export function FeedScreen(): ReactNode {
   }, [location, navigate]);
   const close = useCallback(() => closeRef.current(), []);
 
-  // 만들자마자 load를 시작한다: 시드가 있으면 같은 효과 안에서 content가 되므로 loading 프레임이 그려지지 않는다.
-  const create = useCallback(() => {
-    const created = container.createFeedViewModel({ postId, seed, assumeMine, navigator: { close } });
-    void created.load();
-    return created;
-  }, [container, postId, seed, assumeMine, close]);
-  const vm = useOwnedViewModel(create);
+  // 생성은 부작용이 없다. 마운트 효과에서 load를 시작한다: 시드가 있으면 그 효과 안에서 content가 되므로 loading 프레임이 그려지지 않는다.
+  const create = useCallback(() => container.createFeedViewModel({ postId, seed, assumeMine, navigator: { close } }), [container, postId, seed, assumeMine, close]);
+  const vm = useOwnedViewModel(create, startFeed);
   // AI 영역(알약·시트)은 상세 로직과 따로 둔다. 홈 "자세히 보기"로 들어왔으면 첫 GET 뒤 시트를 자동으로 연다(REQ-AIR-047).
   // 진입 때 한 번만 읽는다: 소비 뒤 state에서 지워도 AI ViewModel이 다시 만들어지지 않게 postId별로 고정한다.
   const [entered, setEntered] = useState({ postId, open: readOpenAiReview(location.state) });
@@ -80,6 +76,10 @@ export function FeedScreen(): ReactNode {
   const aiVm = useOwnedViewModel(createAi);
 
   return vm && aiVm ? <FeedBody vm={vm} aiVm={aiVm} previewUrl={previewUrl} onClose={close} /> : null;
+}
+
+function startFeed(vm: FeedViewModel): void {
+  void vm.load();
 }
 
 function FeedBody({ vm, aiVm, previewUrl, onClose }: { vm: FeedViewModel; aiVm: FeedAiViewModel; previewUrl: string | null; onClose: () => void }): ReactNode {

@@ -8,7 +8,6 @@ import type { CopyKey } from '../../copy/ko';
 import { webOnlyCopy } from '../../copy/webOnly';
 import { useScreenView } from '../../core/analytics/useScreenView';
 import { useOwnedViewModel } from '../../core/state/useOwnedViewModel';
-import { useSubscribed } from '../../core/state/useSubscribed';
 import { useViewModel } from '../../core/state/useViewModel';
 import { ConfirmDialog } from '../../core/ui/ConfirmDialog';
 import { useShellContext } from '../shell/MainShell';
@@ -54,10 +53,8 @@ const rowStyle: CSSProperties = { display: 'flex', alignItems: 'center', justify
 
 function SettingsView({ vm, signatureCard, notifications }: { vm: SettingsViewModel; signatureCard: SignatureCardController; notifications: NotificationSettingsStore }): ReactNode {
   const state = useViewModel(vm);
-  const subscribed = useSubscribed();
   const navigate = useNavigate();
 
-  if (!subscribed) return null;
   if (state.mode === 'guest') {
     return (
       <div data-testid="settings.root" style={page}>

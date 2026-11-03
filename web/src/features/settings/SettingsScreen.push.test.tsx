@@ -9,6 +9,7 @@ import { recordToasts } from '../../test/toastLog';
 import { SETTINGS_GET, SETTINGS_PATCH, fx, isDisabled, isOn, patchBodies, pushToggle, resp, routeSettings } from '../../test/settingsHarness';
 import type { PushSettingKey } from './NotificationSettingsRepository';
 
+import { advanceClock } from '../../test/settle';
 type RouteOptions = Parameters<typeof routeSettings>[1];
 
 async function openPush(routes?: RouteOptions) {
@@ -24,7 +25,7 @@ async function openReady(routes?: RouteOptions) {
   await waitFor(() => expect(isDisabled(pushToggle('topicPushEnabled'))).toBe(false));
   return ctx;
 }
-const settle = (h: Harness) => act(async () => void (await h.clock.advance(5_000)));
+const settle = (h: Harness) => advanceClock(h, 5_000);
 const KEYS: PushSettingKey[] = ['topicPushEnabled', 'moderationPushEnabled', 'aiReviewPushEnabled'];
 
 describe('푸시 알림 섹션 구성 (Web은 서버 설정에만 연결, REQ-SET-019)', () => {

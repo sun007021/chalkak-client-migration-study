@@ -12,6 +12,7 @@ import { FakeVisibilityObserver } from '../../test/FakeVisibilityObserver';
 import type { VisibilityObserverFactory } from '../../core/ui/VisibilityObserver';
 import { render } from '@testing-library/react';
 import { VisibilitySentinel } from '../../core/ui/VisibilitySentinel';
+import { advanceClock } from '../../test/settle';
 import {
   BANNERS_P1,
   CALENDAR_OCT,
@@ -53,11 +54,7 @@ async function loaded() {
   await waitFor(() => expect(screen.queryByTestId('home.hero-loading')).not.toBeInTheDocument());
 }
 
-const advance = async (h: Harness, ms: number) => {
-  await act(async () => {
-    await h.clock.advance(ms);
-  });
-};
+const advance = (h: Harness, ms: number) => advanceClock(h, ms);
 const toastText = () => screen.queryByTestId('toast.message')?.textContent ?? null;
 const id = (n: string) => `22222222-2222-4222-8222-222222222${n}`;
 
@@ -397,9 +394,7 @@ describe('홈 AI 피드백 카드 (REQ-HOME-034, 035)', () => {
   ])('TC-HOME-054 히어로가 %s이면 카드가 없고 ai-review 요청도 0건이다', async (_name, fixture) => {
     const { h } = await openHome({ routes: { [TODAY_POST]: fixture } });
     await loaded();
-    await act(async () => {
-      await h.clock.advance(0);
-    });
+    await advanceClock(h, 0);
     expect(screen.queryByTestId('home.ai-card')).not.toBeInTheDocument();
     expect(h.ff.calls.filter((c) => c.path.endsWith('/ai-review'))).toHaveLength(0);
   });

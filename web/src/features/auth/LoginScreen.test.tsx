@@ -10,6 +10,7 @@ import { ME, guestSession, loadFixture, memberSession } from '../../test/fixture
 import { EMPTY_SESSION } from '../../core/auth/SessionStore';
 import { expectGuestRequestsOnlyPublic, outsideHome } from '../../test/homeRequests';
 
+import { advanceClock } from '../../test/settle';
 async function openLogin(options: Parameters<typeof makeHarness>[0] = {}) {
   const h = makeHarness(options);
   const view = renderApp(h.container, '/login');
@@ -191,9 +192,7 @@ describe('카카오 로그인 흐름', () => {
     });
     unmount();
     release();
-    await act(async () => {
-      await h.clock.advance(1);
-    });
+    await advanceClock(h, 1);
     expect(h.store.writes).toHaveLength(0);
     expect(h.container.toast.state.toast).toBeNull();
   });
@@ -369,7 +368,8 @@ describe('카카오 콜백 화면 보강', () => {
     await waitFor(() => expect(resume).toHaveBeenCalledTimes(1));
     expect(signal?.aborted).toBe(false); // StrictMode의 가짜 언마운트로는 취소되지 않는다
     unmount();
-    expect(signal?.aborted).toBe(true);
+    // 소유 ViewModel의 dispose는 한 틱 미뤄진다(StrictMode의 가짜 언마운트에서 인스턴스를 유지하려고).
+    await waitFor(() => expect(signal?.aborted).toBe(true));
   });
 
   it('보관된 시도가 없으면(새로고침·뒤로 가기) 세션이 있을 때 토스트 없이 /home으로 간다', async () => {

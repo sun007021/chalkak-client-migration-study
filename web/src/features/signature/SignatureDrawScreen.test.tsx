@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import { SIGNATURE_MAX_BYTES } from '../../constants';
 import { t } from '../../copy/ko';
@@ -8,6 +8,7 @@ import { screenViews } from '../../test/screenViews';
 import { CARD_GET, SETTINGS_GET, routeSettings } from '../../test/settingsHarness';
 import { drawStroke, stubCanvasRect } from '../../test/signatureDrawing';
 
+import { advanceClock } from '../../test/settle';
 const CREDENTIAL = { idToken: 'fake-id-token-1', rawNonce: 'fake-raw-nonce-1' };
 const STROKE_A = [{ x: 100, y: 100 }, { x: 300, y: 200 }, { x: 500, y: 120 }];
 const STROKE_B = [{ x: 600, y: 300 }, { x: 800, y: 340 }];
@@ -204,7 +205,7 @@ describe('사인 그리기 이동·가드·분석', () => {
     await waitFor(() => expect(path()).toBe('/settings'));
     expect(await screen.findByTestId('settings.root')).toBeInTheDocument();
     await screen.findByTestId('settings.signature-image');
-    await act(async () => void (await h.clock.advance(1_000)));
+    await advanceClock(h, 1_000);
     // 변경 흐름의 서버 호출은 0건이고 설정이 열릴 때의 조회(사인, 푸시)가 한 번씩만 있다.
     expect(h.ff.calls.map((c) => `${c.method} ${c.path}`)).toEqual([CARD_GET, SETTINGS_GET]);
   });

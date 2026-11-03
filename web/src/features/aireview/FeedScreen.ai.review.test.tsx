@@ -44,11 +44,12 @@ describe('상세 AI 화면 코드리뷰 회귀', () => {
   });
 
   it('리뷰11 해당 없음(GET none)이어도 소비하고, 일반 진입은 state를 건드리지 않는다', async () => {
-    const { router } = await openMine({ [aiGet()]: getFx('none') }, { openAiReview: true });
+    const { router, unmount } = await openMine({ [aiGet()]: getFx('none') }, { openAiReview: true });
     await screen.findByTestId('feed.ai-request-button');
     await waitFor(() => expect(router.state.location.state).not.toHaveProperty('openAiReview'));
+    unmount(); // 두 번째 앱과 같은 testid가 한 문서에 겹치지 않게 첫 앱을 내린다.
     const plain = await openMine();
-    await screen.findAllByTestId('feed.ai-request-button');
+    await screen.findByTestId('feed.ai-request-button');
     expect(plain.router.state.location.state).toHaveProperty('seed');
   });
 

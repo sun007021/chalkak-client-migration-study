@@ -7,6 +7,7 @@ import { PUSH_TOGGLE_IDS, SETTINGS_GET, SETTINGS_PATCH, SIGNATURE_URL, fx, isDis
 import { CARD_GET } from '../test/signatureRoutes';
 import { recordToasts } from '../test/toastLog';
 
+import { advanceClock } from '../test/settle';
 const otherSession = () => ({ userId: OTHER_USER, tokens: tokens({ accessToken: 'fixture-access-token-2', refreshToken: 'fixture-refresh-token-2' }), isGuest: false });
 
 /** A 계정으로 설정을 열고, 로그아웃해 로그인 화면까지 간다. */
@@ -63,7 +64,7 @@ describe('계정 전환 (로그아웃 → 다른 계정) — 설정', () => {
     await waitFor(() => expect(isDisabled(pushToggle('topicPushEnabled'))).toBe(false));
     expect(isOn(pushToggle('topicPushEnabled'))).toBe(false); // B 계정: 주제 알림 꺼짐
     lateA.resolve(resp('settings/notification-settings__get-all-true.json')); // A의 늦은 응답(모두 켜짐)
-    await act(async () => void (await h.clock.advance(1_000)));
+    await advanceClock(h, 1_000);
     expect(isOn(pushToggle('topicPushEnabled'))).toBe(false);
   });
 
@@ -80,7 +81,7 @@ describe('계정 전환 (로그아웃 → 다른 계정) — 설정', () => {
     await signInAsOther(h, router);
     await waitFor(() => expect(isDisabled(pushToggle('topicPushEnabled'))).toBe(false));
     patchGate.resolve(resp('settings/notification-settings__patch-internal-error.json'));
-    await act(async () => void (await h.clock.advance(5_000)));
+    await advanceClock(h, 5_000);
     expect(isOn(pushToggle('topicPushEnabled'))).toBe(true);
     expect(toasts.messages).toEqual([]);
   });

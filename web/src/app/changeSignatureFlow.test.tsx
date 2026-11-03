@@ -7,6 +7,7 @@ import { CARD_GET, CHANGE_CONFIRM, CHANGE_PUT, CHANGE_UPLOADS, fx, routeChange, 
 import { drawStroke, stubCanvasRect } from '../test/signatureDrawing';
 import { SETTINGS_GET, routeSettings } from '../test/settingsHarness';
 
+import { advanceClock } from '../test/settle';
 const STROKE = [{ x: 100, y: 100 }, { x: 300, y: 220 }, { x: 520, y: 140 }];
 
 /** 설정 탭에서 시작해 사인 변경 화면을 push로 연다. 설정 화면이 진입 때 사인(GET /users/me/signature)과 푸시 설정(GET /notification-settings)을 조회하므로 먼저 등록한다. */
@@ -35,8 +36,8 @@ describe('사인 변경 전체 흐름 (설정 → 그리기 → 미리보기 →
     fireEvent.click(screen.getByTestId('signature-preview.confirm-button'));
     await waitFor(() => expect(path()).toBe('/settings'));
     expect(await screen.findByTestId('toast.message')).toHaveTextContent('사인 반영까지 시간이 좀 걸릴 수 있어요!');
-    await act(async () => void (await h.clock.advance(1_000)));
-    await act(async () => void (await h.clock.advance(1_000)));
+    await advanceClock(h, 1_000);
+    await advanceClock(h, 1_000);
     // 설정 첫 진입(사인, 푸시) → 변경 3단계 → 설정 복귀 시 재진입 조회와 변경 성공 뒤 재조회(사인 2회) + 푸시 1회.
     expect(sequence(h.ff)).toEqual([CARD_GET, SETTINGS_GET, CHANGE_UPLOADS, CHANGE_PUT, CHANGE_CONFIRM, CARD_GET, CARD_GET, SETTINGS_GET]);
     expect(h.ff.callsTo(CARD_GET)).toHaveLength(3);
@@ -73,7 +74,7 @@ describe('사인 변경 전체 흐름 (설정 → 그리기 → 미리보기 →
     await act(async () => router.navigate(-1));
     await waitFor(() => expect(path()).toBe('/settings'));
     await screen.findByTestId('settings.signature-image');
-    await act(async () => void (await h.clock.advance(1_000)));
+    await advanceClock(h, 1_000);
     // 변경 흐름의 서버 호출은 0건이다: 설정 첫 진입과 복귀 때의 조회(사인, 푸시)가 두 번씩뿐이다.
     expect(sequence(h.ff)).toEqual([CARD_GET, SETTINGS_GET, CARD_GET, SETTINGS_GET]);
     expect(h.container.signatureCard.state).toEqual({ status: 'content', imageUrl: before });

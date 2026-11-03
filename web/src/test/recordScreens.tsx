@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { makeHarness, renderApp } from './appHarness';
 import type { Harness } from './appHarness';
 import { FixtureRouter } from './fixtureRouter';
@@ -7,6 +7,7 @@ import { guestSession, memberSession } from './fixtures';
 import { MEMBER_ROUTES, GUEST_ROUTES } from './homeHarness';
 import { POST_ROUTES, GUEST_POST_ROUTES } from './postRoutes';
 import { RECORD_ROUTES, GUEST_RECORD_ROUTES } from './recordRoutes';
+import { advanceClock } from './settle';
 
 export interface OpenRecordOptions {
   mode?: 'member' | 'guest';
@@ -46,8 +47,4 @@ export const recordLoaded = async (): Promise<void> => {
   await waitFor(() => expect(screen.queryByTestId('record.loading')).not.toBeInTheDocument());
 };
 
-export const advanceApp = async (h: Harness, ms: number): Promise<void> => {
-  await act(async () => {
-    await h.clock.advance(ms);
-  });
-};
+export const advanceApp = async (h: Harness, ms: number): Promise<void> => advanceClock(h, ms);

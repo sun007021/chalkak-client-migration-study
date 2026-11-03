@@ -10,6 +10,7 @@ import { EMPTY_SESSION } from '../core/auth/SessionStore';
 import { t } from '../copy/ko';
 import { expectGuestRequestsOnlyPublic } from '../test/homeRequests';
 
+import { advanceClock } from '../test/settle';
 const decodeId = d.object({ id: d.string() });
 
 describe('부팅 흐름 (스플래시 → 인증 게이트)', () => {
@@ -93,14 +94,10 @@ describe('부팅 흐름 (스플래시 → 인증 게이트)', () => {
     const preloader = new FakeHomePreloader(); // 끝나지 않는다
     const container = { ...h.container, preloader };
     renderApp(container);
-    await act(async () => {
-      await h.clock.advance(699);
-    });
+    await advanceClock(h, 699);
     expect(screen.getByTestId('splash.logo')).toBeInTheDocument();
     expect(screen.queryByTestId('home.root')).not.toBeInTheDocument();
-    await act(async () => {
-      await h.clock.advance(1);
-    });
+    await advanceClock(h, 1);
     expect(await screen.findByTestId('home.root')).toBeInTheDocument();
     expect(preloader.calls).toEqual(['member']);
   });
