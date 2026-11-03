@@ -22,7 +22,7 @@ import { ExpoNotificationResponseSource } from '../core/push/expo/ExpoNotificati
 import { ExpoPushMessageSource } from '../core/push/expo/ExpoPushMessageSource';
 import { ExpoPushNotificationPresenter } from '../core/push/expo/ExpoPushNotificationPresenter';
 import { ExpoPushPermissionGateway } from '../core/push/expo/ExpoPushPermissionGateway';
-import { ExpoPushTokenProvider } from '../core/push/expo/ExpoPushTokenProvider';
+import { createPushTokenProvider } from '../core/push/createPushTokenProvider';
 import type { NotificationResponseSource } from '../core/push/NotificationResponseSource';
 import type { PushMessageSource } from '../core/push/PushMessageSource';
 import type { PushNotificationPresenter } from '../core/push/PushNotificationPresenter';
@@ -218,7 +218,13 @@ function isUserDataCache(value: object): value is UserDataCache {
   return typeof (value as Partial<UserDataCache>).clearAll === 'function';
 }
 
-const DEFAULT_APP_INFO: AppInfo = { platform: 'ios', bundleId: '', version: '', appStoreId: null };
+const DEFAULT_APP_INFO: AppInfo = {
+  platform: 'ios',
+  bundleId: '',
+  version: '',
+  appStoreId: null,
+  iosFcmEnabled: false,
+};
 
 /** 의존성 조립 지점. 테스트에서는 fake를 `overrides`로 넣는다. 전역(Constants 등)은 읽지 않는다. */
 export class AppContainer {
@@ -843,9 +849,9 @@ export class AppContainer {
         logger,
       });
     const o = overrides.push ?? {};
-    const pushTokens = overrides.pushTokens ?? new ExpoPushTokenProvider();
     const featureFlags = overrides.featureFlags ?? readFeatureFlags(undefined);
     const appInfo = overrides.appInfo ?? DEFAULT_APP_INFO;
+    const pushTokens = overrides.pushTokens ?? createPushTokenProvider(appInfo);
     const visibility = overrides.visibility ?? new ReactNativeAppVisibility();
     const pushRegistrar =
       overrides.pushRegistrar ??

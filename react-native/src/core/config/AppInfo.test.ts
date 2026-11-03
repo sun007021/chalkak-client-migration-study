@@ -14,6 +14,7 @@ describe('readAppInfo', () => {
       bundleId: 'com.x.ios',
       version: '1.2.3',
       appStoreId: '123',
+      iosFcmEnabled: false,
     });
     expect(readAppInfo(config, 'android').bundleId).toBe('com.x.android');
   });
@@ -24,6 +25,16 @@ describe('readAppInfo', () => {
       bundleId: '',
       version: '',
       appStoreId: null,
+      iosFcmEnabled: false,
     });
+  });
+
+  it('extra.iosFcmEnabled가 true(불리언 또는 "true")일 때만 iOS FCM을 켠다', () => {
+    const on = (v: unknown) => readAppInfo({ extra: { iosFcmEnabled: v } }, 'ios').iosFcmEnabled;
+    expect(on(true)).toBe(true);
+    expect(on('true')).toBe(true);
+    expect(on(false)).toBe(false);
+    expect(on('false')).toBe(false);
+    expect(on(undefined)).toBe(false);
   });
 });
