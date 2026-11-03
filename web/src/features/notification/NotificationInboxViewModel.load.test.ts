@@ -48,6 +48,19 @@ describe('첫 로딩 (REQ-NOTI-001, 002, 008, 009)', () => {
     expect(h.router.calls(PAGE1)).toHaveLength(1);
   });
 
+  it('첫 로딩 중 onShown이 다시 불려도 같은 요청을 이어 쓴다(중복 요청 없음)', async () => {
+    const gate = deferred<void>();
+    const h = createNotificationHarness({ routes: { [PAGE1]: gated(gate, 'notification/notifications__page1') } });
+    const vm = h.inbox();
+    const first = vm.onShown();
+    const second = vm.onShown();
+    await settle();
+    gate.resolve();
+    await finish(h, Promise.all([first, second]));
+    expect(h.router.calls(PAGE1)).toHaveLength(1);
+    expect(numbers(vm.state)).toEqual(upTo(20));
+  });
+
   it('TC-NOTI-005 0건이면 empty다', async () => {
     const h = createNotificationHarness({ routes: { [PAGE1]: 'notification/notifications__empty' } });
     const vm = await h.openInbox();

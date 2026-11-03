@@ -7,7 +7,7 @@ import { gated } from '../../test/displayAsserts';
 import { json } from '../../test/fixtureRouter';
 import { loadFixture } from '../../test/fixtures';
 import { detailKey, noti } from '../../test/notificationHarness';
-import { openNotifications, toastText } from '../../test/notificationScreens';
+import { openNotifications, settleRetries, toastText } from '../../test/notificationScreens';
 import { screenViews } from '../../test/screenViews';
 
 vi.setConfig({ testTimeout: 15_000 });
@@ -159,6 +159,7 @@ describe('알림 상세 상태 (TC-NOTI-041, 045, 046, 048, REQ-NOTI-027)', () =
     const gate = deferred<void>();
     await openNotifications({ path: path(2), routes: { [detailKey(2)]: gated(gate, 'notification/notification-detail__rejected') }, waitFor: 'notification-detail.loading' });
     expect(tid('notification-detail.loading')).toHaveAttribute('role', 'status');
+    expect(tid('notification-detail.loading')).toHaveAccessibleName(t('noti.inbox.loading'));
     expect(screen.queryByTestId('notification-detail.title')).not.toBeInTheDocument();
     expect(screen.queryByTestId('notification-detail.back-to-inbox-button')).not.toBeInTheDocument();
     expect(tid('notification-detail.back-button')).toBeInTheDocument();
@@ -185,13 +186,9 @@ describe('알림 상세 상태 (TC-NOTI-041, 045, 046, 048, REQ-NOTI-027)', () =
 
   it('TC-NOTI-046 500이면 "알림을 불러오지 못했어요"와 "다시 시도"가 보이고 누르면 다시 요청해 상세가 나온다', async () => {
     const { h, fixtures } = await openNotifications({ path: path(2), routes: { [detailKey(2)]: 'notification/notification-detail__internal-error' }, waitFor: null });
-    // 5xx는 0.5초·1초 간격으로 재시도한다(D-21). 요청이 대기를 시작할 때까지 시계를 계속 민다.
-    await waitFor(async () => {
-      await act(async () => {
-        await h.clock.advance(1_500);
-      });
-      expect(screen.getByTestId('notification-detail.error-state')).toBeInTheDocument();
-    });
+    await settleRetries(h); // 5xx는 0.5초·1초 간격으로 재시도한다(D-21)
+    await screen.findByTestId('notification-detail.error-state');
+    expect(h.ff.calls.filter((c) => c.path === `/notifications/${noti(2)}`)).toHaveLength(3);
     expect(tid('notification-detail.error-state')).toHaveTextContent(t('noti.detail.error'));
     expect(tid('notification-detail.retry-button')).toHaveTextContent(t('noti.inbox.retry'));
     fixtures.set(detailKey(2), 'notification/notification-detail__rejected');
@@ -203,13 +200,9 @@ describe('알림 상세 상태 (TC-NOTI-041, 045, 046, 048, REQ-NOTI-027)', () =
 
   it('TC-NOTI-046 연결 실패면 "네트워크 연결을 확인해 주세요."를 보인다', async () => {
     const { h } = await openNotifications({ path: path(2), routes: { [detailKey(2)]: failing }, waitFor: null });
-    // 연결 실패도 재시도한 뒤 오류가 된다(D-21). 요청이 대기를 시작할 때까지 시계를 계속 민다.
-    await waitFor(async () => {
-      await act(async () => {
-        await h.clock.advance(1_500);
-      });
-      expect(screen.getByTestId('notification-detail.error-state')).toBeInTheDocument();
-    });
+    await settleRetries(h); // 연결 실패도 재시도한 뒤 오류가 된다(D-21)
+    await screen.findByTestId('notification-detail.error-state');
+    expect(h.ff.calls.filter((c) => c.path === `/notifications/${noti(2)}`)).toHaveLength(3);
     expect(tid('notification-detail.error-state')).toHaveTextContent(t('noti.network'));
   });
 

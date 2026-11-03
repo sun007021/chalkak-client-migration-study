@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import { useContainer } from '../../app/AppContext';
 import { t } from '../../copy/ko';
 import { webOnlyCopy } from '../../copy/webOnly';
@@ -12,6 +12,7 @@ import { useScrollRestore } from '../../core/ui/useScrollRestore';
 import { VisibilitySentinel } from '../../core/ui/VisibilitySentinel';
 import type { NotificationItem } from './notificationModels';
 import { planInboxClose, RouterNotificationNavigator } from './notificationNavigation';
+import { useBackAction } from './useBackAction';
 import { INBOX_SENTINEL_OFFSET } from './NotificationInboxViewModel';
 import type { InboxState, NotificationInboxViewModel } from './NotificationInboxViewModel';
 
@@ -53,26 +54,22 @@ const textStyle: CSSProperties = { whiteSpace: 'pre-wrap', overflowWrap: 'break-
 
 function InboxView({ vm }: { vm: NotificationInboxViewModel }): ReactNode {
   const container = useContainer();
-  const navigate = useNavigate();
-  const location = useLocation();
   const state = useViewModel(vm);
   const body = state.body;
   useScrollRestore(body.status !== 'loading');
+  const close = useBackAction(planInboxClose);
 
-  const closeRef = useRef<() => void>(() => undefined);
+  // 화면이 붙어 있는 동안 ViewModel이 초기화되면(계정 전환) 로딩에 머물지 않게 다시 읽는다. 이미 읽는 중이면 그 요청을 이어 쓴다.
+  const loading = body.status === 'loading';
   useEffect(() => {
-    closeRef.current = () => {
-      const plan = planInboxClose(location);
-      if (plan.kind === 'back') void navigate(-1);
-      else void navigate(plan.to, { replace: true });
-    };
-  }, [location, navigate]);
+    if (loading) void vm.onShown();
+  }, [loading, vm]);
 
   const canRefresh = (body.status === 'ready' || body.status === 'empty') && !state.refreshing;
   return (
     <div data-testid="notifications.root">
       <header style={barStyle}>
-        <button type="button" data-testid="notifications.back-button" aria-label={webOnlyCopy['noti.back']} onClick={() => closeRef.current()}>
+        <button type="button" data-testid="notifications.back-button" aria-label={webOnlyCopy['noti.back']} onClick={close}>
           <span aria-hidden="true">←</span>
         </button>
         <h1 style={titleStyle}>{t('noti.inbox.title')}</h1>
@@ -115,13 +112,14 @@ function InboxList({ vm, state, items, hasNext, observe }: { vm: NotificationInb
   }, [armedAt, failures]);
   const showSentinel = hasNext && !state.paging && armedAt === failures;
   const sentinelAt = Math.max(0, items.length - INBOX_SENTINEL_OFFSET);
+  const onPress = useCallback((id: string) => void vm.onItemPress(id), [vm]);
   return (
     <>
       <ul data-testid="notifications.list" aria-label={t('noti.inbox.title')} style={listStyle}>
         {items.map((item, index) => (
           <li key={item.id}>
             {showSentinel && index === sentinelAt ? <VisibilitySentinel key={`${items.length}-${failures}`} observe={observe} onVisible={() => void vm.onSentinelVisible()} /> : null}
-            <InboxRow item={item} onPress={() => void vm.onItemPress(item.id)} />
+            <InboxRow item={item} onPress={onPress} />
           </li>
         ))}
       </ul>
@@ -134,10 +132,10 @@ function InboxList({ vm, state, items, hasNext, observe }: { vm: NotificationInb
   );
 }
 
-function InboxRow({ item, onPress }: { item: NotificationItem; onPress: () => void }): ReactNode {
+const InboxRow = memo(function InboxRow({ item, onPress }: { item: NotificationItem; onPress: (id: string) => void }): ReactNode {
   const id = item.id;
   return (
-    <button type="button" data-testid={`notifications.item-${id}`} style={rowStyle} onClick={onPress}>
+    <button type="button" data-testid={`notifications.item-${id}`} style={rowStyle} onClick={() => onPress(id)}>
       {item.thumbnailImageUrl ? (
         <img data-testid={`notifications.item-thumbnail-${id}`} src={item.thumbnailImageUrl} alt="" style={thumbStyle} />
       ) : (
@@ -150,13 +148,13 @@ function InboxRow({ item, onPress }: { item: NotificationItem; onPress: () => vo
         <span data-testid={`notifications.item-body-${id}`} style={{ display: 'block', ...textStyle }}>
           {item.body}
         </span>
-        <small data-testid={`notifications.item-time-${id}`} style={{ display: 'block', opacity: 0.7 }}>
+        <time data-testid={`notifications.item-time-${id}`} dateTime={new Date(item.createdAt).toISOString()} style={{ display: 'block', fontSize: 12, opacity: 0.7 }}>
           {notificationTimeLabel(item.createdAt)}
-        </small>
+        </time>
       </span>
       {item.readAt === null ? (
         <span data-testid={`notifications.item-unread-${id}`} role="img" aria-label={webOnlyCopy['noti.unread.a11y']} style={{ flex: 'none', width: 8, height: 8, borderRadius: 4, background: '#e53935', marginTop: 6 }} />
       ) : null}
     </button>
   );
-}
+});

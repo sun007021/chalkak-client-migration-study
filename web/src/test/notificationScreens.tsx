@@ -9,6 +9,8 @@ import { MEMBER_ROUTES } from './homeHarness';
 import { NOTIFICATION_ROUTES, PAGE1, UNREAD_KEY, readKey } from './notificationHarness';
 import { POST_ROUTES } from './postRoutes';
 
+type Opened<S> = { h: Harness; fixtures: FixtureRouter; server: S } & ReturnType<typeof renderApp>;
+
 export interface OpenNotificationsOptions {
   routes?: Record<string, RouteValue>;
   visibilityObserver?: VisibilityObserverFactory | null;
@@ -23,8 +25,12 @@ export interface OpenNotificationsOptions {
 const rootFor = (pathname: string): string =>
   pathname.startsWith('/home') ? 'home.root' : pathname.startsWith('/feed') ? 'feed.root' : /^\/notifications\/.+/.test(pathname) ? 'notification-detail.root' : 'notifications.root';
 
-/** 회원 앱에 홈·전시·상세·알림 라우트를 모두 깔고 첫 화면을 그린다(홈 → 알림함 → 상세·게시물 흐름을 한 하네스에서). */
-export async function openNotifications(options: OpenNotificationsOptions = {}) {
+type NotificationServer = ReturnType<typeof createNotificationServer>;
+
+/** 회원 앱에 홈·전시·상세·알림 라우트를 모두 깔고 첫 화면을 그린다(홈 → 알림함 → 상세·게시물 흐름을 한 하네스에서). `server`를 주면 반환값의 server가 null이 아니다. */
+export async function openNotifications(options: OpenNotificationsOptions & { server: { unread?: boolean } }): Promise<Opened<NotificationServer>>;
+export async function openNotifications(options?: OpenNotificationsOptions): Promise<Opened<NotificationServer | null>>;
+export async function openNotifications(options: OpenNotificationsOptions = {}): Promise<Opened<NotificationServer | null>> {
   const h = makeHarness({ session: memberSession(), visibilityObserver: options.visibilityObserver });
   const path = options.path ?? '/notifications';
   const pathname = typeof path === 'string' ? path : path.pathname;
@@ -43,6 +49,14 @@ export const advance = async (h: Harness, ms: number): Promise<void> => {
   await act(async () => {
     await h.clock.advance(ms);
   });
+};
+
+/** 요청의 자동 재시도(0.5초·1초, D-21)를 끝까지 보낸다. 요청이 대기를 시작할 때까지 기다린 뒤 시계를 민다. */
+export const settleRetries = async (h: Harness): Promise<void> => {
+  for (const ms of [500, 1000]) {
+    await waitFor(() => expect(h.clock.pendingTimers).toBeGreaterThan(0));
+    await advance(h, ms);
+  }
 };
 
 /** 알림함 첫 로드가 끝날 때까지(로딩 표시가 사라지고 목록이 보일 때까지) 기다린다. */

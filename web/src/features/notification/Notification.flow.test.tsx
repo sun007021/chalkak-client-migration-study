@@ -1,7 +1,9 @@
 import { vi } from 'vitest';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { deferred } from '../../test/deferred';
+import { gated } from '../../test/displayAsserts';
 import { json } from '../../test/fixtureRouter';
-import { noti, readKey, UNREAD_KEY } from '../../test/notificationHarness';
+import { noti, PAGE1, readKey, UNREAD_KEY } from '../../test/notificationHarness';
 import { inboxLoaded, openNotifications, toastText } from '../../test/notificationScreens';
 import { screenViews } from '../../test/screenViews';
 
@@ -68,7 +70,7 @@ describe('홈 ↔ 알림함 ↔ 상세 흐름 (TC-NOTI-001, TC-NAV-030, TC-NAV-0
 describe('미읽음 점 (TC-NOTI-049, 050, 052, 053, 054, 055, REQ-NOTI-028~032)', () => {
   it('TC-NOTI-049 TC-NOTI-054 읽음 처리 뒤 홈으로 돌아오면 미읽음이 다시 조회되어 점이 사라진다', async () => {
     const opened = await openNotifications({ path: '/home', server: { unread: true } });
-    const server = opened.server!;
+    const server = opened.server;
     await screen.findByTestId('home.topic-title');
     await waitFor(() => expect(dotShown()).toBe(true)); // hasUnread=true
     fireEvent.click(tid('home.notification-button'));
@@ -160,11 +162,16 @@ describe('미읽음 점 (TC-NOTI-049, 050, 052, 053, 054, 055, REQ-NOTI-028~032)
     const home = opened.h.container.homeSession('member').viewModel;
     expect(viewModel.state.body.status).toBe('ready');
     expect(home.state.hasUnread).toBe(true);
+    // 알림함이 붙어 있으면 초기화 직후 다시 읽는다. 새 계정의 응답이 오기 전까지는 이전 계정 목록 없이 loading이다.
+    const gate = deferred<void>();
+    opened.fixtures.set(PAGE1, gated(gate, 'notification/notifications__page1'));
     await act(async () => {
       await opened.h.container.userCaches.clearAll();
     });
     expect(viewModel.state.body).toEqual({ status: 'loading' });
     expect(home.state.hasUnread).toBe(false);
+    await act(async () => gate.resolve());
+    await inboxLoaded();
   });
 
   it('TC-NOTI-049 미읽음이 false면 점이 없고 true면 점이 있다(알림함을 다녀온 뒤에도 서버 값을 따른다)', async () => {

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useId, useRef } from 'react';
+import { useCallback, useId } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { useContainer } from '../../app/AppContext';
 import { t } from '../../copy/ko';
 import { webOnlyCopy } from '../../copy/webOnly';
@@ -10,25 +10,15 @@ import { useViewModel } from '../../core/state/useViewModel';
 import { ErrorState } from '../../core/ui/StateViews';
 import type { NotificationDetail } from './notificationModels';
 import { planBackToInbox } from './notificationNavigation';
+import { useBackAction } from './useBackAction';
 import type { NotificationDetailViewModel } from './NotificationDetailViewModel';
 
 /** 알림 상세 화면(REQ-NOTI-023~027). 마운트마다 ViewModel을 새로 만들어 읽고, 읽음 처리는 하지 않는다. */
 export function NotificationDetailScreen(): ReactNode {
   const { notificationId = '' } = useParams();
   const container = useContainer();
-  const navigate = useNavigate();
-  const location = useLocation();
   useScreenView('notification_detail');
-
-  const backRef = useRef<() => void>(() => undefined);
-  useEffect(() => {
-    backRef.current = () => {
-      const plan = planBackToInbox(location);
-      if (plan.kind === 'back') void navigate(-1);
-      else void navigate(plan.to, { replace: true });
-    };
-  }, [location, navigate]);
-  const goBack = useCallback(() => backRef.current(), []);
+  const goBack = useBackAction(planBackToInbox);
 
   const create = useCallback(() => {
     const created = container.createNotificationDetailViewModel({ notificationId });
@@ -59,7 +49,7 @@ function DetailView({ vm, onBack }: { vm: NotificationDetailViewModel | null; on
 }
 
 function Loading(): ReactNode {
-  return <div data-testid="notification-detail.loading" role="status" aria-busy="true" style={{ padding: 24 }} />;
+  return <div data-testid="notification-detail.loading" role="status" aria-busy="true" aria-label={t('noti.inbox.loading')} style={{ padding: 24 }} />;
 }
 
 function DetailBody({ vm, onBack }: { vm: NotificationDetailViewModel; onBack: () => void }): ReactNode {
@@ -67,7 +57,7 @@ function DetailBody({ vm, onBack }: { vm: NotificationDetailViewModel; onBack: (
   if (body.status === 'loading') return <Loading />;
   if (body.status === 'gone') {
     return (
-      <p data-testid="notification-detail.not-found-state" style={{ padding: 16 }}>
+      <p data-testid="notification-detail.not-found-state" role="status" style={{ padding: 16 }}>
         {t('noti.gone')}
       </p>
     );

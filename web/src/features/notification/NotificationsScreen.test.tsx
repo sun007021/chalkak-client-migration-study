@@ -8,7 +8,7 @@ import { FakeVisibilityObserver } from '../../test/FakeVisibilityObserver';
 import { json } from '../../test/fixtureRouter';
 import { loadFixture } from '../../test/fixtures';
 import { noti, PAGE1, PAGE2, readKey, SOURCE_POST } from '../../test/notificationHarness';
-import { createNotificationServer, inboxLoaded, openNotifications, toastText } from '../../test/notificationScreens';
+import { createNotificationServer, inboxLoaded, openNotifications, settleRetries, toastText } from '../../test/notificationScreens';
 import { screenViews } from '../../test/screenViews';
 import { readOpenAiReview } from '../aireview/aiEntry';
 
@@ -37,6 +37,24 @@ describe('알림함 화면 구성 (TC-NOTI-011, REQ-NOTI-003, 004)', () => {
     expect(screen.queryByTestId('notifications.loading')).not.toBeInTheDocument();
     expect(screen.queryByTestId('notifications.empty-state')).not.toBeInTheDocument();
     expect(screen.queryByTestId('notifications.error-state')).not.toBeInTheDocument();
+  });
+
+  it('행 시각은 time 요소이고 dateTime은 UTC Instant다', async () => {
+    await openNotifications();
+    await inboxLoaded();
+    const time = tid(`notifications.item-time-${noti(1)}`);
+    expect(time.tagName).toBe('TIME');
+    expect(time).toHaveAttribute('datetime', '2026-10-27T01:30:00.000Z');
+  });
+
+  it('화면이 붙어 있는 동안 ViewModel이 초기화되면(계정 전환) 로딩에 머물지 않고 다시 읽는다', async () => {
+    const { h, fixtures } = await openNotifications();
+    await inboxLoaded();
+    await act(async () => {
+      h.container.inboxSession().viewModel.resetForAccountChange();
+    });
+    await inboxLoaded();
+    expect(fixtures.calls(PAGE1)).toHaveLength(2);
   });
 
   it('TC-NOTI-011 썸네일이 null이면 이미지 없이 대체 표시만 있다', async () => {
@@ -123,11 +141,9 @@ describe('알림함 상태 (TC-NOTI-004~008)', () => {
 
   it('TC-NOTI-006 500이면 오류 문구 "알림을 불러오지 못했어요"와 "다시 시도"가 보이고 누르면 다시 요청해 목록이 나온다', async () => {
     const { h, fixtures } = await openNotifications({ routes: { [PAGE1]: 'notification/notifications__internal-error' }, waitFor: null });
-    // 5xx는 0.5초·1초 간격으로 재시도한다(D-21). 요청이 대기를 시작할 때까지 시계를 계속 민다.
-    await waitFor(async () => {
-      await advance(h, 1_500);
-      expect(screen.getByTestId('notifications.error-state')).toBeInTheDocument();
-    });
+    await settleRetries(h); // 5xx는 0.5초·1초 간격으로 재시도한다(D-21)
+    await screen.findByTestId('notifications.error-state');
+    expect(fixtures.calls(PAGE1)).toHaveLength(3);
     expect(tid('notifications.error-state')).toHaveTextContent(t('noti.inbox.error'));
     expect(tid('notifications.retry-button')).toHaveTextContent(t('noti.inbox.retry'));
     expect(screen.queryByTestId('notifications.list')).not.toBeInTheDocument();
@@ -140,11 +156,9 @@ describe('알림함 상태 (TC-NOTI-004~008)', () => {
 
   it('TC-NOTI-007 연결 실패면 "네트워크 연결을 확인해 주세요."를 보인다', async () => {
     const { h } = await openNotifications({ routes: { [PAGE1]: failing }, waitFor: null });
-    // 연결 실패도 재시도한 뒤 오류가 된다(D-21). 요청이 대기를 시작할 때까지 시계를 계속 민다.
-    await waitFor(async () => {
-      await advance(h, 1_500);
-      expect(screen.getByTestId('notifications.error-state')).toBeInTheDocument();
-    });
+    await settleRetries(h); // 연결 실패도 재시도한 뒤 오류가 된다(D-21)
+    await screen.findByTestId('notifications.error-state');
+    expect(h.ff.calls.filter((c) => c.path === '/notifications')).toHaveLength(3);
     expect(tid('notifications.error-state')).toHaveTextContent(t('noti.network'));
   });
 

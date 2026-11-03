@@ -1,6 +1,7 @@
 import { t } from '../../copy/ko';
 import { ApiError, isAbandoned, NetworkError } from '../../core/net/errors';
 import { RequestSlots } from '../../core/state/RequestSlots';
+import type { RequestPass } from '../../core/state/RequestSlots';
 import { ViewModel } from '../../core/state/ViewModel';
 import type { Clock } from '../../core/time/Clock';
 import type { ToastController } from '../../core/ui/ToastController';
@@ -81,10 +82,13 @@ export class NotificationInboxViewModel extends ViewModel<InboxState> {
   private firstPageCount = 0;
   /** 처리 중인 행 탭(읽음 요청 + 이동). 한 번에 하나만 처리한다. */
   private pressing: object | null = null;
+  /** 진행 중인 첫 로딩. onShown이 겹쳐 불려도 같은 요청을 이어 쓴다. */
+  private firstLoad: Promise<void> | null = null;
 
   async onShown(): Promise<void> {
     const status = this.state.body.status;
     if (status === 'ready' || status === 'empty') return this.revalidate();
+    if (status === 'loading' && this.firstLoad) return this.firstLoad;
     if (status === 'error') this.setState({ body: { status: 'loading' } });
     return this.loadFirst();
   }
@@ -92,6 +96,7 @@ export class NotificationInboxViewModel extends ViewModel<InboxState> {
   onHidden(): void {
     this.slots.cancelAll();
     this.pressing = null;
+    this.firstLoad = null;
     this.setState({ refreshing: false, paging: false });
   }
 
@@ -150,6 +155,7 @@ export class NotificationInboxViewModel extends ViewModel<InboxState> {
     return this.loadMore();
   }
 
+  /** 화면은 센티넬(onSentinelVisible)을 쓰지만, 끝에서 4번째 규칙(REQ-NOTI-005)을 ViewModel 단위로 검증하는 테스트가 쓰므로 남긴다. */
   async onLastVisibleIndexChanged(index: number): Promise<void> {
     const body = this.state.body;
     if (body.status !== 'ready' || index < body.items.length - INBOX_SENTINEL_OFFSET) return;
@@ -203,6 +209,7 @@ export class NotificationInboxViewModel extends ViewModel<InboxState> {
   resetForAccountChange(): void {
     this.slots.cancelAll();
     this.pressing = null;
+    this.firstLoad = null;
     this.pagesLoaded = 0;
     this.firstPageCount = 0;
     this.replaceState({ body: { status: 'loading' }, refreshing: false, paging: false, pageFailures: 0 });
@@ -221,8 +228,16 @@ export class NotificationInboxViewModel extends ViewModel<InboxState> {
     this.setState({ body: items.length === 0 ? { status: 'empty' } : { status: 'ready', items, hasNext } });
   }
 
-  private async loadFirst(): Promise<void> {
+  private loadFirst(): Promise<void> {
     const pass = this.slots.begin('first');
+    const promise: Promise<void> = this.fetchFirst(pass).finally(() => {
+      if (this.firstLoad === promise) this.firstLoad = null;
+    });
+    this.firstLoad = promise;
+    return promise;
+  }
+
+  private async fetchFirst(pass: RequestPass): Promise<void> {
     try {
       const page = await this.deps.repository.fetchPage(1, pass.signal);
       if (!pass.isCurrent()) return;
