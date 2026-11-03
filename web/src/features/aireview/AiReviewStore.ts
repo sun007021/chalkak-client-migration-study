@@ -127,16 +127,15 @@ export class AiReviewStore {
   }
 
   watch(postId: string, options: AiWatchOptions): AiReviewWatch {
-    const store = this;
     const watch: AiReviewWatch = {
       postId,
-      show: () => store.show(watch, options),
-      hide: () => store.hide(watch),
-      recheck: () => store.recheck(watch, options),
-      request: () => store.request(watch, options),
+      show: () => this.show(watch, options),
+      hide: () => this.hide(watch),
+      recheck: () => this.recheck(watch, options),
+      request: () => this.request(watch, options),
       release: () => {
-        store.hide(watch);
-        store.slots.get(postId)?.options.delete(watch);
+        this.hide(watch);
+        this.slots.get(postId)?.options.delete(watch);
       },
     };
     return watch;
