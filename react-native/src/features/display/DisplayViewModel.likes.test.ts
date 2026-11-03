@@ -30,7 +30,7 @@ describe('DisplayViewModel 좋아요 연동', () => {
     expect(featured).toEqual(grid);
   });
 
-  it('TC-LIKE-014 게스트가 하트를 누르면 상태 변화 없이 토스트만 뜨고 요청이 없다', async () => {
+  it('TC-LIKE-014 TC-NAV-019 게스트가 하트를 누르면 상태 변화 없이 토스트만 뜨고 요청이 없다', async () => {
     const h = await createDisplayHarness({
       mode: 'guest',
       routes: { [RECENT]: 'display/posts-list__guest-page1' },

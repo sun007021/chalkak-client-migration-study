@@ -67,7 +67,7 @@ describe('App', () => {
     expect(await screen.findByTestId('home.hero-photo')).toBeOnTheScreen();
   });
 
-  it('REQ-NAV-013 게스트가 기록 탭을 누르면 탭이 바뀌지 않고 토스트가 뜬다', async () => {
+  it('REQ-NAV-013 TC-NAV-016 게스트가 기록 탭을 누르면 탭이 바뀌지 않고 토스트가 뜬다', async () => {
     await renderApp('guest');
     await screen.findByTestId('bottom-bar.root');
     await fireEvent.press(screen.getByTestId('bottom-bar.tab-record'));
@@ -77,7 +77,7 @@ describe('App', () => {
     );
   });
 
-  it('D-05 게스트가 업로드 버튼을 누르면 토스트만 뜬다', async () => {
+  it('D-05 TC-NAV-017 게스트가 업로드 버튼을 누르면 토스트만 뜬다', async () => {
     await renderApp('guest');
     await screen.findByTestId('bottom-bar.root');
     await fireEvent.press(screen.getByTestId('bottom-bar.upload-button'));

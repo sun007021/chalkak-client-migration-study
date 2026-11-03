@@ -94,7 +94,7 @@ describe('기록 탭 연결', () => {
     expect(analytics.screenNames.filter((name) => name === 'record')).toEqual(['record']);
   });
 
-  it('TC-REC-033 게스트가 기록 탭을 누르면 토스트만 뜨고 탭이 바뀌지 않으며 기록 API 요청이 0건이다', async () => {
+  it('TC-REC-033 TC-NAV-016 게스트가 기록 탭을 누르면 토스트만 뜨고 탭이 바뀌지 않으며 기록 API 요청이 0건이다', async () => {
     const { net } = await renderApp('guest');
     await screen.findByTestId('bottom-bar.root');
     await fireEvent.press(screen.getByTestId('bottom-bar.tab-record'));
