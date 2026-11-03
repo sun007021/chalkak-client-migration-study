@@ -443,6 +443,7 @@ describe('홈 AI 피드백 카드 (REQ-HOME-034, 035)', () => {
   it('TC-HOME-054 요청 버튼은 POST /ai-review를 1회 보내고 진행 중 카드로 바뀐다', async () => {
     const { fixtures } = await openHome({ routes: { [AI_POST]: 'ai-review/ai-review-post__202-processing' } });
     fireEvent.click(await screen.findByTestId('home.ai-request-button'));
+    fireEvent.click(await screen.findByTestId('ai-start-sheet.start-button'));
     expect(await screen.findByTestId('home.ai-processing')).toBeInTheDocument();
     expect(fixtures.calls(AI_POST)).toHaveLength(1);
   });
@@ -450,6 +451,7 @@ describe('홈 AI 피드백 카드 (REQ-HOME-034, 035)', () => {
   it('D-08 요청이 403이면 정지 안내 토스트가 뜨고 요청 버튼이 그대로 남는다', async () => {
     await openHome({ routes: { [AI_POST]: 'ai-review/ai-review-post__403-banned' } });
     fireEvent.click(await screen.findByTestId('home.ai-request-button'));
+    fireEvent.click(await screen.findByTestId('ai-start-sheet.start-button'));
     await waitFor(() => expect(toastText()).toBe(t('ai.error.banned')));
     expect(screen.getByTestId('home.ai-request-button')).toBeInTheDocument();
   });

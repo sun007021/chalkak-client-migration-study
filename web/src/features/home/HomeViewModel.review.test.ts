@@ -3,6 +3,13 @@ import { deferred } from '../../test/deferred';
 import { loadFixture } from '../../test/fixtures';
 import { MY_POST_ID, TOPICS_TODAY, createHomeHarness, finish, settle } from '../../test/homeHarness';
 
+/** NONE 카드는 시작 시트를 거친다(REQ-AIR-019, 052): 누르고 "분석 시작하기"까지. 실패 재요청 카드는 시트 없이 바로 POST라 확정은 아무 일도 하지 않는다. */
+const pressAi = async (h: { viewModel: { onAiRequestPress(): Promise<void>; confirmAiStart(): Promise<void> } }): Promise<void> => {
+  await h.viewModel.onAiRequestPress();
+  await h.viewModel.confirmAiStart();
+};
+
+
 const AI_GET = `GET /posts/${MY_POST_ID}/ai-review`;
 const AI_POST = `POST /posts/${MY_POST_ID}/ai-review`;
 
@@ -11,16 +18,16 @@ describe('HomeViewModel AI 카드 보강 (D-08, 늦은 GET)', () => {
     const h = createHomeHarness();
     await finish(h, h.viewModel.onShown());
     h.router.set(AI_POST, 'ai-review/ai-review-post__403-banned');
-    await finish(h, h.viewModel.onAiRequestPress());
+    await finish(h, pressAi(h));
     expect(h.viewModel.state.ai).toMatchObject({ kind: 'ready', status: 'NONE', requesting: false, blocked: true });
-    await finish(h, h.viewModel.onAiRequestPress());
-    await finish(h, h.viewModel.onAiRequestPress());
+    await finish(h, pressAi(h));
+    await finish(h, pressAi(h));
     expect(h.router.calls(AI_POST)).toHaveLength(1);
     expect(h.toasts.messages).toEqual([t('ai.error.banned')]);
 
     await finish(h, h.viewModel.refresh()); // GET이 NONE을 다시 줘도 막힘은 그 카드에 남는다
     expect(h.viewModel.state.ai).toMatchObject({ status: 'NONE', blocked: true });
-    await finish(h, h.viewModel.onAiRequestPress());
+    await finish(h, pressAi(h));
     expect(h.router.calls(AI_POST)).toHaveLength(1);
   });
 
@@ -36,7 +43,7 @@ describe('HomeViewModel AI 카드 보강 (D-08, 늦은 GET)', () => {
     await settle();
 
     h.router.set(AI_POST, 'ai-review/ai-review-post__202-processing');
-    await finish(h, h.viewModel.onAiRequestPress());
+    await finish(h, pressAi(h));
     expect(h.viewModel.state.ai).toMatchObject({ status: 'PROCESSING' });
 
     lateGet.resolve();
@@ -112,7 +119,7 @@ describe('HomeViewModel 계정 전환 (resetForAccountChange)', () => {
       await gate.promise;
       return loadFixture('ai-review/ai-review-post__202-processing.json').toResponse();
     });
-    const requesting = h.viewModel.onAiRequestPress();
+    const requesting = pressAi(h);
     await settle();
     expect(h.viewModel.state.ai).toMatchObject({ requesting: true });
 
@@ -126,7 +133,7 @@ describe('HomeViewModel 계정 전환 (resetForAccountChange)', () => {
     expect(h.toasts.messages).toEqual([]);
 
     h.router.set(AI_POST, 'ai-review/ai-review-post__202-processing');
-    await finish(h, h.viewModel.onAiRequestPress()); // aiRequestInFlight가 이전 요청 때문에 남지 않았다
+    await finish(h, pressAi(h)); // aiRequestInFlight가 이전 요청 때문에 남지 않았다
     expect(h.viewModel.state.ai).toMatchObject({ status: 'PROCESSING' });
   });
 });
