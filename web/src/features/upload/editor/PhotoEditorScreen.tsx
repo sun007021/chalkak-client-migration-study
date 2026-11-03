@@ -12,7 +12,7 @@ import type { PhotoEditorComponent, PhotoEditorProps } from '../photoEditor';
 import { fromDisplayValue, keyboardAdjustDisplay, toDisplayValue } from './adjustments';
 import { CROP_RATIO_IDS } from './cropGeometry';
 import type { CropHandle, CropRatioId, CropRect } from './cropGeometry';
-import type { AutoAnalyzer, PreviewRenderer } from './editorPorts';
+import type { AutoAnalyzer, PreviewRenderer, RenderScheduler } from './editorPorts';
 import { EDITOR_TOOLS, PhotoEditorViewModel } from './PhotoEditorViewModel';
 import type { AdjustItem, EditorTool, PhotoEditorState } from './PhotoEditorViewModel';
 
@@ -20,6 +20,8 @@ export interface PhotoEditorScreenDeps {
   decoder: ImageDecoder;
   preview: PreviewRenderer;
   analyzer: AutoAnalyzer;
+  scheduler?: RenderScheduler;
+  lazyThumbnails?: boolean;
 }
 
 /**
@@ -59,6 +61,8 @@ export function PhotoEditorScreen({ source, initialEdit, onConfirm, onCancel, de
       decoder: deps.decoder,
       preview: deps.preview,
       analyzer: deps.analyzer,
+      scheduler: deps.scheduler,
+      lazyThumbnails: deps.lazyThumbnails,
       onConfirm: (edit) => confirmRef.current(edit),
       onCancel: () => cancelRef.current(),
     });

@@ -79,7 +79,7 @@ import { PhotoPreparer } from '../features/upload/PhotoPreparer';
 import type { PhotoEditorComponent } from '../features/upload/photoEditor';
 import { CanvasAutoAnalyzer, CanvasPreviewRenderer } from '../features/upload/editor/canvasPorts';
 import { CanvasEditRenderer, createCanvasPixelSurface } from '../features/upload/editor/CanvasEditRenderer';
-import type { AutoAnalyzer, PixelSurfaceFactory, PreviewRenderer } from '../features/upload/editor/editorPorts';
+import type { AutoAnalyzer, PixelSurfaceFactory, PreviewRenderer, RenderScheduler } from '../features/upload/editor/editorPorts';
 import { createPhotoEditor } from '../features/upload/editor/PhotoEditorScreen';
 import { UploadGate } from '../features/upload/UploadGate';
 import { AttachableUploadNavigator } from '../features/upload/UploadNavigator';
@@ -141,6 +141,8 @@ export interface AppContainerOptions {
   previewRenderer?: PreviewRenderer;
   /** 자동 보정 분석. 기본 CanvasAutoAnalyzer. */
   autoAnalyzer?: AutoAnalyzer;
+  /** 편집기 렌더 요청을 한 프레임으로 모으는 수단. 주면 실제 화면 모드(필터 썸네일은 필터 탭에서만 그린다)이고, 생략하면 변경마다 바로 요청한다(테스트). 앱 진입점(bootstrap)이 BrowserRenderScheduler를 준다. */
+  renderScheduler?: RenderScheduler;
   /** 편집 결과를 그리는 픽셀 표면. 기본 createCanvasPixelSurface(canvas). */
   pixelSurface?: PixelSurfaceFactory;
   /** 약관 문서를 새 탭으로 여는 수단. 기본 WindowExternalLinkOpener. */
@@ -347,6 +349,8 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
           decoder: imageDecoder,
           preview: options.previewRenderer ?? new CanvasPreviewRenderer({ createSurface: pixelSurface, blobUrls }),
           analyzer: options.autoAnalyzer ?? new CanvasAutoAnalyzer({ createSurface: pixelSurface }),
+          scheduler: options.renderScheduler,
+          lazyThumbnails: options.renderScheduler !== undefined,
         })
       : options.photoEditor;
   const photoPreparer = new PhotoPreparer({
