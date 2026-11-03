@@ -6,12 +6,12 @@ import { useOwnedViewModel } from '../../../core/state/useOwnedViewModel';
 import { useViewModel } from '../../../core/state/useViewModel';
 import { useDialogFocus } from '../../../core/ui/useDialogFocus';
 import { PHOTO_FILTERS } from '../editModel';
-import type { AdjustmentKey } from '../editModel';
+import type { AdjustmentKey, PhotoFilter } from '../editModel';
 import type { ImageDecoder } from '../imagePorts';
 import type { PhotoEditorComponent, PhotoEditorProps } from '../photoEditor';
 import { fromDisplayValue, keyboardAdjustDisplay, toDisplayValue } from './adjustments';
 import { CROP_RATIO_IDS } from './cropGeometry';
-import type { CropHandle, CropRect } from './cropGeometry';
+import type { CropHandle, CropRatioId, CropRect } from './cropGeometry';
 import type { AutoAnalyzer, PreviewRenderer } from './editorPorts';
 import { EDITOR_TOOLS, PhotoEditorViewModel } from './PhotoEditorViewModel';
 import type { AdjustItem, EditorTool, PhotoEditorState } from './PhotoEditorViewModel';
@@ -111,6 +111,46 @@ const tabBarStyle: CSSProperties = { flex: 'none', display: 'flex', borderTop: '
 const tabStyle = (selected: boolean): CSSProperties => ({ flex: 1, minHeight: 56, background: 'none', border: 'none', color: 'inherit', fontSize: 16, fontWeight: selected ? 700 : 400, borderBottom: selected ? '3px solid currentColor' : '3px solid transparent', cursor: 'pointer' });
 const sliderStyle: CSSProperties = { width: '100%', minHeight: 44 };
 
+/** testids.md의 식별자(템플릿 문자열로 조립하지 않고 표로 둔다: check-testids가 정적 문자열을 기준으로 검사한다). */
+const TAB_TESTID: Record<EditorTool, string> = { crop: 'photo-edit.tab-crop', adjust: 'photo-edit.tab-adjust', filter: 'photo-edit.tab-filter' };
+const RATIO_TESTID: Record<CropRatioId, string> = {
+  original: 'photo-edit.ratio-original',
+  free: 'photo-edit.ratio-free',
+  '1-1': 'photo-edit.ratio-1-1',
+  '4-5': 'photo-edit.ratio-4-5',
+  '5-4': 'photo-edit.ratio-5-4',
+  '3-4': 'photo-edit.ratio-3-4',
+  '4-3': 'photo-edit.ratio-4-3',
+  '9-16': 'photo-edit.ratio-9-16',
+  '16-9': 'photo-edit.ratio-16-9',
+};
+const FILTER_TESTID: Record<PhotoFilter, string> = {
+  original: 'photo-edit.filter-original',
+  mono: 'photo-edit.filter-mono',
+  warm: 'photo-edit.filter-warm',
+  cool: 'photo-edit.filter-cool',
+  vintage: 'photo-edit.filter-vintage',
+  vivid: 'photo-edit.filter-vivid',
+};
+const ADJUST_ITEM_TESTID: Record<AdjustItem, string> = {
+  auto: 'photo-edit.adjust-item-auto',
+  exposure: 'photo-edit.adjust-item-exposure',
+  contrast: 'photo-edit.adjust-item-contrast',
+  highlights: 'photo-edit.adjust-item-highlights',
+  shadows: 'photo-edit.adjust-item-shadows',
+  blackPoint: 'photo-edit.adjust-item-black-point',
+  saturation: 'photo-edit.adjust-item-saturation',
+  warmth: 'photo-edit.adjust-item-warmth',
+};
+const ADJUST_SLIDER_TESTID: Record<AdjustmentKey, string> = {
+  exposure: 'photo-edit.adjust-exposure-slider',
+  contrast: 'photo-edit.adjust-contrast-slider',
+  highlights: 'photo-edit.adjust-highlights-slider',
+  shadows: 'photo-edit.adjust-shadows-slider',
+  blackPoint: 'photo-edit.adjust-black-point-slider',
+  saturation: 'photo-edit.adjust-saturation-slider',
+  warmth: 'photo-edit.adjust-warmth-slider',
+};
 const TOOL_COPY: Record<EditorTool, 'edit.tab.crop' | 'edit.tab.adjust' | 'edit.tab.filter'> = { crop: 'edit.tab.crop', adjust: 'edit.tab.adjust', filter: 'edit.tab.filter' };
 /** 조정 항목 → testid·문구 키 조각. */
 const ADJUST_SLUG: Record<AdjustItem, 'auto' | 'exposure' | 'contrast' | 'highlights' | 'shadows' | 'black-point' | 'saturation' | 'warmth'> = {
@@ -159,7 +199,7 @@ function EditorBody({ vm }: { vm: PhotoEditorViewModel }): ReactNode {
         </div>
         <div role="tablist" style={tabBarStyle}>
           {EDITOR_TOOLS.map((tool) => (
-            <button key={tool} type="button" role="tab" data-testid={`photo-edit.tab-${tool}`} aria-selected={state.tool === tool} disabled={locked || state.phase !== 'ready'} style={tabStyle(state.tool === tool)} onClick={() => vm.selectTool(tool)}>
+            <button key={tool} type="button" role="tab" data-testid={TAB_TESTID[tool]} aria-selected={state.tool === tool} disabled={locked || state.phase !== 'ready'} style={tabStyle(state.tool === tool)} onClick={() => vm.selectTool(tool)}>
               {t(TOOL_COPY[tool])}
             </button>
           ))}
@@ -274,7 +314,7 @@ function CropPanel({ vm, state }: { vm: PhotoEditorViewModel; state: PhotoEditor
     <>
       <div role="radiogroup" aria-label={webOnlyCopy['edit.ratio.label']} style={rowStyle}>
         {CROP_RATIO_IDS.map((ratio) => (
-          <button key={ratio} type="button" role="radio" data-testid={`photo-edit.ratio-${ratio}`} aria-checked={state.ratio === ratio} style={chipStyle(state.ratio === ratio)} onClick={() => vm.selectRatio(ratio)}>
+          <button key={ratio} type="button" role="radio" data-testid={RATIO_TESTID[ratio]} aria-checked={state.ratio === ratio} style={chipStyle(state.ratio === ratio)} onClick={() => vm.selectRatio(ratio)}>
             {t(`edit.ratio.${ratio}`)}
           </button>
         ))}
@@ -299,7 +339,7 @@ function AdjustPanel({ vm, state }: { vm: PhotoEditorViewModel; state: PhotoEdit
     <>
       <div role="tablist" aria-label={t('edit.tab.adjust')} style={rowStyle}>
         {ADJUST_LIST.map((entry) => (
-          <button key={entry} type="button" role="tab" data-testid={`photo-edit.adjust-item-${ADJUST_SLUG[entry]}`} aria-selected={item === entry} style={chipStyle(item === entry)} onClick={() => vm.selectAdjustItem(entry)}>
+          <button key={entry} type="button" role="tab" data-testid={ADJUST_ITEM_TESTID[entry]} aria-selected={item === entry} style={chipStyle(item === entry)} onClick={() => vm.selectAdjustItem(entry)}>
             {t(`edit.adjust.${ADJUST_SLUG[entry]}`)}
           </button>
         ))}
@@ -346,7 +386,7 @@ function AdjustSlider({ vm, state, item }: { vm: PhotoEditorViewModel; state: Ph
   return (
     <input
       type="range"
-      data-testid={`photo-edit.adjust-${ADJUST_SLUG[item]}-slider`}
+      data-testid={ADJUST_SLIDER_TESTID[key]}
       aria-label={t(`edit.adjust.${ADJUST_SLUG[item]}`)}
       aria-valuetext={String(display)}
       min={-100}
@@ -369,7 +409,7 @@ function FilterPanel({ vm, state }: { vm: PhotoEditorViewModel; state: PhotoEdit
         const selected = state.filter === filter;
         const thumbnail = state.thumbnails[filter];
         return (
-          <button key={filter} type="button" role="radio" data-testid={`photo-edit.filter-${filter}`} aria-checked={selected} onClick={() => vm.selectFilter(filter)} style={{ flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: 4, background: 'none', color: 'inherit', border: selected ? '2px solid currentColor' : '1px solid transparent', borderRadius: 8, cursor: 'pointer', fontWeight: selected ? 700 : 400 }}>
+          <button key={filter} type="button" role="radio" data-testid={FILTER_TESTID[filter]} aria-checked={selected} onClick={() => vm.selectFilter(filter)} style={{ flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: 4, background: 'none', color: 'inherit', border: selected ? '2px solid currentColor' : '1px solid transparent', borderRadius: 8, cursor: 'pointer', fontWeight: selected ? 700 : 400 }}>
             {thumbnail ? <img src={thumbnail} alt="" draggable={false} style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6 }} /> : <span aria-hidden="true" style={{ width: 64, height: 64, borderRadius: 6, background: '#8883' }} />}
             <span>{t(`edit.filter.${filter}`)}</span>
           </button>

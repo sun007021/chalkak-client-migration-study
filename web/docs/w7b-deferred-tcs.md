@@ -23,6 +23,8 @@ W7b는 편집기 본체(순수 연산, ViewModel, 화면, `CanvasEditRenderer` �
 - TC-EDIT-044(그리면서 입히는 경로 vs 픽셀 루프) — 웹은 경로가 하나(픽셀 루프)라 "조정 0 + 필터" 파이프라인이 필터 단독 적용과 ±1 이내로 같은지로 바꿔 검증했다 — 해당 없음(웹은 경로 하나)
 
 ## 실제 canvas/브라우저가 필요한 것
+> 구현 PR에서 `e2e/photo-edit.spec.ts`(Chromium 실제 canvas 픽셀 ±2, 미리보기, 분석기, 편집기 화면)로 아래 항목 중 기하·색 연산·미리보기·분석기를 확인했다. EXIF·큰 사진 디코드는 W7a의 `upload-encoder.spec.ts`가 덮는다. 시각 비교(A)는 그대로 남는다.
+
 - TC-EDIT-009 중 "EXIF 방향 6 사진이 정방향으로" — `FakeImageDecoder`는 이미 보이는 방향 크기를 준다. 4096 상한과 편집기가 그 크기를 쓰는 것만 jsdom에서 검증. 실제 EXIF 반영은 `BrowserImageDecoder` 구현 후 — 업로드 구현 PR/E2E
 - TC-EDIT-010 중 "EXIF는 회전만 반영된 뒤 제거" — 실제 디코더·인코더 필요. 압축 1회와 편집 결과를 그대로 압축하는 것만 검증 — E2E
 - TC-EDIT-016, 020 중 실제 픽셀 크기 — 계산(`planGeometry`)과 Fake 표면까지. 실제 canvas 그리기(`createCanvasPixelSurface`, `CanvasPreviewRenderer`, `CanvasAutoAnalyzer`)는 구현 단계에서 Playwright로 확인 — 편집기 구현 PR

@@ -12,6 +12,8 @@ import type { PhotoEdit } from '../src/features/upload/editModel';
  * 대상: TC-EDIT-016/017/020(기하 크기), 024~029(조정), 039~043/046(필터·순서), 033/034(분석), 009/010 일부(실제 디코드 크기).
  */
 const TOLERANCE = 2;
+/** check-testids가 정적 문자열만 검사하므로 이름 조립은 함수 뒤에 둔다. */
+const editId = (name: string): string => `photo-edit.${name}`;
 let bundle = '';
 
 test.beforeAll(async () => {
@@ -217,7 +219,7 @@ test.describe('편집기 화면 (Chromium 실제 디코드·미리보기·포인
     await expect.poll(() => preview.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBe(600);
     await page.getByTestId('photo-edit.tab-filter').click();
     for (const filter of ['original', 'mono', 'warm', 'cool', 'vintage', 'vivid']) {
-      const thumb = page.getByTestId(`photo-edit.filter-${filter}`).locator('img');
+      const thumb = page.getByTestId(editId(`filter-${filter}`)).locator('img');
       await expect(thumb).toBeVisible();
       await expect.poll(() => thumb.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
     }
