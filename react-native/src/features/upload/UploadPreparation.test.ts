@@ -243,6 +243,26 @@ describe('UploadPreparation - 만료(단조 시계)', () => {
     [POLICY]: ['upload/posts-uploads__issued', 'upload/posts-uploads__issued-new'],
   };
 
+  it('TC-TIME-027 만료 판정은 단조 시계 기준이라 시스템 시각을 하루 앞뒤로 바꿔도 기존 정책을 그대로 쓴다', async () => {
+    const h = await setup(twoPolicies);
+    h.preparation.start(input());
+    await h.preparation.ready();
+    h.monotonic.advance(294_000); // 마진(5초) 직전
+    h.clock.set('2026-10-28T03:00:00Z'); // 시스템 시계 +1일
+    expect((await h.preparation.ready()).policy.uploadId).toBe(UPLOAD_ID_1);
+    h.clock.set('2026-10-26T03:00:00Z'); // 시스템 시계 -1일
+    expect((await h.preparation.ready()).policy.uploadId).toBe(UPLOAD_ID_1);
+    expect(countOf(h, POLICY)).toBe(1);
+  });
+
+  it('TC-TIME-027 시스템 시각이 그대로여도 단조 시계가 expiresIn - 5초(295초)에 닿으면 새 정책을 받는다', async () => {
+    const h = await setup(twoPolicies);
+    h.preparation.start(input());
+    await h.preparation.ready();
+    h.monotonic.advance(295_000);
+    expect((await h.preparation.ready()).policy.uploadId).toBe(UPLOAD_ID_2);
+  });
+
   it('TC-UPL-049 발급 후 294.999초면 기존 정책을 그대로 쓴다', async () => {
     const h = await setup(twoPolicies);
     h.preparation.start(input());

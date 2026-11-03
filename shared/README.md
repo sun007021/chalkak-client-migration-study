@@ -11,6 +11,7 @@
 | `mock-server/` | fixture를 시나리오별로 돌려주는 mock 서버 |
 | `maestro/` | 모바일 E2E flow ([maestro/README.md](maestro/README.md)) |
 | `openapi/` | 개발 서버 OpenAPI 스냅샷(나중에 받음, [openapi/README.md](openapi/README.md)) |
+| `dev-server-data.md` | 개발 서버 E2E 데이터 현황(주제·게시물 날짜, 테스트 계정 상태, 화면별로 쓸 날짜) |
 
 ## 명령
 

@@ -11,7 +11,7 @@ function setup() {
 afterEach(() => jest.useRealTimers());
 
 describe('ToastCenter', () => {
-  it('REQ-NET-030 문구를 띄우고 2.5초 뒤 지운다', () => {
+  it('REQ-NET-030 TC-TIME-030 문구를 띄우고 2.5초 뒤 지운다', () => {
     const { center } = setup();
     center.show('안녕');
     expect(center.getSnapshot().current?.message).toBe('안녕');
