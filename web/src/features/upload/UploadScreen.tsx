@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent, CSSProperties, ReactNode } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
 import { useContainer } from "../../app/AppContext";
 import { ROUTES } from "../../app/paths";
 import { POST_TITLE_MAX } from "../../constants";
 import { t } from "../../copy/ko";
+import { webOnlyCopy } from "../../copy/webOnly";
 import { useScreenView } from "../../core/analytics/useScreenView";
 import { useOwnedViewModel } from "../../core/state/useOwnedViewModel";
 import { useViewModel } from "../../core/state/useViewModel";
@@ -100,18 +101,27 @@ function UploadView({ vm }: { vm: UploadViewModel }): ReactNode {
   useEffect(() => vm.start(), [vm]);
 
   const source = state.photo?.source ?? null;
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // URL은 만든 사진과 한 상태로 둔다: 사진이 바뀐 첫 렌더에서 이미 놓아 버린 이전 URL을 그리지 않는다.
+  const [preview, setPreview] = useState<{ source: Blob; url: string } | null>(null);
   useEffect(() => {
     if (!source) {
       // 사진이 없으면 미리보기 URL도 없다(외부 자원을 선택 수명에 묶는 의도된 setState).
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPreviewUrl(null);
+      setPreview(null);
       return undefined;
     }
     const url = container.blobUrls.create(source);
-    setPreviewUrl(url);
+    setPreview({ source, url });
     return () => container.blobUrls.revoke(url);
   }, [container, source]);
+  const previewUrl = preview && preview.source === source ? preview.url : null;
+
+  // 제출이 실패하면 스크린 리더와 키보드 사용자가 문구를 놓치지 않도록 초점을 오류 문구로 옮긴다.
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  const [failureTick, setFailureTick] = useState(0);
+  useEffect(() => {
+    if (failureTick > 0) errorRef.current?.focus();
+  }, [failureTick]);
 
   const close = () => {
     const plan = planUploadClose(location);
@@ -120,8 +130,8 @@ function UploadView({ vm }: { vm: UploadViewModel }): ReactNode {
   };
   const submit = () => {
     void vm.submit().then((outcome) => {
-      if (outcome.kind === "success")
-        void navigate(ROUTES.uploadSuccess, { replace: true });
+      if (outcome.kind === "success") void navigate(ROUTES.uploadSuccess, { replace: true });
+      else if (outcome.kind === "stay") setFailureTick((n) => n + 1);
     });
   };
   const pick = (event: ChangeEvent<HTMLInputElement>) => {
@@ -176,36 +186,28 @@ function UploadView({ vm }: { vm: UploadViewModel }): ReactNode {
         />
       )}
       <div style={{ ...pickersStyle, ...(photo ? { minHeight: 0 } : {}) }}>
-        <label
-          data-testid="upload.album-button"
-          aria-label={t("upload.subheading")}
-          style={pickerStyle}
-        >
-          <span aria-hidden="true">🖼</span>
+        <PickerLabel testId="upload.album-button" icon="🖼">
           <input
             type="file"
             accept="image/*"
+            aria-label={webOnlyCopy["upload.album.a11y"]}
             disabled={state.submitting}
             style={hiddenInputStyle}
             onChange={pick}
           />
-        </label>
+        </PickerLabel>
         {container.cameraCapture.supported() && (
-          <label
-            data-testid="upload.camera-button"
-            aria-label={t("upload.subheading")}
-            style={pickerStyle}
-          >
-            <span aria-hidden="true">📷</span>
+          <PickerLabel testId="upload.camera-button" icon="📷">
             <input
               type="file"
               accept="image/*"
               capture="environment"
+              aria-label={webOnlyCopy["upload.camera.a11y"]}
               disabled={state.submitting}
               style={hiddenInputStyle}
               onChange={pick}
             />
-          </label>
+          </PickerLabel>
         )}
       </div>
 
@@ -236,6 +238,8 @@ function UploadView({ vm }: { vm: UploadViewModel }): ReactNode {
       {state.submitting && <Indicator testId="upload.submitting-indicator" />}
       {state.errorMessage && (
         <p
+          ref={errorRef}
+          tabIndex={-1}
           data-testid="upload.error-message"
           role="alert"
           style={{ margin: 0 }}
@@ -268,6 +272,34 @@ function UploadView({ vm }: { vm: UploadViewModel }): ReactNode {
   );
 }
 
+/** 숨긴 file input의 라벨. input에 초점이 오면(:focus-within에 해당) 라벨에 윤곽선을 그린다. */
+function PickerLabel({
+  testId,
+  icon,
+  children,
+}: {
+  testId: string;
+  icon: string;
+  children: ReactNode;
+}): ReactNode {
+  const [focused, setFocused] = useState(false);
+  return (
+    <label
+      data-testid={testId}
+      style={
+        focused
+          ? { ...pickerStyle, outline: "3px solid #1a73e8", outlineOffset: 2 }
+          : pickerStyle
+      }
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+    >
+      <span aria-hidden="true">{icon}</span>
+      {children}
+    </label>
+  );
+}
+
 function PhotoPreview({
   aspect,
   url,
@@ -283,7 +315,7 @@ function PhotoPreview({
   const image = (
     <img
       src={url}
-      alt=""
+      alt={editable ? "" : webOnlyCopy["upload.preview.alt"]}
       style={{
         width: "100%",
         height: "100%",
@@ -296,6 +328,7 @@ function PhotoPreview({
     <button
       type="button"
       data-testid="upload.photo-preview"
+      aria-label={webOnlyCopy["upload.preview.edit"]}
       style={{ ...style, cursor: "pointer" }}
       onClick={onPress}
     >

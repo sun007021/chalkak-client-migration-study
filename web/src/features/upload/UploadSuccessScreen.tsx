@@ -4,6 +4,7 @@ import { Navigate, useNavigate } from "react-router";
 import { useContainer } from "../../app/AppContext";
 import { ROUTES } from "../../app/paths";
 import { t } from "../../copy/ko";
+import { webOnlyCopy } from "../../copy/webOnly";
 import { useScreenView } from "../../core/analytics/useScreenView";
 import { objectParticle } from "./koreanParticle";
 import { successNextPath } from "./uploadNavigation";
@@ -67,7 +68,7 @@ function UploadSuccessView({ result }: { result: UploadResult }): ReactNode {
   };
   return (
     <div data-testid="upload-success.root" style={rootStyle}>
-      {photoUrl && <img src={photoUrl} alt="" style={cardStyle} />}
+      {photoUrl && <img src={photoUrl} alt={webOnlyCopy["upload.success.photo-alt"]} style={cardStyle} />}
       <p data-testid="upload-success.message">
         {t("upload.success.title", {
           주제: result.topicTitle,
