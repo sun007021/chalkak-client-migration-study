@@ -2,15 +2,19 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { View } from 'react-native';
 
 import { createBootHarness } from '../features/boot/__testing__/createBootHarness';
-import { FakeStoreOpener } from '../features/boot/__testing__/fakes';
+import { FakeAppExiter, FakeStoreOpener } from '../features/boot/__testing__/fakes';
 import { UpdateDialogViewModel } from '../features/boot/UpdateDialogViewModel';
 import { t } from '../shared/copy';
 import { BootHost } from './BootHost';
 
-function setup(results: Parameters<typeof createBootHarness>[0] = {}) {
+function setup(
+  results: Parameters<typeof createBootHarness>[0] = {},
+  platform: 'ios' | 'android' = 'ios',
+) {
   const h = createBootHarness(results);
   const opener = new FakeStoreOpener();
-  const dialogVm = new UpdateDialogViewModel(opener);
+  const exiter = new FakeAppExiter();
+  const dialogVm = new UpdateDialogViewModel(opener, platform, exiter);
   const ui = (
     <BootHost
       viewModel={h.viewModel}
@@ -19,7 +23,7 @@ function setup(results: Parameters<typeof createBootHarness>[0] = {}) {
       main={<View testID="test.main" />}
     />
   );
-  return { h, opener, ui };
+  return { h, opener, exiter, ui };
 }
 
 describe('BootHost', () => {
@@ -84,6 +88,24 @@ describe('BootHost', () => {
     await fireEvent.press(button);
     await fireEvent.press(button);
     expect(opener.calls).toBe(1);
+  });
+
+  it('TC-BOOT-031 REQ-BOOT-009 iOS 다이얼로그에는 취소 버튼이 그려지지 않는다', async () => {
+    const { h, ui } = setup({ results: ['update-required'] }, 'ios');
+    await render(ui);
+    await h.viewModel.start();
+    expect(await screen.findByTestId('update-gate.update-button')).toBeOnTheScreen();
+    expect(screen.queryByTestId('update-gate.cancel-button')).not.toBeOnTheScreen();
+  });
+
+  it('TC-BOOT-031 REQ-BOOT-009 Android 다이얼로그의 "취소"는 앱을 종료한다', async () => {
+    const { h, ui, exiter } = setup({ results: ['update-required'] }, 'android');
+    await render(ui);
+    await h.viewModel.start();
+    const cancel = await screen.findByTestId('update-gate.cancel-button');
+    expect(cancel).toHaveTextContent(t('boot.update.cancel'));
+    await fireEvent.press(cancel);
+    expect(exiter.exits).toBe(1);
   });
 
   it('TC-AUTH-056 세션 만료 이벤트를 받으면 홈이 사라지고 로그인만 남는다(뒤로 갈 이전 화면 없음)', async () => {

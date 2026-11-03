@@ -1,4 +1,5 @@
 import type { HomePreloader, PreloadMode } from '../HomePreloader';
+import type { AppExiter } from '../AppExiter';
 import type { PlayUpdateClient, PlayUpdateInfo } from '../PlayUpdateChecker';
 import type { StoreOpener, UpdateChecker, UpdateCheckResult } from '../UpdateChecker';
 
@@ -31,6 +32,14 @@ export class FakeStoreOpener implements StoreOpener {
     this.calls += 1;
     if (this.gate) await this.gate;
     if (this.failWith) throw this.failWith;
+  }
+}
+
+export class FakeAppExiter implements AppExiter {
+  exits = 0;
+
+  exit(): void {
+    this.exits += 1;
   }
 }
 
