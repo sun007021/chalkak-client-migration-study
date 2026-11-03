@@ -48,6 +48,11 @@ export class DisplayListingCache {
     this.listings.clear();
   }
 
+  /** 조건에 맞는 키의 목록을 모두 버린다. */
+  deleteWhere(predicate: (key: string) => boolean): void {
+    for (const key of [...this.listings.keys()]) if (predicate(key)) this.listings.delete(key);
+  }
+
   /** 첫 페이지로 새 목록을 만든다(같은 키가 있으면 대체). */
   start(key: string, init: { topicTitle: string; first: PostItem[]; hasNext: boolean; seed: string | null }): Listing {
     const listing: Listing = { topicTitle: init.topicTitle, pages: [init.first], posts: flattenPages([init.first]), hasNext: init.hasNext, seed: init.seed };

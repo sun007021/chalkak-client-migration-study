@@ -1,4 +1,16 @@
-import type { ReactNode } from 'react';
+import { useCallback, useEffect, useState } from "react";
+import type { ChangeEvent, CSSProperties, ReactNode } from "react";
+import { Navigate, useLocation, useNavigate } from "react-router";
+import { useContainer } from "../../app/AppContext";
+import { ROUTES } from "../../app/paths";
+import { POST_TITLE_MAX } from "../../constants";
+import { t } from "../../copy/ko";
+import { useScreenView } from "../../core/analytics/useScreenView";
+import { useOwnedViewModel } from "../../core/state/useOwnedViewModel";
+import { useViewModel } from "../../core/state/useViewModel";
+import { ErrorState } from "../../core/ui/StateViews";
+import { planUploadClose, readUploadRouteState } from "./uploadNavigation";
+import type { UploadViewModel } from "./UploadViewModel";
 
 /**
  * 업로드 화면(`/upload`, screen_view `photo_upload`). 회원 전용(게스트가 URL로 오면 홈으로 replace + nav.guest.upload 토스트).
@@ -7,8 +19,325 @@ import type { ReactNode } from 'react';
  * upload.camera-button(container.cameraCapture.supported()일 때만), upload.title-input, upload.title-counter, upload.submit-button,
  * upload.preparing-indicator, upload.submitting-indicator, upload.error-message, upload.error-state, upload.retry-button.
  * 앨범/카메라 버튼은 `<label data-testid=…>` 안의 `<input type="file" accept="image/*">`(카메라는 capture 속성도)이고 단일 선택이다.
- * 편집기는 container.photoEditor가 있을 때 vm.state.editor가 열려 있는 동안 그 컴포넌트를 그린다. 구현은 구현 단계에서.
+ * 편집기는 container.photoEditor가 있을 때 vm.state.editor가 열려 있는 동안 그 컴포넌트를 그린다.
  */
 export function UploadScreen(): ReactNode {
-  return null;
+  const route = readUploadRouteState(useLocation().state);
+  return route ? (
+    <UploadScreenBody topicDate={route.topicDate} />
+  ) : (
+    <Navigate to={ROUTES.home} replace />
+  );
+}
+
+function UploadScreenBody({ topicDate }: { topicDate: string }): ReactNode {
+  const container = useContainer();
+  const create = useCallback(
+    () => container.createUploadViewModel(topicDate),
+    [container, topicDate],
+  );
+  const vm = useOwnedViewModel(create);
+  return vm ? <UploadView vm={vm} /> : null;
+}
+
+const rootStyle: CSSProperties = {
+  minHeight: "100dvh",
+  boxSizing: "border-box",
+  display: "flex",
+  flexDirection: "column",
+  gap: 16,
+  padding: 16,
+};
+const headerStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+};
+const previewStyle: CSSProperties = {
+  width: "100%",
+  maxHeight: "55dvh",
+  display: "block",
+  padding: 0,
+  border: "none",
+  borderRadius: 12,
+  overflow: "hidden",
+  background: "#f2f2f2",
+};
+const pickersStyle: CSSProperties = { display: "flex", gap: 8 };
+const pickerStyle: CSSProperties = {
+  flex: 1,
+  minHeight: 64,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  border: "1px dashed currentColor",
+  borderRadius: 12,
+  cursor: "pointer",
+};
+const hiddenInputStyle: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  opacity: 0,
+  overflow: "hidden",
+  pointerEvents: "none",
+};
+const editorOverlayStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 30,
+  background: "Canvas",
+  overflow: "auto",
+};
+
+function UploadView({ vm }: { vm: UploadViewModel }): ReactNode {
+  const container = useContainer();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const Editor = container.photoEditor;
+  useScreenView("photo_upload");
+  const state = useViewModel(vm);
+  useEffect(() => vm.start(), [vm]);
+
+  const source = state.photo?.source ?? null;
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!source) {
+      // 사진이 없으면 미리보기 URL도 없다(외부 자원을 선택 수명에 묶는 의도된 setState).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPreviewUrl(null);
+      return undefined;
+    }
+    const url = container.blobUrls.create(source);
+    setPreviewUrl(url);
+    return () => container.blobUrls.revoke(url);
+  }, [container, source]);
+
+  const close = () => {
+    const plan = planUploadClose(location);
+    if (plan.kind === "back") void navigate(-1);
+    else void navigate(plan.to, { replace: true });
+  };
+  const submit = () => {
+    void vm.submit().then((outcome) => {
+      if (outcome.kind === "success")
+        void navigate(ROUTES.uploadSuccess, { replace: true });
+    });
+  };
+  const pick = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) void vm.selectPhoto(file);
+  };
+
+  const { topic, photo, editor } = state;
+  return (
+    <div data-testid="upload.root" style={rootStyle}>
+      <div style={headerStyle}>
+        <button
+          type="button"
+          data-testid="upload.close-button"
+          aria-label={t("common.close")}
+          style={{ minWidth: 44, minHeight: 44 }}
+          onClick={close}
+        >
+          ✕
+        </button>
+        <h1 style={{ margin: 0, fontSize: 18 }}>{t("upload.title")}</h1>
+      </div>
+
+      {topic.status === "ready" && (
+        <div>
+          <h2
+            data-testid="upload.topic-title"
+            style={{ margin: 0, fontSize: 20 }}
+          >
+            {t("upload.heading", { 주제: topic.title })}
+          </h2>
+          <p data-testid="upload.guide-text" style={{ margin: "4px 0 0" }}>
+            {t("upload.subheading")}
+          </p>
+        </div>
+      )}
+      {topic.status === "error" && (
+        <ErrorState
+          screenId="upload"
+          message={topic.message}
+          onRetry={() => vm.retryTopic()}
+        />
+      )}
+
+      {photo && previewUrl && (
+        <PhotoPreview
+          aspect={`${photo.width} / ${photo.height}`}
+          url={previewUrl}
+          editable={Editor !== null && !state.submitting}
+          onPress={() => vm.requestEdit()}
+        />
+      )}
+      <div style={{ ...pickersStyle, ...(photo ? { minHeight: 0 } : {}) }}>
+        <label
+          data-testid="upload.album-button"
+          aria-label={t("upload.subheading")}
+          style={pickerStyle}
+        >
+          <span aria-hidden="true">🖼</span>
+          <input
+            type="file"
+            accept="image/*"
+            disabled={state.submitting}
+            style={hiddenInputStyle}
+            onChange={pick}
+          />
+        </label>
+        {container.cameraCapture.supported() && (
+          <label
+            data-testid="upload.camera-button"
+            aria-label={t("upload.subheading")}
+            style={pickerStyle}
+          >
+            <span aria-hidden="true">📷</span>
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              disabled={state.submitting}
+              style={hiddenInputStyle}
+              onChange={pick}
+            />
+          </label>
+        )}
+      </div>
+
+      <div>
+        <textarea
+          data-testid="upload.title-input"
+          rows={2}
+          value={state.title}
+          placeholder={t("upload.caption.placeholder")}
+          disabled={state.submitting}
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            padding: 12,
+            borderRadius: 8,
+            font: "inherit",
+          }}
+          onChange={(event) => vm.setTitle(event.target.value)}
+        />
+        <div data-testid="upload.title-counter" style={{ textAlign: "right" }}>
+          {state.titleCount}/{POST_TITLE_MAX}
+        </div>
+      </div>
+
+      {state.preparation === "preparing" && !state.submitting && (
+        <Indicator testId="upload.preparing-indicator" />
+      )}
+      {state.submitting && <Indicator testId="upload.submitting-indicator" />}
+      {state.errorMessage && (
+        <p
+          data-testid="upload.error-message"
+          role="alert"
+          style={{ margin: 0 }}
+        >
+          {state.errorMessage}
+        </p>
+      )}
+
+      <button
+        type="button"
+        data-testid="upload.submit-button"
+        disabled={!state.canSubmit}
+        style={{ minHeight: 48, marginTop: "auto" }}
+        onClick={submit}
+      >
+        {state.submitting ? t("upload.submitting") : t("upload.submit")}
+      </button>
+
+      {Editor && editor && (
+        <div style={editorOverlayStyle}>
+          <Editor
+            source={editor.source}
+            initialEdit={editor.initialEdit}
+            onConfirm={(edit) => vm.confirmEdit(edit)}
+            onCancel={() => vm.cancelEdit()}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PhotoPreview({
+  aspect,
+  url,
+  editable,
+  onPress,
+}: {
+  aspect: string;
+  url: string;
+  editable: boolean;
+  onPress: () => void;
+}): ReactNode {
+  const style: CSSProperties = { ...previewStyle, aspectRatio: aspect };
+  const image = (
+    <img
+      src={url}
+      alt=""
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        display: "block",
+      }}
+    />
+  );
+  return editable ? (
+    <button
+      type="button"
+      data-testid="upload.photo-preview"
+      style={{ ...style, cursor: "pointer" }}
+      onClick={onPress}
+    >
+      {image}
+    </button>
+  ) : (
+    <div data-testid="upload.photo-preview" style={style}>
+      {image}
+    </div>
+  );
+}
+
+function Indicator({ testId }: { testId: string }): ReactNode {
+  return (
+    <div
+      data-testid={testId}
+      role="status"
+      aria-busy="true"
+      style={{ display: "flex", justifyContent: "center" }}
+    >
+      <svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true">
+        <circle
+          cx="16"
+          cy="16"
+          r="12"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeDasharray="56 20"
+          opacity="0.6"
+        >
+          <animateTransform
+            attributeName="transform"
+            type="rotate"
+            from="0 16 16"
+            to="360 16 16"
+            dur="0.9s"
+            repeatCount="indefinite"
+          />
+        </circle>
+      </svg>
+    </div>
+  );
 }

@@ -16,6 +16,7 @@ import { DisplayScreen } from '../features/display/DisplayScreen';
 import { FeedScreen } from '../features/feed/FeedScreen';
 import { HomeScreen } from '../features/home/HomeScreen';
 import { TermsScreen } from '../features/onboarding/TermsScreen';
+import { RouterUploadNavigator } from '../features/upload/uploadNavigation';
 import { UploadEntryLoading } from '../features/upload/UploadEntryLoading';
 import { UploadScreen } from '../features/upload/UploadScreen';
 import { UploadSuccessScreen } from '../features/upload/UploadSuccessScreen';
@@ -72,6 +73,8 @@ function RootLayout({ container }: { container: AppContainer }): ReactNode {
   );
   // 다른 탭의 로그아웃·계정 전환(REQ-NAV-022)과 문서 가시성에 따른 토스트(D-20). 정리 함수로 구독이 하나만 남는다(StrictMode 포함).
   useEffect(() => container.crossTabSync.start(), [container]);
+  // 업로드 게이트가 화면을 여는 통로. 라우터가 마운트되어 있는 동안만 붙인다.
+  useEffect(() => container.uploadNavigator.attach(new RouterUploadNavigator(navigate)), [container, navigate]);
   useEffect(() => bindToastVisibility(container.toast, document), [container]);
   return (
     <ContainerProvider container={container}>

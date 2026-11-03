@@ -105,6 +105,8 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
   /** 마지막으로 성공적으로 보여 준 (날짜, 정렬). 날짜 이동이 실패하면 여기로 되돌린다. */
   private good: { date: DateString; sort: DisplaySort; featuredPage: number } | null = null;
   private refreshing = false;
+  /** 새 게시물이 생겨 뒤쪽 페이지가 어긋난 목록 키: 다음 재검증은 첫 페이지만 남긴다. */
+  private readonly firstPageOnly = new Set<string>();
   private paging = false;
   private pageFailures = 0;
   private started = false;
@@ -304,6 +306,7 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
     this.pageGuard.invalidate();
     this.active = null;
     this.cache.clear();
+    this.firstPageOnly.clear();
     this.reads.clear();
     this.view = { kind: 'loading' };
     this.shown = null;
@@ -477,7 +480,7 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
     }
     if (!account.isCurrent()) return;
     if (page) {
-      const keepsTail = requestSort !== 'random' || page.randomSeed === this.cache.get(key)?.seed;
+      const keepsTail = !this.firstPageOnly.delete(key) && (requestSort !== 'random' || page.randomSeed === this.cache.get(key)?.seed);
       this.cache.replaceFirst(key, { first: this.settle(page.posts, stamp), keepsTail, hasNext: this.hasNextOf(page, requestSort), seed: page.randomSeed });
     }
     if (!nav.isCurrent()) {
@@ -542,8 +545,30 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
   // ---------------------------------------------------------------- 변경 이벤트
 
   private applyChange(change: PostChange): void {
+    if (change.type === 'created') {
+      this.applyCreated(change.topicDate);
+      return;
+    }
     this.cache.applyChange(change);
     this.publish();
+  }
+
+  /**
+   * 업로드 직후(REQ-UPL-062): 그 날짜의 낡은 목록 캐시를 버린다(다른 날짜는 그대로). 지금 그 날짜를 보고 있으면 화면을 비우지 않고(loading 없음)
+   * 첫 페이지만 조용히 다시 받는다(화면이 숨겨져 있어도 캐시를 맞춰 둔다).
+   */
+  private applyCreated(topicDate: DateString): void {
+    const shownKey = this.shown?.date === topicDate && this.view.kind === 'ready' ? this.shown.key : null;
+    this.cache.deleteWhere((key) => key.startsWith(`${topicDate}|`) && key !== shownKey);
+    if (shownKey === null) {
+      this.publish();
+      return;
+    }
+    this.firstPageOnly.add(shownKey);
+    // 진행 중인 재검증은 새 게시물을 모르는 응답이라 밀어내고 같은 키의 읽기를 새로 보낸다.
+    this.active = null;
+    for (const id of [...this.reads.keys()]) if (id.startsWith(`revalidate|${shownKey}|`)) this.reads.delete(id);
+    void this.startRevalidate(shownKey, topicDate);
   }
 
   // ---------------------------------------------------------------- 상태 게시
