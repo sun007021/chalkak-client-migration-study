@@ -13,8 +13,10 @@ export const ROUTES = {
   /** 설정에서 들어오는 사인 변경 화면(탭 셸 밖, 하단 바 없음). */
   changeSignature: '/settings/signature',
   changeSignaturePreview: '/settings/signature/preview',
-  /** 알림함(홈 벨). 화면은 알림 PR. 지금은 자리표시. */
+  /** 알림함(홈 벨). 회원만, 탭 셸 밖. */
   notifications: '/notifications',
+  /** 알림 상세 라우트 패턴. 실제 경로는 notificationDetailPath. */
+  notificationDetail: '/notifications/:notificationId',
   /** 업로드 화면(게이트 통과 뒤 push, state { topicDate }). 탭 셸 밖, 하단 바 없음. */
   upload: '/upload',
   /** 업로드 성공 화면(업로드 화면을 replace). */
@@ -54,3 +56,8 @@ export function isSettingsBelow(location: { key: string; state: unknown }): bool
  * 탭 전환 정책(planTabNavigation)이 뒤로 가기(POP)로 홈에 돌아온다.
  */
 export const HOME_BELOW_STATE = { homeBelow: true } as const;
+
+/** 알림 상세: `/notifications/{notificationId}`(소문자 UUID 그대로, 인코딩). */
+export function notificationDetailPath(_notificationId: string): string {
+  throw new Error('not implemented');
+}
