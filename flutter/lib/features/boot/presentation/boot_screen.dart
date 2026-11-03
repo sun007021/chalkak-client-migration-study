@@ -14,11 +14,17 @@ class BootScreen extends StatefulWidget {
     required this.viewModel,
     required this.onReady,
     required this.onUpdatePressed,
+    required this.onCancelPressed,
+    required this.showCancel,
   });
 
   final BootViewModel viewModel;
   final void Function(BootReady ready) onReady;
   final VoidCallback onUpdatePressed;
+  final VoidCallback onCancelPressed;
+
+  /// "취소" 버튼 노출 정책(Android true, iOS false). 주입한 값으로만 정한다.
+  final bool showCancel;
 
   @override
   State<BootScreen> createState() => _BootScreenState();
@@ -72,7 +78,10 @@ class _BootScreenState extends State<BootScreen> {
                 ),
                 if (forced) ...[
                   const ModalBarrier(dismissible: false, color: Colors.black54),
-                  _UpdateDialog(onPressed: widget.onUpdatePressed),
+                  _UpdateDialog(
+                    onUpdate: widget.onUpdatePressed,
+                    onCancel: widget.showCancel ? widget.onCancelPressed : null,
+                  ),
                 ],
               ],
             ),
@@ -83,10 +92,14 @@ class _BootScreenState extends State<BootScreen> {
   }
 }
 
-class _UpdateDialog extends StatelessWidget {
-  const _UpdateDialog({required this.onPressed});
+// TODO: 임시. `boot.update.cancel`이 shared에 들어오면 gen_copy 상수로 대체한다.
+const _tempCancelCopy = '취소';
 
-  final VoidCallback onPressed;
+class _UpdateDialog extends StatelessWidget {
+  const _UpdateDialog({required this.onUpdate, required this.onCancel});
+
+  final VoidCallback onUpdate;
+  final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -103,10 +116,19 @@ class _UpdateDialog extends StatelessWidget {
             child: Text(Copy.bootUpdateBody),
           ),
           actions: [
+            if (onCancel != null)
+              TestId.button(
+                TestIds.updateGateCancelButton,
+                child: TextButton(
+                  onPressed: onCancel,
+                  // TODO: shared ko.json `boot.update.cancel` 추가 후 Copy.bootUpdateCancel로 교체.
+                  child: const Text(_tempCancelCopy),
+                ),
+              ),
             TestId.button(
               TestIds.updateGateUpdateButton,
               child: FilledButton(
-                onPressed: onPressed,
+                onPressed: onUpdate,
                 child: const Text(Copy.bootUpdateButton),
               ),
             ),
