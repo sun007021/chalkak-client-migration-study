@@ -353,3 +353,27 @@ describe('피드백 화면 닫기·이탈·계정 전환', () => {
     expect(screen.getAllByRole('button').map((b) => b.getAttribute('data-testid'))).toEqual(['feedback.close-button', 'feedback.submit-button']);
   });
 });
+
+describe('피드백 접근성 (R5)', () => {
+  it('입력창은 카운터를 aria-describedby로 가리키고 1000자를 넘으면 aria-invalid이다', async () => {
+    await openFeedback();
+    expect(input()).toHaveAttribute('aria-describedby', counter().id);
+    expect(counter().id).not.toBe('');
+    expect(input()).not.toHaveAttribute('aria-invalid', 'true');
+    type('가'.repeat(1001));
+    expect(input()).toHaveAttribute('aria-invalid', 'true');
+    type('가'.repeat(1000));
+    expect(input()).not.toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('전송 중 보내기 버튼은 aria-busy이다(테스트가 disabled를 요구하므로 disabled와 함께)', async () => {
+    const gate = deferred<Response>();
+    const { h } = await openFeedback();
+    routeFeedback(h.ff, () => gate.promise);
+    type('내용');
+    fireEvent.click(submit());
+    await waitFor(() => expect(submit()).toHaveAttribute('aria-busy', 'true'));
+    gate.resolve(resp('feedback/feedbacks__created.json'));
+    await waitFor(() => expect(screen.queryByTestId('feedback.root')).not.toBeInTheDocument());
+  });
+});

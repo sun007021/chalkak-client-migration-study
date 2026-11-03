@@ -32,6 +32,7 @@ function FeedbackView({ vm }: { vm: FeedbackViewModel }): ReactNode {
   const navigate = useNavigate();
   const below = isSettingsBelow(useLocation());
   const inputId = useId();
+  const counterId = useId();
   const leave = () => void (below ? navigate(-1) : navigate(ROUTES.settings, { replace: true }));
   const submit = () =>
     void vm.submit().then(
@@ -64,11 +65,13 @@ function FeedbackView({ vm }: { vm: FeedbackViewModel }): ReactNode {
         value={state.text}
         placeholder={t('fdbk.field.placeholder')}
         readOnly={state.submitting}
+        aria-describedby={counterId}
+        aria-invalid={state.count > FEEDBACK_MAX || undefined}
         rows={8}
         style={{ width: '100%', boxSizing: 'border-box', font: 'inherit' }}
         onChange={(event) => vm.setText(event.target.value)}
       />
-      <div data-testid="feedback.counter" style={{ alignSelf: 'flex-end' }}>
+      <div id={counterId} data-testid="feedback.counter" style={{ alignSelf: 'flex-end' }}>
         {state.count}/{FEEDBACK_MAX}
       </div>
       {state.error === 'invalid' ? (
@@ -81,7 +84,7 @@ function FeedbackView({ vm }: { vm: FeedbackViewModel }): ReactNode {
           {state.error === 'network' ? t('common.error.network') : t('fdbk.error.generic')}
         </p>
       ) : null}
-      <button type="button" data-testid="feedback.submit-button" disabled={!state.canSubmit} style={{ minHeight: 48 }} onClick={submit}>
+      <button type="button" data-testid="feedback.submit-button" disabled={!state.canSubmit} aria-busy={state.submitting || undefined} style={{ minHeight: 48 }} onClick={submit}>
         {state.submitting ? t('fdbk.sending') : t('fdbk.send')}
       </button>
     </div>
