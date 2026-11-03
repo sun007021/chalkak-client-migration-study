@@ -20,7 +20,7 @@ function setup() {
 }
 
 describe('LoginViewModelOwner', () => {
-  it('phase가 login에 들어갈 때 ViewModel을 만들고 screen_view login을 정확히 1번 보낸다', async () => {
+  it('TC-ANL-003 phase가 login에 들어갈 때 ViewModel을 만들고 screen_view login을 정확히 1번 보낸다', async () => {
     const { boot, owner, created } = setup();
     expect(owner.getSnapshot().viewModel).toBeNull();
     await boot.viewModel.start();

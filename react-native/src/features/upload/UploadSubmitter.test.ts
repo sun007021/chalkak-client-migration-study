@@ -125,7 +125,7 @@ describe('UploadSubmitter - 정책 만료', () => {
     expect(bodyOf(h).photoUploadId).toBe(UPLOAD_ID_1);
   });
 
-  it('TC-UPL-050 발급 후 295초면 새 정책을 받아 그 URL로 PUT하고 POST /posts에도 새 uploadId를 쓴다', async () => {
+  it('TC-UPL-050 TC-TIME-030 발급 후 295초면 새 정책을 받아 그 URL로 PUT하고 POST /posts에도 새 uploadId를 쓴다', async () => {
     const h = await setup({ [POLICY]: ISSUED_TWICE });
     await h.preparation.ready();
     h.monotonic.advance(295_000);

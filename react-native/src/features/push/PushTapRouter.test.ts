@@ -23,10 +23,13 @@ type Options = {
   coldStore?: boolean;
   /** true면 처리기가 끝나지 않는다(처리 중 stop·교체 검증). */
   hang?: boolean;
+  /** true면 시작 때 강제 업데이트 게이트가 걸려 있다. */
+  updateRequired?: boolean;
 };
 
 async function setup(options: Options = {}) {
-  const boot = createBootHarness();
+  const boot = createBootHarness(options.updateRequired ? { results: ['update-required'] } : {});
+  if (options.updateRequired) await boot.viewModel.start();
   const net = createNetHarness();
   if (options.signedIn !== false) await net.signIn();
   const responses = new FakeNotificationResponseSource(options.initial ?? null);
@@ -197,6 +200,25 @@ describe('PushTapRouter 처리', () => {
     await settle();
     expect(inputs(h)).toEqual(['POST_APPROVED']);
     expect(h.store.saved).toBeNull();
+  });
+
+  it('TC-BOOT-035 강제 업데이트 다이얼로그 위의 탭은 이동 없이 보류하고, 게이트가 풀리지 않는 한 처리하지 않는다', async () => {
+    const h = await setup({ updateRequired: true });
+    expect(h.boot.getSnapshot().phase).toBe('update-required');
+    h.responses.tap(APPROVED);
+    h.boot.toMain('member'); // 게이트가 풀리지 않으므로 무시된다
+    await settle();
+    expect(h.boot.getSnapshot().phase).toBe('update-required');
+    expect(h.processed).toHaveLength(0);
+    expect(h.store.saved).not.toBeNull(); // 폐기하지 않고 보류
+  });
+
+  it('TC-BOOT-035 게이트가 통과된 뒤(재실행)의 메인 진입에서만 보류분을 처리한다', async () => {
+    const h = await setup({ pending: APPROVED }); // 이전 프로세스가 남긴 보류분
+    expect(h.processed).toHaveLength(0); // 스플래시
+    h.boot.toMain('member');
+    await settle();
+    expect(inputs(h)).toEqual(['POST_APPROVED']);
   });
 
   it('TC-PUSH-061 업로드·피드백 작성 중(blocker)에는 보류했다가 화면을 벗어난 뒤 처리한다', async () => {

@@ -12,6 +12,8 @@ import type { MainMode } from '../../auth/AuthFlowNavigator';
 import { BannerFeedViewModel } from '../../banner/BannerFeedViewModel';
 import { FakeLikeController } from '../../like/__testing__/FakeLikeController';
 import { FakePostChanges } from '../../post/__testing__/FakePostChanges';
+import { VirtualTimeSleeper } from '../../ai-review/__testing__/VirtualTimeSleeper';
+import { MidnightScheduler } from '../../../core/time/MidnightScheduler';
 import { HomeViewModel } from '../HomeViewModel';
 import { FakeHomeNavigator } from './FakeHomeNavigator';
 
@@ -61,9 +63,12 @@ export async function createHomeHarness(options: HomeHarnessOptions = {}) {
   const navigator = new FakeHomeNavigator();
   const toast = new FakeToastPresenter();
   const authFlow = new FakeAuthFlowNavigator();
+  // 자정 대기는 가상 시계와 한 몸인 Sleeper로 건다: midnightSleeper.advance(ms)로만 흐른다.
+  const midnightSleeper = new VirtualTimeSleeper(net.clock);
   const viewModel = new HomeViewModel({
     mode,
     clock: net.clock,
+    midnight: new MidnightScheduler({ clock: net.clock, sleeper: midnightSleeper }),
     topics: new TopicRepository({ api: net.api }),
     posts: new PostRepository({ api: net.api }),
     notifications: new NotificationRepository({ api: net.api }),
@@ -79,6 +84,7 @@ export async function createHomeHarness(options: HomeHarnessOptions = {}) {
   return {
     ...net,
     router,
+    midnightSleeper,
     bannerFeed,
     likes,
     changes,
@@ -92,6 +98,18 @@ export async function createHomeHarness(options: HomeHarnessOptions = {}) {
 }
 
 export type HomeHarness = Awaited<ReturnType<typeof createHomeHarness>>;
+
+/** 새 날짜(10/28) 라우트. 자정 직후 재로드 테스트용. */
+export function routeNextDay(h: HomeHarness) {
+  h.router
+    .set('GET /topics?date=2026-10-28', 'home/topics__open-2026-10-28')
+    .set('GET /topics?date=2026-10-27', 'home/topics__open-2026-10-27')
+    .set(
+      'GET /posts?topicDate=2026-10-28&sort=popular&page=1&pageSize=20',
+      'home/posts-list__popular-5',
+    )
+    .set('GET /posts/calendar?year=2026&month=10', 'home/posts-calendar__2026-10-week-approved');
+}
 
 /** 마이크로태스크를 충분히 비운다(요청 시작·응답 반영 확인용). */
 export async function flush(times = 60): Promise<void> {

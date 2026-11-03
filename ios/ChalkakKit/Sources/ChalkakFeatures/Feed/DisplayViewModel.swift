@@ -69,8 +69,12 @@ public final class DisplayViewModel {
     /// 아카이브 추천 카드 페이저의 현재 페이지.
     public private(set) var featuredPage = 0
     public private(set) var toast: Notice?
-    /// 전시 탭 재선택 때마다 올라가는 토큰(View가 맨 위로 스크롤).
+    /// 맨 위로 스크롤해야 할 때마다 올라가는 토큰(View가 맨 위로 스크롤). 탭 재선택, 날짜 변경 성공, 정렬 변경에서 올린다.
+    /// 같은 날짜·정렬의 재검증(복귀·재진입·새로고침)은 올리지 않는다(보던 위치 유지, REQ-DISP-030).
     public private(set) var scrollToTopToken = 0
+    /// 마지막으로 View가 알려 준 세로 스크롤 위치. 탭을 오가 View가 다시 만들어져도 이 값으로 복원한다.
+    /// 스크롤 프레임마다 바뀌므로 관찰 대상에서 뺀다(View 생성 시 읽어도 상위 화면이 매 프레임 다시 그려지지 않게).
+    @ObservationIgnored public private(set) var savedScrollOffset: Double = 0
     /// 토큰 갱신 후에도 401(재인증 필요)이라 로그인 화면으로 보내야 한다.
     public private(set) var needsLogin = false
 
@@ -194,9 +198,19 @@ public final class DisplayViewModel {
         isPaging = false
     }
 
+    /// View가 스크롤할 때마다 위치를 알린다(음수는 0으로).
+    public func saveScrollOffset(_ offset: Double) {
+        savedScrollOffset = max(0, offset)
+    }
+
+    private func requestScrollToTop() {
+        scrollToTopToken += 1
+        savedScrollOffset = 0
+    }
+
     /// 전시 탭을 다시 누름: `scrollToTopToken` 증가 + 기존 전시를 유지한 채 첫 페이지 재검증(성공 교체, 실패 유지 + 토스트).
     public func tabReselected() async {
-        scrollToTopToken += 1
+        requestScrollToTop()
         switch state {
         case .loaded: await revalidate()
         case .empty, .failed: await loadInitial()
@@ -260,6 +274,7 @@ public final class DisplayViewModel {
     public func selectSort(_ sort: PostSort) async {
         guard mode == .latest, sort != self.sort, state == .loaded || state == .empty else { return }
         preferredSort = sort
+        requestScrollToTop()
         await revalidate()
     }
 
@@ -346,7 +361,10 @@ public final class DisplayViewModel {
             let entry = merged(page, key: key, since: revision)
             cache[key] = entry
             guard isCurrentTarget(date, navigation: navigation) else { return }   // 오래된 응답은 캐시에만 남긴다
-            if date != selectedDate { featuredPage = 0 }
+            if date != selectedDate {
+                featuredPage = 0
+                requestScrollToTop()
+            }
             selectedDate = date
             pendingDate = nil
             self.sort = sort
@@ -555,6 +573,7 @@ public final class DisplayViewModel {
         isRefreshing = false
         isPaging = false
         featuredPage = 0
+        savedScrollOffset = 0
         needsLogin = false
         toast = nil
         // 다른 계정에 이어 쓰지 않도록 탭에서 고른 정렬 선호는 버리고, 열 때 지정받은 정렬(홈 더보기의 인기순 등)로 돌아간다.

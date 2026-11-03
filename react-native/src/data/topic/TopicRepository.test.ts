@@ -131,3 +131,48 @@ describe('TopicRepository.findByDate', () => {
     await expect(pending).rejects.toBeInstanceOf(CancelledError);
   });
 });
+
+describe('TopicRepository.findByDate phase는 서버 값을 신뢰한다 (TC-TIME-019, T8~T10)', () => {
+  const OPEN_AT = new Date('2026-10-26T15:00:00Z'); // topics__open의 startsAt
+  const END_AT = new Date('2026-10-27T15:00:00Z'); // topics__open의 endsAt
+
+  it.each([
+    ['startsAt 정각', 'time/topics__open', TODAY, OPEN_AT.getTime(), 'OPEN'],
+    ['endsAt - 1ms', 'time/topics__open', TODAY, END_AT.getTime() - 1, 'OPEN'],
+    ['endsAt 정각', 'time/topics__closed', KstDate.of(2026, 10, 26), END_AT.getTime(), 'CLOSED'],
+  ])(
+    'TC-TIME-019 now가 %s이고 서버가 %s이면 phase는 서버 값 그대로다',
+    async (_label, fixture, date, now, phase) => {
+      const h = setup();
+      h.clock.set(new Date(now).toISOString());
+      h.transport.script(fixtureResponse(fixture));
+      await expect(h.repository.findByDate(date)).resolves.toMatchObject({ phase });
+    },
+  );
+
+  it('TC-TIME-019 기기 시각이 열림 시각을 지났어도 서버가 BEFORE_OPEN이면 클라이언트가 OPEN으로 바꾸지 않는다', async () => {
+    const h = setup();
+    h.clock.set('2026-10-27T12:00:00Z'); // before-open fixture의 startsAt(11:00Z) 이후
+    h.transport.script(fixtureResponse('time/topics__before-open'));
+    await expect(h.repository.findByDate(TODAY)).resolves.toMatchObject({ phase: 'BEFORE_OPEN' });
+  });
+});
+
+describe('TopicRepository.findByDate 날짜 쿼리 (TC-TIME-006, T1)', () => {
+  it('TC-TIME-006 date 쿼리는 호출자가 넘긴 KST 날짜 yyyy-MM-dd이고 time fixture를 해석한다', async () => {
+    const h = setup();
+    h.transport.script(fixtureResponse('time/topics__open'));
+    await h.repository.findByDate(TODAY);
+    expect(queryOf(h.transport.requests[0])).toEqual({ date: '2026-10-27' });
+  });
+
+  it('TC-TIME-008 미래 날짜 400 "미래의 주제는 조회할 수 없습니다."는 HttpError로 전달된다(크래시 없음, 재시도 없음)', async () => {
+    const h = setup();
+    h.transport.script(fixtureResponse('time/topics__future-400'));
+    await expect(h.repository.findByDate(KstDate.of(2026, 10, 28))).rejects.toMatchObject({
+      status: 400,
+      serverMessage: '미래의 주제는 조회할 수 없습니다.',
+    });
+    expect(h.transport.requests).toHaveLength(1);
+  });
+});

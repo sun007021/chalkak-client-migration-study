@@ -139,6 +139,7 @@ import { ConsoleNetworkLogger } from '../core/http/ConsoleNetworkLogger';
 import { FetchTransport } from '../core/http/FetchTransport';
 import { HttpRefreshEndpoint } from '../core/http/HttpRefreshEndpoint';
 import { SystemSleeper } from '../core/http/SystemSleeper';
+import { MidnightScheduler } from '../core/time/MidnightScheduler';
 import { TokenRefresher } from '../core/http/TokenRefresher';
 import { ExpoSecureKeyValueStorage } from '../core/session/ExpoSecureKeyValueStorage';
 import { SecureSessionStore } from '../core/session/SecureSessionStore';
@@ -697,6 +698,7 @@ export class AppContainer {
     return new HomeViewModel({
       mode,
       clock,
+      midnight: new MidnightScheduler({ clock, sleeper: this.sleeper }),
       topics: this.topicRepository,
       posts: this.postRepository,
       notifications: new NotificationRepository({ api }),

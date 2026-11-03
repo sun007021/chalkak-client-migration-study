@@ -85,7 +85,7 @@ describe('BootViewModel 스플래시 시간', () => {
     expect(h.viewModel.getSnapshot().phase).toBe('main');
   });
 
-  it('TC-BOOT-011 프리로드가 끝나지 않으면 699ms까지 유지하고 700ms에 해제한다', async () => {
+  it('TC-BOOT-011 TC-TIME-030 프리로드가 끝나지 않으면 699ms까지 유지하고 700ms에 해제한다', async () => {
     const { h, started } = await startWithPendingPreload();
     advanceTime(h.clock, 699);
     await flush();
