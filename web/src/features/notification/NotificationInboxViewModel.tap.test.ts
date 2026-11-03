@@ -73,7 +73,7 @@ describe('행 탭: 목적지와 읽음 (REQ-NOTI-015, 016, D-11)', () => {
     await finish(h, vm.onItemPress(noti(6)));
     expect(h.router.calls(readKey(6))).toHaveLength(1);
     expect(itemsOf(vm.state)[5]!.readAt).toBe(first.readAt);
-    expect(h.navigator.calls).toEqual([{ type: 'post', postId: SOURCE_POST, openAiReview: false }]);
+    expect(h.navigator.calls).toEqual([{ type: 'post', postId: '22222222-2222-4222-8222-222222222208', openAiReview: false }]);
     expect(h.toasts.messages).toEqual([]);
   });
 
@@ -163,6 +163,7 @@ describe('행 탭: 읽음 실패 분기 (REQ-NOTI-017~019, D-11, D-24)', () => {
     ['400', () => json(400, { errorCode: 'BUSINESS_ERROR', message: '잘못된 요청입니다.' })],
   ])('TC-NOTI-034 %s도 404와 같게 처리한다: 이동 없음, noti.gone, 목록·미읽음 새로고침', async (_status, route) => {
     const { h, vm } = await open({ routes: { [readKey(1)]: route } });
+    h.router.set(PAGE1, 'notification/notifications__page1'); // 호출 수를 0부터 센다
     await finish(h, vm.onItemPress(noti(1)));
     expect(h.toasts.messages).toEqual([T.gone]);
     expect(h.navigator.calls).toEqual([]);
@@ -181,6 +182,7 @@ describe('행 탭: 읽음 실패 분기 (REQ-NOTI-017~019, D-11, D-24)', () => {
 
   it('TC-NOTI-035 REAUTHENTICATION_REQUIRED면 세션 만료를 알리고 토스트·이동·목록 새로고침 없이 끝난다', async () => {
     const { h, vm } = await open({ routes: { [readKey(1)]: 'notification/notification-read__unauthorized', 'POST /auth/refresh': 'auth/refresh__reauthentication-required' } });
+    h.router.set(PAGE1, 'notification/notifications__page1'); // 호출 수를 0부터 센다
     await finish(h, vm.onItemPress(noti(1)));
     expect(h.expired.count).toBe(1);
     expect(h.toasts.messages).toEqual([]);

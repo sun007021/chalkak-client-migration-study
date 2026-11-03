@@ -245,10 +245,13 @@ describe('당겨서 새로고침 (REQ-NOTI-010)', () => {
     const h = createNotificationHarness();
     const vm = await openAll(h);
     expect(numbers(vm.state)).toEqual(upTo(25));
+    const gate = deferred<void>();
+    h.router.set(PAGE1, gated(gate, 'notification/notifications__page1'));
     const refresh = vm.refresh();
     await settle();
     expect(vm.state.refreshing).toBe(true);
     expect(numbers(vm.state)).toEqual(upTo(25)); // 끝날 때까지 기존 목록 유지
+    gate.resolve();
     await finish(h, refresh);
     expect(vm.state.refreshing).toBe(false);
     expect(numbers(vm.state)).toEqual(upTo(20));
@@ -359,6 +362,7 @@ describe('조용한 재검증 (REQ-NOTI-012)', () => {
     expect(unreadCount(vm)).toBe(5);
     vm.onHidden();
     h.router.set(PAGE1, readFirst(5));
+    h.router.set(PAGE2, 'notification/notifications__page2-last'); // 호출 수를 0부터 센다
     const seen: string[] = [];
     vm.subscribe(() => seen.push(`${vm.state.body.status}/${vm.state.refreshing}`));
     await finish(h, vm.onShown());
@@ -434,7 +438,7 @@ describe('계정 전환 (TC-NOTI-040, 053)', () => {
     expect(vm.state).toMatchObject({ body: { status: 'loading' }, refreshing: false, paging: false, pageFailures: 0 });
     await finish(h, vm.onShown());
     expect(numbers(vm.state)).toEqual(upTo(20)); // 새 계정 기준으로 처음부터
-    expect(h.router.calls(PAGE2)).toHaveLength(0);
+    expect(h.router.calls(PAGE2)).toHaveLength(1); // 이전 계정에서 읽은 2페이지 한 번뿐(다시 읽지 않았다)
   });
 
   it('TC-NOTI-053 이전 계정의 늦은 첫 페이지 응답은 반영되지 않는다', async () => {
