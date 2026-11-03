@@ -131,9 +131,12 @@ export class NotificationInboxViewModel extends ViewModel<InboxState> {
       const current = this.state.body;
       if (current.status === 'ready' && this.pagesLoaded > 1) {
         const freshIds = new Set(fresh.map((item) => item.id));
-        const rest = current.items.slice(this.firstPageCount).filter((item) => !freshIds.has(item.id));
-        const items = [...fresh, ...rest];
-        this.firstPageCount = fresh.length;
+        // 새 알림이 와서 첫 페이지가 밀리면 예전 첫 페이지의 끝 항목은 응답에서 빠지지만 2페이지로 내려갔을 뿐이다.
+        // 응답의 마지막 항목보다 오래된 예전 첫 페이지 항목은 남기고, 응답 범위 안에서 빠진 항목은 서버가 지운 것으로 보고 버린다.
+        const lastFresh = fresh[fresh.length - 1];
+        const pushedDown = current.items.slice(0, this.firstPageCount).filter((item) => !freshIds.has(item.id) && lastFresh !== undefined && item.createdAt < lastFresh.createdAt);
+        const items = dedupe([...fresh, ...pushedDown, ...current.items.slice(this.firstPageCount)]);
+        this.firstPageCount = fresh.length + pushedDown.length;
         this.setState({ body: items.length === 0 ? { status: 'empty' } : { status: 'ready', items, hasNext: current.hasNext } });
       } else {
         this.applyFirstPage(fresh, page.hasNext);

@@ -418,6 +418,33 @@ describe('조용한 재검증 (REQ-NOTI-012)', () => {
     expect(vm.state.body).toEqual({ status: 'error', network: false });
   });
 
+  it('새 알림이 와서 첫 페이지가 밀려도 밀려난 항목(20번)은 목록에 남고 순서가 유지된다(2페이지 이상 읽은 상태)', async () => {
+    const h = createNotificationHarness();
+    const vm = await openAll(h);
+    vm.onHidden();
+    h.router.set(PAGE1, () => {
+      const body = page1Body();
+      const fresh = { ...structuredClone(body.notifications[0]!), id: noti(40), createdAt: '2026-10-28T01:30:00Z' };
+      return json(200, { ...body, notifications: [fresh, ...body.notifications.slice(0, 19)] });
+    });
+    await finish(h, vm.onShown());
+    expect(numbers(vm.state)).toEqual([40, ...upTo(25)]);
+  });
+
+  it('첫 페이지 범위 안에서 응답에 없는 항목은 새 알림이 있어도 지워진 것으로 보고 20번만 남는다', async () => {
+    const h = createNotificationHarness();
+    const vm = await openAll(h);
+    vm.onHidden();
+    h.router.set(PAGE1, () => {
+      const body = page1Body();
+      const fresh = { ...structuredClone(body.notifications[0]!), id: noti(40), createdAt: '2026-10-28T01:30:00Z' };
+      const kept = body.notifications.slice(0, 19).filter((_, i) => i !== 2); // 3번이 서버에서 지워짐
+      return json(200, { ...body, notifications: [fresh, ...kept] });
+    });
+    await finish(h, vm.onShown());
+    expect(numbers(vm.state)).toEqual([40, ...upTo(25).filter((n) => n !== 3)]);
+  });
+
   it('재검증 응답에 없는 첫 페이지 항목은 사라진다(서버가 지운 알림)', async () => {
     const h = createNotificationHarness();
     const vm = await h.openInbox();

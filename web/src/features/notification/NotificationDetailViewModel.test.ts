@@ -1,3 +1,4 @@
+import { NotificationDetailViewModel } from './NotificationDetailViewModel';
 import { deferred } from '../../test/deferred';
 import { gated } from '../../test/displayAsserts';
 import { createNotificationHarness, detailKey, finish, noti, settle } from '../../test/notificationHarness';
@@ -47,6 +48,14 @@ describe('알림 상세 불러오기 (REQ-NOTI-023, 027)', () => {
     expect(h.sync.unreadRefreshes).toBe(1);
     expect(h.toasts.messages).toEqual([]);
     expect(h.ff.calls).toHaveLength(1); // 재시도 없음
+  });
+
+  it('404에서 sync가 던져도 gone을 유지하고 오류 상태로 바꾸지 않는다', async () => {
+    const h = createNotificationHarness({ routes: { [detailKey(GONE_ID)]: 'notification/notification-detail__not-found' } });
+    const boom = () => Promise.reject(new Error('sync failed'));
+    const vm = new NotificationDetailViewModel({ notificationId: GONE_ID, repository: h.repository, sync: { refreshInbox: boom, refreshUnread: boom } });
+    await finish(h, vm.load());
+    expect(vm.state.body).toEqual({ status: 'gone' });
   });
 
   it('TC-NOTI-046 500이면 오류 상태(network:false)이고 다시 시도하면 loading을 거쳐 같은 상세를 다시 요청한다', async () => {

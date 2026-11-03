@@ -44,7 +44,8 @@ export class NotificationDetailViewModel extends ViewModel<DetailState> {
       if (!pass.isCurrent()) return;
       if (detail === null) {
         this.setState({ body: { status: 'gone' } });
-        await Promise.all([this.deps.sync.refreshInbox(), this.deps.sync.refreshUnread()]);
+        // 다른 화면 갱신이 던져도 gone을 오류로 바꾸지 않는다.
+        await Promise.allSettled([(async () => this.deps.sync.refreshInbox())(), (async () => this.deps.sync.refreshUnread())()]);
         return;
       }
       this.setState({ body: { status: 'ready', detail } });
