@@ -11,7 +11,7 @@ import { screenViews } from '../../test/screenViews';
 import { FakeVisibilityObserver } from '../../test/FakeVisibilityObserver';
 import type { VisibilityObserverFactory } from '../../core/ui/VisibilityObserver';
 import { render } from '@testing-library/react';
-import { VisibilitySentinel } from './HomeScreen';
+import { VisibilitySentinel } from '../../core/ui/VisibilitySentinel';
 import {
   BANNERS_P1,
   CALENDAR_OCT,
