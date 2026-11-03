@@ -14,6 +14,11 @@ const CAMERA_PERMISSION = '지금 찍은 사진으로 주제에 참여할 수 �
 const SAVE_PHOTOS_PERMISSION =
   '촬영한 사진과 달력 이미지를 내 앨범에 저장하려고 사진 추가 권한을 사용해요.';
 
+// iOS FCM은 opt-in이다. GoogleService-Info.plist 경로(GOOGLE_SERVICES_PLIST, 커밋 금지)가 있을 때만
+// RNFB 플러그인·dynamic frameworks를 켠다. 없으면 빌드는 이전과 같고 iOS는 푸시 토큰이 null이다.
+const googleServicesPlist = process.env.GOOGLE_SERVICES_PLIST?.trim();
+const iosFcmEnabled = Boolean(googleServicesPlist);
+
 const config: ExpoConfig = {
   name: '찰캌',
   slug: 'chalkak-rn',
@@ -21,7 +26,11 @@ const config: ExpoConfig = {
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'light',
-  ios: { bundleIdentifier: 'com.stonefive.chalkak', supportsTablet: false },
+  ios: {
+    bundleIdentifier: 'com.stonefive.chalkak',
+    supportsTablet: false,
+    ...(googleServicesPlist ? { googleServicesFile: googleServicesPlist } : {}),
+  },
   android: {
     package: 'com.stonefive.chalkak',
     // FCM 푸시: Firebase 콘솔의 google-services.json 경로를 환경변수로 준다(커밋 금지). 없으면 Android 푸시 토큰을 받지 못한다.
@@ -51,6 +60,9 @@ const config: ExpoConfig = {
     e2eKakaoIdToken: isE2e ? process.env.E2E_KAKAO_ID_TOKEN : undefined,
     // 강제 업데이트 다이얼로그가 여는 App Store 앱 숫자 id.
     appStoreId: process.env.APP_STORE_ID,
+    // iOS FCM 토큰 경로 사용 여부(JS가 FirebaseMessagingTokenProvider를 고르는 기준).
+    // 꺼져 있을 땐 키를 넣지 않아 기존 설정과 같다.
+    iosFcmEnabled: iosFcmEnabled ? true : undefined,
   },
   plugins: [
     // D-21: Android OkHttp의 자동 재시도(비멱등 요청 포함)를 끈다.
@@ -80,6 +92,14 @@ const config: ExpoConfig = {
         granularPermissions: [],
       },
     ],
+    ...(iosFcmEnabled
+      ? [
+          '@react-native-firebase/app',
+          '@react-native-firebase/messaging',
+          // RNFB 27 / Firebase Apple SDK 13+는 SPM 전용이라 dynamic frameworks가 필요하다(static 아님).
+          ['expo-build-properties', { ios: { useFrameworks: 'dynamic' } }] as [string, object],
+        ]
+      : []),
     ...(kakaoNativeAppKey
       ? [
           ['@react-native-seoul/kakao-login', { kakaoAppKey: kakaoNativeAppKey }] as [
