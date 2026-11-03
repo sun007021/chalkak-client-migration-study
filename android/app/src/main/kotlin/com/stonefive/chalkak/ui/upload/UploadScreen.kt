@@ -204,9 +204,9 @@ private fun PhotoArea(state: PhotoUploadUiState, preview: PhotoPreview?, actions
                 )
             }
             Row(Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 11.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                RoundIconButton(R.drawable.ic_photo_library, actions::onAlbumClick, Modifier.testTag("upload.album-button"))
+                RoundIconButton(R.drawable.ic_photo_library, copy["upload.album.a11y"], actions::onAlbumClick, Modifier.testTag("upload.album-button"))
                 if (state.cameraAvailable) {
-                    RoundIconButton(R.drawable.ic_photo_camera, actions::onCameraClick, Modifier.testTag("upload.camera-button"))
+                    RoundIconButton(R.drawable.ic_photo_camera, copy["upload.camera.a11y"], actions::onCameraClick, Modifier.testTag("upload.camera-button"))
                 }
             }
         } else {
@@ -224,16 +224,15 @@ private fun PhotoArea(state: PhotoUploadUiState, preview: PhotoPreview?, actions
 }
 
 @Composable
-private fun RoundIconButton(iconRes: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun RoundIconButton(iconRes: Int, description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    // The touch target is 48dp; the visible disc is 42dp.
     Box(
-        modifier = modifier
-            .size(42.dp)
-            .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.66f))
-            .clickable(role = Role.Button, onClick = onClick),
+        modifier = modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(painter = painterResource(iconRes), contentDescription = null, tint = Color.Unspecified, modifier = Modifier.size(22.dp))
+        Box(Modifier.size(42.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.66f)), contentAlignment = Alignment.Center) {
+            Icon(painter = painterResource(iconRes), contentDescription = description, tint = Color.Unspecified, modifier = Modifier.size(22.dp))
+        }
     }
 }
 

@@ -100,6 +100,7 @@ internal fun TestScope.displayRig(
     auto: Boolean = true,
     likeCount: Int = 38,
     analytics: RecordingAnalytics = RecordingAnalytics(),
+    creations: kotlinx.coroutines.flow.Flow<kr.chalkak.core.data.upload.PostCreated> = kotlinx.coroutines.flow.emptyFlow(),
 ): DisplayRig {
     val clock = FakeClock().also { c -> now?.let { c.set(it) } }
     val repo = FakePostRepository().also { if (auto) it.autoRespond() }
@@ -108,7 +109,7 @@ internal fun TestScope.displayRig(
     val user = FakeUser(userId)
     val changes = PostChanges()
     val likes = LikeController(holderScope(), repo, { user.id != null }, changes)
-    val holder = DisplayStateHolder(holderScope(), repo, likes, changes, user, KstCalendar(clock), analytics, initialDate, initialSort)
+    val holder = DisplayStateHolder(holderScope(), repo, likes, changes, user, KstCalendar(clock), analytics, initialDate, initialSort, creations)
     return DisplayRig(this, holder, repo, likes, changes, user, clock, server, collectAll(holder.effects), collectAll(holder.state), analytics)
 }
 

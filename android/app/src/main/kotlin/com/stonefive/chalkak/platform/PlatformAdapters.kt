@@ -14,13 +14,11 @@ import kr.chalkak.feature.auth.ConfiguredUpdateChecker
 import kr.chalkak.feature.auth.HomePreloader
 import kr.chalkak.feature.auth.KakaoSocialLoginClient
 import kr.chalkak.feature.auth.PlayUpdateChecker
-import kr.chalkak.feature.auth.PushRegistrar
 import kr.chalkak.feature.auth.SocialLoginClient
 import kr.chalkak.feature.auth.UpdateCheckResult
 import kr.chalkak.feature.auth.UpdateChecker
 import kr.chalkak.feature.auth.UpdateFlowResult
 import kr.chalkak.feature.auth.UpdateLauncher
-import kr.chalkak.feature.onboarding.DeviceRegistrar
 import kr.chalkak.feature.onboarding.ExternalBrowser
 import kr.chalkak.feature.onboarding.SignatureImageEncoder
 import kr.chalkak.feature.settings.DeviceNotificationSettings
@@ -38,8 +36,6 @@ class PlatformAdapters(
     val linkBrowser: kr.chalkak.feature.home.ExternalBrowser,
     val signatureEncoder: SignatureImageEncoder,
     val analytics: AnalyticsTracker,
-    val push: PushRegistrar,
-    val deviceRegistrar: DeviceRegistrar,
     val preloader: HomePreloader,
     /** Foreground Activity (Kakao login, Play update). `MainActivity` registers itself here. */
     val currentActivity: CurrentActivity = CurrentActivity(),
@@ -78,8 +74,6 @@ class PlatformAdapters(
                 linkBrowser = AndroidLinkBrowser(app),
                 signatureEncoder = AndroidSignatureEncoder(),
                 analytics = LogAnalyticsTracker(),
-                push = NoopPushRegistrar,
-                deviceRegistrar = NoopPushRegistrar,
                 preloader = ReadyHomePreloader,
                 currentActivity = activity,
                 updateFlowBridge = bridge,
@@ -102,8 +96,6 @@ class PlatformAdapters(
             analytics = object : AnalyticsTracker {
                 override fun screenView(screen: String) = Unit
             },
-            push = NoopPushRegistrar,
-            deviceRegistrar = NoopPushRegistrar,
             preloader = ReadyHomePreloader,
         )
     }

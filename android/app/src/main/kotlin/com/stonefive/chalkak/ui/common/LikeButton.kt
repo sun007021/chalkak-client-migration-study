@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.stonefive.chalkak.R
+import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.ui.theme.ChalkakTheme
 
 /**
@@ -40,6 +41,7 @@ fun LikeButton(
     tint: Color = ChalkakTheme.colors.textPrimary,
     liked: Color = ChalkakTheme.colors.destructive,
 ) {
+    val label = LocalCopy.current.format("like.a11y.count", "n" to count)
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         Box(
             modifier = Modifier
@@ -47,7 +49,7 @@ fun LikeButton(
                 .testTag(buttonTag)
                 .semantics {
                     selected = isLiked
-                    contentDescription = count.toString()
+                    contentDescription = label // "좋아요 N개"; `selected` is read by the screen reader as the state (TC-LIKE-034)
                 }
                 .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,

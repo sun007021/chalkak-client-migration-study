@@ -18,12 +18,12 @@
 | DISP | [display-feed.md](catalog/display-feed.md) | 62 | 1 | 1 | 56/62 | 58/62 | 55/62 | 58/62 | 55/62 |
 | FEED | [display-feed.md](catalog/display-feed.md) | 58 | 2 | 2 | 45/58 | 50/58 | 50/58 | 51/58 | 48/58 |
 | LIKE | [display-feed.md](catalog/display-feed.md) | 35 | 1 | 1 | 32/35 | 34/35 | 34/35 | 34/35 | 33/35 |
-| UPL | [upload-edit.md](catalog/upload-edit.md) | 92 | 3 | 3 | 76/92 | 83/92 | 83/92 | 82/92 | 0/92 |
+| UPL | [upload-edit.md](catalog/upload-edit.md) | 92 | 3 | 3 | 76/92 | 85/92 | 83/92 | 82/92 | 0/92 |
 | EDIT | [upload-edit.md](catalog/upload-edit.md) | 51 | 4 | 4 | 25/51 | 42/51 | 45/51 | 46/51 | 0/51 |
 | AIR | [ai-review.md](catalog/ai-review.md) | 61 | 2 | 2 | 47/61 | 56/61 | 54/61 | 54/61 | 0/61 |
 | REC | [record.md](catalog/record.md) | 45 | 2 | 2 | 38/45 | 42/45 | 41/45 | 41/45 | 0/45 |
-| NOTI | [notification-push.md](catalog/notification-push.md) | 57 | 2 | 2 | 44/57 | 51/57 | 50/57 | 45/57 | 0/57 |
-| PUSH | [notification-push.md](catalog/notification-push.md) | 77 | 4 | 6 | 64/77 | 67/77 | 67/77 | 63/77 | 0/77 |
+| NOTI | [notification-push.md](catalog/notification-push.md) | 57 | 2 | 2 | 44/57 | 54/57 | 50/57 | 45/57 | 0/57 |
+| PUSH | [notification-push.md](catalog/notification-push.md) | 77 | 4 | 6 | 64/77 | 68/77 | 67/77 | 63/77 | 0/77 |
 | SET | [settings-feedback.md](catalog/settings-feedback.md) | 56 | 3 | 3 | 33/56 | 51/56 | 51/56 | 50/56 | 0/56 |
 | FDBK | [settings-feedback.md](catalog/settings-feedback.md) | 37 | 2 | 2 | 29/37 | 32/37 | 34/37 | 32/37 | 0/37 |
 | NET | [common-infra.md](catalog/common-infra.md) | 62 | 2 | 2 | 55/62 | 55/62 | 56/62 | 58/62 | 59/62 |
