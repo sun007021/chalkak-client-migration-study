@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../core/analytics/analytics_tracker.dart';
@@ -15,6 +16,7 @@ import '../features/auth/domain/nonce.dart';
 import '../features/auth/domain/session_use_cases.dart';
 import '../features/auth/domain/user_data_cleaner.dart';
 import '../features/boot/data/disabled_update_check.dart';
+import '../features/boot/data/store_update_launcher.dart';
 import '../features/boot/domain/auth_gate.dart';
 import '../features/boot/domain/update_gate.dart';
 import '../features/home/domain/home_preload.dart';
@@ -44,7 +46,13 @@ AppDependencies buildAppDependencies(
   AppConfig config, {
   PushPlatform push = const PushPlatform.disabled(),
   String appVersion = '',
+  TargetPlatform? platform,
+  String androidApplicationId = 'com.stonefive.chalkak',
+  String appStoreId = '', // TODO: App Store 앱 ID 확정 후 주입(스토어 미배포).
 }) {
+  final isAndroid =
+      (platform ?? defaultTargetPlatform) == TargetPlatform.android;
+  const links = UrlLauncherExternalLinkLauncher();
   final sessions = SessionManager(
     store: SecureTokenStore(
       storage: FlutterSecureKeyValueStore(const FlutterSecureStorage()),
@@ -55,7 +63,14 @@ AppDependencies buildAppDependencies(
 
   final updateGate = UpdateGate(
     checker: const DisabledUpdateChecker(),
-    launcher: const DisabledUpdateLauncher(),
+    launcher: isAndroid
+        ? StoreUpdateLauncher.android(
+            links: links,
+            applicationId: androidApplicationId,
+          )
+        : StoreUpdateLauncher.ios(links: links, appStoreId: appStoreId),
+    exit: isAndroid ? const SystemNavigatorAppExit() : const NoopAppExit(),
+    cancelAvailable: isAndroid,
     enabled: config.forceUpdateCheckEnabled,
   );
   final main = buildMainDependencies(client);

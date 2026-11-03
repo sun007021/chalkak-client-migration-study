@@ -13,5 +13,5 @@ class DisabledUpdateLauncher implements UpdateLauncher {
   const DisabledUpdateLauncher();
 
   @override
-  Future<void> launch() async {}
+  Future<bool> launch() async => false;
 }

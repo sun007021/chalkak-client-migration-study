@@ -5,6 +5,7 @@ abstract final class TestIds {
   static const updateGateTitle = 'update-gate.title';
   static const updateGateMessage = 'update-gate.message';
   static const updateGateUpdateButton = 'update-gate.update-button';
+  static const updateGateCancelButton = 'update-gate.cancel-button';
 
   static const loginRoot = 'login.root';
   static const loginTagline = 'login.tagline';

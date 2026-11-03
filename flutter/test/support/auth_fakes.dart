@@ -75,14 +75,25 @@ class FakeUpdateLauncher implements UpdateLauncher {
   Object? error;
   Completer<void>? gate;
 
+  /// launch()가 돌려줄 값(스토어를 열었는가).
+  bool opens = true;
+
   @override
-  Future<void> launch() async {
+  Future<bool> launch() async {
     calls++;
     final g = gate;
     if (g != null) await g.future;
     final e = error;
     if (e != null) throw e;
+    return opens;
   }
+}
+
+class FakeAppExit implements AppExit {
+  int calls = 0;
+
+  @override
+  Future<void> exit() async => calls++;
 }
 
 class FakeHomePreloader implements HomePreloader {
@@ -199,8 +210,6 @@ class FakePlayUpdateSource implements PlayUpdateSource {
   PlayUpdateInfo? info;
   Object? fetchError;
   int fetchCalls = 0;
-  int startCalls = 0;
-  Object? startError;
 
   @override
   Future<PlayUpdateInfo> fetchInfo() async {
@@ -208,13 +217,6 @@ class FakePlayUpdateSource implements PlayUpdateSource {
     final e = fetchError;
     if (e != null) throw e;
     return info!;
-  }
-
-  @override
-  Future<void> startImmediateUpdate() async {
-    startCalls++;
-    final e = startError;
-    if (e != null) throw e;
   }
 }
 

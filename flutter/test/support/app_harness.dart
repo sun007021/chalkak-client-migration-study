@@ -37,6 +37,7 @@ class AppHarness {
   AppHarness({
     Session? session,
     bool updateGateEnabled = true,
+    bool updateCancelAvailable = false,
     PushPlatform pushPlatform = const PushPlatform.disabled(),
     PermissionPromptFlag? promptFlag,
   }) : http = AuthHttpHarness(session: session) {
@@ -44,6 +45,8 @@ class AppHarness {
       checker: updateChecker,
       launcher: launcher,
       enabled: updateGateEnabled,
+      exit: appExit,
+      cancelAvailable: updateCancelAvailable,
     );
     final repository = ApiAuthRepository(client: http.client);
     final cleaner = CompositeUserDataCleaner([userData, settingsCleaner]);
@@ -121,6 +124,7 @@ class AppHarness {
   final AuthHttpHarness http;
   final FakeUpdateChecker updateChecker = FakeUpdateChecker();
   final FakeUpdateLauncher launcher = FakeUpdateLauncher();
+  final FakeAppExit appExit = FakeAppExit();
   final FakeHomePreloader preloader = FakeHomePreloader();
   final FakePushRegistrar push = FakePushRegistrar();
   final FakeNotificationRepository notificationRepository =
