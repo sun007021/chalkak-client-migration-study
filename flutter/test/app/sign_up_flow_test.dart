@@ -58,7 +58,7 @@ Future<void> _drawAndPreview(WidgetTester tester) async {
 
 void main() {
   widgetTest(
-    'TC-ONB-015 TC-ONB-024 로그인 SIGN_UP_REQUIRED -> 약관 -> 그리기 -> 미리보기 -> 가입 성공이면 메인이고 가입 화면은 모두 사라진다',
+    'TC-ONB-015 TC-ONB-024 TC-ANL-003 로그인 SIGN_UP_REQUIRED -> 약관 -> 그리기 -> 미리보기 -> 가입 성공이면 메인이고 가입 화면은 모두 사라진다',
     (tester) async {
       final h = _harness();
       _scriptSignup(h);
