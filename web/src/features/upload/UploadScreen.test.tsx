@@ -35,6 +35,12 @@ describe('업로드 화면 구성 (REQ-UPL-012~013, 060)', () => {
     expect(screen.getByTestId('upload.close-button')).toBeInTheDocument();
   });
 
+  it('TC-UPL-089 업로드 화면은 탭 셸 밖이라 하단 바가 없다', async () => {
+    await openUploadScreen();
+    expect(screen.queryByTestId('bottom-bar.root')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('bottom-bar.upload-button')).not.toBeInTheDocument();
+  });
+
   it('TC-UPL-014 앨범 입력은 이미지 한 장만 받는 file input이다(권한 불필요)', async () => {
     await openUploadScreen();
     const input = albumInput();
