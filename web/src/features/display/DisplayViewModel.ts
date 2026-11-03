@@ -95,6 +95,8 @@ const FEATURED_COUNT = 5;
 type View = { kind: 'loading' } | { kind: 'empty' } | { kind: 'error'; network: boolean } | { kind: 'ready' };
 
 const keyOf = (date: DateString, requestSort: DisplaySort): string => `${date}|${requestSort}`;
+/** keyOf로 만든 캐시 키가 그 날짜의 것인지(키 형식은 이 두 함수만 안다). */
+const isKeyOfDate = (key: string, date: DateString): boolean => key.startsWith(`${date}|`);
 const isCancel = (error: unknown): boolean => (error instanceof Error && error.name === 'AbortError') || error instanceof SessionChangedError;
 
 export class DisplayViewModel extends ViewModel<DisplayState> {
@@ -466,6 +468,8 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
   private async revalidate(key: string, date: DateString, requestSort: DisplaySort, nav: Ticket, account: Ticket): Promise<void> {
     const listing = this.cache.get(key);
     if (!listing) return;
+    // 업로드 직후 표시는 요청을 보내는 시점에 소비한다(실패·취소해도 뒤의 다른 재검증에 남지 않는다).
+    const firstOnly = this.firstPageOnly.delete(key);
     const stamp = this.deps.likes.beginRead();
     let page: PostsPage | null;
     try {
@@ -480,7 +484,7 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
     }
     if (!account.isCurrent()) return;
     if (page) {
-      const keepsTail = !this.firstPageOnly.delete(key) && (requestSort !== 'random' || page.randomSeed === this.cache.get(key)?.seed);
+      const keepsTail = !firstOnly && (requestSort !== 'random' || page.randomSeed === this.cache.get(key)?.seed);
       this.cache.replaceFirst(key, { first: this.settle(page.posts, stamp), keepsTail, hasNext: this.hasNextOf(page, requestSort), seed: page.randomSeed });
     }
     if (!nav.isCurrent()) {
@@ -559,7 +563,7 @@ export class DisplayViewModel extends ViewModel<DisplayState> {
    */
   private applyCreated(topicDate: DateString): void {
     const shownKey = this.shown?.date === topicDate && this.view.kind === 'ready' ? this.shown.key : null;
-    this.cache.deleteWhere((key) => key.startsWith(`${topicDate}|`) && key !== shownKey);
+    this.cache.deleteWhere((key) => isKeyOfDate(key, topicDate) && key !== shownKey);
     if (shownKey === null) {
       this.publish();
       return;

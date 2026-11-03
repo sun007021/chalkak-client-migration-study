@@ -66,4 +66,16 @@ describe('DisplayViewModel created 변경(업로드 직후 전시, REQ-UPL-062)'
     expect(ids(ready(vm).posts)[0]).toBe('299');
     expect(ready(vm).refreshing).toBe(false);
   });
+
+  it('리뷰 9 created 뒤 첫 페이지 재검증이 실패해도 "첫 페이지만" 표시가 남지 않는다', async () => {
+    const h = createPostHarness();
+    const vm = h.display();
+    await openToday(h, vm);
+    h.router.set(postsKey(TODAY, 'recent'), () => json(500, { errorCode: 'INTERNAL', message: 'x' }));
+    h.changes.publish(CREATED);
+    await finish(h, Promise.resolve());
+    await settle();
+    expect(h.router.calls(postsKey(TODAY, 'recent')).length).toBeGreaterThan(0);
+    expect((vm as unknown as { firstPageOnly: Set<string> }).firstPageOnly.size).toBe(0);
+  });
 });
