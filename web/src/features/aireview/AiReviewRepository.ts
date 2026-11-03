@@ -1,5 +1,51 @@
 import type { ApiClient } from '../../core/net/ApiClient';
-import type { AiReview } from './aiReviewModels';
+import { d, DecodeError } from '../../core/net/decode';
+import type { Decoder } from '../../core/net/decode';
+import { path } from '../../core/net/url';
+import type { AiReview, AiReviewResult } from './aiReviewModels';
+
+const STATUSES = ['NONE', 'PROCESSING', 'COMPLETED', 'FAILED'] as const;
+
+/** 0~10(양 끝 포함). d.number가 NaN·무한대를 먼저 거절한다. */
+const score = (): Decoder<number> => {
+  const number = d.number();
+  return (value) => {
+    const n = number(value);
+    if (n < 0 || n > 10) throw new DecodeError(`score out of range: ${n}`);
+    return n;
+  };
+};
+
+const text = (): Decoder<string> => {
+  const string = d.string();
+  return (value) => {
+    const s = string(value);
+    if (s.trim() === '') throw new DecodeError('empty text');
+    return s;
+  };
+};
+
+const decodeResult: Decoder<AiReviewResult> = d.object({
+  overallScore: score(),
+  criteria: d.array(d.object({ key: d.string(), label: d.string(), score: score() })),
+  distinctivePerspective: d.boolean(),
+  feedback: d.object({ summary: text(), strength: text(), weakness: text(), suggestion: text() }),
+});
+
+const decodeBody = d.object({
+  status: d.enumOf(STATUSES),
+  requestedAt: d.nullable(d.instant()),
+  completedAt: d.nullable(d.instant()),
+  result: d.nullable(decodeResult),
+  canRequestAgain: d.nullable(d.boolean()),
+});
+
+const decodeReview: Decoder<AiReview> = (value) => {
+  const body = decodeBody(value);
+  if (body.status === 'COMPLETED' && body.result === null) throw new DecodeError('COMPLETED without result');
+  if (body.status !== 'COMPLETED' && body.result !== null) throw new DecodeError(`${body.status} with result`);
+  return { status: body.status, requestedAt: body.requestedAt, completedAt: body.completedAt, result: body.result, canRequestAgain: body.canRequestAgain ?? false };
+};
 
 /**
  * AI 피드백 API(API §4.2). 던지는 것은 ApiClient와 같다(ApiError, NetworkError, InvalidResponseError, 취소는 AbortError). 404도 던진다(저장소가 숨김으로 바꾼다).
@@ -10,12 +56,12 @@ export class AiReviewRepository {
   constructor(protected readonly deps: { api: ApiClient }) {}
 
   /** GET /posts/{postId}/ai-review. */
-  fetchReview(_postId: string, _signal?: AbortSignal): Promise<AiReview> {
-    throw new Error('not implemented');
+  fetchReview(postId: string, signal?: AbortSignal): Promise<AiReview> {
+    return this.deps.api.request({ method: 'GET', path: path`/posts/${postId}/ai-review`, signal }, decodeReview);
   }
 
   /** POST /posts/{postId}/ai-review. 본문 없음. 2xx(200·202)는 모두 본문의 status로 해석한다. */
-  requestReview(_postId: string, _signal?: AbortSignal): Promise<AiReview> {
-    throw new Error('not implemented');
+  requestReview(postId: string, signal?: AbortSignal): Promise<AiReview> {
+    return this.deps.api.request({ method: 'POST', path: path`/posts/${postId}/ai-review`, signal }, decodeReview);
   }
 }
