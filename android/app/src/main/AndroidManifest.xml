@@ -4,6 +4,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Android 13+: the OS asks once when an authenticated home opens (no app-made dialog). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Saving a captured photo to Pictures/Chalkak needs this only below Android 10 (MediaStore scoped storage covers the rest). -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
@@ -35,6 +37,18 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- FCM entry point. The class exists only in builds with -PfcmProjectId (src/fcmOn); otherwise the entry is disabled
+             (placeholder fcmEnabled=false) so the missing class can never be started. -->
+        <service
+            android:name=".platform.ChalkakMessagingService"
+            android:enabled="${fcmEnabled}"
+            android:exported="false"
+            tools:ignore="MissingClass">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
 
         <activity
             android:name=".MainActivity"

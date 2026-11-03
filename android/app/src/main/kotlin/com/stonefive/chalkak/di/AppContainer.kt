@@ -6,15 +6,39 @@ import com.stonefive.chalkak.copy.Copy
 import com.stonefive.chalkak.data.KeystoreRecordStorage
 import com.stonefive.chalkak.data.KeystoreSecretCipher
 import com.stonefive.chalkak.data.SecretCipher
+import com.stonefive.chalkak.platform.AppForeground
 import com.stonefive.chalkak.platform.PlatformAdapters
+import com.stonefive.chalkak.push.PushNavigationState
+import com.stonefive.chalkak.push.PushRuntime
+import com.stonefive.chalkak.push.PushTapWiring
 import com.stonefive.chalkak.ui.RootDependencies
+import com.stonefive.chalkak.ui.home.ActiveHomeUnread
 import com.stonefive.chalkak.ui.SignupDependencies
 import com.stonefive.chalkak.ui.signature.SignaturePadSpace
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kr.chalkak.core.data.notification.DefaultNotificationRepository
+import kr.chalkak.core.data.notification.DefaultPushDeviceRepository
+import kr.chalkak.core.data.notification.NotificationRepository
+import kr.chalkak.feature.auth.BootState
+import kr.chalkak.feature.auth.HomeMode
+import kr.chalkak.feature.notification.NotificationDetailStateHolder
+import kr.chalkak.feature.notification.NotificationInboxStateHolder
+import kr.chalkak.feature.notification.NotificationPermissionFlow
+import kr.chalkak.feature.notification.NotificationTapHandler
+import kr.chalkak.feature.notification.PushPayload
+import kr.chalkak.feature.notification.PushRegistrationCoordinator
+import kr.chalkak.feature.notification.PushTapQueue
+import kr.chalkak.feature.notification.SessionRefresher
+import kr.chalkak.feature.notification.TapSession
+import kr.chalkak.feature.notification.UnreadStatusRefresher
 import kr.chalkak.core.common.Clock
 import kr.chalkak.core.common.SystemClock
 import kr.chalkak.core.data.auth.SecureNonceGenerator
@@ -95,6 +119,23 @@ import kr.chalkak.core.network.HttpRefreshApi
 import kr.chalkak.core.network.OkHttpFactory
 import kr.chalkak.core.network.SessionStore
 import kr.chalkak.core.network.TokenRefresher
+import kr.chalkak.core.data.record.DefaultRecordRepository
+import kr.chalkak.core.data.record.RecordRepository
+import kr.chalkak.feature.record.RecordStateHolder
+import com.stonefive.chalkak.ui.terms.LegalWebView
+import kr.chalkak.core.data.onboarding.DefaultSignatureRepository
+import kr.chalkak.core.data.onboarding.SignatureRepository
+import kr.chalkak.core.data.settings.DefaultFeedbackRepository
+import kr.chalkak.core.data.settings.DefaultNotificationSettingsRepository
+import kr.chalkak.core.data.settings.FeedbackRepository
+import kr.chalkak.core.data.settings.NotificationSettingsRepository
+import kr.chalkak.feature.auth.AccountActions
+import kr.chalkak.feature.onboarding.SignatureCardStateHolder
+import kr.chalkak.feature.onboarding.SignatureChangeStateHolder
+import kr.chalkak.feature.settings.FeedbackStateHolder
+import kr.chalkak.feature.settings.PushSettingsStateHolder
+import kr.chalkak.feature.settings.SettingsStateHolder
+import com.stonefive.chalkak.ui.settings.SettingsHolders
 import okhttp3.OkHttpClient
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -164,9 +205,7 @@ class AppContainer(
     private val authFreeOkHttp: OkHttpClient by lazy { OkHttpFactory.apiClient(base = okHttpBase) }
 
     val apiClient: ApiClient by lazy {
-        val sink = authEventSink
-        val refresher = TokenRefresher(sessionStore, HttpRefreshApi(apiBaseUrl, authFreeOkHttp), clock, applicationScope, sink)
-        ApiClient(apiBaseUrl, apiOkHttp, sessionStore, refresher, clock, sink)
+        ApiClient(apiBaseUrl, apiOkHttp, sessionStore, tokenRefresher, clock, authEventSink)
     }
 
     private val uploadOkHttp: OkHttpClient by lazy { OkHttpFactory.uploadClient(base = okHttpBase) }
@@ -178,6 +217,11 @@ class AppContainer(
 
     val authRepository: AuthRepository by lazy { DefaultAuthRepository(apiClient, sessionStore, userDataResetter, clock) }
     val homeRepository: HomeRepository by lazy { DefaultHomeRepository(apiClient) }
+
+    val recordRepository: RecordRepository by lazy { DefaultRecordRepository(apiClient) }
+    val signatureRepository: SignatureRepository by lazy { DefaultSignatureRepository(apiClient) }
+    val notificationSettingsRepository: NotificationSettingsRepository by lazy { DefaultNotificationSettingsRepository(apiClient) }
+    val feedbackRepository: FeedbackRepository by lazy { DefaultFeedbackRepository(apiClient) }
     val bannerRepository: BannerRepository by lazy { DefaultBannerRepository(apiClient) }
     val postRepository: PostRepository by lazy { DefaultPostRepository(apiClient) }
     val postCreationRepository: PostCreationRepository by lazy { DefaultPostCreationRepository(apiClient) }
@@ -229,6 +273,108 @@ class AppContainer(
     fun newAiReviewHolder(scope: CoroutineScope): AiReviewStateHolder =
         AiReviewStateHolder(scope, aiReviewRepository, currentUser, kstCalendar, SystemMonotonicClock)
 
+    // ---- push ------------------------------------------------------------------------------------------------------
+
+    /** Whether an Activity of the app is visible (FCM foreground messages are shown by the app itself). */
+    val appForeground = AppForeground()
+
+    private val tokenRefresher: TokenRefresher by lazy {
+        TokenRefresher(sessionStore, HttpRefreshApi(apiBaseUrl, authFreeOkHttp), clock, applicationScope, authEventSink)
+    }
+
+    private val notificationRepository: NotificationRepository by lazy { DefaultNotificationRepository(apiClient) }
+
+    private val pushRegistrationLazy = lazy {
+        PushRegistrationCoordinator(
+            sessionStore = sessionStore,
+            tokens = platform.pushPlatform.tokens,
+            devices = DefaultPushDeviceRepository(apiClient),
+            refresher = SessionRefresher { tokenRefresher.refresh(it) },
+        )
+    }
+
+    /** The one place that registers this device for push; it is also the [PushRegistrar] / [DeviceRegistrar] of login, sign-up and boot. */
+    val pushRegistration: PushRegistrationCoordinator by pushRegistrationLazy
+
+    private val activeHomeUnread = ActiveHomeUnread()
+
+    /** Unread dot re-check: the home holder is main-thread only, FCM and the tap handler may call from anywhere. */
+    private val unreadRefresher = UnreadStatusRefresher { mainScope.launch { activeHomeUnread.refresh() } }
+
+    init {
+        // Account switch: the dedupe cache of registered devices and the tap that waits for the previous account go away (D-16).
+        registerUserDataResetter {
+            if (pushRegistrationLazy.isInitialized()) pushRegistration.reset()
+            platform.pushPlatform.pendingTaps.clear()
+        }
+    }
+
+    /** The push glue (channel, token refresh, foreground messages). */
+    val pushRuntime: PushRuntime by lazy {
+        PushRuntime(applicationScope, platform.pushPlatform, pushRegistration, unreadRefresher, copy)
+    }
+
+    /** Tap queue + navigation view; also what `RootDependencies.pushTaps` carries. */
+    val pushTaps: PushTapWiring by lazy {
+        val nav = PushNavigationState()
+        val ready = combine(bootGate.state, bootGate.pushNavigationAllowed, nav.reported) { boot, allowed, reported ->
+            when {
+                boot == BootState.Splash || boot == BootState.UpdateRequired -> false
+                reported != null -> reported.mainOpen
+                else -> allowed
+            }
+        }.stateIn(applicationScope, SharingStarted.Eagerly, false)
+        val session = combine(bootGate.state, nav.reported) { boot, reported -> tapSessionOf(boot, reported) }
+            .stateIn(applicationScope, SharingStarted.Eagerly, TapSession.Unknown)
+        val queue = PushTapQueue(
+            scope = applicationScope,
+            store = platform.pushPlatform.pendingTaps,
+            handler = NotificationTapHandler(notificationRepository, unreadRefresher),
+            session = session,
+            mainReady = ready,
+            blockingScreen = nav.blocking,
+            top = { nav.top },
+        )
+        PushTapWiring(queue, nav)
+    }
+
+    /** What the tap queue may assume about the user: the navigation decides once it exists, the boot result until then. */
+    private fun tapSessionOf(boot: BootState, reported: PushNavigationState.Reported?): TapSession = when {
+        boot == BootState.Splash || boot == BootState.UpdateRequired -> TapSession.Unknown
+        reported != null && !reported.mainOpen -> TapSession.LoggedOut
+        reported != null -> if (reported.accessMode == AccessMode.Member) memberSession() else TapSession.Guest
+        boot is BootState.Login -> TapSession.LoggedOut
+        boot is BootState.Home -> if (boot.mode == HomeMode.Member) memberSession() else TapSession.Guest
+        else -> TapSession.Unknown
+    }
+
+    private fun memberSession(): TapSession = trackedSessionStore.userId?.let { TapSession.Member(it) } ?: TapSession.Unknown
+
+    private val pushStarted = AtomicBoolean(false)
+    private val pushReady = CompletableDeferred<Unit>()
+
+    /** Starts the push pipeline once per process: restores a tap saved before process death, then starts the queue and the runtime. */
+    fun startPush() {
+        if (!pushStarted.compareAndSet(false, true)) return
+        applicationScope.launch {
+            try {
+                pushTaps.queue.restore()
+                pushTaps.queue.start()
+                pushRuntime.start()
+            } finally {
+                pushReady.complete(Unit)
+            }
+        }
+    }
+
+    /** A notification tap (launch or `onNewIntent`): handed to the queue once it has restored what was saved. */
+    fun onPushTap(payload: PushPayload) {
+        applicationScope.launch {
+            pushReady.await()
+            pushTaps.queue.onTap(payload)
+        }
+    }
+
     /** BootGate state is touched on the main thread only (its contract). Created on first use. */
     private val mainScope: CoroutineScope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
 
@@ -240,7 +386,7 @@ class AppContainer(
             updateChecker = platform.updateChecker,
             updateLauncher = platform.updateLauncher,
             preloader = platform.preloader,
-            push = platform.push,
+            push = pushRegistration,
             resetter = userDataResetter,
             authEvents = authEventFlow,
         )
@@ -262,7 +408,7 @@ class AppContainer(
                 NavigationController(platform.analytics, mode, listOf(initial)).also { activeNavigation = it }
             },
             newLoginHolder = { scope ->
-                LoginStateHolder(scope, platform.socialLogin, nonces, authRepository, guestFlagStore, platform.push, platform.analytics)
+                LoginStateHolder(scope, platform.socialLogin, nonces, authRepository, guestFlagStore, pushRegistration, platform.analytics)
             },
             newTermsHolder = { TermsStateHolder(signupContext, platform.analytics) },
             signupContext = signupContext,
@@ -272,12 +418,13 @@ class AppContainer(
                     SignaturePadStateHolder(SignatureMode.Signup, SignaturePadSpace, platform.signatureEncoder, platform.analytics)
                 },
                 newSignupHolder = { scope ->
-                    SignupStateHolder(scope, signupContext, signupRepository, signatureUploader, authRepository, platform.deviceRegistrar)
+                    SignupStateHolder(scope, signupContext, signupRepository, signatureUploader, authRepository, pushRegistration)
                 },
             ),
             authEvents = authEventFlow,
             onExitApp = onExitApp,
             main = newMainDependencies(),
+            pushTaps = pushTaps,
         )
     }
 
@@ -328,6 +475,17 @@ class AppContainer(
             },
             uploadPlatform = platform.upload.platform,
             newAiReviewHolder = ::newAiReviewHolder,
+            newNotificationInboxHolder = { scope ->
+                NotificationInboxStateHolder(scope, notificationRepository, NotificationTapHandler(notificationRepository, unreadRefresher), NoScreenViews, clock)
+            },
+            newNotificationDetailHolder = { scope ->
+                NotificationDetailStateHolder(scope, notificationRepository, NoScreenViews, unreadRefresher)
+            },
+            newAiReviewHolderOnEntry = { scope, openSheetOnEntry ->
+                AiReviewStateHolder(scope, aiReviewRepository, currentUser, kstCalendar, SystemMonotonicClock, true, openSheetOnEntry)
+            },
+            notificationPermission = NotificationPermissionFlow(platform.pushPlatform.permission, platform.pushPlatform.promptStore),
+            homeUnread = activeHomeUnread,
             image = if (loader == null) {
                 { _, _ -> }
             } else {
@@ -338,8 +496,42 @@ class AppContainer(
             } else {
                 { url, modifier -> CoilPhotoImage(loader, url, modifier) }
             },
+            // screen_view comes from the navigation controller only (D-22): the record holder's own would double it.
+            newRecordHolder = { scope, mode ->
+                RecordStateHolder(
+                    scope = scope,
+                    clock = clock,
+                    repository = recordRepository,
+                    postChanges = postChanges,
+                    analytics = NoScreenViews,
+                    mode = mode,
+                    renderer = platform.calendarRenderer(loader),
+                    saver = platform.calendarSaver,
+                )
+            },
+            today = kstCalendar::today,
+            newSettingsHolders = ::newSettingsHolders,
+            // screen_view comes from the navigation controller only (D-22): the holders' own would double it.
+            newFeedbackHolder = { scope -> FeedbackStateHolder(scope, feedbackRepository, NoScreenViews) },
+            newChangeSignaturePad = {
+                SignaturePadStateHolder(SignatureMode.Change, SignaturePadSpace, platform.signatureEncoder, NoScreenViews)
+            },
+            newSignatureChangeHolder = { scope -> SignatureChangeStateHolder(scope, signatureRepository, signatureUploader) },
+            legalWeb = { url, onLoaded, onFailed -> LegalWebView(url, onLoaded, onFailed, Modifier.fillMaxSize()) },
+            openSystemNotificationSettings = { platform.deviceNotifications.openSystemSettings() },
             issueWeb = { url, onNavigate, onLoaded, onFailed -> IssueWebView(url, onNavigate, onLoaded, onFailed, Modifier.fillMaxSize()) },
         )
+    }
+
+    /** The four holders of one settings tab scope (signature card, push switches, account actions, and the tab holder that fans out to them). */
+    private fun newSettingsHolders(scope: CoroutineScope, mode: HomeMode): SettingsHolders {
+        val card = SignatureCardStateHolder(scope, signatureRepository, isGuest = mode == HomeMode.Guest)
+        val push = PushSettingsStateHolder(scope, notificationSettingsRepository, platform.deviceNotifications)
+        val account = AccountActions(scope, authRepository, guestFlagStore)
+        val settings = SettingsStateHolder(
+            scope, mode, card, push, account, NoScreenViews, LegalDocumentOpener(platform.externalBrowser), BuildConfig.VERSION_NAME,
+        )
+        return SettingsHolders(settings, card, push, account)
     }
 
     /** `GET /posts/today` once: the upload screen may open only when today's photo has not been posted yet (REQ-UPL-002/003). */

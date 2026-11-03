@@ -8,8 +8,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
@@ -26,6 +29,17 @@ import com.stonefive.chalkak.ui.home.HomeRoute
 import com.stonefive.chalkak.platform.PhotoPreview
 import com.stonefive.chalkak.platform.UploadPlatform
 import com.stonefive.chalkak.ui.issue.IssueWebRoute
+import com.stonefive.chalkak.ui.record.RecordRoute
+import com.stonefive.chalkak.ui.notification.NotificationDetailRoute
+import com.stonefive.chalkak.ui.notification.NotificationRoute
+import com.stonefive.chalkak.ui.settings.FeedbackRoute
+import com.stonefive.chalkak.ui.settings.LegalWebContent
+import com.stonefive.chalkak.ui.settings.SettingsHolders
+import com.stonefive.chalkak.ui.settings.SettingsRoute
+import com.stonefive.chalkak.ui.signature.ChangeSignaturePreviewRoute
+import com.stonefive.chalkak.ui.signature.SignatureScreen
+import com.stonefive.chalkak.ui.terms.LegalDocLoad
+import com.stonefive.chalkak.ui.terms.LegalDocSheet
 import com.stonefive.chalkak.ui.upload.UploadRoute
 import com.stonefive.chalkak.ui.upload.UploadSuccessScreen
 import com.stonefive.chalkak.viewmodel.SessionHolders
@@ -48,6 +62,22 @@ import kr.chalkak.feature.navigation.AccessMode
 import kr.chalkak.feature.navigation.NavigationController
 import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
+import kr.chalkak.feature.navigation.TermsDocumentKind
+import kr.chalkak.feature.onboarding.SignatureChangeStateHolder
+import kr.chalkak.feature.onboarding.SignatureMode
+import kr.chalkak.feature.onboarding.SignaturePadEffect
+import kr.chalkak.feature.onboarding.SignaturePadStateHolder
+import kr.chalkak.feature.onboarding.LegalDocuments
+import kr.chalkak.feature.onboarding.TermsKind
+import kr.chalkak.feature.record.RecordStateHolder
+import kr.chalkak.feature.notification.NotificationDetailStateHolder
+import kr.chalkak.feature.notification.NotificationInboxStateHolder
+import kr.chalkak.feature.notification.NotificationPermissionFlow
+import kr.chalkak.feature.notification.PermissionFlowOutcome
+import kr.chalkak.feature.notification.PushNavigationEvent
+import kotlinx.coroutines.flow.Flow
+import com.stonefive.chalkak.ui.home.ActiveHomeUnread
+import kr.chalkak.feature.settings.FeedbackStateHolder
 import kr.chalkak.feature.upload.PhotoUploadStateHolder
 import kr.chalkak.feature.upload.UploadGateEffect
 
@@ -115,6 +145,35 @@ class MainDependencies(
     val newUploadHolder: (scope: CoroutineScope, topicDate: LocalDate) -> PhotoUploadStateHolder,
     val uploadPlatform: UploadPlatform,
     val otherTab: @Composable (tab: Tab, scrollToTop: ScrollToTopSignal) -> Unit = { tab, _ -> TabPlaceholder(tab) },
+    /** Record tab holder (A7); null = the record tab is still the [otherTab] placeholder. */
+    val newRecordHolder: ((scope: CoroutineScope, mode: HomeMode) -> RecordStateHolder)? = null,
+    /** KST today for the record calendar's today marker; always from the injected clock (TC-TIME-029). */
+    val today: () -> LocalDate,
+    /** Inbox list holder, built once per opened inbox screen; null = presence-only placeholder (`notifications.root`). */
+    val newNotificationInboxHolder: ((scope: CoroutineScope) -> NotificationInboxStateHolder)? = null,
+    /** Notification detail holder, built once per opened detail screen; null = presence-only placeholder. */
+    val newNotificationDetailHolder: ((scope: CoroutineScope) -> NotificationDetailStateHolder)? = null,
+    /**
+     * AI feedback holder with the push entry flag (`openSheetOnEntry`); takes precedence over [newAiReviewHolder] when non-null.
+     * The flag is true only for the feed that a push or an inbox row opened with `PostDetail(openAiFeedbackSheet = true)`.
+     */
+    val newAiReviewHolderOnEntry: ((scope: CoroutineScope, openSheetOnEntry: Boolean) -> AiReviewStateHolder)? = null,
+    /** Asked once each time an authenticated home opens (`onMainEntered`); null = no OS permission prompt. */
+    val notificationPermission: NotificationPermissionFlow? = null,
+    /** Re-checks the unread dot of the home holder shown by this host; attached/detached by the host. */
+    val homeUnread: ActiveHomeUnread? = null,
+    /** Settings tab holders (A9); null = the settings tab is still the [otherTab] placeholder. Built once per settings composition scope. */
+    val newSettingsHolders: ((scope: CoroutineScope, mode: HomeMode) -> SettingsHolders)? = null,
+    /** Feedback screen holder (A9); a fresh one per opened feedback screen. Null = `feedback.root` placeholder. */
+    val newFeedbackHolder: ((scope: CoroutineScope) -> FeedbackStateHolder)? = null,
+    /** Drawing pad of the change-signature flow (A9, `SignatureMode.Change`, `SignaturePadSpace` canvas); a fresh one per visit. */
+    val newChangeSignaturePad: (() -> SignaturePadStateHolder)? = null,
+    /** Upload + confirm holder of the change-signature preview (A9). */
+    val newSignatureChangeHolder: ((scope: CoroutineScope) -> SignatureChangeStateHolder)? = null,
+    /** Web view slot of the terms / privacy sheet opened from settings (A9). */
+    val legalWeb: LegalWebContent = { _, _, _ -> },
+    /** Switch turned on while the device notification permission is off: opens the app's system notification settings (A9). */
+    val openSystemNotificationSettings: () -> Unit = {},
 )
 
 /**
@@ -133,11 +192,13 @@ fun MainHost(
     onExitApp: () -> Unit,
     modifier: Modifier = Modifier,
     sessionKey: Int = 0,
+    /** Push taps the queue released (`PushTapQueue.events`); the host navigates. Null = no push taps. */
+    pushEvents: Flow<PushNavigationEvent>? = null,
 ) {
     val activity = LocalActivity.current
     // The holders of a finished session are cleared with it (not kept in the Activity's store until the Activity dies).
     SessionHolders(sessionKey, isChangingConfigurations = { activity?.isChangingConfigurations == true }) {
-        MainHostContent(nav, deps, showToast, onExitApp, modifier, sessionKey)
+        MainHostContent(nav, deps, showToast, onExitApp, modifier, sessionKey, pushEvents)
     }
 }
 
@@ -149,6 +210,7 @@ private fun MainHostContent(
     onExitApp: () -> Unit,
     modifier: Modifier,
     sessionKey: Int,
+    pushEvents: Flow<PushNavigationEvent>?,
 ) {
     val copy = LocalCopy.current
     val navState by nav.state.collectAsState()
@@ -159,6 +221,20 @@ private fun MainHostContent(
         MainCoordinator(nav, deps, session, copy, showToast = { latestToast(it) }, exitApp = { latestExit() })
     }
     LaunchedEffect(navState.stack) { session.feeds.retain(navState.stack) }
+    // Taps the queue released (also those released before this host composed: the channel buffers them). The queue decides when.
+    val latestPushEvents by rememberUpdatedState(pushEvents)
+    val hasPushEvents = pushEvents != null
+    LaunchedEffect(hasPushEvents, coordinator) {
+        if (hasPushEvents) latestPushEvents?.collect { coordinator.onPushEvent(it) }
+    }
+    // The home holder lives as long as the host, so a push keeps refreshing the unread dot while the inbox covers home.
+    val homeMode = navState.accessMode
+    val homeHolder = rememberStateHolder("home-$sessionKey-$homeMode") { scope -> deps.newHomeHolder(scope, homeMode.toHomeMode()) }
+    val homeUnread = deps.homeUnread
+    DisposableEffect(homeHolder, homeUnread) {
+        homeUnread?.attach(homeHolder)
+        onDispose { homeUnread?.detach(homeHolder) }
+    }
     val homeList = rememberLazyListState()
     val idleSignal = remember { ScrollToTopSignal() }
 
@@ -174,8 +250,20 @@ private fun MainHostContent(
     MainShell(navState, onTabClick = coordinator::onTabClick, onUploadClick = coordinator::onUploadClick, modifier = modifier) { route ->
         when (route) {
             Route.TabRoot(Tab.Home) -> {
-                val mode = navState.accessMode
-                val holder = rememberStateHolder("home-$sessionKey-$mode") { scope -> deps.newHomeHolder(scope, mode.toHomeMode()) }
+                val holder = homeHolder
+                // Authenticated main opened (again): the OS permission is asked once per install; the flow itself skips guests.
+                val permissionFlow = deps.notificationPermission
+                LaunchedEffect(permissionFlow, homeMode) {
+                    val outcome = permissionFlow?.onMainEntered(homeMode.toHomeMode())
+                    if (outcome is PermissionFlowOutcome.Failed) latestToast(copy[outcome.toastCopyKey])
+                }
+                val refreshCount = session.homeRefresh.count
+                LaunchedEffect(refreshCount) {
+                    if (refreshCount != session.homeRefreshHandled) {
+                        session.homeRefreshHandled = refreshCount
+                        holder.onPullToRefresh()
+                    }
+                }
                 HomeRoute(
                     holder = holder,
                     likes = deps.likes,
@@ -203,13 +291,82 @@ private fun MainHostContent(
                 )
                 LaunchedEffect(requestedDate) { if (requestedDate != null) nav.consumeDisplayDateRequest() }
             }
+            Route.TabRoot(Tab.Record) -> {
+                val newHolder = deps.newRecordHolder
+                if (newHolder == null) {
+                    deps.otherTab(Tab.Record, idleSignal)
+                } else {
+                    val mode = navState.accessMode
+                    val holder = rememberStateHolder("record-$sessionKey-$mode") { scope -> newHolder(scope, mode.toHomeMode()) }
+                    // Home's week row asks for a day once; the route takes it when it first shows.
+                    val requestedDate = remember(holder) { session.recordRequestedDate.also { session.recordRequestedDate = null } }
+                    RecordRoute(
+                        holder = holder,
+                        image = deps.image,
+                        showToast = { latestToast(it) },
+                        onOpenFeed = coordinator::onRecordOpenFeed,
+                        onOpenDisplay = coordinator::onRecordOpenDisplay,
+                        onLoginRequired = { }, // the 401 also ends the session through AuthEvent.GoToLogin (as for feed)
+                        today = deps.today,
+                        requestedDate = requestedDate,
+                    )
+                }
+            }
+            // The terms / privacy sheet is an overlay: the settings route below it stays composed (no reload, no screen_view on close).
+            Route.TabRoot(Tab.Settings), is Route.TermsDocument -> {
+                val mode = navState.accessMode
+                val newHolders = deps.newSettingsHolders
+                if (newHolders == null) {
+                    if (route is Route.TabRoot) deps.otherTab(Tab.Settings, idleSignal)
+                } else {
+                    val holders = rememberStateHolder("settings-$sessionKey-$mode") { scope -> newHolders(scope, mode.toHomeMode()) }
+                    SettingsRoute(
+                        holders = holders,
+                        signatureImage = deps.image,
+                        showToast = { latestToast(it) },
+                        onOpenFeedback = coordinator::onOpenFeedback,
+                        onChangeSignature = coordinator::onOpenChangeSignature,
+                        onShowDocument = coordinator::onShowDocument,
+                        onOpenSystemNotificationSettings = { deps.openSystemNotificationSettings() },
+                        onAccountEnded = coordinator::onAccountEnded,
+                        onLoginRequired = { }, // the 401 also ends the session through AuthEvent.GoToLogin (as for feed)
+                    )
+                    if (route is Route.TermsDocument) {
+                        val kind = if (route.kind == TermsDocumentKind.TermsOfService) TermsKind.Service else TermsKind.Privacy
+                        LegalSheet(kind, session.documentUrl ?: LegalDocuments.url(kind), deps.legalWeb, onClose = coordinator::onSystemBack)
+                    }
+                }
+            }
             is Route.TabRoot -> deps.otherTab(route.tab, idleSignal)
-            Route.Notifications -> RoutePlaceholder("notifications.root")
+            Route.Notifications -> {
+                val create = deps.newNotificationInboxHolder
+                if (create == null) {
+                    RoutePlaceholder("notifications.root")
+                } else {
+                    val holder = rememberStateHolder("inbox-$sessionKey-${session.inboxSerial}") { scope -> create(scope) }
+                    NotificationRoute(
+                        holder = holder,
+                        image = deps.image,
+                        showToast = { latestToast(it) },
+                        onNavigate = coordinator::onNotificationNavigate,
+                        onRequireLogin = {}, // AuthEvent.GoToLogin ends the session.
+                        onBack = coordinator::onSystemBack,
+                    )
+                }
+            }
             is Route.Feed -> {
-                val slot = session.feeds.slotFor(navState.stack.lastIndex, route, session.feedSeeds)
+                @Suppress("UNUSED_VARIABLE")
+                val replaced = session.feedReplaceSerial // read only: a pushed replacement of this very route recomposes the feed
+                val slot = session.feeds.slotFor(navState.stack.lastIndex, route, session.feedSeeds, session.recordSeeds)
                 val holder = rememberStateHolder("feed-$sessionKey-${slot.id}") { scope -> deps.newFeedHolder(scope, slot.entry) }
                 slot.holder = holder
-                val aiHolder = deps.newAiReviewHolder?.let { create ->
+                val aiFactory: ((CoroutineScope) -> AiReviewStateHolder)? = deps.newAiReviewHolderOnEntry?.let { create ->
+                    // The push / inbox flag is taken once per feed slot (REQ-AIR-046/047); any other way into the feed has none.
+                    val openSheet = slot.openAiSheet ?: (session.aiSheetOnEntry.remove(route.postId) == true).also { slot.openAiSheet = it }
+                    val factory: (CoroutineScope) -> AiReviewStateHolder = { scope -> create(scope, openSheet) }
+                    factory
+                } ?: deps.newAiReviewHolder
+                val aiHolder = aiFactory?.let { create ->
                     rememberStateHolder("ai-$sessionKey-${slot.id}") { scope -> create(scope) }
                 }
                 slot.aiHolder = aiHolder
@@ -260,8 +417,98 @@ private fun MainHostContent(
                     )
                 }
             }
-            is Route.NotificationDetail -> RoutePlaceholder("notification-detail.root")
-            Route.Feedback -> RoutePlaceholder("feedback.root")
+            is Route.NotificationDetail -> {
+                val create = deps.newNotificationDetailHolder
+                if (create == null) {
+                    RoutePlaceholder("notification-detail.root")
+                } else {
+                    val holder = rememberStateHolder("notification-detail-$sessionKey-${route.notificationId}-${session.notificationDetailSerial}") { scope ->
+                        create(scope)
+                    }
+                    NotificationDetailRoute(
+                        holder = holder,
+                        notificationId = route.notificationId,
+                        inboxIsBelow = navState.stack.dropLast(1).contains(Route.Notifications),
+                        image = deps.image,
+                        showToast = { latestToast(it) },
+                        onClose = coordinator::onSystemBack,
+                        onOpenInbox = coordinator::onOpenInboxInsteadOfDetail,
+                        // The inbox reloads silently whenever it is shown again, which is when it is next seen.
+                        onInvalidateInbox = {},
+                        onRequireLogin = {}, // AuthEvent.GoToLogin ends the session.
+                    )
+                }
+            }
+            Route.Feedback -> {
+                val newHolder = deps.newFeedbackHolder
+                if (newHolder == null) {
+                    RoutePlaceholder("feedback.root")
+                } else {
+                    val holder = rememberStateHolder("feedback-$sessionKey-${session.feedbackSerial}") { scope -> newHolder(scope) }
+                    FeedbackRoute(
+                        holder = holder,
+                        showToast = { latestToast(it) },
+                        onClose = coordinator::onSystemBack,
+                        onLoginRequired = { }, // the 401 also ends the session through AuthEvent.GoToLogin (as for feed)
+                    )
+                }
+            }
+            Route.ChangeSignature -> {
+                val newPad = deps.newChangeSignaturePad
+                if (newPad == null) {
+                    RoutePlaceholder("signature.root")
+                } else {
+                    val pad = rememberStateHolder("change-pad-$sessionKey-${session.changeSerial}") { _ -> newPad() }
+                    val padState by pad.state.collectAsState()
+                    LaunchedEffect(pad) {
+                        pad.effects.collect { effect ->
+                            if (effect is SignaturePadEffect.ShowPreview) coordinator.onChangeSignatureDrawn(effect.png)
+                        }
+                    }
+                    SignatureScreen(
+                        mode = SignatureMode.Change,
+                        state = padState,
+                        onUndo = pad::onUndo,
+                        onClear = pad::onClear,
+                        onConfirm = pad::onConfirm,
+                        onBack = coordinator::onSystemBack,
+                        onBeginStroke = pad::beginStroke,
+                        onExtendStroke = pad::extendStroke,
+                        onEndStroke = pad::endStroke,
+                    )
+                }
+            }
+            Route.ChangeSignaturePreview -> {
+                val newPad = deps.newChangeSignaturePad
+                val newChange = deps.newSignatureChangeHolder
+                val png = session.changePng
+                if (newPad == null || newChange == null || png == null) {
+                    LaunchedEffect(Unit) { coordinator.onSystemBack() }
+                } else {
+                    val pad = rememberStateHolder("change-pad-$sessionKey-${session.changeSerial}") { _ -> newPad() }
+                    val holder = rememberStateHolder("change-sign-$sessionKey-${session.changeSerial}-${session.changePreviewSerial}") { scope ->
+                        newChange(scope)
+                    }
+                    val settingsHolders = deps.newSettingsHolders?.let { create ->
+                        val mode = navState.accessMode
+                        rememberStateHolder("settings-$sessionKey-$mode") { scope -> create(scope, mode.toHomeMode()) }
+                    }
+                    // Back, "다시 그리기" and a rejected signature all return to a blank pad; leaving cancels a running change request.
+                    val backToDrawing = {
+                        pad.onRedraw()
+                        coordinator.onSystemBack()
+                    }
+                    BackHandler(onBack = backToDrawing)
+                    ChangeSignaturePreviewRoute(
+                        holder = holder,
+                        png = png,
+                        onDone = { toastKey -> coordinator.onSignatureChanged(toastKey, settingsHolders) },
+                        onBackToLogin = coordinator::onChangeSignatureExpired,
+                        onBackToDrawing = backToDrawing,
+                        onRedraw = backToDrawing,
+                    )
+                }
+            }
             Route.BannerWeb -> {
                 val banner = session.issueBanner
                 if (banner == null) {
@@ -278,6 +525,25 @@ private fun MainHostContent(
             }
             else -> Unit
         }
+    }
+}
+
+/** Terms / privacy document sheet of the settings tab; the web view is composed afresh for every load attempt (retry). */
+@Composable
+private fun LegalSheet(kind: TermsKind, url: String, web: LegalWebContent, onClose: () -> Unit) {
+    val copy = LocalCopy.current
+    var load by remember { mutableStateOf(LegalDocLoad.Loading) }
+    var attempt by remember { mutableIntStateOf(0) }
+    LegalDocSheet(
+        title = copy[if (kind == TermsKind.Service) "onb.terms.doc.title.service" else "onb.terms.doc.title.privacy"],
+        load = load,
+        onClose = onClose,
+        onRetry = {
+            load = LegalDocLoad.Loading
+            attempt++
+        },
+    ) {
+        key(attempt) { web(url, { load = LegalDocLoad.Loaded }, { load = LegalDocLoad.Failed }) }
     }
 }
 

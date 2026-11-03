@@ -65,3 +65,8 @@ jobs:
       # nothing runs, and a real key is never committed or stored as a secret for this job.
       - name: Compile the Kakao adapter (kakaoOn source set)
         run: ./gradlew :app:compileDebugKotlin -PkakaoNativeAppKey=ci-dummy
+      # The Firebase Cloud Messaging adapter (src/fcmOn, firebase-messaging) is only compiled with -PfcmProjectId and friends; the default
+      # build has no Firebase at all. Compile it here with dummy values (and merge the manifest, which declares the messaging service);
+      # nothing runs, and real values are never committed or stored as secrets for this job.
+      - name: Compile the Firebase adapter (fcmOn source set)
+        run: ./gradlew :app:compileDebugKotlin :app:processDebugMainManifest -PfcmProjectId=ci-dummy -PfcmApplicationId=1:1:android:ci -PfcmApiKey=ci-dummy -PfcmSenderId=1

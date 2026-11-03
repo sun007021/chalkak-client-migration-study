@@ -1,6 +1,10 @@
 package com.stonefive.chalkak.platform
 
 import android.content.Context
+import coil3.ImageLoader
+import kr.chalkak.feature.record.CalendarImageRenderer
+import kr.chalkak.feature.record.CalendarImageSaver
+import kr.chalkak.feature.record.SaveOutcome
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.stonefive.chalkak.BuildConfig
 import com.stonefive.chalkak.copy.Copy
@@ -19,6 +23,7 @@ import kr.chalkak.feature.auth.UpdateLauncher
 import kr.chalkak.feature.onboarding.DeviceRegistrar
 import kr.chalkak.feature.onboarding.ExternalBrowser
 import kr.chalkak.feature.onboarding.SignatureImageEncoder
+import kr.chalkak.feature.settings.DeviceNotificationSettings
 
 /**
  * Everything platform specific that the screens' holders reach through interfaces. [android] wires the real adapters (Kakao SDK or the
@@ -44,6 +49,13 @@ class PlatformAdapters(
     val photoPickBridge: PhotoPickBridge = PhotoPickBridge(),
     /** Photo upload and editing ports (picker, camera, codec, WebP, temp files, gallery, edit preview). */
     val upload: UploadAdapters = UploadAdapters.headless(),
+    /** Record tab "이미지로 저장": MediaStore writer and the month-calendar bitmap renderer (gets the app's image loader). */
+    val calendarSaver: CalendarImageSaver = CalendarImageSaver { _, _ -> SaveOutcome.Failed },
+    val calendarRenderer: (ImageLoader?) -> CalendarImageRenderer = { CalendarImageRenderer { _, _ -> ByteArray(0) } },
+    /** Push ports (FCM token, POST_NOTIFICATIONS, notification display, stores). */
+    val pushPlatform: PushPlatform = PushPlatform.headless(),
+    /** Device notification permission and the jump to the app's system notification settings (settings push switches). */
+    val deviceNotifications: DeviceNotificationSettings = InertDeviceNotificationSettings,
 ) {
     companion object {
         fun android(context: Context, copy: Copy = Copy.load(context)): PlatformAdapters {
@@ -57,6 +69,7 @@ class PlatformAdapters(
                 BuildConfig.FAKE_SOCIAL_LOGIN && BuildConfig.DEBUG -> FakeSocialLoginClient()
                 else -> KakaoSocialLoginClient(KakaoSdkFactory.create(app, BuildConfig.KAKAO_NATIVE_APP_KEY, activity))
             }
+            val pushPlatform = PushPlatform.android(app)
             return PlatformAdapters(
                 socialLogin = socialLogin,
                 updateChecker = ConfiguredUpdateChecker(BuildConfig.FORCE_UPDATE_CHECK_ENABLED, PlayUpdateChecker(PlayUpdateSourceAdapter(playManager))),
@@ -72,6 +85,10 @@ class PlatformAdapters(
                 updateFlowBridge = bridge,
                 photoPickBridge = photoBridge,
                 upload = UploadAdapters.android(app, activity, photoBridge, copy, SystemClock),
+                calendarSaver = AndroidCalendarImageSaver(app),
+                calendarRenderer = { loader -> AndroidCalendarImageRenderer(app, copy, loader) },
+                pushPlatform = pushPlatform,
+                deviceNotifications = AndroidDeviceNotificationSettings.android(app, pushPlatform),
             )
         }
 

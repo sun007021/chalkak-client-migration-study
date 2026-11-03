@@ -49,6 +49,15 @@ fun String.asBuildConfigString(): String = "\"" + replace("\\", "\\\\").replace(
 val kakaoNativeAppKey: String = providers.gradleProperty("kakaoNativeAppKey").orNull?.trim().orEmpty()
 val kakaoSdkEnabled: Boolean = kakaoNativeAppKey.isNotEmpty()
 
+// `-PfcmProjectId=... -PfcmApplicationId=... -PfcmApiKey=... -PfcmSenderId=...` (never committed): turns Firebase Cloud Messaging on. Firebase is
+// initialised by hand from these values (no google-services plugin, no google-services.json). Without them the app builds with a
+// token source that has no token, so push registration is skipped and CI/tests need no Firebase.
+val fcmProjectId: String = providers.gradleProperty("fcmProjectId").orNull?.trim().orEmpty()
+val fcmApplicationId: String = providers.gradleProperty("fcmApplicationId").orNull?.trim().orEmpty()
+val fcmApiKey: String = providers.gradleProperty("fcmApiKey").orNull?.trim().orEmpty()
+val fcmSenderId: String = providers.gradleProperty("fcmSenderId").orNull?.trim().orEmpty()
+val fcmEnabled: Boolean = fcmProjectId.isNotEmpty()
+
 // `-PfakeSocialLogin=true`: E2E builds get a SocialLoginClient that returns a fixture idToken (docs/testing/strategy.md section 2). Debug only.
 val fakeSocialLogin: Boolean = providers.gradleProperty("fakeSocialLogin").orNull.toBoolean()
 
@@ -69,6 +78,13 @@ android {
         buildConfigField("String", "KAKAO_NATIVE_APP_KEY", kakaoNativeAppKey.asBuildConfigString())
         buildConfigField("boolean", "KAKAO_SDK_ENABLED", kakaoSdkEnabled.toString())
         buildConfigField("boolean", "FORCE_UPDATE_CHECK_ENABLED", forceUpdateCheck.toString())
+        buildConfigField("boolean", "FCM_ENABLED", fcmEnabled.toString())
+        buildConfigField("String", "FCM_PROJECT_ID", fcmProjectId.asBuildConfigString())
+        buildConfigField("String", "FCM_APPLICATION_ID", fcmApplicationId.asBuildConfigString())
+        buildConfigField("String", "FCM_API_KEY", fcmApiKey.asBuildConfigString())
+        buildConfigField("String", "FCM_SENDER_ID", fcmSenderId.asBuildConfigString())
+        // Without Firebase the messaging service class does not exist: keep its manifest entry disabled.
+        manifestPlaceholders["fcmEnabled"] = fcmEnabled.toString()
         // Kakao's AuthCodeHandlerActivity needs the scheme `kakao<native app key>`; the placeholder value is harmless without a key.
         manifestPlaceholders["kakaoNativeAppKey"] = kakaoNativeAppKey.ifEmpty { "not-configured" }
         // Without the SDK the AuthCodeHandlerActivity class does not exist: keep its exported manifest entry disabled.
@@ -132,6 +148,9 @@ androidComponents {
         // Exactly one KakaoSdkFactory exists: the real SDK adapter (kakaoOn) or the ConfigError stand-in (kakaoOff).
         val kakaoDir = if (kakaoSdkEnabled) "src/kakaoOn/kotlin" else "src/kakaoOff/kotlin"
         variant.sources.kotlin?.addStaticSourceDirectory(layout.projectDirectory.dir(kakaoDir).asFile.path)
+        // Exactly one FcmTokens exists: the Firebase adapter (fcmOn, with the messaging service) or the no-token stand-in (fcmOff).
+        val fcmDir = if (fcmEnabled) "src/fcmOn/kotlin" else "src/fcmOff/kotlin"
+        variant.sources.kotlin?.addStaticSourceDirectory(layout.projectDirectory.dir(fcmDir).asFile.path)
     }
 }
 
@@ -164,6 +183,10 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     if (kakaoSdkEnabled) implementation(libs.kakao.sdk.user)
+    if (fcmEnabled) {
+        implementation(platform(libs.firebase.bom))
+        implementation(libs.firebase.messaging)
+    }
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
