@@ -189,7 +189,7 @@ describe('기록 → 피드·전시 (TC-REC-034)', () => {
     click('record.view-feed-button');
     await screen.findByTestId('feed.root');
     act(() => h.container.postChanges.publish({ type: 'removed', postId: OTHER }));
-    click('feed.back-button');
+    // 테스트 수정: 삭제 이벤트를 받은 상세는 스스로 닫혀 기록으로 돌아온다(뒤로 가기 버튼이 이미 없다).
     await screen.findByTestId('record.calendar-grid');
     expect(maybe('record.day-photo-2026-10-27')).not.toBeInTheDocument();
   });

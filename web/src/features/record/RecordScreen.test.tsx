@@ -5,7 +5,7 @@ import { deferred } from '../../test/deferred';
 import { gated } from '../../test/displayAsserts';
 import { json } from '../../test/fixtureRouter';
 import { refreshSuccessBody } from '../../test/fixtures';
-import { NOV, OCT, OCT_20, OCT_31, SEP, MONTHS_KEY, monthResponse, monthsBody, recPostId, thumbOf } from '../../test/recordRoutes';
+import { AUG, NOV, OCT, OCT_20, OCT_31, SEP, MONTHS_KEY, monthResponse, monthsBody, recPostId, thumbOf } from '../../test/recordRoutes';
 import { advanceApp, openRecordApp, recordLoaded } from '../../test/recordScreens';
 import { toastText } from '../../test/postScreens';
 import { TOAST_DURATION_MS } from '../../constants';
@@ -215,7 +215,7 @@ describe('월 이동·월 선택 (TC-REC-004, 016, 017, REQ-REC-005)', () => {
   });
 
   it('TC-REC-004 항목을 고르면 그 달로 이동하고 시트가 닫힌다. 기록 없는 달은 빈 달로 보인다', async () => {
-    await openRecordApp({ routes: { [MONTHS_KEY]: () => json(200, monthsBody([2026, 10], [2026, 9], [2026, 8])) } });
+    await openRecordApp({ routes: { [MONTHS_KEY]: () => json(200, monthsBody([2026, 10], [2026, 9], [2026, 8])), [AUG]: 'record/posts-calendar__2026-08-empty' } }); // 테스트 수정: 8월 달력 라우트가 없으면 연결 실패다
     await recordLoaded();
     click('record.month-picker-button');
     click('record.month-picker-item-2026-08');
@@ -251,7 +251,9 @@ describe('월 이동·월 선택 (TC-REC-004, 016, 017, REQ-REC-005)', () => {
 
 describe('오류 화면 (REQ-REC-024, TC-REC-029~032)', () => {
   it('TC-REC-032 서버 500이면 "기록을 불러오지 못했어요" + "다시 시도"이고 다시 시도하면 달력이 열린다', async () => {
-    const { fixtures } = await openRecordApp({ routes: { [OCT]: 'record/posts-calendar__500-server-error' }, waitFor: null });
+    const { fixtures, h } = await openRecordApp({ routes: { [OCT]: 'record/posts-calendar__500-server-error' }, waitFor: null });
+    await waitFor(() => expect(fixtures.calls(OCT).length).toBeGreaterThan(0));
+    await advanceApp(h, 2000); // 테스트 수정: GET 재시도 백오프(0.5초, 1초)는 가상 시간이다. 첫 요청이 나간 뒤에 전진한다
     expect(await screen.findByTestId('record.error-state')).toBeInTheDocument();
     expect(tid('record.error-message')).toHaveTextContent(t('record.err.other'));
     expect(tid('record.retry-button')).toHaveTextContent(t('common.retry'));
@@ -307,7 +309,9 @@ describe('오류 화면 (REQ-REC-024, TC-REC-029~032)', () => {
 
   it('TC-REC-029 오프라인 첫 진입은 "네트워크 연결을 확인해 주세요." + 다시 시도이고 온라인 복귀 후 다시 시도하면 로드된다', async () => {
     const offline = () => Promise.reject(new TypeError('Failed to fetch'));
-    const { fixtures } = await openRecordApp({ routes: { [OCT]: offline, [MONTHS_KEY]: offline }, waitFor: null });
+    const { fixtures, h } = await openRecordApp({ routes: { [OCT]: offline, [MONTHS_KEY]: offline }, waitFor: null });
+    await waitFor(() => expect(fixtures.calls(OCT).length).toBeGreaterThan(0));
+    await advanceApp(h, 2000); // 테스트 수정: 연결 실패의 GET 재시도 백오프도 가상 시간이다. 첫 요청이 나간 뒤에 전진한다
     expect(await screen.findByTestId('record.error-state', undefined, { timeout: 5000 })).toBeInTheDocument();
     expect(tid('record.error-message')).toHaveTextContent(t('common.error.network'));
     fixtures.set(OCT, 'record/posts-calendar__2026-10');
@@ -345,13 +349,15 @@ describe('캐시 재검증과 토스트 (TC-REC-020~022, 029)', () => {
   });
 
   it('TC-REC-021 캐시된 달의 재조회가 실패하면 캐시를 유지하고 토스트 "기록을 불러오지 못했어요"가 2.5초 동안 뜬다', async () => {
-    const { h } = await openRecordApp({ routes: { [SEP]: ['record/posts-calendar__2026-09', 'record/posts-calendar__500-server-error'] } });
+    const { h, fixtures } = await openRecordApp({ routes: { [SEP]: ['record/posts-calendar__2026-09', 'record/posts-calendar__500-server-error'] } });
     await recordLoaded();
     click('record.prev-month-button');
     await waitFor(() => expect(maybe('record.day-photo-2026-09-30')).toBeInTheDocument());
     click('record.next-month-button');
     await waitFor(() => expect(tid('record.month-label')).toHaveTextContent('2026년 10월'));
     click('record.prev-month-button');
+    await waitFor(() => expect(fixtures.calls(SEP).length).toBeGreaterThan(1));
+    await advanceApp(h, 1500); // 테스트 수정: GET 재시도 백오프(0.5초 + 1초)만큼만 전진한다(토스트 2.5초 계산을 흐트러뜨리지 않게). 두 번째 요청이 나간 뒤에 전진한다
     await waitFor(() => expect(toastText()).toBe(t('record.err.other')));
     expect(maybe('record.day-photo-2026-09-30')).toBeInTheDocument();
     expect(maybe('record.error-state')).not.toBeInTheDocument();

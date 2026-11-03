@@ -14,6 +14,7 @@ import { readOpenAiReview } from '../aireview/aiEntry';
 import { FeedAiSection } from '../aireview/FeedAiSection';
 import type { FeedAiViewModel } from '../aireview/FeedAiViewModel';
 import { LikeButton } from '../like/LikeButton';
+import { readRecordFeedEntry } from '../record/recordNavigation';
 import type { FeedPost, FeedState, FeedViewModel } from './FeedViewModel';
 import { planFeedClose, readFeedSeed } from './feedNavigation';
 import { MAX_ZOOM, clampZoomScale, pinchScale, releaseZoom, zoomAroundPoint } from './photoZoom';
@@ -35,6 +36,13 @@ export function FeedScreen(): ReactNode {
   if (seedBox.postId !== postId) setSeedBox({ postId, seed: readFeedSeed(location.state, postId) });
   const seed = seedBox.postId === postId ? seedBox.seed : readFeedSeed(location.state, postId);
 
+  // 기록에서 연 상세(assumeMine, 썸네일)도 진입 때 한 번만 읽는다.
+  const [recordEntryBox, setRecordEntryBox] = useState(() => ({ postId, entry: readRecordFeedEntry(location.state) }));
+  if (recordEntryBox.postId !== postId) setRecordEntryBox({ postId, entry: readRecordFeedEntry(location.state) });
+  const recordEntry = recordEntryBox.postId === postId ? recordEntryBox.entry : readRecordFeedEntry(location.state);
+  const assumeMine = recordEntry ? true : undefined;
+  const previewUrl = recordEntry?.thumbnailImageUrl ?? null;
+
   const closeRef = useRef<() => void>(() => undefined);
   useEffect(() => {
     closeRef.current = () => {
@@ -47,10 +55,10 @@ export function FeedScreen(): ReactNode {
 
   // 만들자마자 load를 시작한다: 시드가 있으면 같은 효과 안에서 content가 되므로 loading 프레임이 그려지지 않는다.
   const create = useCallback(() => {
-    const created = container.createFeedViewModel({ postId, seed, navigator: { close } });
+    const created = container.createFeedViewModel({ postId, seed, assumeMine, navigator: { close } });
     void created.load();
     return created;
-  }, [container, postId, seed, close]);
+  }, [container, postId, seed, assumeMine, close]);
   const vm = useOwnedViewModel(create);
   // AI 영역(알약·시트)은 상세 로직과 따로 둔다. 홈 "자세히 보기"로 들어왔으면 첫 GET 뒤 시트를 자동으로 연다(REQ-AIR-047).
   // 진입 때 한 번만 읽는다: 소비 뒤 state에서 지워도 AI ViewModel이 다시 만들어지지 않게 postId별로 고정한다.
@@ -74,10 +82,10 @@ export function FeedScreen(): ReactNode {
   );
   const aiVm = useOwnedViewModel(createAi);
 
-  return vm && aiVm ? <FeedBody vm={vm} aiVm={aiVm} onClose={close} /> : null;
+  return vm && aiVm ? <FeedBody vm={vm} aiVm={aiVm} previewUrl={previewUrl} onClose={close} /> : null;
 }
 
-function FeedBody({ vm, aiVm, onClose }: { vm: FeedViewModel; aiVm: FeedAiViewModel; onClose: () => void }): ReactNode {
+function FeedBody({ vm, aiVm, previewUrl, onClose }: { vm: FeedViewModel; aiVm: FeedAiViewModel; previewUrl: string | null; onClose: () => void }): ReactNode {
   const state = useViewModel(vm);
   useScrollRestore(state.view.kind !== 'loading');
   // 다른 탭·앱에서 돌아와 문서가 다시 보이면 내용을 조용히 재검증한다(실패하면 내용 유지 + 토스트).
@@ -96,6 +104,7 @@ function FeedBody({ vm, aiVm, onClose }: { vm: FeedViewModel; aiVm: FeedAiViewMo
           <span aria-hidden="true">‹</span>
         </button>
       </header>
+      {view.kind === 'loading' && previewUrl ? <img src={previewUrl} alt={webOnlyCopy['feed.preview-alt']} style={{ display: 'block', width: '100%', maxHeight: '60vh', objectFit: 'contain', background: '#e5e5e5' }} /> : null}
       {view.kind === 'loading' ? <LoadingIndicator screenId="feed" /> : null}
       {view.kind === 'not-found' ? (
         <p data-testid="feed.not-found-state" style={{ padding: 16 }}>
