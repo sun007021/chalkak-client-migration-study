@@ -14,7 +14,9 @@ export const ADJUST_RANGE = { min: -1, max: 1 } as const;
 
 /** 표시값(정수 -100~100) ↔ 값(-1~1). 범위를 넘으면 자르고 소수 둘째 자리로 맞춘다. */
 export function toDisplayValue(value: number): number {
-  const d = Math.round(clampUnit(value) * 100);
+  const scaled = clampUnit(value) * 100;
+  // 0.5는 0에서 먼 쪽으로(양수·음수 대칭, 자바스크립트 Math.round는 -12.5를 -12로 보낸다).
+  const d = Math.sign(scaled) * Math.round(Math.abs(scaled));
   return d === 0 ? 0 : d;
 }
 export function fromDisplayValue(display: number): number {

@@ -3,7 +3,10 @@ import type { RefObject } from 'react';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-const focusables = (root: HTMLElement): HTMLElement[] => Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => !el.hasAttribute('disabled'));
+const focusables = (root: HTMLElement): HTMLElement[] => Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => !el.hasAttribute('disabled') && !el.closest('[inert]'));
+
+/** Tab 순서에 실제로 드는 요소(roving tabindex의 tabindex=-1 항목은 제외). */
+const tabbables = (items: HTMLElement[]): HTMLElement[] => items.filter((el) => el.tabIndex >= 0);
 
 /** 다이얼로그 밖의 형제 요소를 inert로 만든다(배경 클릭·포커스·읽기 차단). 알림(aria-live) 영역은 남겨 토스트가 읽히게 한다. 되돌리는 함수를 돌려준다. */
 export function inertBackground(dialog: HTMLElement): () => void {
@@ -53,13 +56,17 @@ export function useDialogFocus(dialogRef: RefObject<HTMLElement | null>, onClose
         event.preventDefault();
         return;
       }
-      const first = items[0]!;
-      const last = items[items.length - 1]!;
+      const order = tabbables(items);
+      const first = order[0] ?? items[0]!;
+      const last = order[order.length - 1] ?? items[items.length - 1]!;
       const active = document.activeElement;
-      if (event.shiftKey && (active === first || !dialog.contains(active))) {
+      // 끝은 Tab 순서의 끝이거나 목록 전체의 끝(roving tabindex로 초점은 있지만 Tab 순서에는 없는 항목)이다.
+      const atFirst = active === first || active === items[0];
+      const atLast = active === last || active === items[items.length - 1];
+      if (event.shiftKey && (atFirst || !dialog.contains(active))) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
+      } else if (!event.shiftKey && (atLast || !dialog.contains(active))) {
         event.preventDefault();
         first.focus();
       }

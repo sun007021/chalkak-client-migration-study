@@ -2,6 +2,7 @@ import { POST_IMAGE_CONTENT_TYPE } from '../../../constants';
 import { throwIfAborted } from '../../../core/abort';
 import type { BlobUrlFactory } from '../../signature/BlobUrlFactory';
 import type { PhotoEdit } from '../editModel';
+import { isDrawableImage } from '../imagePorts';
 import type { DecodedImage } from '../imagePorts';
 import { fitLongEdge } from '../imageSizing';
 import type { AdjustmentValues } from './adjustments';
@@ -16,13 +17,15 @@ import type { AutoAnalysisRegion, AutoAnalyzer, PixelSurfaceFactory, PreviewFram
  */
 const PREVIEW_TYPE = POST_IMAGE_CONTENT_TYPE;
 const PREVIEW_QUALITY = 0.85;
+/** 미리보기 프록시의 긴 변(REQ-EDIT-007의 미리보기 상한과 같다). */
+export const PREVIEW_PROXY_LONG_EDGE = 1440;
 
 /** 표면이 만든 이미지를 Blob으로 바꾼다. 실제 canvas 표면의 결과(BrowserDecodedImage.drawable)만 다룬다. */
 export function decodedImageToBlob(image: DecodedImage): Promise<Blob> {
-  const drawable = (image as { drawable?: unknown }).drawable;
-  if (!(drawable instanceof HTMLCanvasElement)) return Promise.reject(new Error('image is not a canvas image'));
+  if (!isDrawableImage(image) || !(image.drawable instanceof HTMLCanvasElement)) return Promise.reject(new Error('image is not a canvas image'));
+  const canvas = image.drawable;
   return new Promise((resolve, reject) => {
-    drawable.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('canvas.toBlob returned null'))), PREVIEW_TYPE, PREVIEW_QUALITY);
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('canvas.toBlob returned null'))), PREVIEW_TYPE, PREVIEW_QUALITY);
   });
 }
 
@@ -38,9 +41,42 @@ export interface CanvasPreviewDeps {
  * 자른 결과를 긴 변 maxLongEdge 이내로 줄여 그린다(확대하지 않음, REQ-EDIT-007). 입력 이미지는 release하지 않는다. jsdom에서 테스트하지 않는다(Playwright).
  */
 export class CanvasPreviewRenderer implements PreviewRenderer {
+  /** 큰 원본을 PROXY_LONG_EDGE 이하로 한 번만 줄여 둔 이미지. 미리보기·썸네일은 모두 여기서 그린다(4096 원본을 매번 그리지 않는다). */
+  private readonly proxies = new Map<DecodedImage, { promise: Promise<DecodedImage>; image: DecodedImage | null }>();
+
   constructor(protected readonly deps: CanvasPreviewDeps) {}
 
-  async render(image: DecodedImage, edit: PhotoEdit, options: { maxLongEdge: number }, signal: AbortSignal): Promise<PreviewFrame> {
+  forget(image: DecodedImage): void {
+    const entry = this.proxies.get(image);
+    this.proxies.delete(image);
+    if (!entry) return;
+    if (entry.image) entry.image.release();
+    else entry.promise.then((proxy) => proxy.release(), () => undefined);
+  }
+
+  private async source(image: DecodedImage): Promise<DecodedImage> {
+    if (Math.max(image.width, image.height) <= PREVIEW_PROXY_LONG_EDGE) return image;
+    let entry = this.proxies.get(image);
+    if (!entry) {
+      const created: { promise: Promise<DecodedImage>; image: DecodedImage | null } = { promise: Promise.resolve(image), image: null };
+      created.promise = Promise.resolve().then(() => {
+        const output = fitLongEdge(image, PREVIEW_PROXY_LONG_EDGE);
+        const surface = this.deps.createSurface(output);
+        surface.drawGeometry(image, { quarterTurns: 0, rotatedRect: { x: 0, y: 0, width: image.width, height: image.height }, output });
+        const proxy = surface.toImage();
+        created.image = proxy;
+        return proxy;
+      });
+      created.promise.catch(() => this.proxies.delete(image));
+      this.proxies.set(image, created);
+      entry = created;
+    }
+    return entry.promise;
+  }
+
+  async render(original: DecodedImage, edit: PhotoEdit, options: { maxLongEdge: number }, signal: AbortSignal): Promise<PreviewFrame> {
+    throwIfAborted(signal);
+    const image = await this.source(original);
     throwIfAborted(signal);
     const plan = planGeometry(image, edit);
     const output = fitLongEdge(plan.output, options.maxLongEdge);

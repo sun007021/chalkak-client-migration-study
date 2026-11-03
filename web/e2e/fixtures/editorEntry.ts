@@ -12,6 +12,7 @@ import { CanvasEditRenderer, createCanvasPixelSurface } from '../../src/features
 import { applyColorPipeline, colorParamsOf } from '../../src/features/upload/editor/colorPipeline';
 import { planGeometry } from '../../src/features/upload/editor/cropGeometry';
 import { createPhotoEditor } from '../../src/features/upload/editor/PhotoEditorScreen';
+import { isDrawableImage } from '../../src/features/upload/imagePorts';
 import type { DecodedImage } from '../../src/features/upload/imagePorts';
 
 interface Pixels {
@@ -24,12 +25,12 @@ const decode = (source: Blob, signal: AbortSignal = new AbortController().signal
 
 /** 디코드한 이미지(또는 표면 결과)의 RGBA 픽셀. */
 function pixelsOf(image: DecodedImage): Pixels {
-  const drawable = (image as unknown as { drawable: CanvasImageSource }).drawable;
+  if (!isDrawableImage(image)) throw new Error('image is not drawable');
   const canvas = document.createElement('canvas');
   canvas.width = image.width;
   canvas.height = image.height;
   const context = canvas.getContext('2d', { willReadFrequently: true })!;
-  context.drawImage(drawable, 0, 0);
+  context.drawImage(image.drawable, 0, 0);
   return { width: image.width, height: image.height, data: context.getImageData(0, 0, image.width, image.height).data };
 }
 
