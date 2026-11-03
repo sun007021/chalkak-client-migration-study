@@ -313,6 +313,62 @@ struct DisplayLoadSortTests {
         #expect(vm.featuredPage == 0)
     }
 
+    // MARK: 스크롤 위치
+
+    @Test("TC-DISP-044 TC-FEED-015 같은 날짜·정렬의 재검증(복귀·재진입)은 맨 위 이동을 요청하지 않고 보던 위치를 유지한다")
+    func revalidationKeepsScrollPosition() async {
+        let world = FeedWorld()
+        let vm = world.makeDisplay()
+        await vm.onAppear()
+        let token = vm.scrollToTopToken
+        vm.saveScrollOffset(420)
+        vm.onDisappear()
+        await vm.onAppear()
+        #expect(vm.state == .loaded)
+        #expect(vm.scrollToTopToken == token)
+        #expect(vm.savedScrollOffset == 420)
+    }
+
+    @Test("TC-DISP-044 탭 재선택은 저장한 위치를 비우고 맨 위로 보낸다")
+    func tabReselectResetsScrollOffset() async {
+        let world = FeedWorld()
+        let vm = world.makeDisplay()
+        await vm.onAppear()
+        vm.saveScrollOffset(420)
+        await vm.tabReselected()
+        #expect(vm.savedScrollOffset == 0)
+    }
+
+    @Test("TC-DISP-044 날짜를 바꾸면 맨 위로 보내고 위치를 비우지만, 이동이 실패하면 보던 위치를 유지한다")
+    func dateChangeScrollsToTopOnlyOnSuccess() async {
+        let world = FeedWorld()
+        let vm = world.makeDisplay(initialDate: F.yesterday)
+        await vm.onAppear()
+        vm.saveScrollOffset(300)
+        let token = vm.scrollToTopToken
+        await world.topics.setHandler { _ in throw FeedFailure.notFound }
+        await vm.goToPreviousDay()
+        #expect(vm.scrollToTopToken == token)
+        #expect(vm.savedScrollOffset == 300)
+        await world.topics.setHandler { date in F.topic(date) }
+        await vm.goToPreviousDay()
+        #expect(vm.selectedDate == F.date(2026, 10, 25))
+        #expect(vm.scrollToTopToken == token + 1)
+        #expect(vm.savedScrollOffset == 0)
+    }
+
+    @Test("TC-DISP-012 정렬을 바꾸면 맨 위로 보내고 저장한 위치를 비운다")
+    func sortChangeScrollsToTop() async {
+        let world = FeedWorld()
+        let vm = world.makeDisplay()
+        await vm.onAppear()
+        vm.saveScrollOffset(300)
+        let token = vm.scrollToTopToken
+        await vm.selectSort(.popular)
+        #expect(vm.scrollToTopToken == token + 1)
+        #expect(vm.savedScrollOffset == 0)
+    }
+
     // MARK: 재검증
 
     @Test("TC-DISP-044 탭 재선택은 맨 위로 보내고 기존 전시를 유지한 채 재검증해 성공하면 교체한다")
