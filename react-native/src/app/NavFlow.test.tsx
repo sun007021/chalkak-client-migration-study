@@ -6,7 +6,10 @@ import { createNetHarness } from '../core/http/__testing__/createNetHarness';
 import { FixtureRouter, type RouteValue } from '../data/__testing__/FixtureRouter';
 import { datedRoutes } from '../features/display/__testing__/createDisplayHarness';
 import { GUEST_ROUTES, MEMBER_ROUTES, NOW } from '../features/home/__testing__/createHomeHarness';
-import { NOTI_ROUTES } from '../features/notification/__testing__/createNotificationHarness';
+import {
+  LIST_P1,
+  NOTI_ROUTES,
+} from '../features/notification/__testing__/createNotificationHarness';
 import { MONTHS, RECORD_ROUTES } from '../features/record/__testing__/createRecordHarness';
 import { SETTINGS_ROUTES } from '../features/settings/__testing__/createSettingsHarness';
 import { UPLOAD_ROUTES } from '../features/upload/__testing__/createUploadHarness';
@@ -236,7 +239,7 @@ describe('게스트 제한 (D-05)', () => {
 
 describe('정지(BANNED) 회원 (D-08)', () => {
   it('TC-NAV-024 정지 회원도 기록, 알림, 설정, 전시가 열리고 조회 API가 정상 호출된다', async () => {
-    const { router, container } = await renderApp('member', {
+    const { net, router, container } = await renderApp('member', {
       'GET /posts/today': 'home/posts-today__403-banned',
     });
     await screen.findByTestId('home.root');
@@ -248,10 +251,12 @@ describe('정지(BANNED) 회원 (D-08)', () => {
     expect(router.calls('GET /notification-settings')).toHaveLength(1);
     await pressTab('display');
     expect(await screen.findByTestId('display.root')).toBeOnTheScreen();
+    expect(net.transport.requests.some((r) => /\/posts\?.*sort=recent/.test(r.url))).toBe(true);
     await pressTab('home');
     await fireEvent.press(await screen.findByTestId('home.notification-button'));
     await waitFor(() => expect(rootRouteNames(container)).toEqual(['Tabs', 'Notifications']));
     expect(await screen.findByTestId('notifications.root')).toBeOnTheScreen();
+    await waitFor(() => expect(router.calls(LIST_P1)).toHaveLength(1));
   });
 });
 
