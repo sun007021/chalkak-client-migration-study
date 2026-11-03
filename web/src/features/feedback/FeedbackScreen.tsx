@@ -7,6 +7,7 @@ import { FEEDBACK_MAX } from '../../constants';
 import { t } from '../../copy/ko';
 import { useScreenView } from '../../core/analytics/useScreenView';
 import { useOwnedViewModel } from '../../core/state/useOwnedViewModel';
+import { useSubscribed } from '../../core/state/useSubscribed';
 import { useViewModel } from '../../core/state/useViewModel';
 import type { FeedbackViewModel } from './FeedbackViewModel';
 
@@ -27,6 +28,7 @@ const page: CSSProperties = { minHeight: '100dvh', boxSizing: 'border-box', disp
 
 function FeedbackView({ vm }: { vm: FeedbackViewModel }): ReactNode {
   const state = useViewModel(vm);
+  const subscribed = useSubscribed();
   const navigate = useNavigate();
   const below = isSettingsBelow(useLocation());
   const inputId = useId();
@@ -38,6 +40,7 @@ function FeedbackView({ vm }: { vm: FeedbackViewModel }): ReactNode {
       },
       () => undefined,
     );
+  if (!subscribed) return null;
   return (
     <div data-testid="feedback.root" style={page}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
