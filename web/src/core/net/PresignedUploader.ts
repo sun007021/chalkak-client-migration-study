@@ -13,6 +13,8 @@ export interface PresignedUploaderDeps {
   logger?: Logger;
   /** 전송 직전에 주소를 바꾼다(개발 프록시). 없으면 그대로. 허용 검사와 로그는 원래 주소 기준. */
   urlRewriter?: UploadUrlRewriter;
+  /** false면 https만 허용한다(배포 빌드). 기본 true(https 또는 loopback http). */
+  allowLoopbackHttp?: boolean;
 }
 
 export interface PresignedPutRequest {
@@ -38,7 +40,7 @@ export class PresignedUploader {
   }
 
   async put(request: PresignedPutRequest): Promise<void> {
-    assertAllowedAbsoluteUrl(request.url);
+    assertAllowedAbsoluteUrl(request.url, { allowLoopbackHttp: this.deps.allowLoopbackHttp });
     const response = await this.transport.send({
       method: 'PUT',
       url: this.deps.urlRewriter ? this.deps.urlRewriter.rewrite(request.url) : request.url,

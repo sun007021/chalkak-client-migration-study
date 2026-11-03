@@ -120,6 +120,8 @@ export interface AppContainerOptions {
   sessionChannel?: SessionChannel;
   /** 목록 끝 센티넬이 보이는지 보는 수단. 기본 IntersectionObserver(없는 환경이면 null=자동 다음 페이지 읽기 없음). */
   visibilityObserver?: VisibilityObserverFactory | null;
+  /** presigned 업로드 URL에 loopback http를 허용할지. 기본은 개발 빌드(__UPLOAD_PROXY_ENABLED__)에서만 true, 배포 빌드는 https만. */
+  allowLoopbackUploadHttp?: boolean;
   /** 업로드 버튼(회원)이 부르는 진입. 기본 UploadGate(container.uploadGate). 테스트가 Fake로 덮어쓰면 uploadGate는 null. */
   uploadEntry?: UploadEntry;
   /** 사진 디코드(EXIF 반영·다운샘플). 기본 BrowserImageDecoder. */
@@ -303,7 +305,7 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     window: globalThis.window,
   });
   holder.sync = crossTabSync;
-  const presignedUploader = new PresignedUploader({ fetch: fetchImpl, clock, logger, urlRewriter: options.uploadUrlRewriter });
+  const presignedUploader = new PresignedUploader({ fetch: fetchImpl, clock, logger, urlRewriter: options.uploadUrlRewriter, allowLoopbackHttp: options.allowLoopbackUploadHttp ?? __UPLOAD_PROXY_ENABLED__ });
   const signatureRepository = new SignatureRepository({ api });
   const signatureCard = new SignatureCardController({ repository: signatureRepository, toast });
   userCaches.register(signatureCard);
