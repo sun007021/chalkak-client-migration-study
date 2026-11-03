@@ -31,13 +31,15 @@ export function inertBackground(dialog: HTMLElement): () => void {
 /**
  * 모달 다이얼로그의 키보드·포커스 규칙(WAI-ARIA dialog): 열리면 initialFocus(없으면 첫 포커스 가능 요소)로 포커스를 옮기고,
  * Tab/Shift+Tab은 다이얼로그 안에서만 돌며, Esc는 onClose, 배경은 inert, 닫히면(언마운트) 열기 전 포커스(트리거)로 돌아간다.
- * onClose가 undefined이면 Esc는 아무것도 하지 않는다(처리 중 닫기 금지 등).
+ * onClose가 undefined이면 Esc는 아무것도 하지 않는다(처리 중 닫기 금지 등). enabled가 false인 동안(위에 다른 모달이 열림)은 Esc·Tab 처리를 모두 건너뛴다.
  */
-export function useDialogFocus(dialogRef: RefObject<HTMLElement | null>, onClose?: () => void, initialFocusRef?: RefObject<HTMLElement | null>): void {
+export function useDialogFocus(dialogRef: RefObject<HTMLElement | null>, onClose?: () => void, initialFocusRef?: RefObject<HTMLElement | null>, enabled = true): void {
   const closeRef = useRef(onClose);
+  const enabledRef = useRef(enabled);
   useEffect(() => {
     closeRef.current = onClose;
-  }, [onClose]);
+    enabledRef.current = enabled;
+  }, [onClose, enabled]);
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -45,6 +47,8 @@ export function useDialogFocus(dialogRef: RefObject<HTMLElement | null>, onClose
     const restoreBackground = inertBackground(dialog);
     (initialFocusRef?.current ?? focusables(dialog)[0] ?? dialog).focus();
     const onKeyDown = (event: KeyboardEvent) => {
+      // 위에 다른 모달이 열려 있으면(중첩) 키 처리는 그쪽이 맡는다.
+      if (!enabledRef.current) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         closeRef.current?.();
