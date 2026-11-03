@@ -1,4 +1,4 @@
-import { act, fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import { t } from '../../../copy/ko';
 import { editorFakes, renderEditor, settle } from '../../../test/editorHarness';
@@ -119,7 +119,8 @@ describe('편집기 화면: 구성과 접근성 (REQ-EDIT-001)', () => {
   it('언마운트하면 디코드한 이미지와 미리보기를 놓는다', async () => {
     const { fakes, unmount } = await open();
     unmount();
-    expect(fakes.decoder.images.every((i) => i.released)).toBe(true);
+    // 소유 ViewModel의 dispose는 한 틱 미뤄진다(StrictMode의 가짜 언마운트에서 인스턴스를 유지하려고).
+    await waitFor(() => expect(fakes.decoder.images.every((i) => i.released)).toBe(true));
     expect(fakes.preview.frames.every((f) => f.released)).toBe(true);
   });
 });
