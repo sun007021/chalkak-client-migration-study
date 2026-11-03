@@ -175,7 +175,7 @@ describe('SettingsViewModel 게스트', () => {
     expect(h.viewModel.getSnapshot()).toMatchObject({ mode: 'guest', dialog: 'none' });
   });
 
-  it('TC-FDBK-035 게스트가 피드백 행을 누르면 토스트 nav.guest.feedback만 뜬다', async () => {
+  it('TC-FDBK-035 TC-NAV-022 게스트가 피드백 행을 누르면 토스트 nav.guest.feedback만 뜬다', async () => {
     const h = await createSettingsHarness({ mode: 'guest' });
     h.viewModel.onFeedbackPress();
     expect(h.toast.messages).toEqual([t('nav.guest.feedback')]);

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/analytics/analytics_constants.dart';
+import '../core/analytics/screen_return_reporter.dart';
 import '../core/ui/toast/toast_host.dart';
 import '../features/feed/domain/feed_target.dart';
 import '../features/navigation/main_composition.dart';
@@ -74,9 +75,12 @@ class _InboxRouteState extends State<InboxRoute> with WidgetsBindingObserver {
     // 메인 셸 위에 쌓이는 라우트라 셸의 토스트가 가려진다. 같은 컨트롤러로 여기서도 그린다.
     return ToastHost(
       controller: widget.dependencies.main.toast,
-      child: NotificationInboxScreen(
-        viewModel: _viewModel,
-        onBack: () => unawaited(Navigator.of(context).maybePop()),
+      child: ScreenReturnReporter(
+        onReturn: _viewModel.onReturned,
+        child: NotificationInboxScreen(
+          viewModel: _viewModel,
+          onBack: () => unawaited(Navigator.of(context).maybePop()),
+        ),
       ),
     );
   }
@@ -125,9 +129,12 @@ class _NotificationDetailRouteState extends State<NotificationDetailRoute> {
   Widget build(BuildContext context) {
     return ToastHost(
       controller: widget.dependencies.main.toast,
-      child: NotificationDetailScreen(
-        viewModel: _viewModel,
-        onBack: () => unawaited(Navigator.of(context).maybePop()),
+      child: ScreenReturnReporter(
+        onReturn: _viewModel.onReturned,
+        child: NotificationDetailScreen(
+          viewModel: _viewModel,
+          onBack: () => unawaited(Navigator.of(context).maybePop()),
+        ),
       ),
     );
   }

@@ -285,7 +285,7 @@ describe('SettingsScreen 확인 대화상자', () => {
 });
 
 describe('SettingsScreen 게스트', () => {
-  it('TC-SET-008 REQ-SET-002 "로그인" 버튼 하나뿐이고 다른 행은 없으며 API 호출이 0건이다', async () => {
+  it('TC-SET-008 TC-NAV-021 REQ-SET-002 "로그인" 버튼 하나뿐이고 다른 행은 없으며 API 호출이 0건이다', async () => {
     const { h } = await renderSettings({ mode: 'guest' });
     await flush();
     expect(screen.getByTestId('settings.login-button')).toHaveTextContent(

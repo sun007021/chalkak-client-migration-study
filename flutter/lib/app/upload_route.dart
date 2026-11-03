@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/analytics/screen_return_reporter.dart';
 import '../core/time/kst_date.dart';
 import '../core/ui/toast/toast_host.dart';
 import '../features/edit/domain/rgba_image.dart';
@@ -103,10 +104,13 @@ class _UploadRouteState extends State<UploadRoute> {
   // 업로드 화면은 메인 셸 위에 쌓여 셸의 토스트가 가려지므로 같은 컨트롤러로 여기서도 그린다.
   Widget build(BuildContext context) => ToastHost(
     controller: widget.dependencies.main.toast,
-    child: UploadScreen(
-      viewModel: _viewModel,
-      editorFactory: _editor,
-      onEvent: _onEvent,
+    child: ScreenReturnReporter(
+      onReturn: _viewModel.onReturned,
+      child: UploadScreen(
+        viewModel: _viewModel,
+        editorFactory: _editor,
+        onEvent: _onEvent,
+      ),
     ),
   );
 }

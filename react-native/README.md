@@ -204,6 +204,13 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
 - 마커 주석(`@generated begin chalkak-okhttp-no-retry`)으로 멱등이다. 삽입 위치를 못 찾으면(템플릿 변경) prebuild가 오류로 멈춘다. Java `MainApplication`은 지원하지 않고 오류를 낸다.
 - **E2E 확인 항목(Android)**: 응답을 받기 전에 연결을 끊는 서버로 `POST`(예: `POST /posts`)를 보냈을 때 서버에 요청이 **한 번만** 도착하는지 본다(재전송 없음). 멱등 요청(GET)은 `ApiClient`의 재시도(최대 2회)만 일어나는지도 확인한다.
 
+## 내비게이션 테스트 커버리지 (NAV, `docs/testing/catalog/navigation.md`)
+
+- **단위·컴포넌트(U/C/W)로 닫은 TC**: 하단 바·탭 상태·업로드 버튼·게스트 제한·로그아웃/재인증/계정 전환은 `src/app/NavFlow.test.tsx`(전체 `App`을 가짜 서버에 붙여 확인), 쌓임 화면 연타는 `NavigationRepeatTap.integration.test.tsx`(실제 `RootNavigator`), 게스트 토스트 문구와 `ko.json` 일치는 `NavGuestToasts.test.ts`, 토스트 타이밍·교체·백그라운드는 `core/toast/ToastCenter.test.ts`가 맡는다. 나머지(NAV-005/007/008/012/014~022/042)는 소유 영역 테스트 이름에 NAV ID를 함께 달았다.
+- **스펙을 따른 TC**: TC-NAV-009(홈 탭 재선택 시 맨 위 스크롤 [결정 필요])는 REQ-NAV-008("전시 외 탭 재선택은 화면 변화 없음")과 충돌해 스펙대로 **변화 없음**을 검증한다. 홈 재선택 동작이 결정되면 이 테스트를 바꾼다. TC-NAV-011(홈 스크롤 복원)은 결정 전 보류(REQ-NAV-004는 홈을 항상 처음 상태로 본다).
+- **부분 검증**: TC-NAV-002는 선택 상태(testID `selected`)만 본다(아이콘 에셋 없이 텍스트 라벨 탭바). TC-NAV-010은 정렬·선택 날짜의 유지만 본다(전시·기록 탭은 포커스를 잃으면 화면을 언마운트해 스크롤 위치까지는 유지하지 않는다. 스크롤 유지가 필요하면 E2E에서 판단). TC-NAV-045는 URL 라우팅(`linking`)을 켜지 않았음(초기 URL 미조회, URL 이벤트로 이동 없음)을 확인한다.
+- **RN 단위 테스트 범위 밖**: TC-NAV-006·030·033~038·040·046~049(여러 화면을 건너는 여정과 OS 제스처, E2E/Maestro), TC-NAV-011(E, 결정 보류), TC-NAV-013·029(S, 스크린샷 도구 없음), TC-NAV-043(E, Android 시스템 뒤로. 동작 자체는 `RecordFlow.test.tsx`의 REQ-NAV-026 테스트가 확인), TC-NAV-044(Web 한정).
+
 ## 기록 (`src/features/record`, `src/data/record`)
 
 - **구성**: `RecordViewModel`(상태·캐시·세대 번호) + `RecordViewModelOwner`(`MainPhaseViewModelOwner`, 메인 단계 동안 유지) + `RecordScreen`(구독만, 마운트 = `onShown`, 언마운트 = `onHidden`). `MainTabs`의 `RecordTab`은 홈·전시 탭과 같은 패턴이다: 포커스일 때만 마운트, `screen_view record`, 라우트 파라미터 `selectedDate`(홈 주간 기록)를 화면을 그리기 전에 `openDate`로 넘기고 비움, `tabPress` 재선택은 재검증. `recordOwner`는 `AppContainer`에 있고 만들어진 ViewModel은 `UserDataCacheRegistry`에 올라가 로그아웃·계정 전환 때 `clearAll`된다.

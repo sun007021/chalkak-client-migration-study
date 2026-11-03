@@ -198,7 +198,7 @@ describe('DisplayViewModel 정렬', () => {
     expect(s.photos).toHaveLength(3);
   });
 
-  it('TC-DISP-044 탭 재선택 재검증이 성공하면 새 값으로 교체하고 맨 위로 보낸다', async () => {
+  it('TC-DISP-044 TC-NAV-008 탭 재선택 재검증이 성공하면 새 값으로 교체하고 맨 위로 보낸다', async () => {
     const h = await createDisplayHarness();
     await h.viewModel.onShown();
     const token = h.viewModel.getSnapshot().scrollToTopToken;

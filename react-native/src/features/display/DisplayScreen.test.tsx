@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 
 import { networkFailure } from '../../core/http/__testing__/FakeTransport';
 import { fixtureResponse } from '../../core/http/__testing__/loadFixture';
@@ -330,5 +330,16 @@ describe('DisplayScreen 메이슨리 (D-13 플랫폼 관례)', () => {
     // 로드 후에도 각 타일은 처음 놓인 열·순서 그대로다(점프·스크롤 위치 흔들림 없음).
     expect(columnIds()).toEqual(before);
     expect(before.flat().length).toBe(posts.length);
+  });
+});
+
+describe('DisplayScreen 탭 재선택', () => {
+  it('TC-NAV-008 전시 탭 재선택이 끝나면 목록을 맨 위로 스크롤한다', async () => {
+    const h = await createDisplayHarness();
+    await renderDisplay(h);
+    const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo');
+    await act(async () => h.viewModel.onTabReselected());
+    expect(scrollTo).toHaveBeenCalledWith({ y: 0, animated: true });
+    scrollTo.mockRestore();
   });
 });
