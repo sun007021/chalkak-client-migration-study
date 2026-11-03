@@ -121,7 +121,7 @@ describe('FeedViewModel 상세 로드', () => {
     expect(h.changes.published).toEqual([{ kind: 'deleted', postId: OTHER }]);
   });
 
-  it('TC-FEED-007 시드가 없으면(기록·푸시) NotFound만 보인다', async () => {
+  it('TC-FEED-007 TC-PUSH-067 시드가 없으면(기록·푸시, 푸시 이동의 entry는 mine) NotFound만 보인다', async () => {
     const h = await createFeedHarness({
       open: { entry: 'mine', postId: OTHER },
       routes: { [GET_OTHER]: 'feed/posts-detail__404-not-found' },

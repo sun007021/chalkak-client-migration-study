@@ -69,7 +69,7 @@ describe('PhotoUploadViewModel - 앨범', () => {
     expect(state(h).photo).toMatchObject({ uri: PHOTO_URI, width: 3000, height: 4000 });
   });
 
-  it('TC-UPL-021 읽을 수 없는 사진(0바이트·손상)은 편집기를 열지 않고 준비 실패 문구를 보여 준다', async () => {
+  it('TC-UPL-021 TC-UPL-044 읽을 수 없는 사진(0바이트·손상·지원하지 않는 형식)은 편집기를 열지 않고 준비 실패 문구를 보여 준다', async () => {
     const h = await setup();
     h.engine.sizes.set(PHOTO_URI, new ImageDecodeError());
     h.picker.willPick(picked(PHOTO_URI));

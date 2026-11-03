@@ -39,6 +39,19 @@ describe('expoPushMapping', () => {
     expect(isRemotePush(notification({}, { type: 'channel' }))).toBe(false);
   });
 
+  it('TC-PUSH-069 포그라운드 푸시는 앱이 만든 로컬 알림이 배너·목록·소리로 표시되고 OS는 서버 푸시를 중복 표시하지 않는다', () => {
+    expect(foregroundBehaviorFor(notification({}, null))).toEqual({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    });
+    expect(foregroundBehaviorFor(notification({}, { type: 'push' }))).toMatchObject({
+      shouldShowBanner: false,
+      shouldPlaySound: false,
+    });
+  });
+
   it('포그라운드에서 서버 푸시의 OS 배너는 끄고(중복 방지) 로컬 알림은 보인다', () => {
     expect(foregroundBehaviorFor(notification({}, { type: 'push' })).shouldShowBanner).toBe(false);
     expect(foregroundBehaviorFor(notification({}, null)).shouldShowBanner).toBe(true);
