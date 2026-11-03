@@ -106,6 +106,10 @@ export class RecordViewModel extends ViewModel<RecordState> {
   /** 달별 진행 중 읽기. 같은 달의 요청은 새로 보내지 않고 공유한다. */
   private readonly reads = new Map<string, Promise<void>>();
   private readonly controllers = new Set<AbortController>();
+  /** 달별 진행 중 읽기의 취소 장치(created로 그 달 캐시를 버릴 때 낡은 응답이 이기지 못하게 한다). */
+  private readonly readControllers = new Map<string, AbortController>();
+  /** 진행 중인 이미지 저장의 취소 장치. 화면 이탈·계정 전환·dispose가 취소한다. */
+  private saveAbort: AbortController | null = null;
   /** 계정 전환마다 무효화. 이전 계정의 늦은 응답은 캐시에도 남기지 않는다. */
   private readonly accountGuard = new StaleGuard();
   /** 가장 최근에 고른 달(이동·재검증을 시작할 때마다 새 티켓). 최신이 아닌 응답은 캐시에만 반영한다. */
@@ -258,17 +262,28 @@ export class RecordViewModel extends ViewModel<RecordState> {
   async saveImage(): Promise<void> {
     const { body, month, saving } = this.state;
     if (saving || body.status !== 'ready') return;
+    const account = this.accountGuard.snapshot();
+    const controller = new AbortController();
+    this.saveAbort = controller;
     this.setState({ saving: true });
+    const stale = (): boolean => !account.isCurrent() || controller.signal.aborted;
     try {
-      const blob = await this.deps.exporter.render(buildCalendarImageModel(month, body.posts));
+      const blob = await this.deps.exporter.render(buildCalendarImageModel(month, body.posts), controller.signal);
+      if (stale()) return;
       const size = blob.type === 'image/png' ? await readPngSize(blob) : null;
       if (!size || size.width <= 0 || size.height <= 0) throw new Error('rendered image is not a valid PNG');
+      if (stale()) return;
       await this.deps.downloader.download({ name: calendarFileName(month), blob });
-      this.deps.toast.show(t('record.save.ok'));
+      if (!stale()) this.deps.toast.show(t('record.save.ok'));
     } catch (error) {
+      // 화면 이탈·계정 전환으로 취소된 저장은 조용히 끝낸다.
+      if (stale() || isAbandoned(error)) return;
       this.deps.toast.show(error instanceof SaveDeniedError ? t('record.save.denied') : t('record.save.fail'));
     } finally {
-      this.setState({ saving: false });
+      if (this.saveAbort === controller) {
+        this.saveAbort = null;
+        this.setState({ saving: false });
+      }
     }
   }
 
@@ -372,12 +387,14 @@ export class RecordViewModel extends ViewModel<RecordState> {
     const account = this.accountGuard.snapshot();
     const controller = new AbortController();
     this.controllers.add(controller);
+    this.readControllers.set(key, controller);
     const read = (async () => {
       const month = await this.deps.repository.fetchMonth(ym, controller.signal);
       if (account.isCurrent()) this.cache.set(key, month.posts);
     })();
     const done = () => {
       this.controllers.delete(controller);
+      if (this.readControllers.get(key) === controller) this.readControllers.delete(key);
       if (this.reads.get(key) === read) this.reads.delete(key);
     };
     void read.then(done, done);
@@ -413,10 +430,23 @@ export class RecordViewModel extends ViewModel<RecordState> {
     return read;
   }
 
+  /** 그 달의 진행 중 읽기를 취소하고 버린다(다음 읽기는 새 요청이다). */
+  private dropRead(key: string): void {
+    this.readControllers.get(key)?.abort();
+    this.readControllers.delete(key);
+    this.reads.delete(key);
+  }
+
   private abortReads(): void {
     for (const controller of this.controllers) controller.abort();
     this.controllers.clear();
+    this.readControllers.clear();
     this.reads.clear();
+    if (this.saveAbort) {
+      this.saveAbort.abort();
+      this.saveAbort = null;
+      this.setState({ saving: false });
+    }
     this.monthsRead = null;
   }
 
@@ -444,12 +474,15 @@ export class RecordViewModel extends ViewModel<RecordState> {
     if (change.type !== 'created') return;
     const ym = monthOfDate(change.topicDate);
     if (!ym) return;
+    const key = monthKey(ym);
+    // 이미 나간 읽기는 업로드 이전 응답일 수 있다: 취소해서 낡은 응답이 캐시를 되살리지 못하게 한다.
+    this.dropRead(key);
     if (this.visible && this.started && sameMonth(ym, this.state.month)) {
       // 보이는 달: 목록을 그대로 둔 채 조용히 다시 불러온다.
       void this.go(ym);
       return;
     }
-    this.cache.delete(monthKey(ym));
+    this.cache.delete(key);
   }
 
   // ---------------------------------------------------------------- 상태 만들기

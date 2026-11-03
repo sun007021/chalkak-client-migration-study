@@ -1,5 +1,6 @@
 // Playwright 테스트 전용 번들 진입점: 앱 번들(dist)에는 들어가지 않는다. calendar-image.spec.ts가 vite로 따로 묶어 페이지에 주입한다.
 import { buildCalendarImageModel, readPngSize } from '../../src/features/record/calendarImage';
+import { SystemClock } from '../../src/core/time/SystemClock';
 import { CanvasCalendarImageExporter } from '../../src/features/record/CalendarImageExporter';
 import { AnchorFileDownloader } from '../../src/features/record/FileDownloader';
 import type { CalendarPost } from '../../src/features/record/recordModels';
@@ -44,7 +45,7 @@ function postsOf(ym: { year: number; month: number }, specs: PostSpec[]): Calend
 }
 
 async function render(ym: { year: number; month: number }, specs: PostSpec[]): Promise<Blob> {
-  return new CanvasCalendarImageExporter().render(buildCalendarImageModel(ym, postsOf(ym, specs)));
+  return new CanvasCalendarImageExporter({ clock: new SystemClock() }).render(buildCalendarImageModel(ym, postsOf(ym, specs)));
 }
 
 /** 실제 canvas로 달력을 그려 PNG 형식·크기를 확인하고, 디코드한 결과의 지정 좌표 색을 돌려준다. */

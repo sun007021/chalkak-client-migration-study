@@ -452,7 +452,7 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     homeRepository,
     displayRepository: new DisplayRepository({ api }),
     recordRepository: new RecordRepository({ api }),
-    calendarImageExporter: options.calendarImageExporter ?? new CanvasCalendarImageExporter(),
+    calendarImageExporter: options.calendarImageExporter ?? new CanvasCalendarImageExporter({ clock }),
     fileDownloader: options.fileDownloader ?? new AnchorFileDownloader({ blobUrls }),
     feedRepository: new FeedRepository({ api }),
     aiReviews,
