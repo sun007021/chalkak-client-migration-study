@@ -21,6 +21,31 @@ export function fromDisplayValue(display: number): number {
   return clampUnit(Math.round(display) / 100);
 }
 
+/**
+ * 슬라이더 키보드 조작(REQ-EDIT-019, 접근성): ←/↓ -1, →/↑ +1, PageDown -10, PageUp +10, Home -100, End +100. 현재 표시값을 받아 새 표시값(-100~100)을 돌려주고 해당 키가 아니면 null.
+ */
+export function keyboardAdjustDisplay(current: number, key: string): number | null {
+  const clamp = (v: number) => Math.min(100, Math.max(-100, v));
+  switch (key) {
+    case 'ArrowLeft':
+    case 'ArrowDown':
+      return clamp(current - 1);
+    case 'ArrowRight':
+    case 'ArrowUp':
+      return clamp(current + 1);
+    case 'PageDown':
+      return clamp(current - 10);
+    case 'PageUp':
+      return clamp(current + 10);
+    case 'Home':
+      return -100;
+    case 'End':
+      return 100;
+    default:
+      return null;
+  }
+}
+
 /** 톤 곡선에 쓰는 네 항목. */
 export type ToneValues = Pick<AdjustmentValues, 'blackPoint' | 'shadows' | 'highlights' | 'contrast'>;
 

@@ -8,8 +8,8 @@ import type { Size } from '../imageSizing';
 import { clearedLayers, effectiveValues, withAutoStrength, withAutoValues, withManualValue } from './adjustments';
 import type { AdjustmentValues } from './adjustments';
 import { AUTO_ANALYSIS_LONG_EDGE } from './autoAdjust';
-import { FULL_RECT, clampRect, cropRegionToRect, largestRect, ratioValue, rectToCropRegion, rotateCrop, rotatedSize } from './cropGeometry';
-import type { CropRatioId, CropRect } from './cropGeometry';
+import { FULL_RECT, clampRect, cropRegionToRect, dragRect, largestRect, ratioValue, rectToCropRegion, rotateCrop, rotatedSize } from './cropGeometry';
+import type { CropHandle, CropRatioId, CropRect, Point } from './cropGeometry';
 import type { AutoAnalyzer, PreviewFrame, PreviewRenderer } from './editorPorts';
 import { normalizeEdit } from './normalizeEdit';
 
@@ -179,6 +179,13 @@ export class PhotoEditorViewModel extends ViewModel<PhotoEditorState> {
     this.cropOverride = null;
     this.setState({ cropRect: clampRect(rect, rotated, ratioValue(this.state.ratio, rotated)) });
     this.refresh();
+  }
+
+  /** 프레임 끌기: 끌기 시작 때의 영역·손잡이·이동량(돌린 사진 비율)으로 새 영역을 계산해 반영한다(REQ-EDIT-013, 순수 계산은 dragRect). */
+  dragCrop(start: CropRect, handle: CropHandle, delta: Point): void {
+    if (!this.canEdit() || !this.state.imageSize) return;
+    const rotated = rotatedSize(this.state.imageSize, this.state.quarterTurns);
+    this.setCropRect(dragRect(start, handle, delta, rotated, ratioValue(this.state.ratio, rotated)));
   }
 
   /** 시계 방향 90도(REQ-EDIT-014, 015). */

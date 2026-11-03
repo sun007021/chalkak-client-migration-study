@@ -35,6 +35,13 @@ export const webOnlyCopy = {
   'upload.preview.edit': '사진 편집하기',
   'upload.preview.alt': '선택한 사진',
   'upload.success.photo-alt': '전시한 사진',
+  /** 사진 편집기: 대화상자 이름, 완료 뒤 마지막 렌더를 기다리는 표시, 자르기 영역·비율 묶음의 접근성 이름. TODO: shared/copy/ko.json에 키가 생기면 옮긴다. */
+  'edit.dialog.label': '사진 편집',
+  'edit.rendering': '사진을 준비하는 중',
+  'edit.crop.area': '자르기 영역',
+  'edit.ratio.label': '자르기 비율',
+  /** 오류 알림의 "다시 시도" 버튼(testids.md photo-edit.error-retry-button). */
+  'edit.error.retry': '다시 시도',
   /** 상세: 삭제 요청 중 표시. */
   'feed.deleting': '삭제 중',
 } as const;

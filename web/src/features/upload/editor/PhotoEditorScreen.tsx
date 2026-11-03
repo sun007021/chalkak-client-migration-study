@@ -1,7 +1,20 @@
-import type { ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef } from 'react';
+import type { CSSProperties, KeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import { t } from '../../../copy/ko';
+import { webOnlyCopy } from '../../../copy/webOnly';
+import { useOwnedViewModel } from '../../../core/state/useOwnedViewModel';
+import { useViewModel } from '../../../core/state/useViewModel';
+import { useDialogFocus } from '../../../core/ui/useDialogFocus';
+import { PHOTO_FILTERS } from '../editModel';
+import type { AdjustmentKey } from '../editModel';
 import type { ImageDecoder } from '../imagePorts';
 import type { PhotoEditorComponent, PhotoEditorProps } from '../photoEditor';
+import { fromDisplayValue, keyboardAdjustDisplay, toDisplayValue } from './adjustments';
+import { CROP_RATIO_IDS } from './cropGeometry';
+import type { CropHandle, CropRect } from './cropGeometry';
 import type { AutoAnalyzer, PreviewRenderer } from './editorPorts';
+import { EDITOR_TOOLS, PhotoEditorViewModel } from './PhotoEditorViewModel';
+import type { AdjustItem, EditorTool, PhotoEditorState } from './PhotoEditorViewModel';
 
 export interface PhotoEditorScreenDeps {
   decoder: ImageDecoder;
@@ -32,11 +45,337 @@ export interface PhotoEditorScreenDeps {
  * - 필터 탭: `photo-edit.filter-original|mono|warm|cool|vintage|vivid`(role="radio" aria-checked, 이 순서, role="radiogroup" 안, 안에 썸네일 <img>와 문구).
  * - `photo-edit.rendering-indicator`(role="status", confirming 동안만), `photo-edit.error-dialog`(role="alertdialog", 문구 edit.error.render) 안의 `photo-edit.error-retry-button`(열리면 포커스가 여기로). 오류 알림이 열려 있는 동안 완료는 비활성이다.
  */
-export function PhotoEditorScreen(_props: PhotoEditorProps & { deps: PhotoEditorScreenDeps }): ReactNode {
-  throw new Error('not implemented');
+export function PhotoEditorScreen({ source, initialEdit, onConfirm, onCancel, deps }: PhotoEditorProps & { deps: PhotoEditorScreenDeps }): ReactNode {
+  const confirmRef = useRef(onConfirm);
+  const cancelRef = useRef(onCancel);
+  useEffect(() => {
+    confirmRef.current = onConfirm;
+    cancelRef.current = onCancel;
+  }, [onConfirm, onCancel]);
+  const create = useCallback(() => {
+    const vm = new PhotoEditorViewModel({
+      source,
+      initialEdit,
+      decoder: deps.decoder,
+      preview: deps.preview,
+      analyzer: deps.analyzer,
+      onConfirm: (edit) => confirmRef.current(edit),
+      onCancel: () => cancelRef.current(),
+    });
+    vm.start();
+    return vm;
+  }, [source, initialEdit, deps]);
+  const vm = useOwnedViewModel(create);
+  const vmRef = useRef<PhotoEditorViewModel | null>(null);
+  useEffect(() => {
+    vmRef.current = vm;
+  }, [vm]);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  // Esc는 "취소"다. 완료 처리 중에는 ViewModel이 무시한다.
+  useDialogFocus(rootRef, () => vmRef.current?.cancel());
+  return (
+    <div ref={rootRef} data-testid="photo-edit.root" role="dialog" aria-modal="true" aria-label={webOnlyCopy['edit.dialog.label']} tabIndex={-1} style={rootStyle}>
+      {vm && <EditorBody vm={vm} />}
+    </div>
+  );
 }
 
 /** 컨테이너가 photoEditor로 꽂는 컴포넌트를 만든다. */
-export function createPhotoEditor(_deps: PhotoEditorScreenDeps): PhotoEditorComponent {
-  throw new Error('not implemented');
+export function createPhotoEditor(deps: PhotoEditorScreenDeps): PhotoEditorComponent {
+  const Editor: PhotoEditorComponent = (props) => <PhotoEditorScreen {...props} deps={deps} />;
+  Editor.displayName = 'PhotoEditor';
+  return Editor;
+}
+
+const rootStyle: CSSProperties = { position: 'relative', boxSizing: 'border-box', height: '100dvh', display: 'flex', flexDirection: 'column', background: 'Canvas', color: 'CanvasText', outline: 'none' };
+const headerStyle: CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 8px', height: 56, flex: 'none' };
+const topButtonStyle: CSSProperties = { minHeight: 48, minWidth: 64, padding: '0 12px', fontSize: 16, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' };
+const stageStyle: CSSProperties = { flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 16px', background: '#111' };
+const frameBoxStyle: CSSProperties = { position: 'relative', display: 'inline-block', lineHeight: 0, touchAction: 'none' };
+const imageStyle: CSSProperties = { display: 'block', maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100dvh - 330px)', userSelect: 'none', WebkitUserSelect: 'none' };
+const panelStyle: CSSProperties = { flex: 'none', minHeight: 120, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 12, boxSizing: 'border-box' };
+const rowStyle: CSSProperties = { display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 };
+const chipStyle = (selected: boolean): CSSProperties => ({
+  flex: 'none',
+  minHeight: 44,
+  minWidth: 44,
+  padding: '0 12px',
+  borderRadius: 22,
+  border: selected ? '2px solid currentColor' : '1px solid #888',
+  background: 'none',
+  color: 'inherit',
+  fontWeight: selected ? 700 : 400,
+  cursor: 'pointer',
+});
+const tabBarStyle: CSSProperties = { flex: 'none', display: 'flex', borderTop: '1px solid #8884' };
+const tabStyle = (selected: boolean): CSSProperties => ({ flex: 1, minHeight: 56, background: 'none', border: 'none', color: 'inherit', fontSize: 16, fontWeight: selected ? 700 : 400, borderBottom: selected ? '3px solid currentColor' : '3px solid transparent', cursor: 'pointer' });
+const sliderStyle: CSSProperties = { width: '100%', minHeight: 44 };
+
+const TOOL_COPY: Record<EditorTool, 'edit.tab.crop' | 'edit.tab.adjust' | 'edit.tab.filter'> = { crop: 'edit.tab.crop', adjust: 'edit.tab.adjust', filter: 'edit.tab.filter' };
+/** 조정 항목 → testid·문구 키 조각. */
+const ADJUST_SLUG: Record<AdjustItem, 'auto' | 'exposure' | 'contrast' | 'highlights' | 'shadows' | 'black-point' | 'saturation' | 'warmth'> = {
+  auto: 'auto',
+  exposure: 'exposure',
+  contrast: 'contrast',
+  highlights: 'highlights',
+  shadows: 'shadows',
+  blackPoint: 'black-point',
+  saturation: 'saturation',
+  warmth: 'warmth',
+};
+const ADJUST_LIST: readonly AdjustItem[] = ['auto', 'exposure', 'contrast', 'highlights', 'shadows', 'blackPoint', 'saturation', 'warmth'];
+
+function EditorBody({ vm }: { vm: PhotoEditorViewModel }): ReactNode {
+  const state = useViewModel(vm);
+  const locked = state.confirming;
+  return (
+    <>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }} inert={state.error !== null}>
+        <header style={headerStyle}>
+          <button type="button" data-testid="photo-edit.cancel-button" style={topButtonStyle} disabled={locked} onClick={() => vm.cancel()}>
+            {t('edit.top.cancel')}
+          </button>
+          <button type="button" data-testid="photo-edit.done-button" style={{ ...topButtonStyle, fontWeight: 700 }} disabled={state.phase !== 'ready' || locked || state.error !== null} onClick={() => void vm.confirm()}>
+            {t('edit.top.done')}
+          </button>
+        </header>
+        <div style={stageStyle}>
+          {state.preview && (
+            <div style={frameBoxStyle}>
+              <img data-testid="photo-edit.preview-image" src={state.preview.src} alt="" draggable={false} style={imageStyle} />
+              {state.tool === 'crop' && <CropArea vm={vm} state={state} />}
+            </div>
+          )}
+          {state.confirming && (
+            <div data-testid="photo-edit.rendering-indicator" role="status" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0008', color: '#fff' }}>
+              {webOnlyCopy['edit.rendering']}
+            </div>
+          )}
+        </div>
+        <div style={panelStyle}>
+          {state.tool === 'crop' && <CropPanel vm={vm} state={state} />}
+          {state.tool === 'adjust' && <AdjustPanel vm={vm} state={state} />}
+          {state.tool === 'filter' && <FilterPanel vm={vm} state={state} />}
+        </div>
+        <div role="tablist" style={tabBarStyle}>
+          {EDITOR_TOOLS.map((tool) => (
+            <button key={tool} type="button" role="tab" data-testid={`photo-edit.tab-${tool}`} aria-selected={state.tool === tool} disabled={locked || state.phase !== 'ready'} style={tabStyle(state.tool === tool)} onClick={() => vm.selectTool(tool)}>
+              {t(TOOL_COPY[tool])}
+            </button>
+          ))}
+        </div>
+      </div>
+      {state.error !== null && <ErrorDialog onRetry={() => vm.retry()} />}
+    </>
+  );
+}
+
+function ErrorDialog({ onRetry }: { onRetry: () => void }): ReactNode {
+  const retryRef = useRef<HTMLButtonElement | null>(null);
+  const messageId = useId();
+  useEffect(() => {
+    retryRef.current?.focus();
+  }, []);
+  return (
+    <div data-testid="photo-edit.error-dialog" role="alertdialog" aria-modal="true" aria-describedby={messageId} style={{ position: 'absolute', left: 16, right: 16, top: '40%', padding: 16, background: 'Canvas', border: '1px solid #888', borderRadius: 12, boxShadow: '0 4px 24px #0006', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <p id={messageId} style={{ margin: 0 }}>
+        {t('edit.error.render')}
+      </p>
+      <button ref={retryRef} type="button" data-testid="photo-edit.error-retry-button" style={{ minHeight: 48 }} onClick={onRetry}>
+        {webOnlyCopy['edit.error.retry']}
+      </button>
+    </div>
+  );
+}
+
+// ── 자르기 ──
+
+const HANDLE_SIZE = 44;
+const CORNERS: readonly { handle: Exclude<CropHandle, 'move'>; style: CSSProperties }[] = [
+  { handle: 'top-left', style: { left: -HANDLE_SIZE / 2, top: -HANDLE_SIZE / 2 } },
+  { handle: 'top-right', style: { right: -HANDLE_SIZE / 2, top: -HANDLE_SIZE / 2 } },
+  { handle: 'bottom-left', style: { left: -HANDLE_SIZE / 2, bottom: -HANDLE_SIZE / 2 } },
+  { handle: 'bottom-right', style: { right: -HANDLE_SIZE / 2, bottom: -HANDLE_SIZE / 2 } },
+];
+const GRID_LINES: readonly CSSProperties[] = [
+  { left: '33.333%', top: 0, bottom: 0, width: 1 },
+  { left: '66.667%', top: 0, bottom: 0, width: 1 },
+  { top: '33.333%', left: 0, right: 0, height: 1 },
+  { top: '66.667%', left: 0, right: 0, height: 1 },
+];
+const fixed4 = (value: number): string => value.toFixed(4);
+
+interface DragStart {
+  handle: CropHandle;
+  pointerId: number;
+  x: number;
+  y: number;
+  rect: CropRect;
+}
+
+function CropArea({ vm, state }: { vm: PhotoEditorViewModel; state: PhotoEditorState }): ReactNode {
+  const areaRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<DragStart | null>(null);
+  const { cropRect: rect } = state;
+  const begin = (handle: CropHandle) => (event: ReactPointerEvent<HTMLElement>) => {
+    event.stopPropagation();
+    dragRef.current = { handle, pointerId: event.pointerId, x: event.clientX, y: event.clientY, rect: vm.state.cropRect };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+  const move = (event: ReactPointerEvent<HTMLElement>) => {
+    const drag = dragRef.current;
+    const box = areaRef.current?.getBoundingClientRect();
+    if (!drag || drag.pointerId !== event.pointerId || event.buttons === 0 || !box || box.width === 0 || box.height === 0) return;
+    vm.dragCrop(drag.rect, drag.handle, { x: (event.clientX - drag.x) / box.width, y: (event.clientY - drag.y) / box.height });
+  };
+  const end = (event: ReactPointerEvent<HTMLElement>) => {
+    if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
+  };
+  const handlers = (handle: CropHandle) => ({ onPointerDown: begin(handle), onPointerMove: move, onPointerUp: end, onPointerCancel: end });
+  return (
+    <div
+      ref={areaRef}
+      data-testid="photo-edit.crop-area"
+      role="group"
+      aria-label={webOnlyCopy['edit.crop.area']}
+      data-center-x={fixed4(rect.centerX)}
+      data-center-y={fixed4(rect.centerY)}
+      data-width={fixed4(rect.width)}
+      data-height={fixed4(rect.height)}
+      style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          left: `${(rect.centerX - rect.width / 2) * 100}%`,
+          top: `${(rect.centerY - rect.height / 2) * 100}%`,
+          width: `${rect.width * 100}%`,
+          height: `${rect.height * 100}%`,
+          boxSizing: 'border-box',
+          border: '2px solid #fff',
+          boxShadow: '0 0 0 9999px #0009',
+        }}
+      >
+        <div data-handle="move" aria-hidden="true" {...handlers('move')} style={{ position: 'absolute', inset: 0, cursor: 'move', touchAction: 'none' }} />
+        {GRID_LINES.map((line, index) => (
+          <div key={index} data-grid-line="" aria-hidden="true" style={{ position: 'absolute', background: '#fff8', pointerEvents: 'none', ...line }} />
+        ))}
+        {CORNERS.map(({ handle, style }) => (
+          <div key={handle} data-handle={handle} aria-hidden="true" {...handlers(handle)} style={{ position: 'absolute', width: HANDLE_SIZE, height: HANDLE_SIZE, display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none', ...style }}>
+            <div style={{ width: 16, height: 16, borderRadius: 8, background: '#fff', pointerEvents: 'none' }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CropPanel({ vm, state }: { vm: PhotoEditorViewModel; state: PhotoEditorState }): ReactNode {
+  return (
+    <>
+      <div role="radiogroup" aria-label={webOnlyCopy['edit.ratio.label']} style={rowStyle}>
+        {CROP_RATIO_IDS.map((ratio) => (
+          <button key={ratio} type="button" role="radio" data-testid={`photo-edit.ratio-${ratio}`} aria-checked={state.ratio === ratio} style={chipStyle(state.ratio === ratio)} onClick={() => vm.selectRatio(ratio)}>
+            {t(`edit.ratio.${ratio}`)}
+          </button>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="button" data-testid="photo-edit.rotate-button" style={chipStyle(false)} onClick={() => vm.rotate()}>
+          {t('edit.crop.rotate')}
+        </button>
+        <button type="button" data-testid="photo-edit.reset-button" style={chipStyle(false)} onClick={() => vm.resetCrop()}>
+          {t('edit.crop.reset')}
+        </button>
+      </div>
+    </>
+  );
+}
+
+// ── 조정 ──
+
+function AdjustPanel({ vm, state }: { vm: PhotoEditorViewModel; state: PhotoEditorState }): ReactNode {
+  const item = state.adjustItem;
+  return (
+    <>
+      <div role="tablist" aria-label={t('edit.tab.adjust')} style={rowStyle}>
+        {ADJUST_LIST.map((entry) => (
+          <button key={entry} type="button" role="tab" data-testid={`photo-edit.adjust-item-${ADJUST_SLUG[entry]}`} aria-selected={item === entry} style={chipStyle(item === entry)} onClick={() => vm.selectAdjustItem(entry)}>
+            {t(`edit.adjust.${ADJUST_SLUG[entry]}`)}
+          </button>
+        ))}
+      </div>
+      {item === 'auto' ? <AutoControls vm={vm} state={state} /> : <AdjustSlider vm={vm} state={state} item={item} />}
+      <button type="button" data-testid="photo-edit.adjust-reset-button" style={{ ...chipStyle(false), alignSelf: 'flex-start' }} onClick={() => vm.resetAdjust()}>
+        {t('edit.adjust.reset')}
+      </button>
+    </>
+  );
+}
+
+function AutoControls({ vm, state }: { vm: PhotoEditorViewModel; state: PhotoEditorState }): ReactNode {
+  const strength = state.adjustmentLayers.autoStrength;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <button type="button" role="switch" data-testid="photo-edit.adjust-auto-toggle" aria-checked={strength > 0} aria-label={t('edit.adjust.auto')} style={chipStyle(strength > 0)} onClick={() => vm.toggleAuto()}>
+        {t('edit.adjust.auto')}
+      </button>
+      <input
+        type="range"
+        data-testid="photo-edit.adjust-auto-strength-slider"
+        aria-label={t('edit.adjust.auto')}
+        min={0}
+        max={1}
+        step={0.01}
+        value={strength}
+        style={sliderStyle}
+        onChange={(event) => vm.setAutoStrength(Number(event.target.value))}
+      />
+    </div>
+  );
+}
+
+function AdjustSlider({ vm, state, item }: { vm: PhotoEditorViewModel; state: PhotoEditorState; item: Exclude<AdjustItem, 'auto'> }): ReactNode {
+  const key: AdjustmentKey = item;
+  const display = toDisplayValue(state.adjustValues[key]);
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    const next = keyboardAdjustDisplay(display, event.key);
+    if (next === null) return;
+    event.preventDefault();
+    vm.setAdjustValue(key, fromDisplayValue(next));
+  };
+  return (
+    <input
+      type="range"
+      data-testid={`photo-edit.adjust-${ADJUST_SLUG[item]}-slider`}
+      aria-label={t(`edit.adjust.${ADJUST_SLUG[item]}`)}
+      aria-valuetext={String(display)}
+      min={-100}
+      max={100}
+      step={1}
+      value={display}
+      style={sliderStyle}
+      onChange={(event) => vm.setAdjustValue(key, fromDisplayValue(Number(event.target.value)))}
+      onKeyDown={onKeyDown}
+    />
+  );
+}
+
+// ── 필터 ──
+
+function FilterPanel({ vm, state }: { vm: PhotoEditorViewModel; state: PhotoEditorState }): ReactNode {
+  return (
+    <div role="radiogroup" aria-label={t('edit.tab.filter')} style={rowStyle}>
+      {PHOTO_FILTERS.map((filter) => {
+        const selected = state.filter === filter;
+        const thumbnail = state.thumbnails[filter];
+        return (
+          <button key={filter} type="button" role="radio" data-testid={`photo-edit.filter-${filter}`} aria-checked={selected} onClick={() => vm.selectFilter(filter)} style={{ flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: 4, background: 'none', color: 'inherit', border: selected ? '2px solid currentColor' : '1px solid transparent', borderRadius: 8, cursor: 'pointer', fontWeight: selected ? 700 : 400 }}>
+            {thumbnail ? <img src={thumbnail} alt="" draggable={false} style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6 }} /> : <span aria-hidden="true" style={{ width: 64, height: 64, borderRadius: 6, background: '#8883' }} />}
+            <span>{t(`edit.filter.${filter}`)}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
