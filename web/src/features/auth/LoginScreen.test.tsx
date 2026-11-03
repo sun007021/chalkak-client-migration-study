@@ -10,6 +10,7 @@ import { ME, guestSession, loadFixture, memberSession } from '../../test/fixture
 import { EMPTY_SESSION } from '../../core/auth/SessionStore';
 import { expectGuestRequestsOnlyPublic, outsideHome } from '../../test/homeRequests';
 
+import { advanceClock } from '../../test/settle';
 async function openLogin(options: Parameters<typeof makeHarness>[0] = {}) {
   const h = makeHarness(options);
   const view = renderApp(h.container, '/login');
@@ -191,9 +192,7 @@ describe('카카오 로그인 흐름', () => {
     });
     unmount();
     release();
-    await act(async () => {
-      await h.clock.advance(1);
-    });
+    await advanceClock(h, 1);
     expect(h.store.writes).toHaveLength(0);
     expect(h.container.toast.state.toast).toBeNull();
   });

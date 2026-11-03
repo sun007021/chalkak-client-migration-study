@@ -4,6 +4,7 @@ import { ToastHost } from './ToastHost';
 import { FakeClock } from '../../test/FakeClock';
 import { SequentialIdGenerator } from '../../test/sequentialIds';
 
+import { advanceClock } from '../../test/settle';
 function setup() {
   const clock = new FakeClock();
   const controller = new ToastController({ clock, ids: new SequentialIdGenerator() });
@@ -23,7 +24,7 @@ describe('ToastHost', () => {
     act(() => controller.show('네트워크 연결을 확인해 주세요.'));
     expect(screen.getByTestId('toast.container')).toBeInTheDocument();
     expect(screen.getByTestId('toast.message')).toHaveTextContent('네트워크 연결을 확인해 주세요.');
-    await act(() => clock.advance(2_500));
+    await advanceClock({ clock }, 2_500);
     expect(screen.queryByTestId('toast.container')).not.toBeInTheDocument();
   });
 
@@ -31,7 +32,7 @@ describe('ToastHost', () => {
     const { clock, controller } = setup();
     act(() => controller.show('같은 문구'));
     const first = screen.getByTestId('toast.message');
-    await act(() => clock.advance(1_000));
+    await advanceClock({ clock }, 1_000);
     act(() => controller.show('같은 문구'));
     const second = screen.getByTestId('toast.message');
     expect(second).not.toBe(first);

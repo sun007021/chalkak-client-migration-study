@@ -13,6 +13,7 @@ import { CARD_GET, SETTINGS_GET, SETTINGS_PATCH, SIGNATURE_URL, fx, resp, routeS
 import type { StoredSession } from '../../core/auth/SessionStore';
 import { EMPTY_SESSION } from '../../core/auth/SessionStore';
 
+import { advanceClock } from '../../test/settle';
 type RouteOptions = Parameters<typeof routeSettings>[1];
 
 async function openSettings(o: { session?: StoredSession; strict?: boolean; version?: string; routes?: RouteOptions; path?: string; before?: (h: Harness) => void } = {}) {
@@ -25,7 +26,7 @@ async function openSettings(o: { session?: StoredSession; strict?: boolean; vers
   return { h, toasts, ...view };
 }
 /** 재시도(0.5초, 1초)와 비동기 렌더를 소화한다. */
-const settle = (h: Harness) => act(async () => void (await h.clock.advance(5_000)));
+const settle = (h: Harness) => advanceClock(h, 5_000);
 const rowPosition = (a: HTMLElement, b: HTMLElement) => a.compareDocumentPosition(b);
 
 describe('설정 탭 구성 (회원)', () => {
@@ -136,7 +137,7 @@ describe('설정 사인 카드', () => {
     fireEvent.click(retry);
     // 요청은 토큰 준비(비동기) 뒤에 나가므로 4번째가 나갈 때까지 기다린 뒤, 더 늘지 않는지 본다.
     await waitFor(() => expect(h.ff.callsTo(CARD_GET)).toHaveLength(4));
-    await act(async () => void (await h.clock.advance(100)));
+    await advanceClock(h, 100);
     expect(h.ff.callsTo(CARD_GET)).toHaveLength(4);
     gate.resolve(resp('signature/users-me-signature__get-success.json'));
     await screen.findByTestId('settings.signature-image');

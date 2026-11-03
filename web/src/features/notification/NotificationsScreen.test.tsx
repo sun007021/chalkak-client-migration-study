@@ -399,9 +399,7 @@ describe('행 탭과 이동 (TC-NOTI-024~031, 038)', () => {
     const { router, h } = await openNotifications({ routes: { [PAGE1]: fixture } });
     await inboxLoaded();
     fireEvent.click(item(n));
-    await act(async () => {
-      await h.clock.advance(1_000);
-    });
+    await advanceClock(h, 1_000);
     expect(pathOf(router)).toBe('/notifications');
     expect(h.ff.calls.filter((c) => c.method === 'PATCH')).toHaveLength(0);
     expect(toastText()).toBeNull();

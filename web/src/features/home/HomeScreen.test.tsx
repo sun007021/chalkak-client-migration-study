@@ -394,9 +394,7 @@ describe('홈 AI 피드백 카드 (REQ-HOME-034, 035)', () => {
   ])('TC-HOME-054 히어로가 %s이면 카드가 없고 ai-review 요청도 0건이다', async (_name, fixture) => {
     const { h } = await openHome({ routes: { [TODAY_POST]: fixture } });
     await loaded();
-    await act(async () => {
-      await h.clock.advance(0);
-    });
+    await advanceClock(h, 0);
     expect(screen.queryByTestId('home.ai-card')).not.toBeInTheDocument();
     expect(h.ff.calls.filter((c) => c.path.endsWith('/ai-review'))).toHaveLength(0);
   });

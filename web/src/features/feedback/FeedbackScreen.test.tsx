@@ -9,6 +9,7 @@ import { screenViews } from '../../test/screenViews';
 import { FEEDBACK_POST, COMBINED_EMOJI, feedbackBodies, fx, resp, routeFeedback, routeSettings, toastText } from '../../test/settingsHarness';
 import { recordToasts } from '../../test/toastLog';
 
+import { advanceClock } from '../../test/settle';
 async function openFeedback(o: { strict?: boolean; viaSettings?: boolean } = {}) {
   const h = makeHarness({ session: memberSession() });
   routeSettings(h.ff);
@@ -232,7 +233,7 @@ describe('피드백 전송', () => {
     expect(message).toHaveTextContent('피드백을 보내지 못했어요. 다시 시도해 주세요.');
     expect(message).toHaveAttribute('role', 'alert');
     expect(input().value).toBe('내용');
-    await act(async () => void (await h.clock.advance(10_000)));
+    await advanceClock(h, 10_000);
     expect(h.ff.callsTo(FEEDBACK_POST)).toHaveLength(1);
     expect(screen.queryByTestId('feedback.validation-message')).not.toBeInTheDocument();
   });
@@ -330,7 +331,7 @@ describe('피드백 화면 닫기·이탈·계정 전환', () => {
     await act(async () => h.container.accountService.logout());
     await screen.findByTestId('login.root');
     gate.resolve(resp('feedback/feedbacks__created.json'));
-    await act(async () => void (await h.clock.advance(1_000)));
+    await advanceClock(h, 1_000);
     expect(toasts.messages).toEqual([]);
     expect(router.state.location.pathname).toBe('/login');
     expect(screen.queryByTestId('settings.root')).not.toBeInTheDocument();
