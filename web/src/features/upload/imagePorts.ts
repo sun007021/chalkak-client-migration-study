@@ -64,7 +64,7 @@ export class WebpUnsupportedError extends Error {
 
 /** 기본 EditRenderer. 편집기(W7b)가 들어오기 전에는 받은 이미지를 그대로 돌려준다. */
 export class IdentityEditRenderer implements EditRenderer {
-  render(_image: DecodedImage, _edit: PhotoEdit, _signal: AbortSignal): Promise<DecodedImage> {
-    throw new Error('not implemented');
+  render(image: DecodedImage, _edit: PhotoEdit, _signal: AbortSignal): Promise<DecodedImage> {
+    return Promise.resolve(image);
   }
 }
