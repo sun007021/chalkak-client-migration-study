@@ -160,7 +160,7 @@ describe('편집기 ViewModel: 조정 (REQ-EDIT-019~027)', () => {
 
 describe('편집기 ViewModel: 자동 보정값 분석 시점 (REQ-EDIT-025, TC-EDIT-037)', () => {
   const part: CropRect = { centerX: 0.5, centerY: 0.5, width: 0.5, height: 0.5 };
-  const partRegion = rectToCropRegion(PHOTO, 0, part);
+  const regionOf = () => rectToCropRegion(PHOTO, 0, part);
 
   it('TC-EDIT-037 편집기를 처음 열 때 한 번 분석한다(자른 영역 = 전체)', async () => {
     const { fakes } = await openEditorVm();
@@ -175,7 +175,7 @@ describe('편집기 ViewModel: 자동 보정값 분석 시점 (REQ-EDIT-025, TC-
     vm.selectTool('adjust');
     await settle();
     expect(fakes.analyzer.calls).toHaveLength(2);
-    expect(fakes.analyzer.calls[1]!.region).toEqual({ quarterTurns: 0, crop: partRegion });
+    expect(fakes.analyzer.calls[1]!.region).toEqual({ quarterTurns: 0, crop: regionOf() });
     expect(fakes.analyzer.calls[1]!.longEdge).toBe(256);
   });
 
@@ -222,7 +222,7 @@ describe('편집기 ViewModel: 자동 보정값 분석 시점 (REQ-EDIT-025, TC-
     await vm.confirm();
     expect(fakes.analyzer.calls).toHaveLength(2);
     expect(confirmed).toHaveLength(1);
-    expect(confirmed[0]!.crop).toEqual(partRegion);
+    expect(confirmed[0]!.crop).toEqual(regionOf());
     expect(confirmed[0]!.adjustmentLayers.autoValues.exposure).toBeCloseTo(0.25, 12);
     expect(confirmed[0]!.adjustmentLayers.autoStrength).toBe(1);
   });
@@ -241,7 +241,7 @@ describe('편집기 ViewModel: 자동 보정값 분석 시점 (REQ-EDIT-025, TC-
   it('TC-EDIT-037 자동 보정을 켠 채 완료한 사진을 같은 자르기로 다시 열면 저장값을 쓰고 재분석하지 않는다', async () => {
     const saved: PhotoEdit = {
       quarterTurns: 0,
-      crop: partRegion,
+      crop: regionOf(),
       filter: 'original',
       adjustmentLayers: { autoValues: { ...NO_AUTO_VALUES, exposure: 0.33 }, autoStrength: 1, manual: {} },
     };
@@ -257,7 +257,7 @@ describe('편집기 ViewModel: 자동 보정값 분석 시점 (REQ-EDIT-025, TC-
   it('TC-EDIT-037 저장값으로 다시 연 뒤 자르기를 바꾸면 그때는 다시 분석한다', async () => {
     const saved: PhotoEdit = {
       quarterTurns: 0,
-      crop: partRegion,
+      crop: regionOf(),
       filter: 'original',
       adjustmentLayers: { autoValues: { ...NO_AUTO_VALUES, exposure: 0.33 }, autoStrength: 1, manual: {} },
     };
@@ -269,10 +269,10 @@ describe('편집기 ViewModel: 자동 보정값 분석 시점 (REQ-EDIT-025, TC-
   });
 
   it('TC-EDIT-037 자동 보정을 끄고 완료한 사진(저장된 자동값 없음)을 다시 열면 열 때 분석한다', async () => {
-    const saved: PhotoEdit = { quarterTurns: 0, crop: partRegion, filter: 'original', adjustmentLayers: { autoValues: NO_AUTO_VALUES, autoStrength: 0, manual: {} } };
+    const saved: PhotoEdit = { quarterTurns: 0, crop: regionOf(), filter: 'original', adjustmentLayers: { autoValues: NO_AUTO_VALUES, autoStrength: 0, manual: {} } };
     const { fakes } = await openEditorVm({ initialEdit: saved });
     expect(fakes.analyzer.calls).toHaveLength(1);
-    expect(fakes.analyzer.calls[0]!.region.crop).toEqual(partRegion);
+    expect(fakes.analyzer.calls[0]!.region.crop).toEqual(regionOf());
   });
 
   it('분석이 끝나기 전에 닫으면(dispose) 결과를 반영하지 않는다', async () => {
