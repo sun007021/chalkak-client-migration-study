@@ -105,6 +105,11 @@ import type { HomePreloader } from '../features/boot/HomePreloader';
 import { AiReviewRepository } from '../features/aireview/AiReviewRepository';
 import { AiReviewStore } from '../features/aireview/AiReviewStore';
 import { FeedAiViewModel } from '../features/aireview/FeedAiViewModel';
+import { AttachableNotificationNavigator } from '../features/notification/notificationNavigation';
+import { NotificationDetailViewModel } from '../features/notification/NotificationDetailViewModel';
+import { NotificationInboxViewModel } from '../features/notification/NotificationInboxViewModel';
+import { NotificationRepository } from '../features/notification/NotificationRepository';
+import type { NotificationSync } from '../features/notification/notificationSync';
 import { SIGNATURE_PNG_SIZE } from '../constants';
 import { DEV_SESSION_ENABLED } from './devSession';
 import { ROUTES } from './paths';
@@ -240,6 +245,8 @@ export interface AppContainer {
   feedRepository: FeedRepository;
   /** AI 피드백 공용 저장소(W8): 홈 카드와 상세 알약이 같은 상태를 본다. 계정 전환 때 UserCaches가 reset한다. */
   aiReviews: AiReviewStore;
+  /** 알림함 API(W10): 목록·상세·읽음. */
+  notificationRepository: NotificationRepository;
   likeRepository: LikeRepository;
   /** 게시물 변경 이벤트 통로(like·title·removed). 계정 전환 때 UserCaches가 삭제 기억을 비운다. */
   postChanges: PostChanges;
@@ -271,6 +278,13 @@ export interface AppContainer {
    * 계정 전환·로그아웃 때는 UserCaches가 resetForAccountChange로 처음 상태로 돌린다. 화면은 navigator.attach로 실제 이동 수단을 꽂는다.
    */
   displaySession(mode: SessionMode): { viewModel: DisplayViewModel; navigator: AttachablePostNavigator };
+  /**
+   * 알림함 ViewModel은 하나를 보관한다(상세·피드에 갔다 와도 목록이 남는다). 회원 전용이라 모드가 없다. 계정 전환·로그아웃 때는 UserCaches가 resetForAccountChange로 처음 상태로 돌린다.
+   * 화면은 navigator.attach로 실제 이동 수단을 꽂고, 보이는 동안 viewModel.onShown/onHidden을 부른다.
+   */
+  inboxSession(): { viewModel: NotificationInboxViewModel; navigator: AttachableNotificationNavigator };
+  /** 알림 상세 화면이 마운트될 때마다 새 ViewModel을 만든다. 404이면 알림함(inboxSession의 revalidate)과 홈 미읽음(homeSession의 refreshUnread)을 갱신한다. */
+  createNotificationDetailViewModel(args: { notificationId: string }): NotificationDetailViewModel;
   /**
    * 기록 ViewModel도 모드별로 하나를 보관한다(피드·전시에 갔다 와도 달·날짜·캐시가 남는다). 다른 모드를 요청하면 이전 것은 dispose한다.
    * 계정 전환·로그아웃 때는 UserCaches가 resetForAccountChange로 처음 상태로 돌린다. 화면은 navigator.attach로 실제 이동 수단을 꽂는다.
@@ -375,6 +389,16 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
   const postChanges = new PostChanges();
   const likeRepository = new LikeRepository({ api });
   const likes = new PostLikeStore({ repository: likeRepository, changes: postChanges, toast });
+  let inboxSession: { viewModel: NotificationInboxViewModel; navigator: AttachableNotificationNavigator } | null = null;
+  // 알림 화면이 홈 미읽음 점·알림함 목록을 갱신하는 통로. 해당 ViewModel이 아직 없으면(예: 홈을 거치지 않은 직접 진입) 아무 일도 없다.
+  const notificationSync: NotificationSync = {
+    refreshUnread: async () => {
+      if (homeSession?.mode === 'member') await homeSession.viewModel.refreshUnread();
+    },
+    refreshInbox: async () => {
+      await inboxSession?.viewModel.revalidate();
+    },
+  };
   let displaySession: { mode: SessionMode; viewModel: DisplayViewModel; navigator: AttachablePostNavigator } | null = null;
   userCaches.register({
     clear: () => {
@@ -383,6 +407,8 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
       displaySession?.viewModel.resetForAccountChange();
     },
   });
+  const notificationRepository = new NotificationRepository({ api });
+  userCaches.register({ clear: () => inboxSession?.viewModel.resetForAccountChange() });
   let recordSession: { mode: SessionMode; viewModel: RecordViewModel; navigator: AttachableRecordNavigator } | null = null;
   userCaches.register({ clear: () => recordSession?.viewModel.resetForAccountChange() });
   const aiReviews = new AiReviewStore({ repository: new AiReviewRepository({ api }), clock, toast });
@@ -478,6 +504,7 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     fileDownloader: options.fileDownloader ?? new AnchorFileDownloader({ blobUrls, clock }),
     feedRepository: new FeedRepository({ api }),
     aiReviews,
+    notificationRepository,
     likeRepository,
     postChanges,
     likes,
@@ -571,6 +598,25 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
         };
       }
       return displaySession;
+    },
+    inboxSession() {
+      if (!inboxSession) {
+        const navigator = new AttachableNotificationNavigator();
+        inboxSession = {
+          navigator,
+          viewModel: new NotificationInboxViewModel({
+            repository: this.notificationRepository,
+            toast: this.toast,
+            navigator,
+            sync: notificationSync,
+            clock: this.clock,
+          }),
+        };
+      }
+      return inboxSession;
+    },
+    createNotificationDetailViewModel(args) {
+      return new NotificationDetailViewModel({ notificationId: args.notificationId, repository: this.notificationRepository, sync: notificationSync });
     },
     recordSession(mode) {
       if (recordSession?.mode !== mode) {

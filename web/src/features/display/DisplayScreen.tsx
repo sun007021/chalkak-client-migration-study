@@ -12,7 +12,7 @@ import { useDialogFocus } from '../../core/ui/useDialogFocus';
 import { useScrollRestore } from '../../core/ui/useScrollRestore';
 import type { DateString } from '../../core/time/kst';
 import { formatTopicHeaderDate } from '../home/homeDates';
-import { VisibilitySentinel } from '../home/HomeScreen';
+import { VisibilitySentinel } from '../../core/ui/VisibilitySentinel';
 import { LikeButton } from '../like/LikeButton';
 import type { PostItem } from '../post/postModels';
 import { RouterPostNavigator } from '../post/postNavigation';

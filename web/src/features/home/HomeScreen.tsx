@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useContainer } from '../../app/AppContext';
@@ -14,6 +14,7 @@ import { bannerSentinelIndex } from './BannerFeed';
 import type { HomeState, HomeViewModel, RankingKey, RankingSection } from './HomeViewModel';
 import { LikeButton } from '../like/LikeButton';
 import { useScrollRestore } from '../../core/ui/useScrollRestore';
+import { VisibilitySentinel } from '../../core/ui/VisibilitySentinel';
 import { RouterHomeNavigator } from './RouterHomeNavigator';
 import { formatTopicHeaderDate } from './homeDates';
 import type { PostSummary } from './homeModels';
@@ -419,21 +420,4 @@ function BannerCard({ vm, id, title, subtitle, thumbnailUrl }: { vm: HomeViewMod
       {content}
     </button>
   );
-}
-
-/** 목록 끝 근처에 놓는 1px 요소. 화면에 보이면(마운트 직후 이미 보이는 경우 포함) onVisible. 관찰 수단이 없으면 아무것도 하지 않는다. */
-export function VisibilitySentinel({ onVisible, observe }: { onVisible: () => void; observe: VisibilityObserverFactory | null }): ReactNode {
-  const ref = useRef<HTMLSpanElement | null>(null);
-  const latest = useRef(onVisible);
-  useEffect(() => {
-    latest.current = onVisible;
-  }, [onVisible]);
-  const notify = useCallback(() => latest.current(), []);
-  useEffect(() => {
-    const element = ref.current;
-    if (!element || !observe) return;
-    const watch = observe(element, notify);
-    return () => watch.disconnect();
-  }, [observe, notify]);
-  return <span ref={ref} aria-hidden="true" style={{ display: 'block', height: 1 }} />;
 }
