@@ -1,4 +1,11 @@
+import { POST_IMAGE_CONTENT_TYPE, POST_IMAGE_MAX_LONG_EDGE, WEBP_DOWNSCALE_MAX_ATTEMPTS, WEBP_QUALITY_LADDER } from '../../constants';
+import { NotWebpError, SizeLimitExceededError } from './imagePorts';
 import type { DecodedImage, WebpCompressor } from './imagePorts';
+import { fitLongEdge, roundSizes } from './imageSizing';
+
+function abortError(): DOMException {
+  return new DOMException('The operation was aborted.', 'AbortError');
+}
 
 export interface EncodedPostImage {
   blob: Blob;
@@ -18,8 +25,27 @@ export interface EncodedPostImage {
  * 4라운드 16회가 모두 초과면 SizeLimitExceededError. 결과가 정지 WebP가 아니면(inspectWebp 실패 또는 blob.type이 image/webp가 아님) NotWebpError로 즉시 실패하며
  * 다른 형식·다음 품질로 넘어가지 않는다. signal이 abort되면 후속 compress를 부르지 않고 AbortError로 거절한다. image는 release하지 않는다.
  */
-export function encodePostImage(_input: { image: DecodedImage; compressor: WebpCompressor; maxBytes: number; signal: AbortSignal }): Promise<EncodedPostImage> {
-  throw new Error('not implemented');
+export async function encodePostImage(input: { image: DecodedImage; compressor: WebpCompressor; maxBytes: number; signal: AbortSignal }): Promise<EncodedPostImage> {
+  const { image, compressor, maxBytes, signal } = input;
+  const base = fitLongEdge({ width: image.width, height: image.height }, POST_IMAGE_MAX_LONG_EDGE);
+  let attempts = 0;
+  for (const size of roundSizes(base, WEBP_DOWNSCALE_MAX_ATTEMPTS)) {
+    for (const quality of WEBP_QUALITY_LADDER) {
+      if (signal.aborted) throw abortError();
+      attempts += 1;
+      const blob = await compressor.compress(image, size, quality, signal);
+      if (signal.aborted) throw abortError();
+      await assertStillWebp(blob);
+      if (blob.size <= maxBytes) return { blob, width: size.width, height: size.height, quality, attempts };
+    }
+  }
+  throw new SizeLimitExceededError(`still over ${maxBytes} bytes after ${attempts} attempts`);
+}
+
+async function assertStillWebp(blob: Blob): Promise<void> {
+  if (blob.type !== POST_IMAGE_CONTENT_TYPE) throw new NotWebpError(`blob type ${blob.type || '(empty)'}`);
+  const inspection = inspectWebp(new Uint8Array(await blob.arrayBuffer()));
+  if (!inspection.ok) throw new NotWebpError(inspection.reason);
 }
 
 export type WebpInspection =
@@ -36,8 +62,35 @@ export type WebpInspection =
  * - EXIF, 'XMP '(끝에 공백), ICCP 청크가 있으면 metadata. 검사 순서는 위 나열 순서.
  * 성공이면 청크 id 목록(순회 순서).
  */
-export function inspectWebp(_bytes: Uint8Array): WebpInspection {
-  throw new Error('not implemented');
+export function inspectWebp(bytes: Uint8Array): WebpInspection {
+  if (bytes.length < 12) return { ok: false, reason: 'too-short' };
+  if (ascii(bytes, 0) !== 'RIFF') return { ok: false, reason: 'not-riff' };
+  if (ascii(bytes, 8) !== 'WEBP') return { ok: false, reason: 'not-webp' };
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (view.getUint32(4, true) !== bytes.length - 8) return { ok: false, reason: 'size-mismatch' };
+
+  const chunks: string[] = [];
+  let animated = false;
+  let offset = 12;
+  while (offset + 8 <= bytes.length) {
+    const id = ascii(bytes, offset);
+    const size = view.getUint32(offset + 4, true);
+    if (chunks.length === 0) {
+      if (id !== 'VP8 ' && id !== 'VP8L' && id !== 'VP8X') return { ok: false, reason: 'no-image-chunk' };
+      if (id === 'VP8X' && size > 0 && offset + 8 < bytes.length && ((bytes[offset + 8] ?? 0) & 0x02) !== 0) animated = true;
+    }
+    if (id === 'ANIM' || id === 'ANMF') animated = true;
+    chunks.push(id);
+    offset += 8 + size + (size % 2);
+  }
+  if (chunks.length === 0) return { ok: false, reason: 'no-image-chunk' };
+  if (animated) return { ok: false, reason: 'animated' };
+  if (chunks.some((id) => id === 'EXIF' || id === 'XMP ' || id === 'ICCP')) return { ok: false, reason: 'metadata' };
+  return { ok: true, chunks };
+}
+
+function ascii(bytes: Uint8Array, offset: number): string {
+  return String.fromCharCode(bytes[offset]!, bytes[offset + 1]!, bytes[offset + 2]!, bytes[offset + 3]!);
 }
 
 export type WebpBackend = 'canvas' | 'wasm';
@@ -46,6 +99,7 @@ export type WebpBackend = 'canvas' | 'wasm';
  * 웹 WebP 인코더 선택(upload-edit.md 플랫폼별 허용 차이): canvas가 image/webp 인코딩을 지원하면 'canvas', 아니면 WASM이 가능할 때 'wasm', 둘 다 안 되면 null(준비 실패).
  * PNG/JPEG 같은 다른 형식으로 폴백하는 선택지는 없다.
  */
-export function selectWebpBackend(_support: { canvasWebp: boolean; wasm: boolean }): WebpBackend | null {
-  throw new Error('not implemented');
+export function selectWebpBackend(support: { canvasWebp: boolean; wasm: boolean }): WebpBackend | null {
+  if (support.canvasWebp) return 'canvas';
+  return support.wasm ? 'wasm' : null;
 }

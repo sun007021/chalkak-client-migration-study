@@ -62,11 +62,27 @@ export const CROP_EPSILON = 1e-3;
  * 편집하지 않은 사진인가(REQ-EDIT-005, PhotoEdit.isIdentity): 회전 0, 자르기가 전체와 CROP_EPSILON 이내, 필터 원본, 모든 조정의 유효값이 0.
  * 조정 항목의 유효값 = 직접 만진 값이 있으면 그 값, 없으면 autoValues[항목] × autoStrength.
  */
-export function isIdentityEdit(_edit: PhotoEdit): boolean {
-  throw new Error('not implemented');
+export function isIdentityEdit(edit: PhotoEdit): boolean {
+  if (edit.quarterTurns !== 0 || edit.filter !== 'original') return false;
+  const { crop } = edit;
+  if (
+    Math.abs(crop.centerX - FULL_CROP.centerX) > CROP_EPSILON ||
+    Math.abs(crop.centerY - FULL_CROP.centerY) > CROP_EPSILON ||
+    Math.abs(crop.width - FULL_CROP.width) > CROP_EPSILON ||
+    Math.abs(crop.height - FULL_CROP.height) > CROP_EPSILON
+  ) {
+    return false;
+  }
+  const { autoValues, autoStrength, manual } = edit.adjustmentLayers;
+  return ADJUSTMENT_KEYS.every((key) => (manual[key] ?? autoValues[key] * autoStrength) === 0);
 }
 
 /** 두 편집값이 같은가(값 비교, 참조 아님). 같은 편집값으로 다시 확정하면 사진을 다시 준비하지 않는다(REQ-UPL-035). */
-export function sameEdit(_a: PhotoEdit, _b: PhotoEdit): boolean {
-  throw new Error('not implemented');
+export function sameEdit(a: PhotoEdit, b: PhotoEdit): boolean {
+  if (a.quarterTurns !== b.quarterTurns || a.filter !== b.filter) return false;
+  if (a.crop.centerX !== b.crop.centerX || a.crop.centerY !== b.crop.centerY || a.crop.width !== b.crop.width || a.crop.height !== b.crop.height) return false;
+  const x = a.adjustmentLayers;
+  const y = b.adjustmentLayers;
+  if (x.autoStrength !== y.autoStrength) return false;
+  return ADJUSTMENT_KEYS.every((key) => x.autoValues[key] === y.autoValues[key] && x.manual[key] === y.manual[key]);
 }
