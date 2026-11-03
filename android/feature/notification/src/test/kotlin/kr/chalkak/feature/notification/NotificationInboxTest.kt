@@ -470,12 +470,13 @@ class NotificationInboxStateHolderTest {
     }
 
     @Test
-    fun `TC-NOTI-033 a 404 on read toasts gone, reloads the list and unread and does not navigate`() = runTest {
+    fun `TC-NOTI-033 TC-NOTI-010 a 404 on read toasts gone, reloads the list and unread and does not navigate`() = runTest {
         val r = opened(page(PAGE1), page("notification/notifications__30day-boundary.json"))
         r.repo.readResults += httpFail(404)
         r.holder.onRowClicked(nid(1))
         advanceUntilIdle()
         assertEquals(listOf(NotiCopyKeys.GONE), r.toasts)
+        assertEquals("더 이상 확인할 수 없는 알림이에요.", Copy[NotiCopyKeys.GONE]) // D-24, not the old "만료되었거나 삭제됐어요"
         assertTrue(r.navigations.isEmpty())
         assertEquals(listOf(1, 1), r.repo.listCalls.toList())
         assertEquals(listOf(nid(1), nid(2)), r.ids)

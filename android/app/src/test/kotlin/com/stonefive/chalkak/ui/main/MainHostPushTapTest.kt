@@ -167,6 +167,17 @@ class MainHostPushTapTest {
     }
 
     @Test
+    fun `TC-PUSH-067 푸시로 연 게시물이 삭제되어 404이면 상세가 게시물을 찾을 수 없어요 화면을 보인다`() {
+        launchHome {
+            posts.details.always(NotificationRig.POST, PostFixtures.failure("feed/posts-detail__404-not-found.json"))
+        }
+        send(post(openAi = false))
+        rule.awaitTag("feed.not-found-state")
+        tag("feed.not-found-state").assertIsDisplayed()
+        assertEquals(listOf(home, Route.Feed(NotificationRig.POST, FeedSource.ById)), rig.nav.stack)
+    }
+
+    @Test
     fun `TC-PUSH-064 같은 게시물 상세가 이미 열려 있으면 푸시 탭은 쌓지 않고 교체하며 새 홀더로 다시 불러온다`() {
         launchHome { aiRepo.scriptGet(ApiResult.Success(AiReviews.completed()), ApiResult.Success(AiReviews.completed())) }
         openFeed()

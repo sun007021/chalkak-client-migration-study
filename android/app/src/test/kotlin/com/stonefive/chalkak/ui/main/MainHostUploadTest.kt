@@ -81,6 +81,20 @@ class MainHostUploadTest {
     }
 
     @Test
+    fun `TC-UPL-090 설정 탭에서 업로드 화면을 열었다 닫으면 설정 탭으로 돌아온다`() {
+        launchOnUploadDay()
+        tap("bottom-bar.tab-settings")
+        node("settings.root").assertIsDisplayed()
+        openUpload()
+        assertEquals(Route.PhotoUpload, rig.nav.top)
+        tap("upload.close-button")
+        node("upload.root").assertDoesNotExist()
+        assertEquals(Route.TabRoot(Tab.Settings), rig.nav.top)
+        node("settings.root").assertIsDisplayed()
+        node("bottom-bar.root").assertIsDisplayed()
+    }
+
+    @Test
     fun `TC-UPL-014 업로드 화면을 닫았다 다시 열면 이전 사진 없이 새 화면으로 시작한다`() {
         launchOnUploadDay()
         openUpload()
