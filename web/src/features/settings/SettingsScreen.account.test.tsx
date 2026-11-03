@@ -268,3 +268,12 @@ describe('회원탈퇴', () => {
     expect(h.ff.callsTo(WITHDRAW)).toHaveLength(1);
   });
 });
+
+describe('확인 대화상자 겹침 (하단 바 위)', () => {
+  it.each(['logout', 'withdraw'] as const)('%s: 오버레이가 하단 바(zIndex 100)보다 위(200)에 있다', async (name) => {
+    await openAccount();
+    const dialog = await openDialog(name);
+    expect(dialog.parentElement).toHaveStyle({ zIndex: '200' });
+    expect(Number(screen.getByTestId('bottom-bar.root').style.zIndex)).toBeLessThan(200);
+  });
+});

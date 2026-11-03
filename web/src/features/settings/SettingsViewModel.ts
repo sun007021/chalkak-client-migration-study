@@ -74,6 +74,8 @@ export class SettingsViewModel extends ViewModel<SettingsState> {
     this.setState({ busy: 'logout' });
     try {
       await this.deps.account.logout();
+    } catch {
+      // 로컬 정리와 이동은 AccountService·세션 이벤트가 맡는다. 화면에서는 처리되지 않은 거부로 번지지 않게 삼킨다.
     } finally {
       this.setState({ dialog: null, busy: null });
     }
@@ -85,6 +87,8 @@ export class SettingsViewModel extends ViewModel<SettingsState> {
     try {
       // 서버가 이미 삭제했을 수 있어 화면을 떠나도 취소하지 않는다(signal을 넘기지 않는다).
       await this.deps.account.withdraw();
+    } catch {
+      // 실패 토스트는 AccountService가 보인다. 처리되지 않은 거부로 번지지 않게 삼킨다.
     } finally {
       this.setState({ dialog: null, busy: null });
     }
@@ -97,7 +101,11 @@ export class SettingsViewModel extends ViewModel<SettingsState> {
   }
 
   async pressLogin(): Promise<SettingsLoginOutcome> {
-    await this.deps.session.clear();
+    try {
+      await this.deps.session.clear();
+    } catch {
+      // 게스트 플래그를 못 지워도 로그인 화면으로 보낸다(로그인 화면의 부팅 판정이 다시 읽는다).
+    }
     return { kind: 'login' };
   }
 

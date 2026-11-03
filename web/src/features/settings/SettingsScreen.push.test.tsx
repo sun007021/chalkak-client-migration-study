@@ -237,3 +237,46 @@ describe('푸시 스위치 저장', () => {
     expect(toasts.messages).toEqual([]);
   });
 });
+
+describe('푸시 설정 가시성·재조회 (R2, R3)', () => {
+  const setVisibility = (state: 'hidden' | 'visible') => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
+    document.dispatchEvent(new Event('visibilitychange'));
+  };
+  afterEach(() => {
+    Reflect.deleteProperty(document, 'visibilityState');
+  });
+
+  it('R2 문서가 가려져도 진행 중인 저장은 취소·복원되지 않는다', async () => {
+    const gate = deferred<Response>();
+    const { h } = await openReady({ patch: [() => gate.promise] });
+    fireEvent.click(pushToggle('topicPushEnabled'));
+    await waitFor(() => expect(h.ff.callsTo(SETTINGS_PATCH)).toHaveLength(1));
+    act(() => setVisibility('hidden'));
+    expect(h.ff.callsTo(SETTINGS_PATCH)[0]!.signal?.aborted).toBe(false);
+    expect(isOn(pushToggle('topicPushEnabled'))).toBe(false);
+    gate.resolve(resp('settings/notification-settings__patch-no-content.json'));
+    await settle(h);
+    expect(isOn(pushToggle('topicPushEnabled'))).toBe(false);
+  });
+
+  it('R2 다시 보이면 서버 값을 다시 읽는다', async () => {
+    const { h } = await openReady();
+    act(() => setVisibility('hidden'));
+    act(() => setVisibility('visible'));
+    await waitFor(() => expect(h.ff.callsTo(SETTINGS_GET)).toHaveLength(2));
+  });
+
+  it('R3 다시 읽는 동안에는 이전 값을 그대로 보이고 비활성만 한다', async () => {
+    const gate = deferred<Response>();
+    const { h } = await openReady({ get: [fx('settings/notification-settings__get-ai-off.json'), () => gate.promise] });
+    expect(isOn(pushToggle('aiReviewPushEnabled'))).toBe(false);
+    expect(isOn(pushToggle('topicPushEnabled'))).toBe(true);
+    act(() => setVisibility('visible'));
+    await waitFor(() => expect(h.ff.callsTo(SETTINGS_GET)).toHaveLength(2));
+    expect(isDisabled(pushToggle('topicPushEnabled'))).toBe(true);
+    expect(isOn(pushToggle('topicPushEnabled'))).toBe(true);
+    gate.resolve(resp('settings/notification-settings__get-all-true.json'));
+    await waitFor(() => expect(isDisabled(pushToggle('topicPushEnabled'))).toBe(false));
+  });
+});

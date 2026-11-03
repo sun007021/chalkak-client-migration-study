@@ -232,3 +232,21 @@ describe('SettingsViewModel.pressLogin (게스트)', () => {
     expect(log).toEqual(['session.clear']);
   });
 });
+
+describe('SettingsViewModel 거부 처리 (R4)', () => {
+  it('로그아웃·탈퇴·게스트 로그인이 거부돼도 확인 호출은 거부되지 않고 busy가 풀린다', async () => {
+    const a = setup();
+    a.control.logout = () => Promise.reject(new Error('boom'));
+    a.vm.requestLogout();
+    await expect(a.vm.confirmLogout()).resolves.toBeUndefined();
+    expect(a.vm.state).toMatchObject({ dialog: null, busy: null });
+    const b = setup();
+    b.control.withdraw = () => Promise.reject(new Error('boom'));
+    b.vm.requestWithdraw();
+    await expect(b.vm.confirmWithdraw()).resolves.toBeUndefined();
+    expect(b.vm.state).toMatchObject({ dialog: null, busy: null });
+    const c = setup('guest');
+    c.control.clear = () => Promise.reject(new Error('boom'));
+    await expect(c.vm.pressLogin()).resolves.toEqual({ kind: 'login' });
+  });
+});
