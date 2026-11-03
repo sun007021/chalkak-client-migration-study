@@ -29,6 +29,7 @@ struct IssueWebScreen: View {
                     .accessibilityIdentifier("issue.web-content")
                 }
                 overlay
+                    .zIndex(1)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -42,7 +43,15 @@ struct IssueWebScreen: View {
     private var overlay: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().accessibilityIdentifier("issue.loading")
+            // 웹뷰 위를 배경색으로 덮고 그 위에 스피너를 둔다. 투명한 웹뷰 위에 맨 스피너는 첫 렌더 전 보이지 않았다.
+            ZStack {
+                ChalkakColor.background
+                ProgressView()
+                    .controlSize(.large)
+                    .tint(ChalkakColor.actionPrimary)
+                    .accessibilityIdentifier("issue.loading")
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .loaded:
             EmptyView()
         case .failed(let message):
