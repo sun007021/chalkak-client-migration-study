@@ -469,7 +469,7 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     signatureRepository,
     signatureCard,
     homeRepository,
-    appVersion: options.appVersion ?? '0.0.0',
+    appVersion: options.appVersion ?? __APP_VERSION__,
     notificationSettings,
     feedbackRepository,
     displayRepository: new DisplayRepository({ api }),
@@ -626,7 +626,7 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
         png,
         submitter: mode === 'onboarding' ? this.signupService : this.changeSignatureService,
         toast: this.toast,
-        refreshSignatureCard: mode === 'change' ? () => this.signatureCard.refresh() : undefined,
+        refreshSignatureCard: mode === 'change' ? () => this.signatureCard.refreshAfterChange() : undefined,
       });
     },
     createUploadViewModel(topicDate) {

@@ -33,7 +33,7 @@ export interface SettingsState {
 export type SettingsLoginOutcome = { kind: 'login' };
 
 /**
- * W11 구현 대기(스텁). 설정 탭 화면 상태(REQ-SET-001~007, REQ-AUTH-032~040).
+ * 설정 탭 화면 상태(REQ-SET-001~007, REQ-AUTH-032~040).
  * onShown: 회원이면 사인 카드 refresh와 푸시 설정 load를 서로 독립으로 시작한다(한쪽 실패가 다른 쪽을 막지 않는다). 게스트는 API를 부르지 않는다. onHidden: 푸시 저장 취소(cancelPending).
  * requestLogout/requestWithdraw: 회원이면 확인 대화상자를 연다. cancelDialog: 닫는다(API 0건, 처리 중이면 무시). confirmLogout/confirmWithdraw: 처리 중 중복 호출은 무시, 끝나면 대화상자를 닫는다.
  * openDocument: 약관 문서 열기. pressLogin(게스트): 게스트 플래그를 지우고 { kind: 'login' }.
@@ -44,40 +44,73 @@ export class SettingsViewModel extends ViewModel<SettingsState> {
   }
 
   onShown(): void {
-    void this.deps;
-    throw new Error('not implemented');
+    if (this.deps.mode !== 'member') return;
+    // 두 조회는 서로 독립이다. 한쪽이 동기적으로 던지거나 거절해도 다른 쪽을 막지 않는다.
+    const { signatureCard, notifications } = this.deps;
+    this.startIndependent(() => signatureCard.refresh());
+    this.startIndependent(() => notifications.load());
   }
 
   onHidden(): void {
-    throw new Error('not implemented');
+    if (this.deps.mode !== 'member') return;
+    this.deps.notifications.cancelPending();
   }
 
   requestLogout(): void {
-    throw new Error('not implemented');
+    this.openDialog('logout');
   }
 
   requestWithdraw(): void {
-    throw new Error('not implemented');
+    this.openDialog('withdraw');
   }
 
   cancelDialog(): void {
-    throw new Error('not implemented');
+    if (this.state.busy !== null) return;
+    this.setState({ dialog: null });
   }
 
-  confirmLogout(): Promise<void> {
-    throw new Error('not implemented');
+  async confirmLogout(): Promise<void> {
+    if (this.state.dialog !== 'logout' || this.state.busy !== null) return;
+    this.setState({ busy: 'logout' });
+    try {
+      await this.deps.account.logout();
+    } finally {
+      this.setState({ dialog: null, busy: null });
+    }
   }
 
-  confirmWithdraw(): Promise<void> {
-    throw new Error('not implemented');
+  async confirmWithdraw(): Promise<void> {
+    if (this.state.dialog !== 'withdraw' || this.state.busy !== null) return;
+    this.setState({ busy: 'withdraw' });
+    try {
+      // 서버가 이미 삭제했을 수 있어 화면을 떠나도 취소하지 않는다(signal을 넘기지 않는다).
+      await this.deps.account.withdraw();
+    } finally {
+      this.setState({ dialog: null, busy: null });
+    }
   }
 
   openDocument(kind: LegalDocumentKind): LegalOpenResult {
-    void kind;
-    throw new Error('not implemented');
+    const result = this.deps.launcher.open(kind);
+    this.setState({ documentOpenFailed: result !== 'opened' });
+    return result;
   }
 
-  pressLogin(): Promise<SettingsLoginOutcome> {
-    throw new Error('not implemented');
+  async pressLogin(): Promise<SettingsLoginOutcome> {
+    await this.deps.session.clear();
+    return { kind: 'login' };
+  }
+
+  private openDialog(dialog: 'logout' | 'withdraw'): void {
+    if (this.deps.mode !== 'member' || this.state.busy !== null) return;
+    this.setState({ dialog });
+  }
+
+  private startIndependent(start: () => Promise<void>): void {
+    try {
+      start().catch(() => undefined);
+    } catch {
+      // 동기 예외도 삼킨다. 각 저장소가 자기 실패를 처리한다.
+    }
   }
 }
