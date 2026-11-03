@@ -40,13 +40,13 @@ import { AttachableHomeNavigator } from '../features/home/AttachableHomeNavigato
 import { HomeViewModel } from '../features/home/HomeViewModel';
 import { DisplayRepository } from '../features/display/DisplayRepository';
 import { DisplayViewModel } from '../features/display/DisplayViewModel';
-import type { RecordViewModel } from '../features/record/RecordViewModel';
+import { RecordViewModel } from '../features/record/RecordViewModel';
 import { RecordRepository } from '../features/record/RecordRepository';
 import { CanvasCalendarImageExporter } from '../features/record/CalendarImageExporter';
 import type { CalendarImageExporter } from '../features/record/CalendarImageExporter';
 import { AnchorFileDownloader } from '../features/record/FileDownloader';
 import type { FileDownloader } from '../features/record/FileDownloader';
-import type { AttachableRecordNavigator } from '../features/record/recordNavigation';
+import { AttachableRecordNavigator } from '../features/record/recordNavigation';
 import { FeedRepository } from '../features/feed/FeedRepository';
 import { FeedViewModel } from '../features/feed/FeedViewModel';
 import type { FeedNavigator } from '../features/feed/FeedViewModel';
@@ -364,6 +364,8 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
       displaySession?.viewModel.resetForAccountChange();
     },
   });
+  let recordSession: { mode: SessionMode; viewModel: RecordViewModel; navigator: AttachableRecordNavigator } | null = null;
+  userCaches.register({ clear: () => recordSession?.viewModel.resetForAccountChange() });
   const aiReviews = new AiReviewStore({ repository: new AiReviewRepository({ api }), clock, toast });
   userCaches.register({ clear: () => aiReviews.reset() });
   const uploadNavigator = new AttachableUploadNavigator();
@@ -534,8 +536,26 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
       }
       return displaySession;
     },
-    recordSession(_mode) {
-      throw new Error('not implemented');
+    recordSession(mode) {
+      if (recordSession?.mode !== mode) {
+        recordSession?.viewModel.dispose();
+        const navigator = new AttachableRecordNavigator();
+        recordSession = {
+          mode,
+          navigator,
+          viewModel: new RecordViewModel({
+            mode,
+            clock: this.clock,
+            repository: this.recordRepository,
+            changes: this.postChanges,
+            toast: this.toast,
+            navigator,
+            exporter: this.calendarImageExporter,
+            downloader: this.fileDownloader,
+          }),
+        };
+      }
+      return recordSession;
     },
     createFeedViewModel(args) {
       return new FeedViewModel({

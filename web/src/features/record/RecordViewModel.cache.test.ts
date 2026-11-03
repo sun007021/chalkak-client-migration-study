@@ -9,6 +9,8 @@ import { MONTHS_KEY, OCT, OCT_20, OCT_27, OCT_31, SEP, SEP_17, SEP_30, monthResp
 const ym = (year: number, month: number) => ({ year, month });
 const offline = () => Promise.reject(new TypeError('Failed to fetch'));
 const octAfterDelete = 'record/posts-calendar__2026-10-after-delete';
+/** 5xx 한 번의 재검증 실패 = 최초 호출 + 자동 재시도 2회(D-21). */
+const failing500 = Array.from({ length: 3 }, () => 'record/posts-calendar__500-server-error');
 
 describe('RecordViewModel 캐시와 재검증 (REQ-REC-021~023, TC-REC-019~023)', () => {
   it('TC-REC-020 이전에 본 달로 돌아오면 응답 전에도 캐시를 보여 주고 최신 값으로 교체한다', async () => {
@@ -85,7 +87,8 @@ describe('RecordViewModel 캐시와 재검증 (REQ-REC-021~023, TC-REC-019~023)'
   });
 
   it('TC-REC-022 화면이 숨겨졌다 다시 보일 때(onShown)도 같은 방식으로 월 목록과 보이는 달을 재검증한다', async () => {
-    const h = createRecordHarness();
+    const gate = deferred<void>(); // 테스트 수정: 응답을 붙잡아 두어야 재검증 중 상태를 볼 수 있다(응답 없이 settle만으로는 이미 끝난다)
+    const h = createRecordHarness({ routes: { [OCT]: ['record/posts-calendar__2026-10', gated(gate, 'record/posts-calendar__2026-10')] } });
     const vm = h.viewModel;
     await finish(h, vm.onShown());
     vm.onHidden();
@@ -93,6 +96,7 @@ describe('RecordViewModel 캐시와 재검증 (REQ-REC-021~023, TC-REC-019~023)'
     const shown = vm.onShown();
     await settle();
     expect(vm.state.body).toMatchObject({ status: 'ready', revalidating: true }); // 첫 진입과 달리 캐시를 바로 보여 준다
+    gate.resolve();
     await finish(h, shown);
     expect(recordRequestsSince(h, before).sort()).toEqual(['GET /posts/calendar', 'GET /posts/calendar/months']);
   });
@@ -108,7 +112,7 @@ describe('RecordViewModel 캐시와 재검증 (REQ-REC-021~023, TC-REC-019~023)'
   });
 
   it('TC-REC-021 캐시된 달로 돌아와 재조회가 계약 위반 응답이어도 캐시를 유지하고 토스트다', async () => {
-    const h = createRecordHarness({ routes: { [SEP]: ['record/posts-calendar__2026-09', 'record/posts-calendar__month-mismatch'] } });
+    const h = createRecordHarness({ routes: { [SEP]: ['record/posts-calendar__2026-09', monthResponse(2026, 10)] } }); // 테스트 수정: month-mismatch fixture는 year 2026 month 9라 9월 요청에는 불일치가 아니다. 9월 요청에 10월 응답을 준다
     const vm = h.viewModel;
     await finish(h, vm.onShown());
     await finish(h, vm.selectPreviousMonth());
@@ -129,7 +133,7 @@ describe('RecordViewModel 캐시와 재검증 (REQ-REC-021~023, TC-REC-019~023)'
   });
 
   it('TC-REC-022 재검증 실패 뒤 다음 재검증이 성공하면 새 값으로 교체된다', async () => {
-    const h = createRecordHarness({ routes: { [OCT]: ['record/posts-calendar__2026-10', 'record/posts-calendar__500-server-error', octAfterDelete] } });
+    const h = createRecordHarness({ routes: { [OCT]: ['record/posts-calendar__2026-10', ...failing500, octAfterDelete] } }); // 테스트 수정: 읽기 GET의 자동 재시도(3회 호출)가 모두 실패해야 한 번의 재검증 실패다
     const vm = h.viewModel;
     await finish(h, vm.onShown());
     await finish(h, vm.onTabReselect());
@@ -329,7 +333,9 @@ describe('RecordViewModel 업로드 반영 (PostChange created, TC-REC-043)', ()
   });
 
   it('TC-REC-043 다른 달의 업로드는 지금 요청하지 않고 그 달 캐시만 버린다', async () => {
-    const h = createRecordHarness({ routes: { [SEP]: ['record/posts-calendar__2026-09', monthResponse(2026, 9, [['2026-09-17', SEP_17, 'APPROVED']])] } });
+    const gate = deferred<void>(); // 테스트 수정: 두 번째 9월 응답을 붙잡아 두어야 로딩 상태를 볼 수 있다
+    const sepAfterUpload = monthResponse(2026, 9, [['2026-09-17', SEP_17, 'APPROVED']]);
+    const h = createRecordHarness({ routes: { [SEP]: ['record/posts-calendar__2026-09', async () => (await gate.promise, sepAfterUpload())] } });
     const vm = h.viewModel;
     await finish(h, vm.onShown());
     await finish(h, vm.selectPreviousMonth());
@@ -341,6 +347,7 @@ describe('RecordViewModel 업로드 반영 (PostChange created, TC-REC-043)', ()
     const moving = vm.selectPreviousMonth();
     await settle();
     expect(vm.state.body).toEqual({ status: 'loading' }); // 버려진 캐시: 낡은 9월을 보여 주지 않는다
+    gate.resolve();
     await finish(h, moving);
     expect(datesOf(vm)).toEqual(['2026-09-17']);
   });

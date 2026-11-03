@@ -132,7 +132,7 @@ describe('RecordViewModel 월 이동 (REQ-REC-005, 006, TC-REC-004, 016, 017)', 
   });
 
   it('TC-REC-004 REQ-REC-020 기록이 없는 달로도 이동할 수 있고 빈 달(오류 아님, 선택 없음)로 보인다', async () => {
-    const h = createRecordHarness({ routes: { [MONTHS_KEY]: () => json(200, monthsBody([2026, 10], [2026, 9], [2026, 8])) } });
+    const h = createRecordHarness({ routes: { [MONTHS_KEY]: () => json(200, monthsBody([2026, 10], [2026, 9], [2026, 8])), [AUG]: 'record/posts-calendar__2026-08-empty' } }); // 테스트 수정: 8월 달력 라우트가 없으면 연결 실패다
     const vm = await open(h);
     await finish(h, vm.selectMonth(ym(2026, 8)));
     expect(h.router.calls(AUG)).toHaveLength(1);
@@ -375,10 +375,12 @@ describe('RecordViewModel 첫 불러오기 오류 (REQ-REC-018, 019, 024, TC-REC
     const h = createRecordHarness({ routes: { [OCT]: 'record/posts-calendar__500-server-error' } });
     const vm = await open(h);
     expect(vm.state.body).toEqual({ status: 'error', kind: 'other' });
-    h.router.set(OCT, 'record/posts-calendar__2026-10');
+    const gate = deferred<void>(); // 테스트 수정: 응답을 붙잡아 두어야 다시 시도 중 로딩을 볼 수 있다
+    h.router.set(OCT, gated(gate, 'record/posts-calendar__2026-10'));
     const retrying = vm.retry();
     await settle();
     expect(vm.state.body.status).toBe('loading');
+    gate.resolve();
     await finish(h, retrying);
     expect(vm.state.body.status).toBe('ready');
   });

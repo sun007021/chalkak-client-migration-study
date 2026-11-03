@@ -1,6 +1,5 @@
+import { ROUTES } from '../../app/paths';
 import type { DateString } from '../../core/time/kst';
-
-const NOT_IMPLEMENTED = 'not implemented';
 
 export type NavigateFn = (to: string, options?: { state?: unknown }) => void | Promise<void>;
 
@@ -14,14 +13,20 @@ export interface RecordNavigator {
 
 /** 오래 사는 ViewModel이 들고 있는 RecordNavigator. 화면이 붙어 있는 동안만 실제 구현을 꽂고, 붙어 있지 않을 때의 요청은 버린다. */
 export class AttachableRecordNavigator implements RecordNavigator {
-  attach(_target: RecordNavigator): () => void {
-    throw new Error(NOT_IMPLEMENTED);
+  private target: RecordNavigator | null = null;
+
+  attach(target: RecordNavigator): () => void {
+    this.target = target;
+    return () => {
+      // 이미 다른 구현으로 바뀌었으면 새 구현을 떼지 않는다.
+      if (this.target === target) this.target = null;
+    };
   }
-  openFeed(_target: { postId: string; thumbnailImageUrl: string }): void {
-    throw new Error(NOT_IMPLEMENTED);
+  openFeed(target: { postId: string; thumbnailImageUrl: string }): void {
+    this.target?.openFeed(target);
   }
-  openDisplay(_date: DateString): void {
-    throw new Error(NOT_IMPLEMENTED);
+  openDisplay(date: DateString): void {
+    this.target?.openDisplay(date);
   }
 }
 
@@ -29,25 +34,38 @@ export class AttachableRecordNavigator implements RecordNavigator {
 export class RouterRecordNavigator implements RecordNavigator {
   constructor(protected readonly navigate: NavigateFn) {}
 
-  openFeed(_target: { postId: string; thumbnailImageUrl: string }): void {
-    throw new Error(NOT_IMPLEMENTED);
+  openFeed(target: { postId: string; thumbnailImageUrl: string }): void {
+    void this.navigate(`${ROUTES.feed}/${target.postId}`, { state: recordFeedLocationState(target.thumbnailImageUrl) });
   }
-  openDisplay(_date: DateString): void {
-    throw new Error(NOT_IMPLEMENTED);
+  openDisplay(date: DateString): void {
+    void this.navigate(recordDisplayPath(date));
   }
 }
 
 /** `/display?date=2026-10-20`(정렬은 정하지 않는다: 전시가 날짜로 정한다). */
-export function recordDisplayPath(_date: DateString): string {
-  throw new Error(NOT_IMPLEMENTED);
+export function recordDisplayPath(date: DateString): string {
+  return `${ROUTES.display}?date=${date}`;
 }
 
 /** 상세를 push할 때 넣는 location state: 내 게시물로 본다(assumeMine)와 로딩 중 미리 보일 썸네일. */
-export function recordFeedLocationState(_thumbnailImageUrl: string): { assumeMine: true; thumbnailImageUrl: string } {
-  throw new Error(NOT_IMPLEMENTED);
+export function recordFeedLocationState(thumbnailImageUrl: string): { assumeMine: true; thumbnailImageUrl: string } {
+  return { assumeMine: true, thumbnailImageUrl };
 }
 
+const isHttpsUrl = (value: unknown): value is string => {
+  if (typeof value !== 'string') return false;
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
 /** location.state에서 기록 진입 값을 꺼낸다. assumeMine이 true가 아니면 null. 썸네일은 https만 받고 아니면 null. */
-export function readRecordFeedEntry(_state: unknown): { assumeMine: true; thumbnailImageUrl: string | null } | null {
-  throw new Error(NOT_IMPLEMENTED);
+export function readRecordFeedEntry(state: unknown): { assumeMine: true; thumbnailImageUrl: string | null } | null {
+  if (typeof state !== 'object' || state === null || Array.isArray(state)) return null;
+  const record = state as Record<string, unknown>;
+  if (record['assumeMine'] !== true) return null;
+  const thumbnail = record['thumbnailImageUrl'];
+  return { assumeMine: true, thumbnailImageUrl: isHttpsUrl(thumbnail) ? thumbnail : null };
 }
