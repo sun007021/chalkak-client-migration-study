@@ -234,9 +234,11 @@ final class AppContainer {
         let authEvents = DeferredAuthEvents()
         let refresher = AuthRefresher(configuration: apiConfiguration, transport: transport, store: sessionStore, clock: clock, events: authEvents)
         let client = APIClient(configuration: apiConfiguration, transport: transport, store: sessionStore, refresher: refresher, clock: clock)
-        // 푸시 기기 등록. FCM SDK가 없어 토큰 제공자는 자리표시자다(PushPlatform.swift 참고).
+        // 푸시 기기 등록. GoogleService-Info.plist가 번들에 있으면 Firebase의 FCM 토큰을, 없으면 토큰 없음(자리표시자)을 쓴다.
+        let firebaseAvailable = FirebaseBootstrap.isConfigurationAvailable()
+        let fcmTokens: any FCMTokenProviding = firebaseAvailable ? FirebaseFCMTokenProvider() : PlaceholderFCMTokenProvider()
         let apnsTokens = APNsTokenHolder()
-        let pushRegistrar = PushDeviceRegistrar(client: client, store: sessionStore, refresher: refresher, tokens: PlaceholderFCMTokenProvider())
+        let pushRegistrar = PushDeviceRegistrar(client: client, store: sessionStore, refresher: refresher, tokens: fcmTokens)
         let userCaches = CompositeUserCacheClearer([PushRegistrationSessionClearer(registrar: pushRegistrar)])
         let authRepository = APIAuthRepository(client: client, sessionStore: sessionStore, guestFlags: guestFlags, userCaches: userCaches, clock: clock)
 
@@ -268,7 +270,7 @@ final class AppContainer {
         self.authRepository = authRepository
         self.socialLogin = KakaoLoginFlow(gateway: KakaoSDKGatewayImpl(isConfigured: kakaoReady))
         self.pushRegistration = pushRegistration
-        self.screenTracker = ScreenTracker(tracker: LogAnalyticsTracker())
+        self.screenTracker = ScreenTracker(tracker: firebaseAvailable ? FirebaseAnalyticsTracker() : LogAnalyticsTracker())
         self.clock = clock
         self.viewer = viewer
         let topicRepository = APITopicRepository(client: client)

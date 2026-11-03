@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { ScrollView } from 'react-native';
 
 import { networkFailure } from '../../core/http/__testing__/FakeTransport';
 import { fixtureResponse } from '../../core/http/__testing__/loadFixture';
@@ -293,5 +294,16 @@ describe('DisplayScreen 좋아요', () => {
     await fireEvent.press(screen.getByTestId(`display.like-button-${ID('02')}`));
     expect(h.toast.messages).toEqual([t('guest.like')]);
     expect(h.likes.toggled).toEqual([]);
+  });
+});
+
+describe('DisplayScreen 탭 재선택', () => {
+  it('TC-NAV-008 전시 탭 재선택이 끝나면 목록을 맨 위로 스크롤한다', async () => {
+    const h = await createDisplayHarness();
+    await renderDisplay(h);
+    const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo');
+    await act(async () => h.viewModel.onTabReselected());
+    expect(scrollTo).toHaveBeenCalledWith({ y: 0, animated: true });
+    scrollTo.mockRestore();
   });
 });

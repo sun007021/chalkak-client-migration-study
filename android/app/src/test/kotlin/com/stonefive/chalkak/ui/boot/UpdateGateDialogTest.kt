@@ -31,23 +31,25 @@ class UpdateGateDialogTest {
 
     private val copy = loadCopy()
     private var updateClicks = 0
+    private var cancelClicks = 0
 
     private fun show() = rule.setContent {
         TestApp(copy) {
             Box(Modifier.fillMaxSize().testTag("test.host")) {
-                UpdateGateDialog(onUpdateClick = { updateClicks++ })
+                UpdateGateDialog(onUpdateClick = { updateClicks++ }, onCancelClick = { cancelClicks++ })
             }
         }
     }
 
     @Test
-    fun `TC-BOOT-028 강제 업데이트 다이얼로그는 제목 본문 버튼 하나를 copy 문구로 보인다`() {
+    fun `TC-BOOT-028 강제 업데이트 다이얼로그는 제목 본문 업데이트·취소 버튼을 copy 문구로 보인다`() {
         show()
         rule.onNodeWithTag("update-gate.dialog").assertIsDisplayed()
         rule.onNodeWithTag("update-gate.title").assertTextEquals(copy["boot.update.title"])
         rule.onNodeWithTag("update-gate.message").assertTextEquals(copy["boot.update.body"])
         rule.onNodeWithTag("update-gate.update-button").assertIsEnabled().assertTextEquals(copy["boot.update.button"])
-        rule.onAllNodes(hasClickAction()).assertCountEquals(1)
+        rule.onNodeWithTag("update-gate.cancel-button").assertIsEnabled().assertTextEquals(copy["boot.update.cancel"])
+        rule.onAllNodes(hasClickAction()).assertCountEquals(2)
     }
 
     @Test
@@ -76,5 +78,14 @@ class UpdateGateDialogTest {
         rule.waitForIdle()
         assertEquals(1, updateClicks)
         rule.onNodeWithTag("update-gate.dialog").assertIsDisplayed()
+    }
+
+    @Test
+    fun `TC-BOOT-031 REQ-BOOT-009 취소 버튼 탭은 취소 콜백만 호출한다`() {
+        show()
+        rule.onNodeWithTag("update-gate.cancel-button").performClick()
+        rule.waitForIdle()
+        assertEquals(1, cancelClicks)
+        assertEquals(0, updateClicks)
     }
 }

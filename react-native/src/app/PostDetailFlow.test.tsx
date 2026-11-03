@@ -39,7 +39,7 @@ async function renderApp(extra: Record<string, RouteValue> = {}) {
 }
 
 describe('홈 → 게시물 상세 내비게이션 계약', () => {
-  it('TC-FEED-001 REQ-NAV-027 홈 랭킹 사진을 누르면 상세가 열리고 하단 바가 숨겨지며 상세 응답 전에도 시드 내용이 보인다', async () => {
+  it('TC-FEED-001 TC-NAV-012 REQ-NAV-027 홈 랭킹 사진을 누르면 상세가 열리고 하단 바가 숨겨지며 상세 응답 전에도 시드 내용이 보인다', async () => {
     const gateHolder: { release?: () => void } = {};
     const { router } = await renderApp();
     const gate = new Promise<void>((resolve) => (gateHolder.release = resolve));
@@ -57,7 +57,7 @@ describe('홈 → 게시물 상세 내비게이션 계약', () => {
     await waitFor(() => expect(screen.getByTestId('feed.like-button')).toBeEnabled());
   });
 
-  it('TC-FEED-015 TC-FEED-013 뒤로가기는 홈으로 돌아가고 하단 바가 다시 보인다', async () => {
+  it('TC-FEED-015 TC-FEED-013 TC-NAV-012 뒤로가기는 홈으로 돌아가고 하단 바가 다시 보인다', async () => {
     await renderApp();
     await fireEvent.press(await screen.findByTestId(`home.popular-item-${ID}`));
     await screen.findByTestId('feed.root');

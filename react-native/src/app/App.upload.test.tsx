@@ -63,7 +63,7 @@ async function renderApp(mode: 'member' | 'guest', routes: Record<string, RouteV
 const press = (id: string) => fireEvent.press(screen.getByTestId(id));
 
 describe('App - 업로드 진입 (하단 + 버튼)', () => {
-  it('TC-UPL-001 게스트는 토스트만 뜨고 요청이 0건이며 업로드 화면이 열리지 않는다', async () => {
+  it('TC-UPL-001 TC-NAV-017 게스트는 토스트만 뜨고 요청이 0건이며 업로드 화면이 열리지 않는다', async () => {
     const { net } = await renderApp('guest');
     await screen.findByTestId('home.root');
     const before = net.transport.requests.length;
@@ -75,7 +75,7 @@ describe('App - 업로드 진입 (하단 + 버튼)', () => {
     expect(screen.queryByTestId('upload.root')).not.toBeOnTheScreen();
   });
 
-  it('TC-UPL-002 회원은 GET /posts/today 확인 뒤 업로드 화면이 열린다', async () => {
+  it('TC-UPL-002 TC-NAV-005 회원은 GET /posts/today 확인 뒤 업로드 화면이 열린다', async () => {
     const { router } = await renderApp('member', {
       'GET /posts/today': 'home/posts-today__not-posted',
     });
@@ -86,7 +86,7 @@ describe('App - 업로드 진입 (하단 + 버튼)', () => {
     expect(router.calls('GET /posts/today').length).toBe(before + 1);
   });
 
-  it('TC-UPL-009 확인 중에는 upload-entry.loading이 보이고 연타해도 요청은 1회다', async () => {
+  it('TC-UPL-009 TC-NAV-007 확인 중에는 upload-entry.loading이 보이고 연타해도 요청은 1회다', async () => {
     const gate = deferred<void>();
     let calls = 0;
     const { router } = await renderApp('member', {
@@ -110,6 +110,7 @@ describe('App - 업로드 진입 (하단 + 버튼)', () => {
     gate.resolve();
     expect(await screen.findByTestId('upload.root')).toBeOnTheScreen();
     expect(screen.queryByTestId('upload-entry.loading')).not.toBeOnTheScreen();
+    expect(screen.getAllByTestId('upload.root')).toHaveLength(1);
   });
 
   it('TC-UPL-003 이미 작성했으면 토스트로 알리고 업로드 화면은 열리지 않는다', async () => {
