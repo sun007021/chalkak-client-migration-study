@@ -45,7 +45,7 @@ export class PresignedUploader {
       headers: { 'content-type': request.contentType },
       body: request.body,
       timeoutMs: UPLOAD_PUT_TIMEOUT_MS,
-      retry: false,
+      retry: request.retry === true,
       signal: request.signal,
     });
     if (response.status >= 200 && response.status < 300) return;

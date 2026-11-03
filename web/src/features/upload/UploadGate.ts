@@ -1,3 +1,5 @@
+import { t } from '../../copy/ko';
+import { ApiError, isCancellation, SessionChangedError } from '../../core/net/errors';
 import { ViewModel } from '../../core/state/ViewModel';
 import type { ToastController } from '../../core/ui/ToastController';
 import type { SessionMode } from '../boot/authGate';
@@ -38,19 +40,79 @@ export interface UploadGateState {
  * cancel(): 확인 중인 요청을 abort하고 결과(토스트·이동)를 버린다. 그 뒤 start()는 다시 동작한다. dispose(): 영구 종료 — 이후 start()는 요청 0건.
  */
 export class UploadGate extends ViewModel<UploadGateState> implements UploadEntry {
+  private run: { controller: AbortController } | null = null;
+  private closed = false;
+
   constructor(protected readonly deps: UploadGateDeps) {
     super({ checking: false });
   }
 
   start(): void {
-    throw new Error('not implemented');
+    if (this.closed || this.run) return;
+    const run = { controller: new AbortController() };
+    this.run = run;
+    this.setState({ checking: true });
+    void this.check(run);
   }
 
   cancel(): void {
-    throw new Error('not implemented');
+    const run = this.run;
+    if (!run) return;
+    this.run = null;
+    run.controller.abort();
+    this.setState({ checking: false });
   }
 
   override dispose(): void {
-    throw new Error('not implemented');
+    this.closed = true;
+    this.cancel();
+    super.dispose();
+  }
+
+  private async check(run: { controller: AbortController }): Promise<void> {
+    const current = () => this.run === run;
+    try {
+      const mode = await this.deps.mode();
+      if (!current()) return;
+      if (!this.deps.guestGate.requireMember(mode, 'upload')) return;
+      const today = await this.deps.today.fetchTodayPost(run.controller.signal);
+      if (!current()) return;
+      // 상태를 먼저 내린 뒤 이동한다: 어떤 경우에도 화면을 연 뒤에는 토스트가 없다.
+      this.finish(run);
+      this.report(today);
+    } catch (error) {
+      if (!current()) return;
+      this.finish(run);
+      // 재인증(401)·계정 전환은 세션 이벤트가 처리한다: 토스트도 이동도 없다.
+      if (isCancellation(error) || error instanceof SessionChangedError) return;
+      if (error instanceof ApiError && error.status === 401) return;
+      this.deps.toast.show(t('upload.gate.check-failed'));
+      return;
+    } finally {
+      if (current()) this.finish(run);
+    }
+  }
+
+  private finish(run: { controller: AbortController }): void {
+    if (this.run !== run) return;
+    this.run = null;
+    this.setState({ checking: false });
+  }
+
+  private report(today: TodayPost): void {
+    switch (today.kind) {
+      case 'not-posted':
+        this.deps.navigator.openUpload({ topicDate: today.topicDate });
+        return;
+      case 'posted':
+        this.deps.toast.show(t('upload.gate.already-posted'));
+        return;
+      case 'no-open-topic':
+        this.deps.toast.show(t('upload.gate.no-open-topic'));
+        return;
+      case 'banned':
+        this.deps.toast.show(t('upload.gate.banned'));
+        return;
+    }
   }
 }
