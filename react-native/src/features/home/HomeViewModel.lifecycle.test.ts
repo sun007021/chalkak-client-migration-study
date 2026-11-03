@@ -1,24 +1,11 @@
 import { deferred, networkFailure } from '../../core/http/__testing__/FakeTransport';
 import { fixtureResponse } from '../../core/http/__testing__/loadFixture';
 import { t } from '../../shared/copy';
-import { createHomeHarness } from './__testing__/createHomeHarness';
-import type { HomeHarness } from './__testing__/createHomeHarness';
+import { createHomeHarness, routeNextDay } from './__testing__/createHomeHarness';
 
 const TODAY_POSTS = 'GET /posts?topicDate=2026-10-27&sort=popular&page=1&pageSize=20';
 const UNREAD = 'GET /notifications/unread-status';
 const settle = () => new Promise((resolve) => setImmediate(resolve));
-
-/** 새 날짜(10/28) 라우트. 자정 직후 재로드 테스트용. */
-function routeNextDay(h: HomeHarness) {
-  h.router
-    .set('GET /topics?date=2026-10-28', 'home/topics__open-2026-10-28')
-    .set('GET /topics?date=2026-10-27', 'home/topics__open-2026-10-27')
-    .set(
-      'GET /posts?topicDate=2026-10-28&sort=popular&page=1&pageSize=20',
-      'home/posts-list__popular-5',
-    )
-    .set('GET /posts/calendar?year=2026&month=10', 'home/posts-calendar__2026-10-week-approved');
-}
 
 describe('HomeViewModel 새로고침 (D-20)', () => {
   it('TC-HOME-035 REQ-HOME-038 새로고침 중에는 기존 내용을 유지하고 refreshing이 켜지며 성공하면 교체한다', async () => {
@@ -242,7 +229,7 @@ describe('HomeViewModel 복귀·재진입 조용한 갱신', () => {
 });
 
 describe('HomeViewModel KST 날짜 변경 (REQ-HOME-041)', () => {
-  it('TC-HOME-040 TC-TIME-014 KST 23:59:59에는 재로드 없이 10/27 기준 그대로다', async () => {
+  it('TC-HOME-040 KST 23:59:59에는 재로드 없이 10/27 기준 그대로다', async () => {
     const h = await createHomeHarness();
     await h.viewModel.onShown();
     h.clock.set('2026-10-27T14:59:59Z');
@@ -252,7 +239,7 @@ describe('HomeViewModel KST 날짜 변경 (REQ-HOME-041)', () => {
     expect(h.router.calls('GET /topics?date=2026-10-27')).toHaveLength(2); // 같은 날짜의 조용한 갱신
   });
 
-  it('TC-HOME-041 TC-TIME-015 KST 00:00:00을 지나 홈이 다시 보이면 오늘=10/28, 어제 랭킹=10/27로 전체를 다시 불러오고 이전 날짜 내용이 섞이지 않는다', async () => {
+  it('TC-HOME-041 KST 00:00:00을 지나 홈이 다시 보이면 오늘=10/28, 어제 랭킹=10/27로 전체를 다시 불러오고 이전 날짜 내용이 섞이지 않는다', async () => {
     const h = await createHomeHarness();
     await h.viewModel.onShown();
     routeNextDay(h);
@@ -276,14 +263,18 @@ describe('HomeViewModel KST 날짜 변경 (REQ-HOME-041)', () => {
     expect(seenTopics).not.toContain('2026-10-27'); // 날짜가 바뀌면 먼저 비우고 새로 채운다
   });
 
-  it('TC-HOME-041 TC-TIME-014 TC-TIME-015 포그라운드 복귀로도 날짜 변경을 감지한다', async () => {
+  it('TC-HOME-041 TC-TIME-015 포그라운드 복귀로도 날짜 변경을 감지한다', async () => {
     const h = await createHomeHarness();
     await h.viewModel.onShown();
     routeNextDay(h);
     h.clock.set('2026-10-27T15:00:00Z');
     h.visibility.emit('foreground');
     await settle();
-    expect(h.viewModel.getSnapshot().todayDate.toString()).toBe('2026-10-28');
+    const state = h.viewModel.getSnapshot();
+    expect(state.todayDate.toString()).toBe('2026-10-28');
+    expect(state.yesterdayDate.toString()).toBe('2026-10-27');
+    expect(state.topic).toMatchObject({ status: 'ready', topic: { title: '골목길' } });
+    expect(h.router.calls('GET /topics?date=2026-10-28')).toHaveLength(1);
   });
 
   it('TC-HOME-042 자정 직후 새 주제가 아직 없으면 히어로 no-open-topic, 오늘 인기는 빈 ready, 어제 랭킹은 10/27 기준이다', async () => {
