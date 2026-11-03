@@ -11,14 +11,14 @@ export interface ConfigEnv {
 const API_PATH = '/api/v1/';
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1']);
 
-function parseAllowedUrl(raw: string): URL {
+function parseAllowedUrl(raw: string, allowLoopbackHttp = true): URL {
   let url: URL;
   try {
     url = new URL(raw);
   } catch {
     throw new ConfigError(`invalid URL: ${raw}`);
   }
-  const allowed = url.protocol === 'https:' || (url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname));
+  const allowed = url.protocol === 'https:' || (allowLoopbackHttp && url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname));
   if (!allowed) throw new ConfigError(`URL must be https (or http on loopback): ${raw}`);
   if (url.username || url.password) throw new ConfigError('URL must not contain credentials');
   return url;
@@ -49,9 +49,12 @@ export function readApiBaseUrl(env: { VITE_API_BASE_URL?: string }, configEnv?: 
   return parseApiBaseUrl(env.VITE_API_BASE_URL, configEnv);
 }
 
-/** presigned 업로드 URL 등 절대 URL도 같은 규칙: https 또는 loopback http만. 아니면 ConfigError. */
-export function assertAllowedAbsoluteUrl(url: string): void {
-  parseAllowedUrl(url);
+/**
+ * presigned 업로드 URL 등 절대 URL도 같은 규칙: https 또는 loopback http만. 아니면 ConfigError.
+ * allowLoopbackHttp를 false로 주면 https만 허용한다(배포 빌드의 업로드 URL: loopback http는 개발 전용).
+ */
+export function assertAllowedAbsoluteUrl(url: string, options: { allowLoopbackHttp?: boolean } = {}): void {
+  parseAllowedUrl(url, options.allowLoopbackHttp ?? true);
 }
 
 export { ConfigError };

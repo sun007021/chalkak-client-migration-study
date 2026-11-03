@@ -325,7 +325,7 @@ export class FeedViewModel extends ViewModel<FeedState> {
     }
     if (!post) return;
     if (change.type === 'like') this.setState({ post: { ...post, isLiked: change.isLiked, likeCount: change.likeCount } });
-    else this.setState({ post: { ...post, title: change.title } });
+    else if (change.type === 'title') this.setState({ post: { ...post, title: change.title } });
   }
 
   private announceRemoved(postId: string): void {

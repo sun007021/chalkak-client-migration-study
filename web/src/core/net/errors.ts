@@ -68,6 +68,13 @@ export function isCancellation(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { name?: unknown }).name === 'AbortError';
 }
 
+/**
+ * 결과를 버려야 하는 오류: 취소(AbortError) 또는 세션 변경(로그아웃·계정 전환, SessionChangedError). 화면은 오류 문구 없이 끝낸다.
+ */
+export function isAbandoned(error: unknown): boolean {
+  return isCancellation(error) || error instanceof SessionChangedError;
+}
+
 const isKnownErrorCode = (value: string): value is KnownErrorCode => (KNOWN_ERROR_CODES as readonly string[]).includes(value);
 
 function parseJsonObject(bodyText: string): Record<string, unknown> | null {

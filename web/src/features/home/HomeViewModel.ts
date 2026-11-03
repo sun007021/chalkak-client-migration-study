@@ -394,6 +394,13 @@ export class HomeViewModel extends ViewModel<HomeState> {
         });
         this.dropMyPost(change.postId);
         return;
+      case 'created':
+        // 업로드 직후(REQ-UPL-062): /posts/today를 다시 부르지 않고 이벤트만으로 히어로를 바꾼다. 홈이 다시 보이면 서버 상태로 맞춘다.
+        if (change.topicDate !== this.state.todayDate) return;
+        this.today = { kind: 'posted', topicDate: change.topicDate, postId: change.postId, moderationStatus: change.moderationStatus };
+        this.setState({ ai: { kind: 'hidden' } });
+        this.publishHero();
+        return;
     }
   }
 

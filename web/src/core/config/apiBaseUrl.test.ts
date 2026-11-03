@@ -76,3 +76,11 @@ describe('assertAllowedAbsoluteUrl (presigned URL)', () => {
     expect(() => assertAllowedAbsoluteUrl(u)).toThrow(ConfigError);
   });
 });
+
+describe('assertAllowedAbsoluteUrl allowLoopbackHttp (리뷰 8)', () => {
+  it('리뷰 8 allowLoopbackHttp: false면 loopback http도 거절하고 https는 통과한다', () => {
+    expect(() => assertAllowedAbsoluteUrl('http://localhost:9000/b/k', { allowLoopbackHttp: false })).toThrow(ConfigError);
+    expect(() => assertAllowedAbsoluteUrl('http://127.0.0.1:9000/b/k', { allowLoopbackHttp: false })).toThrow(ConfigError);
+    expect(() => assertAllowedAbsoluteUrl('https://s3.test/b/k', { allowLoopbackHttp: false })).not.toThrow();
+  });
+});

@@ -29,6 +29,12 @@ export const webOnlyCopy = {
   'display.picker.year-label': '연도',
   'display.picker.month-label': '월',
   'display.picker.day-label': '일',
+  /** 업로드: 앨범·카메라 파일 입력의 접근성 이름(안내 문구와 겹치지 않게 서로 다르게), 미리보기 버튼·이미지, 성공 화면 사진. TODO: shared/copy/ko.json에 키가 생기면 옮긴다. */
+  'upload.album.a11y': '앨범에서 사진 고르기',
+  'upload.camera.a11y': '카메라로 사진 찍기',
+  'upload.preview.edit': '사진 편집하기',
+  'upload.preview.alt': '선택한 사진',
+  'upload.success.photo-alt': '전시한 사진',
   /** 상세: 삭제 요청 중 표시. */
   'feed.deleting': '삭제 중',
 } as const;

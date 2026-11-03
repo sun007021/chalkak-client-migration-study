@@ -42,4 +42,9 @@ export type PostChange =
   | { type: 'like'; postId: string; isLiked: boolean; likeCount: number }
   | { type: 'title'; postId: string; title: string | null }
   /** 삭제·비공개(404). 구독자는 목록·캐시에서 뺀다. */
-  | { type: 'removed'; postId: string };
+  | { type: 'removed'; postId: string }
+  /**
+   * 업로드 성공(201 또는 복구 확인, REQ-UPL-063). 홈은 히어로를 곧바로 이 상태로 바꾸고(VALIDATING → 처리 중, PENDING → 검수 대기),
+   * 전시는 그 topicDate의 목록 캐시를 버리고 보고 있으면 조용히 다시 불러온다.
+   */
+  | { type: 'created'; postId: string; topicDate: DateString; moderationStatus: 'VALIDATING' | 'PENDING' | 'APPROVED' };
