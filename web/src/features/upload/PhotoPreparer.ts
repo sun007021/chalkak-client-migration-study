@@ -1,5 +1,5 @@
 import { POST_IMAGE_CONTENT_TYPE, POST_IMAGE_MAX_LONG_EDGE } from '../../constants';
-import { ApiError, isCancellation, NetworkError } from '../../core/net/errors';
+import { ApiError, isAbandoned, NetworkError } from '../../core/net/errors';
 import type { Clock } from '../../core/time/Clock';
 import { MonotonicDeadline } from '../../core/time/MonotonicDeadline';
 import { isIdentityEdit } from './editModel';
@@ -38,6 +38,12 @@ export interface PreparedUpload {
   size: Size;
   /** 정책 응답을 받은 시각부터 센다(인코딩이 끝난 시각이 아니다). 수명 expiresInSeconds, 안전 여유 5초. */
   deadline: MonotonicDeadline;
+}
+
+/** PUT이 거절돼 정책만 버렸을 때 다시 쓸 수 있는 인코딩 결과(REQ-UPL-059). */
+export interface ReusableFile {
+  file: Blob;
+  size: Size;
 }
 
 export interface PhotoInput {
@@ -85,8 +91,10 @@ export class PhotoPreparer {
    * 5) encodePostImage(maxBytes = 정책 maxBytes)  6) PreparedUpload(deadline은 2번 이전, 정책 응답을 받은 직후 시작).
    * S3 PUT은 하지 않는다. 정책 발급 오류 분류: NetworkError → network, ApiError 403 → forbidden, ApiError 401 → unauthorized, 그 밖 → prepare.
    */
-  async prepare(input: PhotoInput, signal: AbortSignal): Promise<PreparedUpload> {
+  async prepare(input: PhotoInput, signal: AbortSignal, reuse?: ReusableFile): Promise<PreparedUpload> {
     const { policy, deadline } = await this.issuePolicy(signal);
+    // reuse: 같은 사진·편집값으로 이미 만든 파일이 새 정책 maxBytes 이하면 디코드·인코딩을 다시 하지 않는다.
+    if (reuse && policy.maxBytes >= reuse.file.size) return { policy, file: reuse.file, size: reuse.size, deadline };
     const { file, size } = await this.encode(input, policy.maxBytes, signal);
     return { policy, file, size, deadline };
   }
@@ -147,12 +155,12 @@ function throwIfAborted(signal: AbortSignal): void {
 
 /** 디코드·편집·인코딩 실패: 취소는 그대로, 그 밖은 모두 prepare. */
 function classifyLocalFailure(error: unknown): unknown {
-  if (isCancellation(error) || error instanceof PrepareError) return error;
+  if (isAbandoned(error) || error instanceof PrepareError) return error;
   return new PrepareError('prepare', error);
 }
 
 function classifyPolicyFailure(error: unknown): unknown {
-  if (isCancellation(error)) return error;
+  if (isAbandoned(error)) return error;
   if (error instanceof NetworkError) return new PrepareError('network', error);
   if (error instanceof ApiError && error.status === 403) return new PrepareError('forbidden', error);
   if (error instanceof ApiError && error.status === 401) return new PrepareError('unauthorized', error);

@@ -1,6 +1,6 @@
 import { t } from '../../copy/ko';
 import type { CopyKey } from '../../copy/ko';
-import { ApiError, InvalidResponseError, isCancellation, NetworkError, SessionChangedError } from '../../core/net/errors';
+import { ApiError, InvalidResponseError, isAbandoned, isCancellation, NetworkError, SessionChangedError } from '../../core/net/errors';
 import type { PresignedUploader } from '../../core/net/PresignedUploader';
 import { RequestSlots } from '../../core/state/RequestSlots';
 import { ViewModel } from '../../core/state/ViewModel';
@@ -10,7 +10,7 @@ import type { PostChanges } from '../post/PostChanges';
 import { IDENTITY_EDIT, sameEdit } from './editModel';
 import type { PhotoEdit } from './editModel';
 import { PrepareError } from './PhotoPreparer';
-import type { PhotoPreparer, PreparedUpload } from './PhotoPreparer';
+import type { PhotoPreparer, PreparedUpload, ReusableFile } from './PhotoPreparer';
 import type { TodayPostSource } from './UploadGate';
 import type { CreatedModerationStatus, UploadRepository } from './UploadRepository';
 import type { UploadResultStore } from './UploadResult';
@@ -118,7 +118,7 @@ export interface UploadViewModelDeps {
  *   · 취소(dispose) → {cancelled}: 성공 화면·results·changes 모두 없음.
  * - dispose(): 모든 요청(주제, 준비, PUT, POST, 복구 확인)을 abort하고 이후 상태를 바꾸지 않는다.
  */
-type PrepOutcome = { kind: 'ready'; prepared: PreparedUpload } | { kind: 'failed'; failure: PrepareError } | { kind: 'stale' };
+type PrepOutcome = { kind: 'ready'; prepared: PreparedUpload } | { kind: 'failed'; failure: PrepareError } | { kind: 'stale' } | { kind: 'abandoned' };
 
 interface PrepTask {
   id: number;
@@ -146,6 +146,8 @@ export class UploadViewModel extends ViewModel<UploadState> {
   private prepGeneration = 0;
   /** 준비가 끝난 업로드 준비물(preparation === 'ready'일 때만 있다). */
   private prepared: PreparedUpload | null = null;
+  /** PUT이 거절돼 정책만 버린 뒤 남긴 파일. 같은 사진·편집값의 다음 준비에서만 쓰고, 새 선택·편집값은 버린다. */
+  private reusable: ReusableFile | null = null;
   private submitController: AbortController | null = null;
 
   constructor(protected readonly deps: UploadViewModelDeps) {
@@ -180,7 +182,7 @@ export class UploadViewModel extends ViewModel<UploadState> {
     const pass = this.slots.begin('select');
     try {
       const size = await this.deps.preparer.inspect(file, pass.signal);
-      if (!pass.isCurrent()) return;
+      if (!pass.isCurrent() || this.state.submitting) return;
       this.patch({ errorMessage: null });
       if (this.deps.editorEnabled) {
         this.pendingSize = size;
@@ -231,6 +233,8 @@ export class UploadViewModel extends ViewModel<UploadState> {
   async submit(): Promise<UploadOutcome> {
     if (this.closed) return { kind: 'cancelled' };
     if (!this.state.canSubmit || this.state.submitting) return { kind: 'stay' };
+    // 진행 중인 사진 검사는 버린다: 제출하는 사진이 중간에 바뀌면 안 된다.
+    this.slots.begin('select');
     const controller = new AbortController();
     this.submitController = controller;
     this.patch({ submitting: true, errorMessage: null });
@@ -283,11 +287,12 @@ export class UploadViewModel extends ViewModel<UploadState> {
     this.prepGeneration += 1;
   }
 
-  private startPrepare(): PrepTask | null {
+  private startPrepare(reuse?: ReusableFile): PrepTask | null {
     const photo = this.state.photo;
     if (this.closed || !photo) return null;
     this.cancelPrep();
     this.prepared = null;
+    this.reusable = null;
     const id = this.prepGeneration;
     const controller = new AbortController();
     const edit = this.state.edit;
@@ -295,7 +300,7 @@ export class UploadViewModel extends ViewModel<UploadState> {
     const isCurrent = () => !this.closed && this.prepGeneration === id;
     const promise = (async (): Promise<PrepOutcome> => {
       try {
-        const prepared = await this.deps.preparer.prepare({ photo: photo.source, edit }, controller.signal);
+        const prepared = await this.deps.preparer.prepare({ photo: photo.source, edit }, controller.signal, reuse);
         if (!isCurrent()) return { kind: 'stale' };
         this.prepared = prepared;
         this.prep = null;
@@ -303,6 +308,11 @@ export class UploadViewModel extends ViewModel<UploadState> {
         return { kind: 'ready', prepared };
       } catch (error) {
         if (!isCurrent() || isCancellation(error)) return { kind: 'stale' };
+        if (error instanceof SessionChangedError) {
+          this.prep = null;
+          this.patch({ preparation: 'failed' });
+          return { kind: 'abandoned' };
+        }
         const failure = error instanceof PrepareError ? error : new PrepareError('prepare', error);
         this.prep = null;
         this.patch({ preparation: 'failed' });
@@ -321,7 +331,8 @@ export class UploadViewModel extends ViewModel<UploadState> {
   }
 
   /** 준비물을 버린다: 다음 제출은 정책 발급부터 다시 한다. */
-  private discardPrepared(): void {
+  private discardPrepared(keepFile = false): void {
+    this.reusable = keepFile && this.prepared ? { file: this.prepared.file, size: this.prepared.size } : null;
     this.prepared = null;
     this.patch({ preparation: 'idle' });
   }
@@ -332,11 +343,12 @@ export class UploadViewModel extends ViewModel<UploadState> {
 
     // 2) 준비: 진행 중이면 기다리고, ready가 아니면 처음부터 다시 한다.
     let prepared = this.prepared;
-    const task = this.prep ?? (prepared ? null : this.startPrepare());
+    const task = this.prep ?? (prepared ? null : this.startPrepare(this.reusable ?? undefined));
     if (task) {
       const outcome = await task.promise;
       if (this.closed) return { kind: 'cancelled' };
       if (outcome.kind === 'failed') return outcome.failure.kind === 'unauthorized' ? { kind: 'login' } : { kind: 'stay' };
+      if (outcome.kind === 'abandoned') return { kind: 'cancelled' };
       if (outcome.kind === 'stale') return { kind: 'stay' };
       prepared = outcome.prepared;
     }
@@ -349,7 +361,7 @@ export class UploadViewModel extends ViewModel<UploadState> {
       if (fresh !== prepared) this.prepared = fresh;
       prepared = fresh;
     } catch (error) {
-      if (this.closed || isCancellation(error)) return { kind: 'cancelled' };
+      if (this.closed || isAbandoned(error)) return { kind: 'cancelled' };
       const failure = error instanceof PrepareError ? error : new PrepareError('prepare', error);
       this.showPrepareFailure(failure);
       return failure.kind === 'unauthorized' ? { kind: 'login' } : { kind: 'stay' };
@@ -364,7 +376,7 @@ export class UploadViewModel extends ViewModel<UploadState> {
         this.patch({ errorMessage: t('upload.error.network') });
       } else {
         this.patch({ errorMessage: t('upload.error.upload') });
-        this.discardPrepared();
+        this.discardPrepared(true);
       }
       return { kind: 'stay' };
     }
@@ -375,7 +387,7 @@ export class UploadViewModel extends ViewModel<UploadState> {
       const created = await this.deps.repository.createPost({ topicId: topic.id, photoUploadId: prepared.policy.uploadId, title: titlePayload(title) }, signal);
       return this.succeed(created.postId, created.moderationStatus, topic.title, prepared.file);
     } catch (error) {
-      if (this.closed || isCancellation(error) || error instanceof SessionChangedError) return { kind: 'cancelled' };
+      if (this.closed || isAbandoned(error)) return { kind: 'cancelled' };
       if (error instanceof NetworkError || error instanceof InvalidResponseError) return this.recover(topic.title, prepared.file, signal);
       if (error instanceof ApiError) return this.rejectedByServer(error, signal);
       this.patch({ errorMessage: t('upload.error.create') });
@@ -400,7 +412,7 @@ export class UploadViewModel extends ViewModel<UploadState> {
       if (this.closed) return { kind: 'cancelled' };
       if (today.kind === 'posted' && today.topicDate === this.deps.topicDate) return this.succeed(today.postId, today.moderationStatus, topicTitle, photo);
     } catch (error) {
-      if (this.closed || isCancellation(error)) return { kind: 'cancelled' };
+      if (this.closed || isAbandoned(error)) return { kind: 'cancelled' };
       if (error instanceof ApiError && error.status === 401) return { kind: 'login' };
     }
     this.patch({ errorMessage: t('upload.error.network') });
@@ -437,7 +449,7 @@ export class UploadViewModel extends ViewModel<UploadState> {
         this.discardPrepared();
       }
     } catch (checkError) {
-      if (this.closed || isCancellation(checkError)) return { kind: 'cancelled' };
+      if (this.closed || isAbandoned(checkError)) return { kind: 'cancelled' };
       if (checkError instanceof ApiError && checkError.status === 401) return { kind: 'login' };
       this.patch({ errorMessage: t('upload.error.create') });
     }
