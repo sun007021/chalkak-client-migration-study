@@ -111,6 +111,24 @@ export function planGeometry(size: Size, edit: Pick<PhotoEdit, 'quarterTurns' | 
   return { quarterTurns: edit.quarterTurns, rotatedRect: { x, y, width, height }, output: { width, height } };
 }
 
+/**
+ * 원본 이미지(size) 좌표를 plan.output 표면 좌표로 보내는 아핀 행렬 [a, b, c, d, e, f](canvas setTransform 순서):
+ * 원본 → 돌린 사진(rotatedPointToSource의 역) → rotatedRect 왼쪽 위를 원점으로 옮기고 output 크기로 맞춘다.
+ */
+export function geometryMatrix(size: Size, plan: GeometryPlan): [number, number, number, number, number, number] {
+  const { width: w, height: h } = size;
+  const rotation: Record<QuarterTurns, [number, number, number, number, number, number]> = {
+    0: [1, 0, 0, 1, 0, 0],
+    1: [0, 1, -1, 0, h, 0],
+    2: [-1, 0, 0, -1, w, h],
+    3: [0, -1, 1, 0, 0, w],
+  };
+  const [a, b, c, d, e, f] = rotation[plan.quarterTurns];
+  const sx = plan.output.width / plan.rotatedRect.width;
+  const sy = plan.output.height / plan.rotatedRect.height;
+  return [sx * a, sy * b, sx * c, sy * d, sx * (e - plan.rotatedRect.x), sy * (f - plan.rotatedRect.y)];
+}
+
 // ── 비율 ──
 
 /** 보이는 순서(REQ-EDIT-010). 처음 선택은 'free'. */

@@ -72,7 +72,8 @@ export function analyzePixels(pixels: Uint8ClampedArray): AutoStats {
 /** 통계에서 자동 보정값을 정한다(부록 '자동 보정 식'). 노출 → 블랙 포인트 → 그림자·하이라이트·대비 → 채도. 따뜻함은 0. 각 값은 round2. 픽셀이 없으면 모두 0. */
 export function autoAdjustFromStats(stats: AutoStats): AdjustmentValues {
   const { histogram } = stats;
-  const total = Array.prototype.reduce.call(histogram, (sum: number, n: number) => sum + n, 0) as number;
+  let total = 0;
+  for (let bin = 0; bin < histogram.length; bin += 1) total += histogram[bin]!;
   if (total === 0) return { ...NO_AUTO_VALUES };
   const a = editConstants().auto;
   const perUnit = editConstants().exposureEvPerUnit;
