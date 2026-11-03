@@ -1,7 +1,6 @@
 import 'package:chalkak/app/app_routes.dart';
 import 'package:chalkak/core/copy/ko.g.dart';
 import 'package:chalkak/core/ui/test_ids.dart';
-import 'package:chalkak/core/push/notification_permission.dart';
 import 'package:chalkak/features/notification/data/push_platform.dart';
 import 'package:chalkak/features/onboarding/presentation/onboarding_test_ids.dart';
 import 'package:chalkak/features/signature/presentation/signature_test_ids.dart';

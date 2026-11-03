@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:chalkak/core/copy/ko.g.dart';
 import 'package:chalkak/features/notification/presentation/notification_inbox_screen.dart';
 import 'package:chalkak/features/notification/presentation/notification_test_ids.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/notification_fakes.dart';

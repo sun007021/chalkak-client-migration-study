@@ -7,7 +7,6 @@ import 'package:chalkak/features/signature/presentation/signature_card_view_mode
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../support/app_harness.dart' show byId, widgetTest;
 import '../../../support/net_harness.dart' show sessionAt;
 import '../../../support/onboarding_fakes.dart';
 
