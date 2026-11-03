@@ -67,6 +67,7 @@ describe('홈 ↔ 상세 AI 상태 공유 (REQ-AIR-050, 051, TC-AIR-018)', () =>
       routes: { [aiGet()]: [getFx('none'), getFx('processing')], [aiPost()]: postFx('202-processing') },
     });
     fireEvent.click(await screen.findByTestId('home.ai-request-button'));
+    fireEvent.click(await screen.findByTestId('ai-start-sheet.start-button'));
     await screen.findByTestId('home.ai-processing');
     await act(async () => {
       await router.navigate(`/feed/${MINE}`, { state: { seed: seedMine } });

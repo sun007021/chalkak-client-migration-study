@@ -4,6 +4,7 @@ import { RequestSlots } from '../../core/state/RequestSlots';
 import type { RequestPass } from '../../core/state/RequestSlots';
 import { ViewModel } from '../../core/state/ViewModel';
 import type { Clock } from '../../core/time/Clock';
+import { MidnightWatcher } from '../../core/time/MidnightWatcher';
 import { kstToday } from '../../core/time/kst';
 import type { DateString } from '../../core/time/kst';
 import type { ToastController } from '../../core/ui/ToastController';
@@ -75,6 +76,8 @@ export interface HomeState {
   yesterday: RankingSection;
   popular: RankingSection;
   ai: AiCardState;
+  /** NONE 카드의 시작 시트(REQ-AIR-019, 052)가 열려 있다. 실패 재요청은 시트 없이 바로 보낸다(REQ-AIR-036). */
+  aiStartSheet: boolean;
   hasUnread: boolean;
   /** 새로고침 표시(home.refresh-indicator). 조용한 갱신(복귀)에서는 false. */
   refreshing: boolean;
@@ -174,11 +177,20 @@ export class HomeViewModel extends ViewModel<HomeState> {
 
   private readonly unsubscribeChanges: () => void;
   private readonly unsubscribeAi: () => void;
+  private readonly midnight: MidnightWatcher;
 
   constructor(protected readonly deps: HomeViewModelDeps) {
     super(HomeViewModel.initialState(deps));
     this.unsubscribeChanges = deps.changes.subscribe((change) => this.applyChange(change));
     this.unsubscribeAi = deps.aiReviews.subscribe(() => this.syncAiCard());
+    // 보이는 채 자정을 넘기면 어제 사진의 AI 카드는 자격을 잃는다: 카드를 내린다(REQ-AIR-003). 나머지 섹션은 다음 onShown/새로고침이 맞춘다.
+    this.midnight = new MidnightWatcher({
+      clock: deps.clock,
+      onDateChanged: () => {
+        const watch = this.aiWatch;
+        if (watch && !this.aiEligible(watch.postId)) this.detachAi();
+      },
+    });
   }
 
   /** ISSUE 배너 목록(화면이 구독한다). */
@@ -209,6 +221,7 @@ export class HomeViewModel extends ViewModel<HomeState> {
       yesterday: { status: 'loading' },
       popular: { status: 'loading' },
       ai: { kind: 'hidden' },
+      aiStartSheet: false,
       hasUnread: false,
       refreshing: false,
     };
@@ -224,6 +237,7 @@ export class HomeViewModel extends ViewModel<HomeState> {
   async onShown(): Promise<void> {
     this.hidden = false;
     this.shown = true;
+    if (this.isMember) this.midnight.start();
     this.startDateIfChanged();
     this.runId += 1;
     this.refreshPromise = null;
@@ -237,6 +251,7 @@ export class HomeViewModel extends ViewModel<HomeState> {
     this.shown = false;
     this.aiWatch?.hide();
     this.aiShown = false;
+    this.midnight.stop();
     this.cancelAll();
     this.runId += 1;
     this.refreshPromise = null;
@@ -287,6 +302,7 @@ export class HomeViewModel extends ViewModel<HomeState> {
   override dispose(): void {
     this.unsubscribeChanges();
     this.unsubscribeAi();
+    this.midnight.stop();
     this.detachAi();
     this.gone = true;
     this.cancelAll();
@@ -470,10 +486,34 @@ export class HomeViewModel extends ViewModel<HomeState> {
   }
 
   /**
-   * AI 카드 요청/재요청 버튼 → 저장소가 POST 1회(요청 중 연타·정지 차단·오류 안내는 저장소 규칙). 실패 재요청도 시트 없이 바로 보낸다(REQ-AIR-036).
+   * AI 카드 요청/재요청 버튼. NONE 카드는 시작 시트를 연다(REQ-AIR-019, 052: 시트에서 "분석 시작하기"를 눌러야 POST).
+   * 실패(FAILED) 재요청만 시트 없이 바로 POST 한다(REQ-AIR-036). 요청 중 연타·정지 차단·오류 안내는 저장소 규칙.
    */
   async onAiRequestPress(): Promise<void> {
+    const card = this.state.ai;
+    if (card.kind !== 'ready' || card.requesting) return;
+    if (card.status === 'NONE') {
+      if (this.aiEligible(card.postId) && !card.blocked) this.setState({ aiStartSheet: true });
+      return;
+    }
     await this.aiWatch?.request();
+  }
+
+  /** 시작 시트의 "분석 시작하기": 시트를 닫고 POST. 누른 시점에 자격(오늘 승인 사진)이 없으면 저장소가 보내지 않는다. */
+  async confirmAiStart(): Promise<void> {
+    if (!this.state.aiStartSheet) return;
+    this.setState({ aiStartSheet: false });
+    await this.aiWatch?.request();
+  }
+
+  closeAiStartSheet(): void {
+    this.setState({ aiStartSheet: false });
+  }
+
+  /** 오늘 승인된 내 사진(이 postId)이고 주제 날짜가 KST 오늘인가(REQ-AIR-003). */
+  private aiEligible(postId: string): boolean {
+    const today = this.today;
+    return today?.kind === 'posted' && today.postId === postId && today.moderationStatus === 'APPROVED' && today.topicDate === kstToday(this.deps.clock);
   }
 
   /** COMPLETED의 자세히 보기 → navigator.openAiReview(postId). */
@@ -628,7 +668,13 @@ export class HomeViewModel extends ViewModel<HomeState> {
     if (!this.aiWatch || this.aiWatch.postId !== postId) {
       this.aiWatch?.release();
       this.aiShown = false;
-      this.aiWatch = this.deps.aiReviews.watch(postId, { refreshCompleted: false, quietReads: true });
+      this.aiWatch = this.deps.aiReviews.watch(postId, {
+      refreshCompleted: false,
+      // 첫 확인(GET) 실패는 토스트 없이 카드만 숨긴다(REQ-HOME-035). 폴링 오류는 상세와 같이 창마다 1회 알린다(REQ-AIR-029).
+      onReadError: (_error, phase) => phase === 'check',
+      // 누른 시점에도 오늘 승인된 내 사진인지 다시 본다(REQ-AIR-003).
+      canRequest: () => this.aiEligible(postId),
+    });
     }
     const watch = this.aiWatch;
     this.syncAiCard();
@@ -647,7 +693,7 @@ export class HomeViewModel extends ViewModel<HomeState> {
     this.aiWatch?.release();
     this.aiWatch = null;
     this.aiShown = false;
-    this.setState({ ai: { kind: 'hidden' } });
+    this.setState({ ai: { kind: 'hidden' }, aiStartSheet: false });
   }
 
   /** 저장소 entry에서 카드 상태를 만든다(저장소가 바뀔 때마다). 확인 전·첫 확인 실패·404는 카드가 없다. */

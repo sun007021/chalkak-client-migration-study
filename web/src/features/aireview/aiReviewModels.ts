@@ -37,7 +37,7 @@ export interface AiReview {
  * 한 게시물의 AI 상태(홈 카드와 상세 알약이 공유, REQ-AIR-050). 저장소가 서버 GET/POST 결과로만 바꾼다.
  * - phase: checking(첫 GET 진행 중 또는 아직 확인 전) / check-failed(첫 GET이 404 외 오류) / hidden(404) / ready(status 확인됨)
  * - status·result·canRequestAgain: ready일 때만 의미가 있다(그 밖에는 null·null·false). 재확인이 실패해도 이전에 확인한 값은 유지한다(REQ-AIR-044).
- * - requesting: POST 응답을 기다리는 중. blocked: POST가 403(정지)으로 거절됐다(같은 요청을 다시 보내지 않는다).
+ * - requesting: POST 응답을 기다리는 중. blocked: POST가 403(정지, D-08)으로 거절됐다(같은 요청을 다시 보내지 않는다). 저장소 reset(계정 전환·로그아웃)에서만 풀린다. GET으로는 풀리지 않는다.
  * - stalled: 폴링 창 300초가 끝났는데도 PROCESSING(ProcessingStalled). polling: 지금 폴링 루프가 돌고 있다(보이는 화면이 있고 PROCESSING이며 창 안).
  */
 export interface AiReviewEntry {

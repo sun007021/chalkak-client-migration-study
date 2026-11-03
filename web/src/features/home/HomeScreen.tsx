@@ -7,6 +7,7 @@ import { t } from '../../copy/ko';
 import { webOnlyCopy } from '../../copy/webOnly';
 import { useScreenView } from '../../core/analytics/useScreenView';
 import { useViewModel } from '../../core/state/useViewModel';
+import { AiStartSheet } from '../aireview/AiStartSheet';
 import { useShellContext } from '../shell/MainShell';
 import type { BannerFeedState } from './BannerFeed';
 import { bannerSentinelIndex } from './BannerFeed';
@@ -167,7 +168,13 @@ function AiCard({ vm, state }: { vm: HomeViewModel; state: HomeState }): ReactNo
           {t('ai.card.request')}
         </button>
       ) : null}
-      {ai.status === 'PROCESSING' ? <p data-testid="home.ai-processing">{t('ai.card.processing')}</p> : null}
+      {ai.status === 'PROCESSING' ? (
+        <div>
+          <p data-testid="home.ai-processing">{t('ai.card.processing')}</p>
+          {/* 폴링 창(300초)이 끝났는데도 진행 중이면 안내한다(REQ-AIR-027, REQ-HOME-036). */}
+          {ai.stalled ? <p role="status">{t('ai.poll.timeout')}</p> : null}
+        </div>
+      ) : null}
       {ai.status === 'COMPLETED' ? (
         <div>
           <p data-testid="home.ai-completed">{t('ai.card.completed')}</p>
@@ -186,6 +193,7 @@ function AiCard({ vm, state }: { vm: HomeViewModel; state: HomeState }): ReactNo
           ) : null}
         </div>
       ) : null}
+      {state.aiStartSheet ? <AiStartSheet retry={false} onConfirm={() => void vm.confirmAiStart()} onClose={() => vm.closeAiStartSheet()} /> : null}
     </section>
   );
 }

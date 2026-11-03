@@ -5,6 +5,7 @@ import { useViewModel } from '../../core/state/useViewModel';
 import type { DateString } from '../../core/time/kst';
 import { useDialogFocus } from '../../core/ui/useDialogFocus';
 import type { AiReviewResult } from './aiReviewModels';
+import { AiStartSheet } from './AiStartSheet';
 import type { FeedAiViewModel } from './FeedAiViewModel';
 
 /**
@@ -31,20 +32,30 @@ export function FeedAiSection({ vm, isMine, topicDate }: { vm: FeedAiViewModel; 
   }, [vm]);
 
   const { sheet } = state;
+  // 시트가 닫힌 뒤 원래 트리거(알약)가 사라졌으면(요청 → 분석중 등) 포커스가 body로 떨어지지 않게 알약 영역으로 옮긴다.
+  const regionRef = useRef<HTMLDivElement | null>(null);
+  const previousSheet = useRef(sheet.kind);
+  useEffect(() => {
+    const was = previousSheet.current;
+    previousSheet.current = sheet.kind;
+    if (was !== 'none' && sheet.kind === 'none' && (document.activeElement === document.body || document.activeElement === null)) regionRef.current?.focus();
+  }, [sheet.kind]);
   return (
     <>
-      <Pill vm={vm} pill={state.pill} />
-      {state.stalled ? (
-        <p data-testid="feed.ai-message" style={{ margin: '4px 0' }}>
-          {t('ai.poll.timeout')}
-        </p>
-      ) : null}
-      {state.stalled ? (
-        <button type="button" data-testid="feed.ai-recheck-button" onClick={() => void vm.onRecheckPress()}>
-          {t('ai.pill.recheck')}
-        </button>
-      ) : null}
-      {sheet.kind === 'start' ? <StartSheet vm={vm} retry={sheet.retry} requesting={state.pill === 'requesting'} /> : null}
+      <div ref={regionRef} role="status" tabIndex={-1} style={{ outline: 'none' }}>
+        <Pill vm={vm} pill={state.pill} />
+        {state.stalled ? (
+          <p data-testid="feed.ai-message" style={{ margin: '4px 0' }}>
+            {t('ai.poll.timeout')}
+          </p>
+        ) : null}
+        {state.stalled ? (
+          <button type="button" data-testid="feed.ai-recheck-button" onClick={() => void vm.onRecheckPress()}>
+            {t('ai.pill.recheck')}
+          </button>
+        ) : null}
+      </div>
+      {sheet.kind === 'start' ? <AiStartSheet retry={sheet.retry} onConfirm={() => void vm.confirmStart()} onClose={() => vm.closeSheet()} /> : null}
       {sheet.kind === 'result' ? <ResultSheet vm={vm} result={sheet.result} criteriaOpen={state.criteriaOpen} /> : null}
       {sheet.kind === 'failed' ? <FailedSheet vm={vm} reason={sheet.reason} canRetry={sheet.canRetry} /> : null}
     </>
@@ -111,42 +122,13 @@ const overlay: CSSProperties = { position: 'fixed', inset: 0, zIndex: 200, displ
 const panel: CSSProperties = { width: 'min(90vw, 360px)', maxHeight: '90vh', overflowY: 'auto', padding: 16, borderRadius: 12, background: '#fff' };
 const row: CSSProperties = { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 };
 
-function StartSheet({ vm, retry, requesting }: { vm: FeedAiViewModel; retry: boolean; requesting: boolean }): ReactNode {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const startRef = useRef<HTMLButtonElement | null>(null);
-  const titleId = useId();
-  useDialogFocus(ref, () => vm.closeSheet(), startRef);
-  return (
-    <div style={overlay}>
-      <div ref={ref} data-testid="ai-start-sheet.root" role="dialog" aria-modal="true" aria-labelledby={titleId} style={panel}>
-        <h2 id={titleId} style={{ margin: '0 0 8px', fontSize: 16 }}>
-          {retry ? t('ai.start.title-retry') : t('ai.start.title')}
-        </h2>
-        <div data-testid="ai-start-sheet.description">
-          <p style={{ margin: '4px 0' }}>{t('ai.start.line1')}</p>
-          <p style={{ margin: '4px 0' }}>{t('ai.start.line2')}</p>
-          <p style={{ margin: '4px 0' }}>{t('ai.start.line3')}</p>
-        </div>
-        <div style={row}>
-          <button type="button" data-testid="ai-start-sheet.close-button" onClick={() => vm.closeSheet()}>
-            {t('common.close')}
-          </button>
-          <button ref={startRef} type="button" data-testid="ai-start-sheet.start-button" disabled={requesting} onClick={() => void vm.confirmStart()}>
-            {t('ai.start.confirm')}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 const formatScore = (score: number): string => score.toFixed(1);
 
 function ResultSheet({ vm, result, criteriaOpen }: { vm: FeedAiViewModel; result: AiReviewResult; criteriaOpen: boolean }): ReactNode {
   const ref = useRef<HTMLDivElement | null>(null);
   const titleId = useId();
-  // 기준 설명 다이얼로그가 위에 열려 있는 동안 Esc는 그쪽만 닫는다.
-  useDialogFocus(ref, criteriaOpen ? undefined : () => vm.closeSheet());
+  // 기준 설명 다이얼로그가 위에 열려 있는 동안 Esc·Tab 처리는 그쪽만 한다(중첩 모달).
+  useDialogFocus(ref, () => vm.closeSheet(), undefined, !criteriaOpen);
   const { feedback } = result;
   return (
     <div style={overlay}>
@@ -154,13 +136,13 @@ function ResultSheet({ vm, result, criteriaOpen }: { vm: FeedAiViewModel; result
         <h2 id={titleId} data-testid="ai-result-sheet.feedback-summary" style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700 }}>
           {feedback.summary}
         </h2>
-        <p data-testid="ai-result-sheet.overall-score" aria-label={t('ai.result.score-a11y', { X: formatScore(result.overallScore) })} style={{ margin: '4px 0', fontSize: 28, fontWeight: 700 }}>
+        <p data-testid="ai-result-sheet.overall-score" role="img" aria-label={t('ai.result.score-a11y', { X: formatScore(result.overallScore) })} style={{ margin: '4px 0', fontSize: 28, fontWeight: 700 }}>
           {formatScore(result.overallScore)}
         </p>
         {result.distinctivePerspective ? <p data-testid="ai-result-sheet.distinctive-badge">{t('ai.result.perspective-badge')}</p> : null}
         <ul style={{ listStyle: 'none', margin: '8px 0', padding: 0 }}>
-          {result.criteria.map((criterion) => (
-            <li key={criterion.key} data-testid={`ai-result-sheet.criteria-item-${criterion.key}`} style={{ display: 'flex', justifyContent: 'space-between' }}>
+          {result.criteria.map((criterion, index) => (
+            <li key={`${criterion.key}-${index}`} data-testid={`ai-result-sheet.criteria-item-${criterion.key}`} style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>{criterion.label}</span>
               <span>{formatScore(criterion.score)}</span>
             </li>

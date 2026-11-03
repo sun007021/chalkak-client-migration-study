@@ -2,6 +2,13 @@ import { t } from '../../copy/ko';
 import { MY_POST_ID, createHomeHarness, finish, settle } from '../../test/homeHarness';
 import type { HomeHarness } from '../../test/homeHarness';
 
+/** NONE 카드는 시작 시트를 거친다(REQ-AIR-019, 052): 누르고 "분석 시작하기"까지. 실패 재요청 카드는 시트 없이 바로 POST라 확정은 아무 일도 하지 않는다. */
+const pressAi = async (h: { viewModel: { onAiRequestPress(): Promise<void>; confirmAiStart(): Promise<void> } }): Promise<void> => {
+  await h.viewModel.onAiRequestPress();
+  await h.viewModel.confirmAiStart();
+};
+
+
 const AI_GET = `GET /posts/${MY_POST_ID}/ai-review`;
 const AI_POST = `POST /posts/${MY_POST_ID}/ai-review`;
 const aiGets = (h: HomeHarness) => h.router.calls(AI_GET).length;
@@ -33,7 +40,7 @@ describe('HomeViewModel AI 카드 + AiReviewStore (REQ-AIR-050 ~ 053)', () => {
     const h = createHomeHarness();
     await finish(h, h.viewModel.onShown());
     h.router.set(AI_POST, 'ai-review/ai-review-post__202-processing');
-    await finish(h, h.viewModel.onAiRequestPress());
+    await finish(h, pressAi(h));
     expect(h.aiReviews.entry(MY_POST_ID)).toMatchObject({ status: 'PROCESSING', polling: true });
   });
 
@@ -81,7 +88,7 @@ describe('HomeViewModel AI 카드 + AiReviewStore (REQ-AIR-050 ~ 053)', () => {
     h.router.set(AI_GET, 'ai-review/ai-review-get__failed-can-retry');
     h.router.set(AI_POST, 'ai-review/ai-review-post__202-processing');
     await finish(h, h.viewModel.onShown());
-    await finish(h, h.viewModel.onAiRequestPress());
+    await finish(h, pressAi(h));
     expect(h.router.calls(AI_POST)).toHaveLength(1);
     expect(h.viewModel.state.ai).toMatchObject({ status: 'PROCESSING' });
   });
@@ -90,7 +97,7 @@ describe('HomeViewModel AI 카드 + AiReviewStore (REQ-AIR-050 ~ 053)', () => {
     const h = createHomeHarness();
     h.router.set(AI_POST, 'ai-review/ai-review-post__400-limit-reached');
     await finish(h, h.viewModel.onShown());
-    await finish(h, h.viewModel.onAiRequestPress());
+    await finish(h, pressAi(h));
     expect(h.toasts.messages).toEqual(['더 이상 AI 리뷰를 다시 요청할 수 없습니다.']);
     expect(h.viewModel.state.ai).toMatchObject({ status: 'NONE', requesting: false });
   });
@@ -101,7 +108,7 @@ describe('HomeViewModel AI 카드 + AiReviewStore (REQ-AIR-050 ~ 053)', () => {
       throw new TypeError('Failed to fetch');
     });
     await finish(h, h.viewModel.onShown());
-    await finish(h, h.viewModel.onAiRequestPress());
+    await finish(h, pressAi(h));
     expect(h.toasts.messages).toEqual([t('ai.error.network')]);
     expect(aiGets(h)).toBe(2);
     await h.clock.advance(10_000);

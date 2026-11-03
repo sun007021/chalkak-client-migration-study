@@ -1,3 +1,4 @@
+import { t } from '../../copy/ko';
 import type { Clock } from '../../core/time/Clock';
 import { MidnightWatcher } from '../../core/time/MidnightWatcher';
 import { kstToday } from '../../core/time/kst';
@@ -15,6 +16,8 @@ export interface FeedAiViewModelDeps {
   toast: ToastController;
   /** 홈 "자세히 보기"(location.state.openAiReview)로 들어왔다. 첫 GET이 반영되면 COMPLETED는 결과 시트, FAILED는 실패 시트를 한 번만 연다(REQ-AIR-047). */
   openAiReview: boolean;
+  /** 자동 열기를 소비했다(시트를 열었든 해당 없음이든 한 번). 화면이 history state의 openAiReview를 지워 새로고침·뒤로가기에서 다시 열리지 않게 한다. */
+  onOpenAiReviewConsumed?: () => void;
 }
 
 /** FeedViewModel이 확정한 게시물 정보. isMine은 확정 전에는 진입 경로 값(시드)이다. */
@@ -24,9 +27,9 @@ export interface FeedAiPost {
 }
 
 /**
- * 상세 화면의 AI 영역(알약·시트). FeedViewModel과 따로 만들어 화면(FeedBody)이 setPost로 이어 준다(기존 FeedState를 건드리지 않는다).
+ * 상세 화면의 AI 영역(알약·시트). FeedViewModel과 따로 만들어 FeedAiSection이 setPost로 이어 준다(기존 FeedState를 건드리지 않는다).
  *
- * - setPost: 내 게시물이 되면(그리고 게스트가 아니면) store.watch(postId, { refreshCompleted: true, canRequest })를 만들고 보이는 상태면 show()한다. 내 게시물이 아니면 watch도 GET도 없다(REQ-AIR-001).
+ * - setPost: 내 게시물이 되면 store.watch(postId, { refreshCompleted: true, canRequest })를 만들고 보이는 상태면 show()한다. 내 게시물이 아니면 watch도 GET도 없다(REQ-AIR-001).
  * - onShown/onHidden: 문서 가시성. 가려지면 watch.hide(), 다시 보이면 watch.show()(GET부터 새 창).
  * - onPillPress: request→시작 시트, retry→재요청 시트, view→결과 시트, failed→실패 시트, recheck→watch.recheck(). processing·checking·requesting은 눌러도 아무 일 없다.
  * - confirmStart: 시트를 닫고 request(). 누른 시점에도 자격(오늘 주제)을 다시 확인해 자정이 지났으면 POST를 보내지 않는다. closeSheet: 요청 없음.
@@ -80,9 +83,11 @@ export class FeedAiViewModel extends ViewModel<FeedAiState> {
   onPillPress(): void {
     switch (this.state.pill) {
       case 'request':
+        if (this.rejectBlocked()) return;
         this.setState({ sheet: { kind: 'start', retry: false }, criteriaOpen: false });
         return;
       case 'retry':
+        if (this.rejectBlocked()) return;
         this.setState({ sheet: { kind: 'start', retry: true }, criteriaOpen: false });
         return;
       case 'view': {
@@ -147,6 +152,13 @@ export class FeedAiViewModel extends ViewModel<FeedAiState> {
     return this.deps.store.entry(this.deps.postId);
   }
 
+  /** 403(정지, D-08) 뒤에는 같은 요청을 다시 보내지 않는다: 시트 없이 정지 안내만 다시 보인다. blocked는 reset(계정 전환)에서만 풀린다. */
+  private rejectBlocked(): boolean {
+    if (!this.entry()?.blocked) return false;
+    this.deps.toast.show(t('ai.error.banned'));
+    return true;
+  }
+
   private eligible(): boolean {
     return canRequestAi({ isMine: this.post?.isMine ?? false, topicDate: this.post?.topicDate ?? null, today: kstToday(this.deps.clock) });
   }
@@ -180,6 +192,7 @@ export class FeedAiViewModel extends ViewModel<FeedAiState> {
     const entry = this.entry();
     if (!entry || entry.phase === 'checking' || entry.phase === 'check-failed') return;
     this.autoOpenDone = true;
+    this.deps.onOpenAiReviewConsumed?.();
     if (entry.phase !== 'ready') return;
     if (entry.status === 'COMPLETED' && entry.result) this.setState({ sheet: { kind: 'result', result: entry.result }, criteriaOpen: false });
     else if (entry.status === 'FAILED') this.setState({ sheet: this.failedSheet(), criteriaOpen: false });

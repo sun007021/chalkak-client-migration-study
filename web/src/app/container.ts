@@ -227,7 +227,7 @@ export interface AppContainer {
   /** 상세 화면이 마운트될 때마다 새 ViewModel을 만든다. 저장된 userId는 store에서 읽는다. */
   createFeedViewModel(args: { postId: string; seed: PostSeed | null; assumeMine?: boolean; navigator: FeedNavigator }): FeedViewModel;
   /** 상세 화면의 AI 영역(알약·시트). 상세가 마운트될 때마다 새로 만든다. openAiReview는 location.state에서 읽은 값. */
-  createFeedAiViewModel(args: { postId: string; openAiReview: boolean }): FeedAiViewModel;
+  createFeedAiViewModel(args: { postId: string; openAiReview: boolean; onOpenAiReviewConsumed?: () => void }): FeedAiViewModel;
   /** 빈 패드(1024×512)로 시작한다. */
   createSignatureDrawViewModel(mode: SignatureMode): SignatureDrawViewModel;
   createSignaturePreviewViewModel(mode: SignatureMode, png: Blob): SignaturePreviewViewModel;
@@ -494,7 +494,7 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
       });
     },
     createFeedAiViewModel(args) {
-      return new FeedAiViewModel({ postId: args.postId, clock: this.clock, store: this.aiReviews, toast: this.toast, openAiReview: args.openAiReview });
+      return new FeedAiViewModel({ postId: args.postId, clock: this.clock, store: this.aiReviews, toast: this.toast, openAiReview: args.openAiReview, onOpenAiReviewConsumed: args.onOpenAiReviewConsumed });
     },
     createSignatureDrawViewModel(mode) {
       return new SignatureDrawViewModel({

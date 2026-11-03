@@ -23,10 +23,11 @@ export interface AiWatchOptions {
   /** 요청 자격(내 게시물 + 주제 날짜가 KST 오늘). request() 시점에 다시 평가해 false면 POST를 보내지 않는다(REQ-AIR-003). 기본 () => true. */
   canRequest?: () => boolean;
   /**
-   * 조회(GET: show·recheck·폴링) 실패를 토스트로 알리지 않는다(홈 카드: 실패하면 카드만 숨긴다, REQ-HOME-035). 요청(POST) 오류 안내는 영향이 없다.
-   * 폴링 오류는 보이는 손잡이가 모두 조용할 때만 생략한다.
+   * 조회(GET) 오류 알림 정책을 소비자가 정한다. phase: 'check'(show·recheck·POST 뒤 동기화의 첫 확인) / 'poll'(폴링).
+   * true를 돌려주면 저장소의 기본 토스트(`ai.error.*`)를 생략한다. 없으면 기본 토스트. 401(로그인 안내)은 어느 쪽이든 이 콜백을 거치지 않고 지금처럼 동작한다.
+   * 폴링 오류는 창마다 1회만 알리고, 보이는 손잡이가 모두 true를 돌려줄 때만 생략한다.
    */
-  quietReads?: boolean;
+  onReadError?: (error: unknown, phase: 'check' | 'poll') => boolean;
 }
 
 /**
@@ -56,13 +57,6 @@ export interface AiReviewWatch {
   release(): void;
 }
 
-/**
- * AI 피드백 공용 저장소(Android AiReviewSession 방식, 홈 카드·상세 알약 공용). 계정 전환 때 UserCaches가 reset한다.
- * 게시물마다 AiReviewEntry 하나를 갖고, 화면은 watch()로 붙어 show/hide로 가시성을 알린다.
- * 늦게 도착한 응답(화면 이탈 뒤, 수동 갱신 뒤의 이전 폴링, 다른 게시물, reset 뒤)은 상태를 바꾸지 않는다(StaleGuard).
- * 폴링: 3초 간격(`AI_REVIEW_POLL_INTERVAL_MS`), 창 300초(`AI_REVIEW_POLL_WINDOW_MS`), 창 시작 후 경과가 300초 이상이면 GET 없이 stalled(PROCESSING 유지) + 안내.
- * 동시에 두 GET을 보내지 않는다. 폴링 GET 일시 오류는 계속 폴링하고 토스트는 한 번만, 404는 hidden으로 멈추고 메시지 없음, 401은 멈추고 `ai.error.login`.
- */
 /** 폴링 한 번(창)의 상태. alive가 false가 되면 루프는 다음 확인 지점에서 끝난다. */
 interface PollRun {
   alive: boolean;
@@ -83,6 +77,8 @@ interface Slot {
   epoch: number;
   getSeq: number;
   getAbort: AbortController | null;
+  /** 진행 중인 show·recheck·동기화 GET(폴링 GET은 아님). */
+  refreshing: Promise<void> | null;
   /** POST의 시작·끝마다 올린다. 그보다 먼저 시작한 GET 응답이 POST 결과를 덮지 않게 한다. */
   mutationSeq: number;
   postAbort: AbortController | null;
@@ -161,7 +157,7 @@ export class AiReviewStore {
   private slotFor(postId: string): Slot {
     let slot = this.slots.get(postId);
     if (!slot) {
-      slot = { postId, entry: null, visible: new Set(), options: new Map(), dead: false, epoch: 0, getSeq: 0, getAbort: null, mutationSeq: 0, postAbort: null, poll: null };
+      slot = { postId, entry: null, visible: new Set(), options: new Map(), dead: false, epoch: 0, getSeq: 0, getAbort: null, refreshing: null, mutationSeq: 0, postAbort: null, poll: null };
       this.slots.set(postId, slot);
     }
     return slot;
@@ -189,6 +185,7 @@ export class AiReviewStore {
     slot.getSeq += 1;
     slot.getAbort?.abort();
     slot.getAbort = null;
+    slot.refreshing = null;
     slot.postAbort?.abort();
     slot.postAbort = null;
   }
@@ -231,7 +228,18 @@ export class AiReviewStore {
    * GET 한 번을 보내 항목에 반영한다(show·recheck·POST 뒤 동기화 공용). 진행 중이던 폴링과 GET은 버린다.
    * 실패하면 첫 확인 전이면 check-failed, 이미 상태가 있으면 유지하고, 둘 다 토스트(silent이면 생략). 이전이 PROCESSING이고 보이면 폴링은 이어 간다.
    */
-  private async refresh(slot: Slot, silent = false): Promise<void> {
+  private refresh(slot: Slot, options?: AiWatchOptions, silent = false): Promise<void> {
+    // 첫 확인이 진행 중이면(연타·중복 show) 같은 GET을 기다린다. 동시에 두 GET을 보내지 않는다.
+    if (slot.refreshing && slot.entry?.phase === 'checking') return slot.refreshing;
+    if (slot.entry?.phase === 'check-failed') this.commit(slot, { phase: 'checking' });
+    const promise = this.doRefresh(slot, options, silent).finally(() => {
+      if (slot.refreshing === promise) slot.refreshing = null;
+    });
+    slot.refreshing = promise;
+    return promise;
+  }
+
+  private async doRefresh(slot: Slot, options: AiWatchOptions | undefined, silent: boolean): Promise<void> {
     this.stopPolling(slot);
     const ticket = this.beginGet(slot);
     let review: AiReview;
@@ -243,11 +251,11 @@ export class AiReviewStore {
         this.commit(slot, { phase: 'hidden', status: null, canRequestAgain: false, result: null, stalled: false });
         return;
       }
-      if (!silent) this.toastFor(error);
+      if (!silent && options?.onReadError?.(error, 'check') !== true) this.toastFor(error);
       const entry = slot.entry;
       if (entry?.status === 'PROCESSING' && this.isVisible(slot) && !(error instanceof ApiError && error.status === 401)) {
         const run = this.newRun(slot, this.deps.clock.monotonicMs());
-        this.commit(slot);
+        this.commit(slot, { stalled: false });
         void this.runPoll(slot, run);
         return;
       }
@@ -303,8 +311,8 @@ export class AiReviewStore {
       }
       if (!run.toasted) {
         run.toasted = true;
-        const quiet = [...slot.visible].every((watch) => slot.options.get(watch)?.quietReads === true);
-        if (!quiet) this.toastFor(error);
+        const handled = [...slot.visible].every((watch) => slot.options.get(watch)?.onReadError?.(error, 'poll') === true);
+        if (!handled) this.toastFor(error);
       }
       return;
     }
@@ -321,12 +329,13 @@ export class AiReviewStore {
   private async show(watch: AiReviewWatch, options: AiWatchOptions): Promise<void> {
     const slot = this.slotFor(watch.postId);
     slot.options.set(watch, options);
-    if (slot.visible.has(watch)) return;
+    // 이미 보이는 중이면 진행 중인 GET(내 show가 시작한 것)이 반영될 때까지 기다린다.
+    if (slot.visible.has(watch)) return slot.refreshing ?? undefined;
     slot.visible.add(watch);
     if (!slot.entry) this.commit(slot);
     const entry = slot.entry!;
     if (!options.refreshCompleted && entry.phase === 'ready' && entry.status === 'COMPLETED') return;
-    await this.refresh(slot, options.quietReads === true);
+    await this.refresh(slot, options);
   }
 
   private hide(watch: AiReviewWatch): void {
@@ -342,7 +351,7 @@ export class AiReviewStore {
     const slot = this.slotFor(watch.postId);
     slot.options.set(watch, options);
     if (!slot.entry) this.commit(slot);
-    await this.refresh(slot, options.quietReads === true);
+    await this.refresh(slot, options);
   }
 
   private async request(watch: AiReviewWatch, options: AiWatchOptions): Promise<void> {
@@ -363,11 +372,13 @@ export class AiReviewStore {
     try {
       review = await this.deps.repository.requestReview(watch.postId, abort.signal);
     } catch (error) {
+      if (slot.postAbort === abort) slot.postAbort = null;
       if (isCancellation(error) || !current()) return;
       slot.mutationSeq += 1;
       await this.afterRequestError(slot, error, current);
       return;
     }
+    if (slot.postAbort === abort) slot.postAbort = null;
     if (!current()) return;
     slot.mutationSeq += 1;
     this.applyReview(slot, review, startMs, { requesting: false });
@@ -405,7 +416,7 @@ export class AiReviewStore {
     // 연결 실패·5xx·검증 실패·409: 서버가 요청을 받았을 수 있으니 POST는 다시 보내지 않고 GET으로 맞춘다.
     const conflict = error instanceof ApiError && error.status === 409;
     if (!conflict) toast(error instanceof NetworkError ? t('ai.error.network') : t('ai.error.load'));
-    await this.refresh(slot, true);
+    await this.refresh(slot, undefined, true);
     if (current()) this.commit(slot, { requesting: false });
   }
 }
