@@ -5,6 +5,13 @@ import { json } from '../../test/fixtureRouter';
 import { loadFixture } from '../../test/fixtures';
 import { CALENDAR_OCT, MY_POST_ID, POPULAR_TODAY, TODAY_POST, TOPICS_TODAY, createHomeHarness, finish, settle } from '../../test/homeHarness';
 
+/** NONE 카드는 시작 시트를 거친다(REQ-AIR-019, 052): 누르고 "분석 시작하기"까지. 실패 재요청 카드는 시트 없이 바로 POST라 확정은 아무 일도 하지 않는다. */
+const pressAi = async (h: { viewModel: { onAiRequestPress(): Promise<void>; confirmAiStart(): Promise<void> } }): Promise<void> => {
+  await h.viewModel.onAiRequestPress();
+  await h.viewModel.confirmAiStart();
+};
+
+
 const THUMB = `https://cdn.example.test/posts/${MY_POST_ID}/thumbnail.webp`;
 
 describe('HomeViewModel 오늘 주제 머리글', () => {
@@ -319,11 +326,11 @@ describe('HomeViewModel AI 피드백 카드 노출·요청 (REQ-HOME-034, 035)',
       await gate.promise;
       return loadFixture('ai-review/ai-review-post__202-processing.json').toResponse();
     });
-    const first = h.viewModel.onAiRequestPress();
+    const first = pressAi(h);
     await settle();
     expect(h.viewModel.state.ai).toMatchObject({ kind: 'ready', requesting: true });
-    void h.viewModel.onAiRequestPress();
-    void h.viewModel.onAiRequestPress();
+    void pressAi(h);
+    void pressAi(h);
     gate.resolve();
     await finish(h, first);
     expect(h.viewModel.state.ai).toEqual({ kind: 'ready', postId: MY_POST_ID, status: 'PROCESSING', canRequestAgain: false, requesting: false });
@@ -336,7 +343,7 @@ describe('HomeViewModel AI 피드백 카드 노출·요청 (REQ-HOME-034, 035)',
     h.router.set(AI_GET, 'ai-review/ai-review-get__failed-can-retry');
     await finish(h, h.viewModel.onShown());
     h.router.set(AI_POST, 'ai-review/ai-review-post__202-processing');
-    await finish(h, h.viewModel.onAiRequestPress());
+    await finish(h, pressAi(h));
     expect(h.viewModel.state.ai).toMatchObject({ status: 'PROCESSING' });
     expect(h.router.calls(AI_POST)).toHaveLength(1);
   });
@@ -345,7 +352,7 @@ describe('HomeViewModel AI 피드백 카드 노출·요청 (REQ-HOME-034, 035)',
     const h = createHomeHarness();
     await finish(h, h.viewModel.onShown());
     h.router.set(AI_POST, 'ai-review/ai-review-post__403-banned');
-    await finish(h, h.viewModel.onAiRequestPress());
+    await finish(h, pressAi(h));
     expect(h.toasts.messages).toEqual([t('ai.error.banned')]);
     expect(h.viewModel.state.ai).toMatchObject({ status: 'NONE', requesting: false });
     expect(h.router.calls(AI_POST)).toHaveLength(1);
@@ -355,7 +362,7 @@ describe('HomeViewModel AI 피드백 카드 노출·요청 (REQ-HOME-034, 035)',
     const h = createHomeHarness();
     await finish(h, h.viewModel.onShown());
     h.router.set(AI_POST, networkFailure);
-    await finish(h, h.viewModel.onAiRequestPress());
+    await finish(h, pressAi(h));
     expect(h.toasts.messages).toEqual([t('ai.error.network')]);
     expect(h.router.calls(AI_POST)).toHaveLength(1);
     expect(h.viewModel.state.ai).toMatchObject({ status: 'NONE', requesting: false });

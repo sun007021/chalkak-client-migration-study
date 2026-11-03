@@ -12,6 +12,8 @@ import { recordToasts } from './toastLog';
 import { ToastController } from '../core/ui/ToastController';
 import { BannerFeed } from '../features/home/BannerFeed';
 import { BannerRepository } from '../features/home/BannerRepository';
+import { AiReviewRepository } from '../features/aireview/AiReviewRepository';
+import { AiReviewStore } from '../features/aireview/AiReviewStore';
 import { HomeRepository } from '../features/home/HomeRepository';
 import { HomeViewModel } from '../features/home/HomeViewModel';
 import { GuestGate } from '../features/shell/GuestGate';
@@ -76,6 +78,7 @@ export function createHomeHarness(options: HomeHarnessOptions = {}) {
   const banners = options.bannerFeed ? options.bannerFeed(bannerRepository) : new BannerFeed({ repository: bannerRepository });
   const changes = new PostChanges();
   const likes = new PostLikeStore({ repository: new LikeRepository({ api }), changes, toast });
+  const aiReviews = new AiReviewStore({ repository: new AiReviewRepository({ api }), clock: env.clock, toast });
   const viewModel = new HomeViewModel({
     mode,
     clock: env.clock,
@@ -87,8 +90,9 @@ export function createHomeHarness(options: HomeHarnessOptions = {}) {
     navigator,
     likes,
     changes,
+    aiReviews,
   });
-  return { ...env, router, toast, toasts, navigator, upload, banners, viewModel, likes, changes };
+  return { ...env, router, toast, toasts, navigator, upload, banners, viewModel, likes, changes, aiReviews };
 }
 
 export type HomeHarness = ReturnType<typeof createHomeHarness>;

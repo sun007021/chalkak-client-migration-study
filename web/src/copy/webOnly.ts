@@ -40,6 +40,12 @@ export const webOnlyCopy = {
   'edit.rendering': '사진을 준비하는 중',
   'edit.crop.area': '자르기 영역',
   'edit.ratio.label': '자르기 비율',
+  /** 자르기 프레임 손잡이의 접근성 이름(방향키로 조작한다). */
+  'edit.crop.move': '자르기 영역 이동',
+  'edit.crop.handle.top-left': '왼쪽 위 모서리',
+  'edit.crop.handle.top-right': '오른쪽 위 모서리',
+  'edit.crop.handle.bottom-left': '왼쪽 아래 모서리',
+  'edit.crop.handle.bottom-right': '오른쪽 아래 모서리',
   /** 상세: 삭제 요청 중 표시. */
   'feed.deleting': '삭제 중',
 } as const;

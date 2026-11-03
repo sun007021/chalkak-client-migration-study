@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { useContainer } from '../../app/AppContext';
@@ -10,6 +10,9 @@ import { useViewModel } from '../../core/state/useViewModel';
 import { LoadingIndicator } from '../../core/ui/StateViews';
 import { useDialogFocus } from '../../core/ui/useDialogFocus';
 import { useScrollRestore } from '../../core/ui/useScrollRestore';
+import { readOpenAiReview } from '../aireview/aiEntry';
+import { FeedAiSection } from '../aireview/FeedAiSection';
+import type { FeedAiViewModel } from '../aireview/FeedAiViewModel';
 import { LikeButton } from '../like/LikeButton';
 import type { FeedPost, FeedState, FeedViewModel } from './FeedViewModel';
 import { planFeedClose, readFeedSeed } from './feedNavigation';
@@ -27,7 +30,10 @@ export function FeedScreen(): ReactNode {
   const navigate = useNavigate();
   const location = useLocation();
   useScreenView('feed');
-  const seed = useMemo(() => readFeedSeed(location.state, postId), [location.state, postId]);
+  // 시드도 진입 때 한 번만 읽는다: 브라우저가 history.state를 복제해 돌려주므로(openAiReview 정리용 replace 등) 참조가 바뀌어 상세가 다시 만들어지지 않게 한다.
+  const [seedBox, setSeedBox] = useState(() => ({ postId, seed: readFeedSeed(location.state, postId) }));
+  if (seedBox.postId !== postId) setSeedBox({ postId, seed: readFeedSeed(location.state, postId) });
+  const seed = seedBox.postId === postId ? seedBox.seed : readFeedSeed(location.state, postId);
 
   const closeRef = useRef<() => void>(() => undefined);
   useEffect(() => {
@@ -46,11 +52,32 @@ export function FeedScreen(): ReactNode {
     return created;
   }, [container, postId, seed, close]);
   const vm = useOwnedViewModel(create);
+  // AI 영역(알약·시트)은 상세 로직과 따로 둔다. 홈 "자세히 보기"로 들어왔으면 첫 GET 뒤 시트를 자동으로 연다(REQ-AIR-047).
+  // 진입 때 한 번만 읽는다: 소비 뒤 state에서 지워도 AI ViewModel이 다시 만들어지지 않게 postId별로 고정한다.
+  const [entered, setEntered] = useState({ postId, open: readOpenAiReview(location.state) });
+  if (entered.postId !== postId) setEntered({ postId, open: readOpenAiReview(location.state) });
+  const openAiReview = entered.postId === postId ? entered.open : readOpenAiReview(location.state);
+  const locationRef = useRef(location);
+  useEffect(() => {
+    locationRef.current = location;
+  }, [location]);
+  const consumeOpenAiReview = useCallback(() => {
+    const current = locationRef.current;
+    const rest = typeof current.state === 'object' && current.state !== null ? { ...(current.state as Record<string, unknown>) } : {};
+    if (!('openAiReview' in rest)) return;
+    delete rest['openAiReview'];
+    void navigate(current.pathname + current.search, { replace: true, state: rest });
+  }, [navigate]);
+  const createAi = useCallback(
+    (): FeedAiViewModel => container.createFeedAiViewModel({ postId, openAiReview, onOpenAiReviewConsumed: consumeOpenAiReview }),
+    [container, postId, openAiReview, consumeOpenAiReview],
+  );
+  const aiVm = useOwnedViewModel(createAi);
 
-  return vm ? <FeedBody vm={vm} onClose={close} /> : null;
+  return vm && aiVm ? <FeedBody vm={vm} aiVm={aiVm} onClose={close} /> : null;
 }
 
-function FeedBody({ vm, onClose }: { vm: FeedViewModel; onClose: () => void }): ReactNode {
+function FeedBody({ vm, aiVm, onClose }: { vm: FeedViewModel; aiVm: FeedAiViewModel; onClose: () => void }): ReactNode {
   const state = useViewModel(vm);
   useScrollRestore(state.view.kind !== 'loading');
   // 다른 탭·앱에서 돌아와 문서가 다시 보이면 내용을 조용히 재검증한다(실패하면 내용 유지 + 토스트).
@@ -83,14 +110,14 @@ function FeedBody({ vm, onClose }: { vm: FeedViewModel; onClose: () => void }): 
           </button>
         </div>
       ) : null}
-      {view.kind === 'content' && state.post ? <Content vm={vm} state={state} post={state.post} /> : null}
+      {view.kind === 'content' && state.post ? <Content vm={vm} aiVm={aiVm} state={state} post={state.post} /> : null}
       {state.titleDialog.open ? <TitleDialog vm={vm} state={state} /> : null}
       {state.deleteDialog.open ? <DeleteDialog vm={vm} state={state} /> : null}
     </div>
   );
 }
 
-function Content({ vm, state, post }: { vm: FeedViewModel; state: FeedState; post: FeedPost }): ReactNode {
+function Content({ vm, aiVm, state, post }: { vm: FeedViewModel; aiVm: FeedAiViewModel; state: FeedState; post: FeedPost }): ReactNode {
   return (
     <article style={{ padding: '0 16px 16px' }}>
       <ZoomablePhoto post={post} />
@@ -117,6 +144,7 @@ function Content({ vm, state, post }: { vm: FeedViewModel; state: FeedState; pos
           </button>
         ) : null}
       </div>
+      <FeedAiSection vm={aiVm} isMine={state.isMine} topicDate={post.topicDate} />
     </article>
   );
 }

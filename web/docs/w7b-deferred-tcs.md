@@ -54,3 +54,8 @@ W7b는 편집기 본체(순수 연산, ViewModel, 화면, `CanvasEditRenderer` �
 
 ## 테스트가 W7a 구현에 기대는 것
 `container.editor.test.tsx`의 업로드 화면 흐름(TC-EDIT-004 ~ 006, 011, 003)과 `editor/editPipeline.test.ts`는 W7a의 `UploadScreen`·`PhotoPreparer`·`isIdentityEdit`/`sameEdit`이 구현돼야 통과한다(지금은 그 스텁 때문에 실패). 편집기 쪽 단위 테스트는 W7a 구현과 무관하다. `PhotoEditorViewModel.confirm.test.ts`·`.crop.test.ts`·`.lifecycle.test.ts`의 일부(`isIdentityEdit`, `sameEdit` 사용)는 W7a의 `editModel.ts` 구현이 필요하다.
+- 선형 값 자르기(clamp) 위치 — 선형 단계의 노출·따뜻함·채도 결과를 저장 값으로 되돌리기 전에 [0, 1]로 자르는 위치(채도 적용 전후)가 부록에 없다. 지금은 채도까지 적용한 뒤 한 번 자르고(`applyAdjustments`), 골든 허용 오차 ±2 안에서 TC-EDIT-024~029와 맞는다. 다른 플랫폼 소스(Android)의 자르는 위치를 확인해 부록에 명시해야 한다 — 명세 확인 필요(동작은 바꾸지 않음)
+
+## 코드 리뷰 반영에서 테스트와 어긋난 것
+- 필터 썸네일을 필터 탭에서만 그리는 지연은 `PhotoEditorDeps.lazyThumbnails`(기본 꺼짐)로 둔다. 기존 `PhotoEditorViewModel.*.test.ts`가 자르기 도구에서도 썸네일이 만들어지는 것을 검증하고 있어, 실제 앱 진입점(`bootstrap`이 `renderScheduler`를 줄 때)에서만 켠다 — 테스트가 갱신되면 기본값을 바꾼다
+

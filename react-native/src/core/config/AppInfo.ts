@@ -9,13 +9,15 @@ export type AppInfo = {
   readonly version: string;
   /** App Store 숫자 id. 없으면 스토어 열기가 실패한다(강제 업데이트가 꺼져 있으면 쓰이지 않음). */
   readonly appStoreId: string | null;
+  /** iOS를 Firebase 설정(GOOGLE_SERVICES_PLIST)으로 빌드했는가. 켜져 있을 때만 iOS FCM 토큰을 얻는다. */
+  readonly iosFcmEnabled: boolean;
 };
 
 type ExpoConfigLike = {
   version?: string;
   ios?: { bundleIdentifier?: string };
   android?: { package?: string };
-  extra?: { appStoreId?: unknown } | null;
+  extra?: { appStoreId?: unknown; iosFcmEnabled?: unknown } | null;
 };
 
 export function readAppInfo(
@@ -24,6 +26,7 @@ export function readAppInfo(
 ): AppInfo {
   const platform = os === 'android' ? 'android' : 'ios';
   const appStoreId = expoConfig?.extra?.appStoreId;
+  const fcm = expoConfig?.extra?.iosFcmEnabled;
   return {
     platform,
     bundleId:
@@ -31,5 +34,6 @@ export function readAppInfo(
     version: expoConfig?.version ?? '',
     appStoreId:
       typeof appStoreId === 'string' && appStoreId.trim() !== '' ? appStoreId.trim() : null,
+    iosFcmEnabled: fcm === true || fcm === 'true',
   };
 }

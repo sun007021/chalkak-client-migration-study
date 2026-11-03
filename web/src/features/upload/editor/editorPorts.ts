@@ -18,6 +18,16 @@ export interface PreviewFrame {
  */
 export interface PreviewRenderer {
   render(image: DecodedImage, edit: PhotoEdit, options: { maxLongEdge: number }, signal: AbortSignal): Promise<PreviewFrame>;
+  /** 이 image에 대해 렌더러가 따로 들고 있는 것(예: 줄여 둔 프록시)을 놓는다. 편집기가 image를 release하기 전에 부른다. */
+  forget?(image: DecodedImage): void;
+}
+
+/**
+ * 렌더 요청을 한 프레임으로 모으는 수단. 실제 구현은 requestAnimationFrame, 테스트는 FakeRenderScheduler.
+ * schedule은 callback을 다음 프레임에 한 번 실행하도록 예약하고 취소 함수를 돌려준다.
+ */
+export interface RenderScheduler {
+  schedule(callback: () => void): () => void;
 }
 
 /** 자동 보정 분석 영역: 돌려서 자른 부분. */

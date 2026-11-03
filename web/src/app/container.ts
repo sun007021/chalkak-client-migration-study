@@ -86,7 +86,7 @@ import { PhotoPreparer } from '../features/upload/PhotoPreparer';
 import type { PhotoEditorComponent } from '../features/upload/photoEditor';
 import { CanvasAutoAnalyzer, CanvasPreviewRenderer } from '../features/upload/editor/canvasPorts';
 import { CanvasEditRenderer, createCanvasPixelSurface } from '../features/upload/editor/CanvasEditRenderer';
-import type { AutoAnalyzer, PixelSurfaceFactory, PreviewRenderer } from '../features/upload/editor/editorPorts';
+import type { AutoAnalyzer, PixelSurfaceFactory, PreviewRenderer, RenderScheduler } from '../features/upload/editor/editorPorts';
 import { createPhotoEditor } from '../features/upload/editor/PhotoEditorScreen';
 import { UploadGate } from '../features/upload/UploadGate';
 import { AttachableUploadNavigator } from '../features/upload/UploadNavigator';
@@ -97,6 +97,9 @@ import type { SessionMode } from '../features/boot/authGate';
 import { BootViewModel } from '../features/boot/BootViewModel';
 import { NoopHomePreloader } from '../features/boot/HomePreloader';
 import type { HomePreloader } from '../features/boot/HomePreloader';
+import { AiReviewRepository } from '../features/aireview/AiReviewRepository';
+import { AiReviewStore } from '../features/aireview/AiReviewStore';
+import { FeedAiViewModel } from '../features/aireview/FeedAiViewModel';
 import { SIGNATURE_PNG_SIZE } from '../constants';
 import { DEV_SESSION_ENABLED } from './devSession';
 import { ROUTES } from './paths';
@@ -148,6 +151,8 @@ export interface AppContainerOptions {
   previewRenderer?: PreviewRenderer;
   /** 자동 보정 분석. 기본 CanvasAutoAnalyzer. */
   autoAnalyzer?: AutoAnalyzer;
+  /** 편집기 렌더 요청을 한 프레임으로 모으는 수단. 주면 실제 화면 모드(필터 썸네일은 필터 탭에서만 그린다)이고, 생략하면 변경마다 바로 요청한다(테스트). 앱 진입점(bootstrap)이 BrowserRenderScheduler를 준다. */
+  renderScheduler?: RenderScheduler;
   /** 편집 결과를 그리는 픽셀 표면. 기본 createCanvasPixelSurface(canvas). */
   pixelSurface?: PixelSurfaceFactory;
   /** 약관 문서를 새 탭으로 여는 수단. 기본 WindowExternalLinkOpener. */
@@ -221,6 +226,8 @@ export interface AppContainer {
   /** 기록 탭 이미지 저장(W9). 기본 `<a download>` 구현. */
   fileDownloader: FileDownloader;
   feedRepository: FeedRepository;
+  /** AI 피드백 공용 저장소(W8): 홈 카드와 상세 알약이 같은 상태를 본다. 계정 전환 때 UserCaches가 reset한다. */
+  aiReviews: AiReviewStore;
   likeRepository: LikeRepository;
   /** 게시물 변경 이벤트 통로(like·title·removed). 계정 전환 때 UserCaches가 삭제 기억을 비운다. */
   postChanges: PostChanges;
@@ -256,6 +263,8 @@ export interface AppContainer {
   recordSession(mode: SessionMode): { viewModel: RecordViewModel; navigator: AttachableRecordNavigator };
   /** 상세 화면이 마운트될 때마다 새 ViewModel을 만든다. 저장된 userId는 store에서 읽는다. */
   createFeedViewModel(args: { postId: string; seed: PostSeed | null; assumeMine?: boolean; navigator: FeedNavigator }): FeedViewModel;
+  /** 상세 화면의 AI 영역(알약·시트). 상세가 마운트될 때마다 새로 만든다. openAiReview는 location.state에서 읽은 값. */
+  createFeedAiViewModel(args: { postId: string; openAiReview: boolean; onOpenAiReviewConsumed?: () => void }): FeedAiViewModel;
   /** 빈 패드(1024×512)로 시작한다. */
   createSignatureDrawViewModel(mode: SignatureMode): SignatureDrawViewModel;
   createSignaturePreviewViewModel(mode: SignatureMode, png: Blob): SignaturePreviewViewModel;
@@ -355,6 +364,8 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
       displaySession?.viewModel.resetForAccountChange();
     },
   });
+  const aiReviews = new AiReviewStore({ repository: new AiReviewRepository({ api }), clock, toast });
+  userCaches.register({ clear: () => aiReviews.reset() });
   const uploadNavigator = new AttachableUploadNavigator();
   const uploadResults = new UploadResultStore();
   const uploadRepository = new UploadRepository({ api });
@@ -369,6 +380,8 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
           decoder: imageDecoder,
           preview: options.previewRenderer ?? new CanvasPreviewRenderer({ createSurface: pixelSurface, blobUrls }),
           analyzer: options.autoAnalyzer ?? new CanvasAutoAnalyzer({ createSurface: pixelSurface }),
+          scheduler: options.renderScheduler,
+          lazyThumbnails: options.renderScheduler !== undefined,
         })
       : options.photoEditor;
   const photoPreparer = new PhotoPreparer({
@@ -440,6 +453,7 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     calendarImageExporter: options.calendarImageExporter ?? new CanvasCalendarImageExporter(),
     fileDownloader: options.fileDownloader ?? new AnchorFileDownloader({ blobUrls }),
     feedRepository: new FeedRepository({ api }),
+    aiReviews,
     likeRepository,
     postChanges,
     likes,
@@ -493,6 +507,7 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
             navigator,
             likes: this.likes,
             changes: this.postChanges,
+            aiReviews: this.aiReviews,
           }),
         };
       }
@@ -535,6 +550,9 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
         toast: this.toast,
         navigator: args.navigator,
       });
+    },
+    createFeedAiViewModel(args) {
+      return new FeedAiViewModel({ postId: args.postId, clock: this.clock, store: this.aiReviews, toast: this.toast, openAiReview: args.openAiReview, onOpenAiReviewConsumed: args.onOpenAiReviewConsumed });
     },
     createSignatureDrawViewModel(mode) {
       return new SignatureDrawViewModel({

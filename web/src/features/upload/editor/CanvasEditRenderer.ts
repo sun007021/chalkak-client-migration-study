@@ -2,6 +2,7 @@ import { throwIfAborted } from '../../../core/abort';
 import type { PhotoEdit } from '../editModel';
 import type { DecodedImage, EditRenderer } from '../imagePorts';
 import { BrowserDecodedImage } from '../browserImage';
+import { isDrawableImage } from '../imagePorts';
 import { applyColorPipeline, colorParamsOf, hasColorEffect } from './colorPipeline';
 import { geometryMatrix, planGeometry } from './cropGeometry';
 import type { GeometryPlan } from './cropGeometry';
@@ -60,19 +61,19 @@ export function createCanvasPixelSurface(size: { width: number; height: number }
     width: size.width,
     height: size.height,
     drawGeometry(image: DecodedImage, plan: GeometryPlan): void {
-      const drawable = (image as { drawable?: CanvasImageSource }).drawable;
-      if (!drawable) throw new Error('image is not a browser image');
+      if (!isDrawableImage(image)) throw new Error('image is not a browser image');
       const [a, b, c, d, e, f] = geometryMatrix(image, plan);
       context.save();
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = 'high';
       context.setTransform(a, b, c, d, e, f);
-      context.drawImage(drawable, 0, 0, image.width, image.height);
+      context.drawImage(image.drawable, 0, 0, image.width, image.height);
       context.restore();
     },
     readPixels: () => context.getImageData(0, 0, size.width, size.height).data,
     writePixels(pixels: Uint8ClampedArray): void {
-      context.putImageData(new ImageData(new Uint8ClampedArray(pixels), size.width, size.height), 0, 0);
+      // readPixels가 준 버퍼를 그대로 되돌려 쓰므로 복사하지 않는다(canvas가 만든 ArrayBuffer 기반 배열).
+      context.putImageData(new ImageData(pixels as Uint8ClampedArray<ArrayBuffer>, size.width, size.height), 0, 0);
     },
     toImage: () => new BrowserDecodedImage(canvas, size.width, size.height),
   };

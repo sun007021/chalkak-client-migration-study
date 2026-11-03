@@ -2,7 +2,7 @@ import { POST_IMAGE_CONTENT_TYPE, POST_IMAGE_MAX_LONG_EDGE } from '../../constan
 import { abortError, throwIfAborted } from '../../core/abort';
 import { CanvasWebpCompressor, probeCanvasWebp } from './CanvasWebpCompressor';
 import { ImageDecodeError, WebpUnsupportedError } from './imagePorts';
-import type { DecodedImage, DecodeOptions, ImageDecoder, WasmWebpEncoder, WebpCompressor } from './imagePorts';
+import type { DecodedImage, DecodeOptions, DrawableImage, ImageDecoder, WasmWebpEncoder, WebpCompressor } from './imagePorts';
 import { fitLongEdge } from './imageSizing';
 import type { Size } from './imageSizing';
 import { selectWebpBackend } from './postImageEncoder';
@@ -15,7 +15,7 @@ import { JsquashWebpEncoder } from './WasmWebpEncoder';
 export const MAX_FALLBACK_PIXELS = 100_000_000;
 
 /** 브라우저 디코더가 돌려주는 핸들. 압축기가 그릴 수 있는 원본(ImageBitmap 또는 이미 목표 크기로 그린 canvas)을 들고 있다. */
-export class BrowserDecodedImage implements DecodedImage {
+export class BrowserDecodedImage implements DrawableImage {
   constructor(
     readonly drawable: ImageBitmap | HTMLCanvasElement,
     readonly width: number,

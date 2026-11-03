@@ -14,6 +14,15 @@ export interface DecodedImage {
   release(): void;
 }
 
+/** 브라우저 canvas가 그릴 수 있는 이미지(BrowserDecodedImage). 편집·압축 구현이 포트 밖에서 캐스트하지 않도록 타입 가드로 좁힌다. */
+export interface DrawableImage extends DecodedImage {
+  readonly drawable: CanvasImageSource;
+}
+
+export function isDrawableImage(image: DecodedImage): image is DrawableImage {
+  return 'drawable' in image && (image as { drawable?: unknown }).drawable != null;
+}
+
 export interface DecodeOptions {
   /** 원본의 긴 변이 이 값을 넘으면 디코드 단계에서 줄여 읽는다. 결과 긴 변은 이 값 이하이고 확대하지 않는다. */
   maxLongEdge: number;

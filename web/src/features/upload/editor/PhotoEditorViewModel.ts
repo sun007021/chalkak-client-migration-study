@@ -10,7 +10,7 @@ import type { AdjustmentValues } from './adjustments';
 import { AUTO_ANALYSIS_LONG_EDGE } from './autoAdjust';
 import { FULL_RECT, clampRect, cropRegionToRect, dragRect, largestRect, ratioValue, rectToCropRegion, rotateCrop, rotatedSize } from './cropGeometry';
 import type { CropHandle, CropRatioId, CropRect, Point } from './cropGeometry';
-import type { AutoAnalyzer, PreviewFrame, PreviewRenderer } from './editorPorts';
+import type { AutoAnalyzer, PreviewFrame, PreviewRenderer, RenderScheduler } from './editorPorts';
 import { normalizeEdit } from './normalizeEdit';
 
 export type EditorTool = 'crop' | 'adjust' | 'filter';
@@ -70,6 +70,10 @@ export interface PhotoEditorDeps {
   decoder: ImageDecoder;
   preview: PreviewRenderer;
   analyzer: AutoAnalyzer;
+  /** 렌더 요청을 한 프레임으로 모은다. 없으면 바로 요청한다(테스트). */
+  scheduler?: RenderScheduler;
+  /** true면 필터 썸네일은 필터 탭이 열려 있을 때만 그린다(실제 화면). 기본은 편집이 바뀔 때마다 그린다. */
+  lazyThumbnails?: boolean;
   onConfirm(edit: PhotoEdit): void;
   onCancel(): void;
 }
@@ -126,6 +130,7 @@ export class PhotoEditorViewModel extends ViewModel<PhotoEditorState> {
   /** 마지막 미리보기 요청: 진행 중이면 settled=false, 끝나면 ok가 결과. */
   private lastPreview: { promise: Promise<void>; settled: boolean; ok: boolean } | null = null;
 
+  private renderScheduled: (() => void) | null = null;
   private thumbController: AbortController | null = null;
   private thumbKey: string | null = null;
   private readonly thumbFrames: Partial<Record<PhotoFilter, PreviewFrame>> = {};
@@ -254,6 +259,7 @@ export class PhotoEditorViewModel extends ViewModel<PhotoEditorState> {
       return;
     }
     this.setState({ confirming: true });
+    this.flushRender();
     try {
       // 자동 보정을 켠 채 완료하면 지금 자른 영역의 분석값을 저장한다(REQ-EDIT-025).
       if (this.state.adjustmentLayers.autoStrength > 0) {
@@ -296,6 +302,7 @@ export class PhotoEditorViewModel extends ViewModel<PhotoEditorState> {
   override dispose(): void {
     this.gone = true;
     this.abortAll();
+    if (this.image) this.deps.preview.forget?.(this.image);
     this.image?.release();
     this.image = null;
     this.previewFrame?.release();
@@ -320,6 +327,8 @@ export class PhotoEditorViewModel extends ViewModel<PhotoEditorState> {
   }
 
   private abortAll(): void {
+    this.renderScheduled?.();
+    this.renderScheduled = null;
     this.decodeController?.abort();
     this.previewController?.abort();
     this.thumbController?.abort();
@@ -377,6 +386,30 @@ export class PhotoEditorViewModel extends ViewModel<PhotoEditorState> {
   private refresh(): void {
     const draft = this.draft();
     this.setState({ adjustValues: effectiveValues(draft.adjustmentLayers), identity: isIdentityEdit(draft) });
+    this.scheduleRender();
+  }
+
+  /** 렌더 요청은 한 프레임에 한 번으로 모은다(슬라이더를 끄는 동안 요청이 쌓이지 않게). 스케줄러가 없으면 바로 요청한다. */
+  private scheduleRender(): void {
+    const scheduler = this.deps.scheduler;
+    if (!scheduler) {
+      this.flushRender();
+      return;
+    }
+    if (this.renderScheduled) return;
+    this.renderScheduled = scheduler.schedule(() => {
+      this.renderScheduled = null;
+      this.flushRender();
+    });
+  }
+
+  /** 예약돼 있던 렌더 요청을 지금 낸다. */
+  private flushRender(): void {
+    if (this.renderScheduled) {
+      this.renderScheduled();
+      this.renderScheduled = null;
+    }
+    if (this.gone || this.closed) return;
     this.requestPreview(false);
     this.requestThumbnails();
   }
@@ -422,6 +455,7 @@ export class PhotoEditorViewModel extends ViewModel<PhotoEditorState> {
   private requestThumbnails(): void {
     const image = this.image;
     if (!image) return;
+    if (this.deps.lazyThumbnails && this.state.tool !== 'filter') return;
     const base = this.renderEdit('original');
     const key = JSON.stringify({ t: base.quarterTurns, c: base.crop, v: effectiveValues(base.adjustmentLayers) });
     if (key === this.thumbKey) return;
@@ -465,7 +499,10 @@ export class PhotoEditorViewModel extends ViewModel<PhotoEditorState> {
         if (controller.signal.aborted || this.gone || !values) return;
         this.setLayers(withAutoValues(this.state.adjustmentLayers, values));
       },
-      () => undefined,
+      () => {
+        // 실패한 분석은 같은 영역으로 다시 시도할 수 있게 표시를 지운다(다음 도구 이동·완료 때).
+        if (this.analyzedKey === key && !controller.signal.aborted) this.analyzedKey = null;
+      },
     );
   }
 }

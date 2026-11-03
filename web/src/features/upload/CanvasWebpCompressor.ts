@@ -2,7 +2,7 @@ import { POST_IMAGE_CONTENT_TYPE } from '../../constants';
 import { throwIfAborted } from '../../core/abort';
 import { createSurface, releaseSurface } from './canvasSurface';
 import type { Surface } from './canvasSurface';
-import { WebpUnsupportedError } from './imagePorts';
+import { WebpUnsupportedError, isDrawableImage } from './imagePorts';
 import type { DecodedImage, WebpCompressor } from './imagePorts';
 import type { Size } from './imageSizing';
 import { stripWebpMetadata, webpBlob } from './webpMetadata';
@@ -41,8 +41,8 @@ export async function probeCanvasWebp(): Promise<boolean> {
 export class CanvasWebpCompressor implements WebpCompressor {
   async compress(image: DecodedImage, size: Size, quality: number, signal: AbortSignal): Promise<Blob> {
     throwIfAborted(signal);
-    const drawable = (image as { drawable?: CanvasImageSource }).drawable;
-    if (!drawable) throw new WebpUnsupportedError('image is not a browser image');
+    if (!isDrawableImage(image)) throw new WebpUnsupportedError('image is not a browser image');
+    const { drawable } = image;
     const surface = createSurface(size.width, size.height);
     try {
       const context = surface.getContext('2d') as OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;

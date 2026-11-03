@@ -1,6 +1,6 @@
 import { throwIfAborted } from '../../core/abort';
 import { createSurface, releaseSurface } from './canvasSurface';
-import { WebpUnsupportedError } from './imagePorts';
+import { WebpUnsupportedError, isDrawableImage } from './imagePorts';
 import type { DecodedImage, WasmWebpEncoder } from './imagePorts';
 import type { Size } from './imageSizing';
 import { stripWebpMetadata, webpBlob } from './webpMetadata';
@@ -22,8 +22,8 @@ export class JsquashWebpEncoder implements WasmWebpEncoder {
 
   async compress(image: DecodedImage, size: Size, quality: number, signal: AbortSignal): Promise<Blob> {
     throwIfAborted(signal);
-    const drawable = (image as { drawable?: CanvasImageSource }).drawable;
-    if (!drawable) throw new WebpUnsupportedError('image is not a browser image');
+    if (!isDrawableImage(image)) throw new WebpUnsupportedError('image is not a browser image');
+    const { drawable } = image;
     const pixels = readPixels(drawable, size);
     let encode: Encode;
     try {

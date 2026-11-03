@@ -3,7 +3,10 @@ import type { RefObject } from 'react';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-const focusables = (root: HTMLElement): HTMLElement[] => Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => !el.hasAttribute('disabled'));
+const focusables = (root: HTMLElement): HTMLElement[] => Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => !el.hasAttribute('disabled') && !el.closest('[inert]'));
+
+/** Tab 순서에 실제로 드는 요소(roving tabindex의 tabindex=-1 항목은 제외). */
+const tabbables = (items: HTMLElement[]): HTMLElement[] => items.filter((el) => el.tabIndex >= 0);
 
 /** 다이얼로그 밖의 형제 요소를 inert로 만든다(배경 클릭·포커스·읽기 차단). 알림(aria-live) 영역은 남겨 토스트가 읽히게 한다. 되돌리는 함수를 돌려준다. */
 export function inertBackground(dialog: HTMLElement): () => void {
@@ -28,13 +31,15 @@ export function inertBackground(dialog: HTMLElement): () => void {
 /**
  * 모달 다이얼로그의 키보드·포커스 규칙(WAI-ARIA dialog): 열리면 initialFocus(없으면 첫 포커스 가능 요소)로 포커스를 옮기고,
  * Tab/Shift+Tab은 다이얼로그 안에서만 돌며, Esc는 onClose, 배경은 inert, 닫히면(언마운트) 열기 전 포커스(트리거)로 돌아간다.
- * onClose가 undefined이면 Esc는 아무것도 하지 않는다(처리 중 닫기 금지 등).
+ * onClose가 undefined이면 Esc는 아무것도 하지 않는다(처리 중 닫기 금지 등). enabled가 false인 동안(위에 다른 모달이 열림)은 Esc·Tab 처리를 모두 건너뛴다.
  */
-export function useDialogFocus(dialogRef: RefObject<HTMLElement | null>, onClose?: () => void, initialFocusRef?: RefObject<HTMLElement | null>): void {
+export function useDialogFocus(dialogRef: RefObject<HTMLElement | null>, onClose?: () => void, initialFocusRef?: RefObject<HTMLElement | null>, enabled = true): void {
   const closeRef = useRef(onClose);
+  const enabledRef = useRef(enabled);
   useEffect(() => {
     closeRef.current = onClose;
-  }, [onClose]);
+    enabledRef.current = enabled;
+  }, [onClose, enabled]);
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -42,6 +47,8 @@ export function useDialogFocus(dialogRef: RefObject<HTMLElement | null>, onClose
     const restoreBackground = inertBackground(dialog);
     (initialFocusRef?.current ?? focusables(dialog)[0] ?? dialog).focus();
     const onKeyDown = (event: KeyboardEvent) => {
+      // 위에 다른 모달이 열려 있으면(중첩) 키 처리는 그쪽이 맡는다.
+      if (!enabledRef.current) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         closeRef.current?.();
@@ -53,13 +60,17 @@ export function useDialogFocus(dialogRef: RefObject<HTMLElement | null>, onClose
         event.preventDefault();
         return;
       }
-      const first = items[0]!;
-      const last = items[items.length - 1]!;
+      const order = tabbables(items);
+      const first = order[0] ?? items[0]!;
+      const last = order[order.length - 1] ?? items[items.length - 1]!;
       const active = document.activeElement;
-      if (event.shiftKey && (active === first || !dialog.contains(active))) {
+      // 끝은 Tab 순서의 끝이거나 목록 전체의 끝(roving tabindex로 초점은 있지만 Tab 순서에는 없는 항목)이다.
+      const atFirst = active === first || active === items[0];
+      const atLast = active === last || active === items[items.length - 1];
+      if (event.shiftKey && (atFirst || !dialog.contains(active))) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
+      } else if (!event.shiftKey && (atLast || !dialog.contains(active))) {
         event.preventDefault();
         first.focus();
       }
