@@ -36,9 +36,9 @@
 | TC-BOOT-026 | Given 이미 강제 업데이트가 확인됨 / When 재조회가 실패(unavailable) / Then 강제 상태를 유지한다 | D-15 | U | - | iOS:AppVersionGateTests L75 |
 | TC-BOOT-027 | Given 앱이 백그라운드에서 돌아옴(scene active) / When 게이트 재확인 / Then 새로 강제 대상이면 다이얼로그를 띄운다 | D-15 | U | - | iOS:AppVersionGate scene active / AN:VersionGateViewModelTest(복귀 시 재확인) |
 | TC-BOOT-028 | Given 강제 업데이트 다이얼로그 / When 화면 확인 / Then 제목 "업데이트가 필요해요", 본문 "원활한 서비스 이용을 위해 최신 버전으로 업데이트해 주세요.", 버튼 "업데이트" 한 개이며 뒤로가기, 바깥 탭, 스와이프로 닫히지 않는다 | D-15 | W | - | iOS:AppVersionGate 다이얼로그 / AN:VersionGateScreenTest |
-| TC-BOOT-029 | Given 강제 업데이트 다이얼로그 / When "업데이트" 탭 / Then 스토어 열기 인터페이스가 정확히 1회 호출된다(연타해도 1회) | D-15 | U | - | 신규 |
+| TC-BOOT-029 | Given 강제 업데이트 다이얼로그 / When "업데이트" 탭 / Then 스토어 앱 상세 열기 인터페이스가 정확히 1회 호출된다(연타해도 1회, Play 즉시 업데이트 흐름은 쓰지 않는다) | D-15 | U | - | 신규 |
 | TC-BOOT-030 | Given Play In-App Update 우선순위 1 이상 / 0 / When 게이트 (Android 계열) / Then 1 이상이면 강제, 0이면 통과 | D-15 | U | boot/play-update__priority-1.json, boot/play-update__priority-0.json | AN:VersionGateViewModelTest |
-| TC-BOOT-031 | Given Android 계열에서 업데이트 흐름이 실패하거나 사용자가 취소 / When 돌아옴 / Then 앱을 통과시키지 않고 다이얼로그가 다시 열린다 (기존의 finish()로 종료하는 동작 대신 게이트 유지) | D-15 | U | - | AN:VersionGateViewModelTest(업데이트 후 잔존) [결정 필요: 종료 vs 게이트 유지] |
+| TC-BOOT-031 | Given 강제 업데이트 다이얼로그 / When Android 계열에서 "취소" 탭 또는 스토어 열기 실패, iOS 계열에서 스토어에서 업데이트 없이 돌아옴 / Then Android 계열은 앱을 종료하고, iOS 계열은 다이얼로그가 그대로 남아 앱을 통과시키지 않는다(iOS 계열에는 취소 버튼이 없다) | D-15, REQ-BOOT-009 | U | - | AN:VersionGateViewModelTest |
 | TC-BOOT-032 | Given 디버그/설정으로 조회를 끈 빌드(이 레포 기본) / When 시작 / Then 스토어 조회 호출 0건이며 통과한다 | D-15 | U | - | AN:DisabledAppUpdateGatewayTest |
 | TC-BOOT-033 | Given Web / When 시작 / Then 버전 게이트 UI와 조회가 없다 | D-15 | W | - | 신규 |
 | TC-BOOT-034 | Given 강제 업데이트 대상이고 인증 세션이 유효함 / When 시작 / Then 게이트가 인증 게이트보다 먼저이며 홈이 열리지 않고, 푸시 기기 등록과 홈 데이터 호출도 0건이다 | D-15, overview §5 | U | boot/itunes-lookup__newer-major.json, boot/session__authenticated.json | 신규 |

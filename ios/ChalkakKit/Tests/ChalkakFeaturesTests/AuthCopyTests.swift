@@ -34,10 +34,14 @@ struct AuthCopyTests {
         #expect(actual == expected)
     }
 
-    @Test("ko.json에 있는 boot.*·auth.login/logout/withdraw/confirm 키는 모두 AuthCopy에 있다(정지 문구 auth.banned.*는 각 기능 몫)")
+    @Test("ko.json에 있는 boot.*·auth.login/logout/withdraw/confirm 키는 모두 AuthCopy에 있다(정지 문구 auth.banned.*는 각 기능 몫, Android 전용 boot.update.cancel 제외)")
     func everySharedKeyIsCovered() {
         let covered = Set(Self.pairs.map(\.key))
-        let shared = SharedCopy.allKeys.filter { ($0.hasPrefix("boot.") || $0.hasPrefix("auth.")) && !$0.hasPrefix("auth.banned.") }
+        // D-15: 강제 업데이트 취소 버튼은 Android 계열에만 있다. iOS 다이얼로그는 업데이트 버튼만 둔다.
+        let androidOnly: Set<String> = ["boot.update.cancel"]
+        let shared = SharedCopy.allKeys.filter {
+            ($0.hasPrefix("boot.") || $0.hasPrefix("auth.")) && !$0.hasPrefix("auth.banned.") && !androidOnly.contains($0)
+        }
         #expect(Set(shared).subtracting(covered).isEmpty)
     }
 }

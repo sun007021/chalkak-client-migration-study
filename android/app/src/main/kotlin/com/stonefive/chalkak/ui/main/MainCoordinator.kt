@@ -202,15 +202,17 @@ class MainCoordinator(
 
     /** "알림함으로" on a detail that has no inbox below it: the inbox takes the detail's place. */
     fun onOpenInboxInsteadOfDetail() {
-        if (nav.top is Route.NotificationDetail) nav.onSystemBack()
-        open(Route.Notifications)
+        // One screen_view (the inbox): popping first would also report the screen the detail was covering (TC-ANL-017).
+        val outcome = if (nav.top is Route.NotificationDetail) nav.replaceTop(Route.Notifications) else nav.open(Route.Notifications)
+        if (outcome is NavOutcome.Blocked) showToast(copy[outcome.copyKey])
     }
 
     private fun goHome(destination: NotificationDestination.Home, mode: NavMode) {
         val home = Route.TabRoot(Tab.Home)
         val already = mode == NavMode.AlreadyThere || nav.top == home
         // Pop to home; the home route's own `onShown` refreshes it silently, so only the already-there case asks for a refresh.
-        while (nav.top != home && nav.stack.size > 1 && nav.onSystemBack() is NavOutcome.Navigated) Unit
+        // One screen_view for home, not one per popped screen.
+        nav.popTo { it == home }
         if (destination.scrollToTopAndRefresh) {
             session.homeScroll.request()
             if (already) session.homeRefresh.request()

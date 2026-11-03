@@ -4,6 +4,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -110,6 +111,15 @@ class LikeUiTest {
 
         tag("display.like-button-${post.id}").assertIsNotSelected()
         tag("display.like-count-${post.id}").assertTextEquals((post.likeCount - 1).toString())
+    }
+
+    @Test
+    fun `TC-LIKE-034 하트 접근성 라벨은 좋아요 N개이고 선택 상태가 함께 노출된다`() {
+        val (_, photos) = showDisplay()
+        val post = photos.first { it.isLiked }
+        val other = photos.first { !it.isLiked }
+        tag("display.like-button-${post.id}").assertContentDescriptionEquals(copy.format("like.a11y.count", "n" to post.likeCount)).assertIsSelected()
+        tag("display.like-button-${other.id}").assertContentDescriptionEquals(copy.format("like.a11y.count", "n" to other.likeCount)).assertIsNotSelected()
     }
 
     @Test

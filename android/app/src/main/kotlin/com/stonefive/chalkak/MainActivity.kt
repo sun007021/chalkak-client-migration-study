@@ -13,11 +13,6 @@ import com.stonefive.chalkak.ui.theme.ChalkakTheme
 class MainActivity : ComponentActivity() {
     private var startedOnce = false
 
-    // Registered before STARTED, as the Activity Result API requires; Play's immediate update flow reports here.
-    private val updateFlow = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-        platform.updateFlowBridge.onResult(result.resultCode)
-    }
-
     // The Photo Picker (album) and the system camera report here; both launchers are detached again in onDestroy.
     private val pickPhoto = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         platform.photoPickBridge.onAlbumResult(uri)
@@ -38,7 +33,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         platform.currentActivity.set(this)
-        platform.updateFlowBridge.launcher = updateFlow
         platform.photoPickBridge.albumLauncher = pickPhoto
         platform.photoPickBridge.cameraLauncher = takePhoto
         platform.pushPlatform.permissionBridge.launcher = requestNotifications
@@ -74,7 +68,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         platform.currentActivity.clear(this)
-        platform.updateFlowBridge.detach(updateFlow)
         platform.photoPickBridge.detach(pickPhoto)
         platform.photoPickBridge.detach(takePhoto)
         platform.pushPlatform.permissionBridge.detach(requestNotifications)

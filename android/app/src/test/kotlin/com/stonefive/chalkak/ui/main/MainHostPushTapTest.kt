@@ -125,10 +125,27 @@ class MainHostPushTapTest {
         launchHome()
         openFeed()
         val before = rig.fakes.home.todayCalls.size
+        val homeViews = rig.analytics.screens.count { it == "home" }
         send(NotificationDestination.Home(scrollToTopAndRefresh = true))
         rule.awaitTag("home.hero-photo")
         assertEquals(listOf(home), rig.nav.stack)
+        assertEquals(homeViews + 1, rig.analytics.screens.count { it == "home" }) // one screen_view for home, however many screens closed
         rule.waitUntil(2_000) { rig.fakes.home.todayCalls.size > before }
+    }
+
+    @Test
+    fun `TC-PUSH-037 TOPIC 푸시로 여러 화면을 한 번에 닫아도 홈 screen_view는 한 번이고 중간 화면은 보고되지 않는다`() {
+        launchHome { noti.listFixture("notifications__page1"); noti.detailFixture("notice") }
+        rule.runOnUiThread {
+            rig.nav.open(Route.Notifications)
+            rig.nav.open(Route.NotificationDetail(NotificationRig.NOTICE))
+        }
+        rule.awaitTag("notification-detail.root")
+        val before = rig.analytics.screens.toList()
+        send(NotificationDestination.Home(scrollToTopAndRefresh = true))
+        rule.awaitTag("home.hero-photo")
+        assertEquals(listOf(home), rig.nav.stack)
+        assertEquals(listOf("home"), rig.analytics.screens.drop(before.size))
     }
 
     @Test
@@ -147,6 +164,17 @@ class MainHostPushTapTest {
     private fun openFeed() {
         rule.runOnUiThread { rig.nav.open(Route.Feed(POST_MINE, FeedSource.ById)) }
         rule.awaitTag("feed.root")
+    }
+
+    @Test
+    fun `TC-PUSH-067 푸시로 연 게시물이 삭제되어 404이면 상세가 게시물을 찾을 수 없어요 화면을 보인다`() {
+        launchHome {
+            posts.details.always(NotificationRig.POST, PostFixtures.failure("feed/posts-detail__404-not-found.json"))
+        }
+        send(post(openAi = false))
+        rule.awaitTag("feed.not-found-state")
+        tag("feed.not-found-state").assertIsDisplayed()
+        assertEquals(listOf(home, Route.Feed(NotificationRig.POST, FeedSource.ById)), rig.nav.stack)
     }
 
     @Test
@@ -180,9 +208,13 @@ class MainHostPushTapTest {
         }
         send(NotificationDestination.NotificationDetail(NotificationRig.REJECTED))
         rule.awaitTag("notification-detail.back-to-inbox-button")
+        val homeViews = rig.analytics.screens.count { it == "home" }
         tag("notification-detail.back-to-inbox-button").performClick()
         rule.awaitTag("notifications.list")
         assertEquals(listOf(home, Route.Notifications), rig.nav.stack)
+        // The inbox takes the detail's place: one screen_view for it, none for the home that was never revealed (TC-ANL-017).
+        assertEquals(homeViews, rig.analytics.screens.count { it == "home" })
+        assertEquals(1, rig.analytics.screens.count { it == "notifications" })
     }
 
     // ---- toasts and login ----------------------------------------------------------------------------------------------------

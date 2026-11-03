@@ -292,7 +292,7 @@ class HomeHeroTest {
     }
 
     @Test
-    fun `TC-HOME-049 a guest tapping the bell gets the login toast and no unread request is ever made`() = runTest {
+    fun `TC-HOME-049 TC-NOTI-051 a guest tapping the bell gets the login toast and no unread request is ever made`() = runTest {
         val r = rig(HomeMode.Guest)
         show(r)
         r.holder.onNotificationClicked(); r.holder.onForeground(); r.holder.onPushReceived(); r.holder.onNotificationInboxClosed()
@@ -304,7 +304,7 @@ class HomeHeroTest {
     }
 
     @Test
-    fun `TC-HOME-050 hasUnread true shows the dot and false hides it`() = runTest {
+    fun `TC-HOME-050 TC-NOTI-049 hasUnread true shows the dot and false hides it`() = runTest {
         val r = rig()
         r.home.unreadHandler = { ok(HomeFixtureModels.hasUnread("home/notifications-unread-status__true.json")) }
         show(r)
@@ -332,7 +332,7 @@ class HomeHeroTest {
     }
 
     @Test
-    fun `TC-HOME-052 a failing unread check keeps the previous dot value and shows nothing`() = runTest {
+    fun `TC-HOME-052 TC-NOTI-052 a failing unread check keeps the previous dot value and shows nothing`() = runTest {
         val r = rig()
         r.home.unreadHandler = { ok(true) }
         show(r)

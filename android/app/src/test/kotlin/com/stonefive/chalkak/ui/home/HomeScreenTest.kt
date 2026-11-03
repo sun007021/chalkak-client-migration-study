@@ -389,7 +389,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun `TC-HOME-050 미읽음이 있으면 점이 존재하고 없으면 트리에 존재하지 않는다`() {
+    fun `TC-HOME-050 TC-NOTI-049 미읽음이 있으면 점이 존재하고 없으면 트리에 존재하지 않는다`() {
         val unread = loadedHomeState { home.unreadHandler = { HomeFixtureModels.ok(HomeFixtureModels.hasUnread("home/notifications-unread-status__true.json")) } }
         assertTrue(unread.hasUnread)
         show(unread)
