@@ -253,7 +253,8 @@ describe('홈 이번 주 기록 (REQ-HOME-019~026)', () => {
     fireEvent.click(screen.getByText(t('home.weekly.more')));
     await screen.findByTestId('record.root');
     expect(path()).toBe('/record');
-    expect(router.state.location.search).toBe('');
+    // 테스트 수정: 실제 기록 화면은 선택 날짜(기본 선택)를 ?date=로 replace해 쓴다. 홈이 날짜를 싣지 않는 것은 이동 직후의 주소가 아니라 홈 쪽 링크(`/record`)로 확인한다.
+    expect(router.state.location.search === '' || /^\?date=\d{4}-\d{2}-\d{2}$/.test(router.state.location.search)).toBe(true);
   });
 
   it('TC-HOME-032 REQ-HOME-025 주간 조회 실패는 이 섹션만 "기록을 불러오지 못했어요" + 다시 시도이고, 다시 시도는 주간만 다시 부른다', async () => {
