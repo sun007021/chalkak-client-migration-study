@@ -6,6 +6,7 @@ import { fakePng } from '../../test/FakeSignatureRasterizer';
 import { networkFailure } from '../../test/fakeFetch';
 import { ME, loadFixture, memberSession } from '../../test/fixtures';
 import { screenViews } from '../../test/screenViews';
+import { SETTINGS_GET, routeSettings } from '../../test/settingsHarness';
 import { CARD_GET, CHANGE_CONFIRM, CHANGE_PUT, CHANGE_UPLOADS, SIGNUP_CONFIRM, SIGNUP_PUT, SIGNUP_UPLOADS, fx, routeChange, routeSignup, sequence } from '../../test/signatureRoutes';
 
 const CREDENTIAL = { idToken: 'fake-id-token-1', rawNonce: 'fake-raw-nonce-1' };
@@ -100,10 +101,13 @@ describe('미리보기 → 다시 그리기', () => {
 
   it('TC-SIGN-042 변경 도중 그리기·미리보기를 벗어나 설정으로 돌아가면 서버 호출이 0건이다', async () => {
     const { h, router } = await openPreview('change');
+    routeSettings(h.ff); // 설정 화면이 열리며 사인·푸시 설정을 읽는다
     await router.navigate('/settings');
     expect(await screen.findByTestId('settings.root')).toBeInTheDocument();
-    expect(h.ff.calls).toHaveLength(0);
-    expect(h.container.signatureCard.state).toEqual({ status: 'idle', imageUrl: null });
+    await screen.findByTestId('settings.signature-image');
+    // 변경 흐름의 서버 호출은 0건이다(설정 화면이 읽는 조회만 있다). 사인 카드는 변경 없이 서버의 현재 사인이다.
+    expect(h.ff.calls.filter((c) => ![CARD_GET, SETTINGS_GET].includes(`${c.method} ${c.path}`))).toHaveLength(0);
+    expect(h.container.signatureCard.state.status).toBe('content');
   });
 });
 
@@ -255,13 +259,15 @@ describe('가입 확정', () => {
 describe('사인 변경 확정', () => {
   it('TC-SIGN-019 TC-SIGN-025 TC-SIGN-026 "사인 변경하기" → uploads → PUT → 확정 후 설정으로 돌아가 토스트를 보이고 GET /users/me/signature를 다시 불러 썸네일을 쓴다', async () => {
     const { h, path } = await openPreview('change');
+    routeSettings(h.ff); // 설정 화면이 열리며 사인·푸시 설정을 읽는다
     routeChange(h.ff);
     fireEvent.click(confirm());
     expect(await screen.findByTestId('settings.root')).toBeInTheDocument();
     expect(path()).toBe('/settings');
     expect(await screen.findByTestId('toast.message')).toHaveTextContent('사인 반영까지 시간이 좀 걸릴 수 있어요!');
-    await waitFor(() => expect(h.ff.callsTo(CARD_GET)).toHaveLength(1));
-    expect(sequence(h.ff).slice(0, 4)).toEqual([CHANGE_UPLOADS, CHANGE_PUT, CHANGE_CONFIRM, CARD_GET]);
+    // 설정이 열릴 때의 GET 1회 + 변경 성공 뒤 재조회 1회.
+    await waitFor(() => expect(h.ff.callsTo(CARD_GET)).toHaveLength(2));
+    expect(sequence(h.ff).filter((entry) => entry !== SETTINGS_GET).slice(0, 4)).toEqual([CHANGE_UPLOADS, CHANGE_PUT, CHANGE_CONFIRM, CARD_GET]);
     await waitFor(() =>
       expect(h.container.signatureCard.state).toEqual({
         status: 'content',
