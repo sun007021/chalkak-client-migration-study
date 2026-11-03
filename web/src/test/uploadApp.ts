@@ -18,6 +18,8 @@ export interface UploadAppOptions {
   routes?: Record<string, RouteValue>;
   cameraSupported?: boolean;
   photoEditor?: PhotoEditorComponent | null;
+  /** true면 컨테이너의 실제 편집기를 쓴다(Fake 디코더·미리보기·분석기). */
+  realEditor?: boolean;
   /** false면 FakeUploadEntry(진입 게이트를 쓰지 않는 화면 테스트). 기본 true(실제 게이트). */
   realUpload?: boolean;
   strict?: boolean;
@@ -33,6 +35,7 @@ export function openUploadApp(options: UploadAppOptions = {}) {
     realUpload: options.realUpload ?? true,
     cameraSupported: options.cameraSupported,
     photoEditor: options.photoEditor,
+    realEditor: options.realEditor,
   });
   const router = new FixtureRouter(h.ff, { ...POST_ROUTES, ...MEMBER_ROUTES, ...UPLOAD_ROUTES, ...options.routes });
   options.beforeRender?.(h);
