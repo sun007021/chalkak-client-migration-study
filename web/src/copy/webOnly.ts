@@ -46,6 +46,14 @@ export const webOnlyCopy = {
   'edit.crop.handle.top-right': '오른쪽 위 모서리',
   'edit.crop.handle.bottom-left': '왼쪽 아래 모서리',
   'edit.crop.handle.bottom-right': '오른쪽 아래 모서리',
+  /** 기록: 이전·다음 달 버튼, 기록 없는 달 안내, 선택한 날짜의 사진 대체 텍스트. TODO: shared/copy/ko.json에 키가 생기면 옮긴다. */
+  'record.nav.previous': '이전 달',
+  'record.nav.next': '다음 달',
+  'record.empty': '이 달에는 기록이 없어요',
+  'record.selected-photo-alt': '선택한 날짜의 사진',
+  'record.today': '오늘',
+  /** 기록 → 상세: 응답 전에 미리 보이는 썸네일의 대체 텍스트. */
+  'feed.preview-alt': '사진',
   /** 상세: 삭제 요청 중 표시. */
   'feed.deleting': '삭제 중',
 } as const;

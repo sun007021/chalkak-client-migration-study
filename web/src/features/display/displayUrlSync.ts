@@ -15,13 +15,5 @@ export function planUrlWrite(search: string, target: { date: DateString; sort: D
   return `?${params.toString()}`;
 }
 
-/**
- * 화면이 replace로 쓴 URL이 뒤늦게 location으로 돌아왔는지 가린다. pending은 쓴 순서대로의 search 목록이다.
- * 목록에 있으면(ours) 그 항목까지 비우고 상태는 이미 그 이후 값이므로 URL→상태 반영을 건너뛴다(연타 중 늦게 온 중간 URL이 상태를 되돌리지 않게).
- * 목록에 없으면 바깥에서 온 이동이므로 목록을 비우고 반영한다.
- */
-export function takeWrittenSearch(pending: readonly string[], search: string): { ours: boolean; pending: string[] } {
-  const index = pending.indexOf(search);
-  if (index < 0) return { ours: false, pending: [] };
-  return { ours: true, pending: pending.slice(index + 1) };
-}
+// 공용 훅(core/ui/useSearchSync)으로 옮겼다. 기존 import 경로를 유지한다.
+export { takeWrittenSearch } from '../../core/ui/useSearchSync';

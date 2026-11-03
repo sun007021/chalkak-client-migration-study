@@ -40,6 +40,13 @@ import { AttachableHomeNavigator } from '../features/home/AttachableHomeNavigato
 import { HomeViewModel } from '../features/home/HomeViewModel';
 import { DisplayRepository } from '../features/display/DisplayRepository';
 import { DisplayViewModel } from '../features/display/DisplayViewModel';
+import { RecordViewModel } from '../features/record/RecordViewModel';
+import { RecordRepository } from '../features/record/RecordRepository';
+import { CanvasCalendarImageExporter } from '../features/record/CalendarImageExporter';
+import type { CalendarImageExporter } from '../features/record/CalendarImageExporter';
+import { AnchorFileDownloader } from '../features/record/FileDownloader';
+import type { FileDownloader } from '../features/record/FileDownloader';
+import { AttachableRecordNavigator } from '../features/record/recordNavigation';
 import { FeedRepository } from '../features/feed/FeedRepository';
 import { FeedViewModel } from '../features/feed/FeedViewModel';
 import type { FeedNavigator } from '../features/feed/FeedViewModel';
@@ -156,6 +163,10 @@ export interface AppContainerOptions {
   blobUrls?: BlobUrlFactory;
   /** presigned PUT 주소 재작성(개발 프록시). 기본 그대로. */
   uploadUrlRewriter?: UploadUrlRewriter;
+  /** 기록 탭 달력 이미지 렌더(PNG Blob). 기본 CanvasCalendarImageExporter(canvas). */
+  calendarImageExporter?: CalendarImageExporter;
+  /** 기록 탭 이미지 저장(파일 다운로드). 기본 AnchorFileDownloader(`<a download>`). */
+  fileDownloader?: FileDownloader;
 }
 
 export interface AppContainer {
@@ -209,6 +220,11 @@ export interface AppContainer {
   signupService: SignupService;
   changeSignatureService: ChangeSignatureService;
   displayRepository: DisplayRepository;
+  recordRepository: RecordRepository;
+  /** 기록 탭 달력 이미지 렌더(W9). 기본 canvas 구현. */
+  calendarImageExporter: CalendarImageExporter;
+  /** 기록 탭 이미지 저장(W9). 기본 `<a download>` 구현. */
+  fileDownloader: FileDownloader;
   feedRepository: FeedRepository;
   /** AI 피드백 공용 저장소(W8): 홈 카드와 상세 알약이 같은 상태를 본다. 계정 전환 때 UserCaches가 reset한다. */
   aiReviews: AiReviewStore;
@@ -239,6 +255,12 @@ export interface AppContainer {
    * 계정 전환·로그아웃 때는 UserCaches가 resetForAccountChange로 처음 상태로 돌린다. 화면은 navigator.attach로 실제 이동 수단을 꽂는다.
    */
   displaySession(mode: SessionMode): { viewModel: DisplayViewModel; navigator: AttachablePostNavigator };
+  /**
+   * 기록 ViewModel도 모드별로 하나를 보관한다(피드·전시에 갔다 와도 달·날짜·캐시가 남는다). 다른 모드를 요청하면 이전 것은 dispose한다.
+   * 계정 전환·로그아웃 때는 UserCaches가 resetForAccountChange로 처음 상태로 돌린다. 화면은 navigator.attach로 실제 이동 수단을 꽂는다.
+   * PostChanges(created·removed)는 ViewModel이 직접 구독한다.
+   */
+  recordSession(mode: SessionMode): { viewModel: RecordViewModel; navigator: AttachableRecordNavigator };
   /** 상세 화면이 마운트될 때마다 새 ViewModel을 만든다. 저장된 userId는 store에서 읽는다. */
   createFeedViewModel(args: { postId: string; seed: PostSeed | null; assumeMine?: boolean; navigator: FeedNavigator }): FeedViewModel;
   /** 상세 화면의 AI 영역(알약·시트). 상세가 마운트될 때마다 새로 만든다. openAiReview는 location.state에서 읽은 값. */
@@ -342,6 +364,8 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
       displaySession?.viewModel.resetForAccountChange();
     },
   });
+  let recordSession: { mode: SessionMode; viewModel: RecordViewModel; navigator: AttachableRecordNavigator } | null = null;
+  userCaches.register({ clear: () => recordSession?.viewModel.resetForAccountChange() });
   const aiReviews = new AiReviewStore({ repository: new AiReviewRepository({ api }), clock, toast });
   userCaches.register({ clear: () => aiReviews.reset() });
   const uploadNavigator = new AttachableUploadNavigator();
@@ -427,6 +451,9 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     signatureCard,
     homeRepository,
     displayRepository: new DisplayRepository({ api }),
+    recordRepository: new RecordRepository({ api }),
+    calendarImageExporter: options.calendarImageExporter ?? new CanvasCalendarImageExporter({ clock }),
+    fileDownloader: options.fileDownloader ?? new AnchorFileDownloader({ blobUrls, clock }),
     feedRepository: new FeedRepository({ api }),
     aiReviews,
     likeRepository,
@@ -508,6 +535,27 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
         };
       }
       return displaySession;
+    },
+    recordSession(mode) {
+      if (recordSession?.mode !== mode) {
+        recordSession?.viewModel.dispose();
+        const navigator = new AttachableRecordNavigator();
+        recordSession = {
+          mode,
+          navigator,
+          viewModel: new RecordViewModel({
+            mode,
+            clock: this.clock,
+            repository: this.recordRepository,
+            changes: this.postChanges,
+            toast: this.toast,
+            navigator,
+            exporter: this.calendarImageExporter,
+            downloader: this.fileDownloader,
+          }),
+        };
+      }
+      return recordSession;
     },
     createFeedViewModel(args) {
       return new FeedViewModel({

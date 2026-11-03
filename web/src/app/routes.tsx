@@ -15,6 +15,7 @@ import { BootScreen, SplashView } from '../features/boot/BootScreen';
 import { DisplayScreen } from '../features/display/DisplayScreen';
 import { FeedScreen } from '../features/feed/FeedScreen';
 import { HomeScreen } from '../features/home/HomeScreen';
+import { RecordScreen } from '../features/record/RecordScreen';
 import { TermsScreen } from '../features/onboarding/TermsScreen';
 import { RouterUploadNavigator } from '../features/upload/uploadNavigation';
 import { UploadEntryLoading } from '../features/upload/UploadEntryLoading';
@@ -129,7 +130,7 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
               handle: recordHandle,
               element: (
                 <TabGate tab="record">
-                  <TabPlaceholder tab="record" testId="record.root" />
+                  <RecordScreen />
                 </TabGate>
               ),
             },
