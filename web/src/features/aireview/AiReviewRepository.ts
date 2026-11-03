@@ -33,7 +33,7 @@ const decodeResult: Decoder<AiReviewResult> = d.object({
 });
 
 const decodeBody = d.object({
-  status: d.enumOf(STATUSES),
+  status: d.enumOf<typeof STATUSES>(STATUSES),
   requestedAt: d.nullable(d.instant()),
   completedAt: d.nullable(d.instant()),
   result: d.nullable(decodeResult),

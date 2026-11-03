@@ -10,6 +10,9 @@ import { useViewModel } from '../../core/state/useViewModel';
 import { LoadingIndicator } from '../../core/ui/StateViews';
 import { useDialogFocus } from '../../core/ui/useDialogFocus';
 import { useScrollRestore } from '../../core/ui/useScrollRestore';
+import { readOpenAiReview } from '../aireview/aiEntry';
+import { FeedAiSection } from '../aireview/FeedAiSection';
+import type { FeedAiViewModel } from '../aireview/FeedAiViewModel';
 import { LikeButton } from '../like/LikeButton';
 import type { FeedPost, FeedState, FeedViewModel } from './FeedViewModel';
 import { planFeedClose, readFeedSeed } from './feedNavigation';
@@ -46,11 +49,15 @@ export function FeedScreen(): ReactNode {
     return created;
   }, [container, postId, seed, close]);
   const vm = useOwnedViewModel(create);
+  // AI 영역(알약·시트)은 상세 로직과 따로 둔다. 홈 "자세히 보기"로 들어왔으면 첫 GET 뒤 시트를 자동으로 연다(REQ-AIR-047).
+  const openAiReview = readOpenAiReview(location.state);
+  const createAi = useCallback((): FeedAiViewModel => container.createFeedAiViewModel({ postId, openAiReview }), [container, postId, openAiReview]);
+  const aiVm = useOwnedViewModel(createAi);
 
-  return vm ? <FeedBody vm={vm} onClose={close} /> : null;
+  return vm && aiVm ? <FeedBody vm={vm} aiVm={aiVm} onClose={close} /> : null;
 }
 
-function FeedBody({ vm, onClose }: { vm: FeedViewModel; onClose: () => void }): ReactNode {
+function FeedBody({ vm, aiVm, onClose }: { vm: FeedViewModel; aiVm: FeedAiViewModel; onClose: () => void }): ReactNode {
   const state = useViewModel(vm);
   useScrollRestore(state.view.kind !== 'loading');
   // 다른 탭·앱에서 돌아와 문서가 다시 보이면 내용을 조용히 재검증한다(실패하면 내용 유지 + 토스트).
@@ -83,14 +90,14 @@ function FeedBody({ vm, onClose }: { vm: FeedViewModel; onClose: () => void }): 
           </button>
         </div>
       ) : null}
-      {view.kind === 'content' && state.post ? <Content vm={vm} state={state} post={state.post} /> : null}
+      {view.kind === 'content' && state.post ? <Content vm={vm} aiVm={aiVm} state={state} post={state.post} /> : null}
       {state.titleDialog.open ? <TitleDialog vm={vm} state={state} /> : null}
       {state.deleteDialog.open ? <DeleteDialog vm={vm} state={state} /> : null}
     </div>
   );
 }
 
-function Content({ vm, state, post }: { vm: FeedViewModel; state: FeedState; post: FeedPost }): ReactNode {
+function Content({ vm, aiVm, state, post }: { vm: FeedViewModel; aiVm: FeedAiViewModel; state: FeedState; post: FeedPost }): ReactNode {
   return (
     <article style={{ padding: '0 16px 16px' }}>
       <ZoomablePhoto post={post} />
@@ -117,6 +124,7 @@ function Content({ vm, state, post }: { vm: FeedViewModel; state: FeedState; pos
           </button>
         ) : null}
       </div>
+      <FeedAiSection vm={aiVm} isMine={state.isMine} topicDate={post.topicDate} />
     </article>
   );
 }
