@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { json } from '../../test/fixtureRouter';
 import { noti, readKey, UNREAD_KEY } from '../../test/notificationHarness';
-import { createNotificationServer, inboxLoaded, openNotifications, toastText } from '../../test/notificationScreens';
+import { inboxLoaded, openNotifications, toastText } from '../../test/notificationScreens';
 import { screenViews } from '../../test/screenViews';
 
 vi.setConfig({ testTimeout: 15_000 });
@@ -67,8 +67,8 @@ describe('홈 ↔ 알림함 ↔ 상세 흐름 (TC-NOTI-001, TC-NAV-030, TC-NAV-0
 
 describe('미읽음 점 (TC-NOTI-049, 050, 052, 053, 054, 055, REQ-NOTI-028~032)', () => {
   it('TC-NOTI-049 TC-NOTI-054 읽음 처리 뒤 홈으로 돌아오면 미읽음이 다시 조회되어 점이 사라진다', async () => {
-    const opened = await openNotifications({ path: '/home' });
-    const server = createNotificationServer(opened.fixtures, { unread: true });
+    const opened = await openNotifications({ path: '/home', server: { unread: true } });
+    const server = opened.server!;
     await screen.findByTestId('home.topic-title');
     await waitFor(() => expect(dotShown()).toBe(true)); // hasUnread=true
     fireEvent.click(tid('home.notification-button'));
@@ -84,8 +84,7 @@ describe('미읽음 점 (TC-NOTI-049, 050, 052, 053, 054, 055, REQ-NOTI-028~032)
   });
 
   it('TC-NOTI-050 읽음 요청이 성공하면 미읽음을 한 번 다시 조회하고, 알림함에서 홈으로 돌아오면 또 한 번 조회한다', async () => {
-    const opened = await openNotifications({ path: '/home' });
-    createNotificationServer(opened.fixtures, { unread: true });
+    const opened = await openNotifications({ path: '/home', server: { unread: true } });
     await screen.findByTestId('home.topic-title');
     await waitFor(() => expect(unreadCalls(opened.fixtures)).toBe(1));
     fireEvent.click(tid('home.notification-button'));
@@ -123,8 +122,7 @@ describe('미읽음 점 (TC-NOTI-049, 050, 052, 053, 054, 055, REQ-NOTI-028~032)
   });
 
   it('TC-NOTI-052 읽음 뒤 미읽음 조회가 실패하면 이전 점 상태를 유지하고 토스트·오류 UI가 없다', async () => {
-    const opened = await openNotifications({ path: '/home' });
-    createNotificationServer(opened.fixtures, { unread: true });
+    const opened = await openNotifications({ path: '/home', server: { unread: true } });
     await screen.findByTestId('home.topic-title');
     await waitFor(() => expect(dotShown()).toBe(true));
     opened.fixtures.set(UNREAD_KEY, 'notification/unread-status__internal-error');
@@ -145,8 +143,7 @@ describe('미읽음 점 (TC-NOTI-049, 050, 052, 053, 054, 055, REQ-NOTI-028~032)
   });
 
   it('TC-NOTI-055 읽음 뒤 미읽음 조회가 401이고 refresh가 REAUTHENTICATION_REQUIRED면 로그인 화면으로 간다', async () => {
-    const opened = await openNotifications({ path: '/home' });
-    createNotificationServer(opened.fixtures, { unread: true });
+    const opened = await openNotifications({ path: '/home', server: { unread: true } });
     await screen.findByTestId('home.topic-title');
     await waitFor(() => expect(unreadCalls(opened.fixtures)).toBe(1));
     opened.fixtures.set(UNREAD_KEY, 'notification/unread-status__unauthorized');

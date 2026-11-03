@@ -122,7 +122,12 @@ describe('알림함 상태 (TC-NOTI-004~008)', () => {
   });
 
   it('TC-NOTI-006 500이면 오류 문구 "알림을 불러오지 못했어요"와 "다시 시도"가 보이고 누르면 다시 요청해 목록이 나온다', async () => {
-    const { fixtures } = await openNotifications({ routes: { [PAGE1]: 'notification/notifications__internal-error' }, waitFor: 'notifications.error-state' });
+    const { h, fixtures } = await openNotifications({ routes: { [PAGE1]: 'notification/notifications__internal-error' }, waitFor: null });
+    // 5xx는 0.5초·1초 간격으로 재시도한다(D-21). 요청이 대기를 시작할 때까지 시계를 계속 민다.
+    await waitFor(async () => {
+      await advance(h, 1_500);
+      expect(screen.getByTestId('notifications.error-state')).toBeInTheDocument();
+    });
     expect(tid('notifications.error-state')).toHaveTextContent(t('noti.inbox.error'));
     expect(tid('notifications.retry-button')).toHaveTextContent(t('noti.inbox.retry'));
     expect(screen.queryByTestId('notifications.list')).not.toBeInTheDocument();
@@ -134,7 +139,12 @@ describe('알림함 상태 (TC-NOTI-004~008)', () => {
   });
 
   it('TC-NOTI-007 연결 실패면 "네트워크 연결을 확인해 주세요."를 보인다', async () => {
-    await openNotifications({ routes: { [PAGE1]: failing }, waitFor: 'notifications.error-state' });
+    const { h } = await openNotifications({ routes: { [PAGE1]: failing }, waitFor: null });
+    // 연결 실패도 재시도한 뒤 오류가 된다(D-21). 요청이 대기를 시작할 때까지 시계를 계속 민다.
+    await waitFor(async () => {
+      await advance(h, 1_500);
+      expect(screen.getByTestId('notifications.error-state')).toBeInTheDocument();
+    });
     expect(tid('notifications.error-state')).toHaveTextContent(t('noti.network'));
   });
 

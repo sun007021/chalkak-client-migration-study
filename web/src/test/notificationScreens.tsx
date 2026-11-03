@@ -14,6 +14,8 @@ export interface OpenNotificationsOptions {
   visibilityObserver?: VisibilityObserverFactory | null;
   /** renderApp의 첫 위치. 기본 '/notifications'(새로고침·딥링크로 첫 항목이 된 경우와 같다). */
   path?: string | { pathname: string; state?: unknown };
+  /** 주면 첫 화면을 그리기 전에 읽음·미읽음 상태를 가진 가짜 서버(createNotificationServer)를 깐다. 홈의 첫 미읽음 조회가 이 서버를 보게 하려면 그리기 전에 깔아야 한다. */
+  server?: { unread?: boolean };
   /** 이 testid가 보일 때까지 기다린다. 기본은 경로에 맞는 화면 루트. null이면 기다리지 않는다. */
   waitFor?: string | null;
 }
@@ -28,10 +30,11 @@ export async function openNotifications(options: OpenNotificationsOptions = {}) 
   const pathname = typeof path === 'string' ? path : path.pathname;
   const startsAtHome = pathname.startsWith('/home');
   const fixtures = new FixtureRouter(h.ff, { ...(startsAtHome ? { ...POST_ROUTES, ...MEMBER_ROUTES } : { ...MEMBER_ROUTES, ...POST_ROUTES }), ...NOTIFICATION_ROUTES, ...options.routes });
+  const server = options.server ? createNotificationServer(fixtures, options.server) : null;
   const view = renderApp(h.container, path);
   const root = options.waitFor === undefined ? rootFor(pathname) : options.waitFor;
   if (root) await screen.findByTestId(root);
-  return { h, fixtures, ...view };
+  return { h, fixtures, server, ...view };
 }
 
 export const toastText = (): string | null => screen.queryByTestId('toast.message')?.textContent ?? null;

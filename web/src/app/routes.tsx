@@ -13,6 +13,8 @@ import { resolveAuthGate } from '../features/boot/authGate';
 import type { AuthGateDecision } from '../features/boot/authGate';
 import { BootScreen, SplashView } from '../features/boot/BootScreen';
 import { DisplayScreen } from '../features/display/DisplayScreen';
+import { NotificationDetailScreen } from '../features/notification/NotificationDetailScreen';
+import { NotificationsScreen } from '../features/notification/NotificationsScreen';
 import { FeedScreen } from '../features/feed/FeedScreen';
 import { HomeScreen } from '../features/home/HomeScreen';
 import { TermsScreen } from '../features/onboarding/TermsScreen';
@@ -136,10 +138,13 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
             { path: ROUTES.settings, handle: settingsHandle, element: <TabPlaceholder tab="settings" testId="settings.root" /> },
           ],
         },
-        // 알림함·게시물 상세는 다음 PR의 화면이 대체하는 자리표시(홈 이동 계약 검증용). 탭 셸 밖이라 하단 바가 없고 회원만 들어온다(게스트는 홈으로).
+        // 알림함·알림 상세. 탭 셸 밖이라 하단 바가 없고 회원만 들어온다(게스트는 홈으로).
         {
           element: <RequireSession container={container}>{(mode) => <MemberOnly mode={mode} action="notification"><Outlet /></MemberOnly>}</RequireSession>,
-          children: [{ path: ROUTES.notifications, element: <div data-testid="notifications.root" /> }],
+          children: [
+            { path: ROUTES.notifications, element: <NotificationsScreen /> },
+            { path: ROUTES.notificationDetail, element: <NotificationDetailScreen /> },
+          ],
         },
         {
           element: <RequireSession container={container}>{(mode) => <MemberOnly mode={mode} action="feed"><Outlet /></MemberOnly>}</RequireSession>,
