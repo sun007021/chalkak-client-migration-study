@@ -25,3 +25,6 @@
 - 창 종료(stalled) 뒤 알약은 "AI 분석중"(비활성)을 유지하고, 안내 문구 `feed.ai-message` 옆에 `feed.ai-recheck-button`이 따로 생긴다. 첫 GET 실패(check-failed)에서는 알약 자체가 `feed.ai-recheck-button`이다.
 - 폴링 격자: 창 시작 + 3초 × n에 GET을 보내고, 경과가 300초 이상이 되는 격자(300.000초)에서는 GET 없이 멈춘다. 응답이 늦으면 겹쳐 보내지 않는다.
 - 분석 이벤트: ai-review.md에는 AI 전용 이벤트가 없고 D-22의 `screen_view` 이름 목록에도 AI 시트가 없다. 그래서 새 이벤트는 만들지 않고, 알약·시트를 열어도 `screen_view`가 `feed` 하나뿐인 것만 검증한다(FeedScreen.ai.test).
+
+## 백엔드·QA 확인 대상
+- GET 404 안내: 위 임시 결정(GET 404는 메시지 없이 알약만 숨김, REQ-AIR-005·030과 실패 표 기준)이 `docs/testing/testids.md:236`의 `feed.ai-message` 예시 문구("AI 피드백을 확인할 수 없는 게시물이에요." 등)와 충돌한다. 404일 때 안내 문구를 보일지(문구는 `ai.error.not-viewable`가 같은 값) 백엔드·QA가 확정해 주세요. 확정 전에는 무메시지로 둔다.
