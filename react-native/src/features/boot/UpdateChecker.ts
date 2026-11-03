@@ -6,7 +6,7 @@ export interface UpdateChecker {
   check(): Promise<UpdateCheckResult>;
 }
 
-/** "업데이트" 버튼이 여는 곳: iOS는 App Store, Android는 Play 즉시 업데이트 흐름. 실패하면 reject. */
+/** "업데이트" 버튼이 여는 곳: 모든 플랫폼에서 스토어 앱 상세(iOS App Store, Android Play 스토어). 실패하면 reject. */
 export interface StoreOpener {
   open(): Promise<void>;
 }

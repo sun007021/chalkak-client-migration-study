@@ -124,6 +124,8 @@ import { LoginViewModel } from '../features/auth/LoginViewModel';
 import { LoginViewModelOwner } from '../features/auth/LoginViewModelOwner';
 import { AuthGate } from '../features/boot/AuthGate';
 import { BootViewModel } from '../features/boot/BootViewModel';
+import type { AppExiter } from '../features/boot/AppExiter';
+import { BackHandlerAppExiter } from '../features/boot/BackHandlerAppExiter';
 import { ForceUpdateGate } from '../features/boot/ForceUpdateGate';
 import type { HomePreloader } from '../features/boot/HomePreloader';
 import { ItunesUpdateChecker } from '../features/boot/ItunesUpdateChecker';
@@ -164,6 +166,7 @@ export interface Dependencies {
   readonly homePreloader: HomePreloader;
   readonly updateChecker: UpdateChecker;
   readonly storeOpener: StoreOpener;
+  readonly appExiter: AppExiter;
   readonly visibility: AppVisibility;
   readonly linkOpener: ExternalLinkOpener;
   readonly sleeper: Sleeper;
@@ -353,7 +356,11 @@ export class AppContainer {
       authFlow: this.bootViewModel,
     });
     this.pushFeature = this.createPushFeature();
-    this.updateDialogViewModel = new UpdateDialogViewModel(dependencies.storeOpener);
+    this.updateDialogViewModel = new UpdateDialogViewModel(
+      dependencies.storeOpener,
+      dependencies.appInfo.platform,
+      dependencies.appExiter,
+    );
     this.loginOwner = new LoginViewModelOwner(this.bootViewModel, () =>
       this.createLoginViewModel(),
     );
@@ -887,7 +894,8 @@ export class AppContainer {
         },
         homePreloader: overrides.homePreloader ?? new NoopHomePreloader(),
         updateChecker: overrides.updateChecker ?? createUpdateChecker(appInfo, transport),
-        storeOpener: overrides.storeOpener ?? new LinkingStoreOpener(storeUrlFor(appInfo)),
+        storeOpener: overrides.storeOpener ?? new LinkingStoreOpener(storeUrlsFor(appInfo)),
+        appExiter: overrides.appExiter ?? new BackHandlerAppExiter(),
         userDataCaches: overrides.userDataCaches ?? [],
         visibility,
         linkOpener: overrides.linkOpener ?? new LinkingExternalLinkOpener(),
@@ -931,9 +939,14 @@ function createUpdateChecker(appInfo: AppInfo, transport: FetchTransport): Updat
   });
 }
 
-function storeUrlFor(appInfo: AppInfo): string | null {
+/** 스토어 앱 상세 URL을 시도 순서대로 돌려준다. Android는 Play 앱(`market://`), 실패하면 Play 웹 URL. */
+function storeUrlsFor(appInfo: AppInfo): string[] {
   if (appInfo.platform === 'android') {
-    return appInfo.bundleId ? `market://details?id=${appInfo.bundleId}` : null;
+    if (!appInfo.bundleId) return [];
+    return [
+      `market://details?id=${appInfo.bundleId}`,
+      `https://play.google.com/store/apps/details?id=${appInfo.bundleId}`,
+    ];
   }
-  return appInfo.appStoreId ? `itms-apps://itunes.apple.com/app/id${appInfo.appStoreId}` : null;
+  return appInfo.appStoreId ? [`itms-apps://itunes.apple.com/app/id${appInfo.appStoreId}`] : [];
 }
