@@ -186,7 +186,7 @@ describe('DisplayViewModel 첫 로드', () => {
     expect(new URL(calls.at(-1)!.url).searchParams.has('randomSeed')).toBe(false);
   });
 
-  it('TC-DISP-050 오프라인 진입은 오류 + 다시 시도이고 온라인 복귀 뒤 다시 시도하면 성공한다', async () => {
+  it('TC-DISP-050 TC-NET-047 오프라인 진입은 오류 + 다시 시도이고 온라인 복귀 뒤 다시 시도하면 성공한다', async () => {
     const h = await createDisplayHarness({
       routes: {
         [TOPIC_TODAY]: [

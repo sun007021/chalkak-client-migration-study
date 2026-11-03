@@ -122,7 +122,7 @@ describe('AiReviewPoller 폴링 정책 (D-03)', () => {
     expect(h.poller.getSnapshot().stalled).toBe(false);
   });
 
-  it('TC-AIR-035 기본 설정: 3~297초 사이 폴링 99회, 300.000초에는 GET 없이 멈추고 PROCESSING을 유지한다', async () => {
+  it('TC-AIR-035 TC-TIME-030 기본 설정: 3~297초 사이 폴링 99회, 300.000초에는 GET 없이 멈추고 PROCESSING을 유지한다', async () => {
     const h = await createAiReviewHarness({ routes: { [GET_AI]: PROCESSING } });
     const start = h.clock.now().getTime();
     h.poller.start(POST_ID);

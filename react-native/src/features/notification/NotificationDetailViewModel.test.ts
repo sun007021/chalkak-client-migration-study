@@ -120,7 +120,7 @@ describe('NotificationDetailViewModel', () => {
     await run;
   });
 
-  it('TC-NOTI-048 화면이 보일 때 screen_view notification_detail을 1회 보낸다', async () => {
+  it('TC-NOTI-048 TC-ANL-006 화면이 보일 때 screen_view notification_detail을 1회 보낸다', async () => {
     const h = await setup(REJECTED, 'notification/notification-detail__rejected');
     await h.viewModel.onShown();
     expect(h.analytics.screenNames).toEqual(['notification_detail']);

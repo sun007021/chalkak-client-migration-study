@@ -278,3 +278,13 @@ React와 무관한 TS 클래스가 `Observable<State>`를 상속해 상태를 �
   5. **피드백 전송 중 이탈**: 전송 중 화면을 닫으면 요청을 abort하고 결과를 버린다(서버에는 이미 반영됐을 수 있다). 이탈 시 중단할지, 끝까지 보내고 조용히 처리할지 기획 확인이 필요하다.
   6. **피드백 공백 제거**: 스펙은 "앞뒤 공백 제거"만 정한다. JS `trim()`(줄바꿈 포함 공백)을 그대로 쓴다.
 - **StrictMode와 screen_view**: 설정 화면의 `screen_view`는 탭 마운트마다 한 번 보낸다. 개발 모드의 이중 effect는 한 번 더 보낼 수 있고(홈·전시·기록의 `useFocusEffect`와 같음) 운영에는 영향이 없다. 피드백은 소유자가 `start()`로 한 번 보낸다.
+
+## 공통 인프라 TC 테스트 노트 (BOOT·AUTH·NET·TIME·ANL)
+
+- **기존 테스트에 ID만 붙인 것**: 같은 동작을 이미 검증하던 테스트의 이름에 TC ID를 더했다. TC-AUTH-009(`AuthRepository.test`), TC-AUTH-051(`ApiClient.auth.test`의 refresh REAUTH), TC-AUTH-055(`AuthHeaderPolicy.test`), TC-NET-046(`HomeViewModel.lifecycle.test` 새로고침 실패는 내용 유지 + 토스트), TC-NET-047(`DisplayViewModel.load.test` 오프라인 오류 화면 + 다시 시도), TC-TIME-007·010(`DisplayViewModel.date.test`), TC-TIME-014·015(`HomeViewModel.lifecycle.test`), TC-TIME-017(`PhotoUploadViewModel.topic.test`), TC-TIME-030(스플래시 700ms, 토스트 2.5초, 폴링 3초·300초, 가입 재시도 1초, 업로드 만료 5초 마진 테스트들), TC-ANL-003·004·006·008(화면별 `screen_view` 테스트들).
+- **새로 쓴 테스트**: TC-BOOT-035(`PushTapRouter.test`), TC-AUTH-030(`LoginViewModel.test`), TC-TIME-006·008(`DisplayViewModel.date.test`, `TopicRepository.test`), TC-TIME-018·019·020·021(`HomeViewModel.time.test`, `TopicRepository.test`, `PostRepository.test`), TC-TIME-027·028(`UploadPreparation.test`, `ApiClient.auth.test`). 앱 코드 변경은 필요 없었다.
+- **TC-TIME-014의 해석**: 스펙(home.md REQ-HOME-041)은 홈이 다시 보이거나 포그라운드로 돌아올 때만 날짜 변경을 검사하고, 홈이 계속 보이는 중 자정을 넘길 때의 타이머 재로드는 정하지 않았다(home.md 미결). 그래서 "가상 시계 전진 후 포그라운드 복귀 신호"로 재로드를 검증하고 자정 타이머는 만들지 않았다.
+- **TC-TIME-030의 총 시간 상한**: 시간 의존 테스트는 모두 `FakeClock`/`FakeSleeper`/`jest.useFakeTimers` 가상 전진만 쓴다. 별도의 총 시간 상한 검사 대신 Jest `testTimeout`(20초)이 실제 대기를 걸러 낸다.
+- **RN에 해당하지 않는 TC(Web 한정)**: TC-BOOT-033(Web은 버전 게이트 없음), TC-AUTH-059·060(Web 개발 우회, Web refresh token 보관), TC-ANL-025(Web SPA 라우트 `screen_view`). RN은 모바일이라 대상이 아니다.
+- **E2E(Maestro)로만 가능한 TC, 보류**: TC-BOOT-036·037, TC-AUTH-050, TC-NET-059·060, TC-ANL-024. flow 파일(`shared/maestro/<영역>/TC-*.yaml`)은 모바일 4종 공통이라 `shared/` 소유다. RN 쪽은 이 flow를 돌릴 수 있게 E2E 빌드(`APP_VARIANT=e2e`)와 testID를 이미 갖췄고 flow가 추가되면 커버리지로 센다. 같은 동작의 단위 수준 검증은 `AuthGate.test`(세션 복원), `ApiClient.auth.test`(401 -> refresh -> 재전송)에 있다.
+- **에이전트 검증(A)**: TC-BOOT-038·039, TC-AUTH-061~065, TC-NET-061·062는 시뮬레이터·실서비스 검증이라 자동 테스트 대상이 아니다.

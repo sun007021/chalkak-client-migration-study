@@ -129,6 +129,17 @@ describe('ApiClient 인증 헤더와 401 갱신', () => {
       expect(bearer(h.transport.requests[2])).toBe('Bearer access-2');
     });
 
+    it('TC-TIME-028 기기 시계가 하루 빨라 만료로 오판해 Authorization을 생략해도 401 -> refresh 경로로 정상 복구된다', async () => {
+      await h.signIn(); // 서버 기준으로는 아직 유효한 access token
+      h.clock.set(new Date(h.clock.now().getTime() + 24 * 60 * 60 * 1000).toISOString()); // 기기 시계 +1일
+      useRotatingServer();
+      await expect(getNotifications()).resolves.toEqual(OK_BODY);
+      expect(bearer(h.transport.requests[0])).toBeUndefined(); // 로컬 만료 판정으로 헤더 생략
+      expect(path(h.transport.requests[1])).toBe('/auth/refresh');
+      expect(bearer(h.transport.requests[2])).toBe('Bearer access-2');
+      expect((await h.sessionStore.load()).kind).toBe('authenticated');
+    });
+
     it('만료되지 않은 access token은 Bearer로 붙인다', async () => {
       await h.signIn();
       h.transport.script(json(200, OK_BODY));
@@ -446,7 +457,7 @@ describe('ApiClient 인증 헤더와 401 갱신', () => {
       expect(h.transport.requestsTo('POST', '/auth/refresh')).toHaveLength(0);
     });
 
-    it('TC-NET-021 refresh 요청 자체가 REAUTHENTICATION_REQUIRED면 세션을 지우고 로그인 이벤트를 낸다', async () => {
+    it('TC-NET-021 TC-AUTH-051 refresh 요청 자체가 REAUTHENTICATION_REQUIRED면 세션을 지우고 로그인 이벤트를 낸다', async () => {
       // fixture: auth/refresh__reauthentication-required.json
       await h.signIn();
       h.transport.respond((req) => (path(req) === '/auth/refresh' ? reauth() : unauthorized()));

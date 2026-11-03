@@ -251,6 +251,39 @@ describe('LoginViewModel 진행 상태', () => {
     expect(h.viewModel.getSnapshot().error).toBeNull();
   });
 
+  it('TC-AUTH-030 요청 중 앱이 백그라운드로 갔다 복귀해도(ViewModel은 생명주기에 반응하지 않는다) 늦게 온 LOGIN_SUCCESS를 정상 처리해 메인으로 간다', async () => {
+    const h = createLoginHarness();
+    const gate = deferred<void>();
+    h.transport.respond(async () => {
+      await gate.promise; // 백그라운드에 있는 동안 응답이 지연된다
+      return fixtureResponse('auth/social-login__login-success');
+    });
+
+    const login = h.viewModel.onKakaoPress();
+    await flush();
+    expect(h.viewModel.getSnapshot().busy).toBe(true);
+    gate.resolve(); // 복귀 후 응답 도착
+    await login;
+
+    expect(h.navigator.calls).toEqual(['main:member']);
+    expect(h.viewModel.getSnapshot()).toMatchObject({ busy: false, error: null });
+    expect((await h.sessionStore.load()).kind).toBe('authenticated');
+  });
+
+  it('TC-AUTH-030 늦게 온 SIGN_UP_REQUIRED도 약관 단계로 이동한다', async () => {
+    const h = createLoginHarness();
+    const gate = deferred<void>();
+    h.transport.respond(async () => {
+      await gate.promise;
+      return fixtureResponse('auth/social-login__sign-up-required');
+    });
+    const login = h.viewModel.onKakaoPress();
+    await flush();
+    gate.resolve();
+    await login;
+    expect(h.navigator.calls).toEqual(['sign-up']);
+  });
+
   it('TC-AUTH-028 로그인 성공 뒤 새 ViewModel(화면 재진입)은 깨끗한 상태에서 다시 제출할 수 있다', async () => {
     const h = createLoginHarness();
     h.routes(LOGIN_OK);

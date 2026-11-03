@@ -67,7 +67,7 @@ describe('HomeViewModel 새로고침 (D-20)', () => {
     );
   });
 
-  it('TC-HOME-035 REQ-HOME-039 연결 실패면 기존 내용을 유지하고 토스트 "네트워크 연결을 확인해 주세요."를 한 번만 띄운다', async () => {
+  it('TC-HOME-035 TC-NET-046 REQ-HOME-039 연결 실패면 기존 내용을 유지하고 토스트 "네트워크 연결을 확인해 주세요."를 한 번만 띄운다', async () => {
     const h = await createHomeHarness();
     await h.viewModel.onShown();
     h.router.set('GET /posts/today', networkFailure());
@@ -242,7 +242,7 @@ describe('HomeViewModel 복귀·재진입 조용한 갱신', () => {
 });
 
 describe('HomeViewModel KST 날짜 변경 (REQ-HOME-041)', () => {
-  it('TC-HOME-040 KST 23:59:59에는 재로드 없이 10/27 기준 그대로다', async () => {
+  it('TC-HOME-040 TC-TIME-014 KST 23:59:59에는 재로드 없이 10/27 기준 그대로다', async () => {
     const h = await createHomeHarness();
     await h.viewModel.onShown();
     h.clock.set('2026-10-27T14:59:59Z');
@@ -252,7 +252,7 @@ describe('HomeViewModel KST 날짜 변경 (REQ-HOME-041)', () => {
     expect(h.router.calls('GET /topics?date=2026-10-27')).toHaveLength(2); // 같은 날짜의 조용한 갱신
   });
 
-  it('TC-HOME-041 KST 00:00:00을 지나 홈이 다시 보이면 오늘=10/28, 어제 랭킹=10/27로 전체를 다시 불러오고 이전 날짜 내용이 섞이지 않는다', async () => {
+  it('TC-HOME-041 TC-TIME-015 KST 00:00:00을 지나 홈이 다시 보이면 오늘=10/28, 어제 랭킹=10/27로 전체를 다시 불러오고 이전 날짜 내용이 섞이지 않는다', async () => {
     const h = await createHomeHarness();
     await h.viewModel.onShown();
     routeNextDay(h);
@@ -276,7 +276,7 @@ describe('HomeViewModel KST 날짜 변경 (REQ-HOME-041)', () => {
     expect(seenTopics).not.toContain('2026-10-27'); // 날짜가 바뀌면 먼저 비우고 새로 채운다
   });
 
-  it('TC-HOME-041 포그라운드 복귀로도 날짜 변경을 감지한다', async () => {
+  it('TC-HOME-041 TC-TIME-014 TC-TIME-015 포그라운드 복귀로도 날짜 변경을 감지한다', async () => {
     const h = await createHomeHarness();
     await h.viewModel.onShown();
     routeNextDay(h);
