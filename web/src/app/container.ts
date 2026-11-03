@@ -78,6 +78,7 @@ import { IdentityEditRenderer } from '../features/upload/imagePorts';
 import type { EditRenderer, ImageDecoder, WebpCompressor } from '../features/upload/imagePorts';
 import { PhotoPreparer } from '../features/upload/PhotoPreparer';
 import type { PhotoEditorComponent } from '../features/upload/photoEditor';
+import type { AutoAnalyzer, PixelSurfaceFactory, PreviewRenderer } from '../features/upload/editor/editorPorts';
 import { UploadGate } from '../features/upload/UploadGate';
 import { AttachableUploadNavigator } from '../features/upload/UploadNavigator';
 import { UploadRepository } from '../features/upload/UploadRepository';
@@ -132,8 +133,14 @@ export interface AppContainerOptions {
   editRenderer?: EditRenderer;
   /** 카메라 버튼 표시 판정. 기본 BrowserCameraCaptureSupport. */
   cameraCapture?: CameraCaptureSupport;
-  /** 편집기 화면(W7b). 기본 null = 편집기 없음(고른 사진은 편집하지 않은 값으로 바로 확정). */
+  /** 편집기 화면(W7b). 생략하면 실제 편집기(createPhotoEditor), 명시적 null이면 편집기 없음(고른 사진은 편집하지 않은 값으로 바로 확정). */
   photoEditor?: PhotoEditorComponent | null;
+  /** 편집기 미리보기·썸네일 렌더. 기본 CanvasPreviewRenderer. */
+  previewRenderer?: PreviewRenderer;
+  /** 자동 보정 분석. 기본 CanvasAutoAnalyzer. */
+  autoAnalyzer?: AutoAnalyzer;
+  /** 편집 결과를 그리는 픽셀 표면. 기본 createCanvasPixelSurface(canvas). */
+  pixelSurface?: PixelSurfaceFactory;
   /** 약관 문서를 새 탭으로 여는 수단. 기본 WindowExternalLinkOpener. */
   externalLinkOpener?: ExternalLinkOpener;
   /** 사인 PNG 내보내기. 기본 CanvasSignatureRasterizer(canvas). */
@@ -175,6 +182,8 @@ export interface AppContainer {
   uploadResults: UploadResultStore;
   cameraCapture: CameraCaptureSupport;
   photoEditor: PhotoEditorComponent | null;
+  /** 업로드 준비가 쓰는 편집값 적용. 기본 CanvasEditRenderer(W7b). */
+  editRenderer: EditRenderer;
   /** 다른 탭의 로그아웃·계정 전환을 받는다. 라우트 루트가 마운트될 때 start()한다. */
   crossTabSync: CrossTabSessionSync;
   /** 인증 헤더 없는 presigned PUT(사진·사인). */
@@ -326,11 +335,12 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
   const uploadResults = new UploadResultStore();
   const uploadRepository = new UploadRepository({ api });
   const homeRepository = new HomeRepository({ api });
+  const editRenderer = options.editRenderer ?? new IdentityEditRenderer();
   const photoPreparer = new PhotoPreparer({
     repository: uploadRepository,
     decoder: options.imageDecoder ?? new BrowserImageDecoder(),
     compressor: options.webpCompressor ?? new BrowserWebpCompressor(),
-    renderer: options.editRenderer ?? new IdentityEditRenderer(),
+    renderer: editRenderer,
     clock,
   });
   const guestGate = new GuestGate({ toast });
@@ -379,6 +389,7 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     uploadResults,
     cameraCapture: options.cameraCapture ?? new BrowserCameraCaptureSupport(),
     photoEditor: options.photoEditor ?? null,
+    editRenderer,
     crossTabSync,
     presignedUploader,
     externalLinkOpener: options.externalLinkOpener ?? new WindowExternalLinkOpener(),
