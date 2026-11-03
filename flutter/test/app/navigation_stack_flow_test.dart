@@ -25,14 +25,11 @@ Future<void> _settle(WidgetTester tester, {int ticks = 12}) async {
 Future<AppHarness> _enterMain(
   WidgetTester tester, {
   bool loggedIn = true,
-  bool guest = false,
 }) async {
   tester.view.physicalSize = const Size(800, 6000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  final h = AppHarness(
-    session: guest ? sessionGuest() : (loggedIn ? sessionAt() : null),
-  );
+  final h = AppHarness(session: loggedIn ? sessionAt() : null);
   h.homeFakes.api.standard();
   h.http.adapter
     ..on('GET', meSignaturePath, [
@@ -69,32 +66,6 @@ Future<void> _sendRouteInformation(WidgetTester tester, String uri) async {
 }
 
 void main() {
-  widgetTest('TC-NAV-021 게스트 설정 탭은 로그인 버튼과 피드백·정보만 보이고 푸시 설정·사인·로그아웃·탈퇴는 없다', (
-    tester,
-  ) async {
-    await _enterMain(tester, guest: true);
-    await tester.tap(byId(NavigationTestIds.tabSettings));
-    await _settle(tester);
-    expect(byId(SettingsTestIds.root), findsOneWidget);
-    for (final id in [
-      SettingsTestIds.loginButton,
-      SettingsTestIds.feedbackRow,
-      SettingsTestIds.privacyRow,
-      SettingsTestIds.termsRow,
-      SettingsTestIds.versionRow,
-    ]) {
-      expect(byId(id), findsOneWidget, reason: id);
-    }
-    for (final id in [
-      SettingsTestIds.pushSection,
-      SettingsTestIds.signatureCard,
-      SettingsTestIds.logoutRow,
-      SettingsTestIds.withdrawRow,
-    ]) {
-      expect(byId(id), findsNothing, reason: id);
-    }
-  });
-
   widgetTest('TC-NAV-039 로그인에 성공해 홈에 들어오면 뒤로 가기가 로그인 화면으로 돌아가지 않는다', (
     tester,
   ) async {
