@@ -95,6 +95,12 @@ class SignatureDrawViewModel extends ChangeNotifier {
     _analytics.logEvent(AnalyticsEvent.screenView(_mode.drawScreenName));
   }
 
+  /// 위에 쌓인 화면(미리보기)이 닫혀 그리기 화면이 다시 보인다.
+  void onReturned() {
+    if (_disposed || !_shown) return;
+    _analytics.logEvent(AnalyticsEvent.screenView(_mode.drawScreenName));
+  }
+
   void onCanvasSizeChanged(double width, double height) {
     final drawing = _state.drawing;
     if (drawing.width == width && drawing.height == height) return;

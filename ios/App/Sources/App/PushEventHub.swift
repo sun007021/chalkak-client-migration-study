@@ -39,6 +39,9 @@ final class PushEventHub {
             await session?.push.received()
         case .apnsToken(let hex):
             apnsTokens.update(hex)
+        case .fcmToken(let token):
+            // 세션 없음·같은 토큰 중복·동시 호출은 등록기가 거른다(REQ-PUSH-009, 013).
+            _ = await registrar.tokenChanged(token)
         }
     }
 

@@ -10,6 +10,7 @@ import 'package:chalkak/features/boot/domain/auth_gate.dart';
 import 'package:chalkak/features/boot/domain/update_gate.dart';
 import 'package:chalkak/features/feedback/data/api_feedback_repository.dart';
 import 'package:chalkak/features/notification/data/push_platform.dart';
+import 'package:chalkak/features/notification/domain/notification_permission_prompt.dart';
 import 'package:chalkak/features/notification/notification_dependencies.dart';
 import 'package:chalkak/features/onboarding/data/api_sign_up_repository.dart';
 import 'package:chalkak/features/onboarding/domain/sign_up_context.dart';
@@ -33,8 +34,12 @@ export 'ui_helpers.dart';
 
 /// Fake로 채운 [AppDependencies]와 그 Fake들에 접근하는 창구. 위젯 테스트용.
 class AppHarness {
-  AppHarness({Session? session, bool updateGateEnabled = true})
-    : http = AuthHttpHarness(session: session) {
+  AppHarness({
+    Session? session,
+    bool updateGateEnabled = true,
+    PushPlatform pushPlatform = const PushPlatform.disabled(),
+    PermissionPromptFlag? promptFlag,
+  }) : http = AuthHttpHarness(session: session) {
     updateGate = UpdateGate(
       checker: updateChecker,
       launcher: launcher,
@@ -95,9 +100,9 @@ class AppHarness {
         devices: pushDevices,
         sessions: http.sessions,
         refresher: FakeSessionRefresher(),
-        platform: const PushPlatform.disabled(),
+        platform: pushPlatform,
         pendingStore: FakePendingPushStore(),
-        promptFlag: FakePermissionFlag(),
+        promptFlag: promptFlag ?? FakePermissionFlag(),
         toast: homeFakes.dependencies.toast,
       ),
       settings: SettingsDependencies(

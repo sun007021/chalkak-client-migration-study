@@ -102,7 +102,7 @@ final class UserDefaultsPendingPushStore: PendingPushStoring {
 }
 
 /// OS가 준 APNs 기기 토큰(16진수)을 보관한다. 로그·서버로 보내지 않는다.
-/// FCM SDK가 없어 이 값은 아직 서버 등록에 쓰이지 않는다(`PlaceholderFCMTokenProvider` 참고).
+/// 서버 등록에는 쓰이지 않는다. FCM 토큰은 Firebase가 이 값으로 발급한다(`FirebaseSupport.swift`).
 final class APNsTokenHolder: Sendable {
     private let token = Mutex<String?>(nil)
 
@@ -115,8 +115,8 @@ final class APNsTokenHolder: Sendable {
     }
 }
 
-/// FCM 토큰 자리표시자. 프로젝트에 Firebase가 없어서 토큰이 없다고 답하고(→ 등록 요청 0건, `skippedNoToken`),
-/// APNs 토큰을 FCM 토큰인 척 서버에 보내지 않는다. Firebase를 붙이는 PR이 `Messaging.messaging().token()`으로 바꾼다.
+/// FCM 토큰 자리표시자. GoogleService-Info.plist가 없는 빌드(CI·설정 파일 미주입)에서 쓴다.
+/// 토큰이 없다고 답하고(→ 등록 요청 0건, `skippedNoToken`), APNs 토큰을 FCM 토큰인 척 서버에 보내지 않는다.
 struct PlaceholderFCMTokenProvider: FCMTokenProviding {
     func currentToken() async -> String? { nil }
 }
