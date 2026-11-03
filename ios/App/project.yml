@@ -32,9 +32,16 @@ targets:
     sources:
       - Sources
       - Resources
-      # Firebase 설정 파일. 저장소에 없고(gitignore) 로컬·배포에서 주입한다. 없어도 빌드는 성공한다(ios/README.md 참고).
-      - path: Config/GoogleService-Info.plist
-        optional: true
+    # Firebase 설정 파일(Config/GoogleService-Info.plist)은 저장소에 없고(gitignore) 로컬·배포에서 주입한다(ios/README.md 참고).
+    # 소스로 등록하면 파일이 없을 때 빌드가 깨지므로, 있을 때만 앱 번들에 복사한다.
+    postBuildScripts:
+      - name: Copy GoogleService-Info.plist if present
+        basedOnDependencyAnalysis: false
+        script: |
+          PLIST="${PROJECT_DIR}/Config/GoogleService-Info.plist"
+          if [ -f "$PLIST" ]; then
+            cp "$PLIST" "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist"
+          fi
     configFiles:
       Debug: Config/App.xcconfig
       Release: Config/App.xcconfig
@@ -79,6 +86,8 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         # 서명이 없으면 키체인 저장이 -34018로 실패해 로그인 세션이 남지 않는다. 시뮬레이터는 ad-hoc 서명으로 빌드한다.
         CODE_SIGNING_ALLOWED: YES
+        # 위 복사 스크립트가 선언되지 않은 입력 파일을 읽으므로 스크립트 샌드박스를 끈다.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
         "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": "-"
     dependencies:
       - package: ChalkakKit
