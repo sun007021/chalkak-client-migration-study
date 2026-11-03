@@ -74,3 +74,20 @@ src/
 | refresh 동시성 | 탭이 여러 개라 메모리 single-flight로는 부족 → Web Locks(`chalkak-auth-refresh`) 안에서 재읽기→refresh→비교 후 쓰기. 미지원이면 탭 안 뮤텍스 | D-17 |
 | Retry-After 상한 | `RETRY_AFTER_MAX_MS`(30초, shared 상수) 초과는 기다리지 않고 실패 | D-21(임시) |
 | 카메라 | 카메라 없는 기기·데스크톱은 버튼 숨김 | D-14 |
+
+## 사진 업로드(W7a) 구현 메모
+
+- **흐름**: `UploadGate`(+ 버튼·홈 히어로 공용, `container.uploadEntry`) → `/upload`(state `{topicDate}`, 탭 셸 밖) → `/upload/success`(업로드 화면을 replace) → "확인했어요."는 `/display?date=…&sort=recent`로 replace. 결과는 `container.uploadResults`(메모리, 계정 전환 때 비움).
+- **이미지 파이프라인**: 포트(`imagePorts.ts`) 뒤에 브라우저 구현을 둔다. `BrowserImageDecoder`(`<img>`로 EXIF가 반영된 크기만 읽고 `createImageBitmap(from-image, resizeWidth/Height)`로 목표 크기만 디코드. 지원하지 않으면 `<img>` + canvas), `CanvasWebpCompressor`(`OffscreenCanvas.convertToBlob`, 없으면 `canvas.toBlob`, `image/webp`만), `BrowserWebpCompressor`(canvas 지원을 한 번 확인해 `selectWebpBackend`로 canvas → WASM 선택), `IdentityEditRenderer`(W7b 전 기본값). 실제 canvas 검증은 jsdom이 아니라 `e2e/upload-encoder.spec.ts`(Chromium)가 한다. 이 테스트는 `e2e/fixtures/encoderEntry.ts`를 vite로 따로 묶어 페이지에 주입하므로 앱 번들에는 테스트 코드가 들어가지 않는다.
+- **canvas WebP의 ICCP**: Chromium의 canvas WebP는 항상 sRGB `ICCP` 청크를 넣는다. 업로드 사진은 메타데이터가 없어야 하므로(`inspectWebp`가 ICCP·EXIF·XMP를 거절) `CanvasWebpCompressor`가 `stripWebpMetadata`로 청크와 VP8X 플래그를 지운다(canvas는 sRGB로 그리므로 색은 변하지 않는다).
+- **PNG/JPEG 폴백 금지**: WebP를 만들 수 없는 환경(canvas가 다른 형식을 돌려주는 Safari 등)에서는 `WebpUnsupportedError` → 준비 실패(`upload.error.prepare`)다. `noFallbackFormat.test.ts`가 소스에 다른 형식 문자열이 없는지 정적으로 본다.
+- **카메라**: `<input type="file" accept="image/*" capture>`. `capture` 속성 지원 + 터치 기기(`maxTouchPoints > 0` 또는 `pointer: coarse`)일 때만 버튼을 보인다(`detectCameraCapture`). 촬영본은 사진 선택과 똑같이 다루고 기기 앨범에 저장하지 않는다.
+- **사진 PUT 재시도**: `PresignedUploader.put({ retry: true })`가 D-21 재시도(0.5초, 1초, 최대 2회)를 탄다. 사인 업로드는 기본값(재시도 없음) 그대로다.
+- **PostChange `created`**: 홈 히어로를 곧바로 갱신하고(VALIDATING → 처리 중, PENDING → 검수 대기 사진) 전시는 그 날짜의 낡은 목록 캐시를 버린 뒤 지금 보는 날짜면 조용히 첫 페이지만 다시 받는다.
+
+### TODO(W7a 이후)
+
+- WASM WebP 인코더: `browserImage.ts`의 `WasmWebpEncoder`는 인터페이스만 있고 `UnavailableWasmWebpEncoder`(항상 불가)가 기본이다. canvas가 `image/webp`를 못 만드는 브라우저(Safari)를 지원하려면 의존성을 더해 구현한다.
+- 앨범·카메라 버튼의 보이는 문구: `shared/copy/ko.json`에 키가 없어 지금은 아이콘 + `aria-label`(`upload.subheading`)이다. 문구 키가 정해지면 교체한다.
+- 편집기(W7b): `container.photoEditor`가 null이면 고른 사진을 편집하지 않은 값으로 바로 확정한다. 편집기 컴포넌트와 실제 `EditRenderer`를 W7b에서 꽂는다.
+- 실서버·실기기 확인(S3 PUT CORS, 실제 사진 EXIF 1~8, HEIC, 오프라인 제출): E2E/A 계층.
