@@ -1,6 +1,7 @@
 import 'package:chalkak/app/app_routes.dart';
 import 'package:chalkak/core/copy/ko.g.dart';
 import 'package:chalkak/core/ui/test_ids.dart';
+import 'package:chalkak/features/notification/data/push_platform.dart';
 import 'package:chalkak/features/onboarding/presentation/onboarding_test_ids.dart';
 import 'package:chalkak/features/signature/presentation/signature_test_ids.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_harness.dart';
 import '../support/auth_fakes.dart';
+import '../support/notification_fakes.dart';
 import '../support/onboarding_fakes.dart';
 
 /// 로그인(SIGN_UP_REQUIRED) -> 약관 -> 사인 그리기 -> 미리보기 -> 가입 완료의 라우팅 연결.
@@ -58,7 +60,7 @@ Future<void> _drawAndPreview(WidgetTester tester) async {
 
 void main() {
   widgetTest(
-    'TC-ONB-015 TC-ONB-024 로그인 SIGN_UP_REQUIRED -> 약관 -> 그리기 -> 미리보기 -> 가입 성공이면 메인이고 가입 화면은 모두 사라진다',
+    'TC-ONB-015 TC-ONB-024 TC-ANL-003 로그인 SIGN_UP_REQUIRED -> 약관 -> 그리기 -> 미리보기 -> 가입 성공이면 메인이고 가입 화면은 모두 사라진다',
     (tester) async {
       final h = _harness();
       _scriptSignup(h);
@@ -85,6 +87,43 @@ void main() {
         'onboarding_signature_preview',
         'home', // 메인 셸이 시작할 때 screen_view home을 보낸다(REQ-NAV).
       ]);
+    },
+  );
+
+  widgetTest(
+    'TC-ONB-047 가입 직후 첫 홈 진입에서 OS 알림 권한 요청이 1회만 처리되고 홈을 다시 열어도 반복되지 않는다',
+    (tester) async {
+      final permission = FakeNotificationPermission();
+      final flag = FakePermissionFlag();
+      final h = AppHarness(
+        pushPlatform: PushPlatform(
+          isAvailable: true,
+          messages: FakePushMessageSource(),
+          tokens: FakePushTokenProvider(),
+          permission: permission,
+          presenter: FakeLocalNotificationPresenter(),
+          showsLocalNotification: false,
+        ),
+        promptFlag: flag,
+      );
+      h.http.onSocialLogin('auth/social-login__sign-up-required.json');
+      _scriptSignup(h);
+      await _loginToTerms(tester, h);
+      await _agreeAndNext(tester);
+      await _drawAndPreview(tester);
+      expect(permission.requestCalls, 0, reason: '가입 화면에서는 묻지 않는다');
+
+      await tester.tap(byId(SignatureTestIds.previewConfirmButton));
+      await settleUi(tester, frames: 30);
+
+      expect(byId(TestIds.homeRoot), findsOneWidget);
+      expect(permission.requestCalls, 1);
+      expect(flag.marks, 1);
+
+      // 홈에 다시 들어와도(재진입) 다시 묻지 않는다.
+      await h.dependencies.notification.onMainEntered(isGuest: false);
+      expect(permission.requestCalls, 1);
+      expect(flag.marks, 1);
     },
   );
 
@@ -156,6 +195,42 @@ void main() {
         findsOneWidget,
       );
       expect(h.signUpContext.current, isNull);
+    },
+  );
+
+  widgetTest('TC-ANL-017 사인 그리기에서 뒤로 가 약관으로 돌아오면 terms의 screen_view를 다시 보낸다', (
+    tester,
+  ) async {
+    final h = _harness();
+    await _loginToTerms(tester, h);
+    await _agreeAndNext(tester);
+    expect(h.analytics.screenNames.last, 'onboarding_signature');
+    final before = h.analytics.screenNames.length;
+
+    await tester.tap(byId(SignatureTestIds.drawBackButton));
+    await settleUi(tester, frames: 30);
+    expect(byId(OnboardingTestIds.termsRoot), findsOneWidget);
+    expect(h.analytics.screenNames.length, before + 1);
+    expect(h.analytics.screenNames.last, 'terms');
+  });
+
+  widgetTest(
+    'TC-ANL-017 가입 미리보기에서 다시 그리기로 돌아오면 onboarding_signature의 screen_view를 다시 보낸다',
+    (tester) async {
+      final h = _harness();
+      await _loginToTerms(tester, h);
+      await _agreeAndNext(tester);
+      await _drawAndPreview(tester);
+      expect(h.analytics.screenNames.last, 'onboarding_signature_preview');
+
+      await tester.tap(byId(SignatureTestIds.previewRedrawButton));
+      await settleUi(tester, frames: 30);
+      expect(byId(SignatureTestIds.drawRoot), findsOneWidget);
+      expect(h.analytics.screenNames.last, 'onboarding_signature');
+      expect(
+        h.analytics.screenNames.where((n) => n == 'onboarding_signature'),
+        hasLength(2),
+      );
     },
   );
 

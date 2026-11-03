@@ -69,6 +69,12 @@ class TermsViewModel extends ChangeNotifier {
     _analytics.logEvent(AnalyticsEvent.screenView(ScreenNames.terms));
   }
 
+  /// 위에 쌓인 화면(사인 그리기)이 닫혀 약관이 다시 보인다.
+  void onReturned() {
+    if (_disposed || !_shown) return;
+    _analytics.logEvent(AnalyticsEvent.screenView(ScreenNames.terms));
+  }
+
   void toggleAll() {
     final next = !_state.agreedAll;
     _setState(TermsState(agreedService: next, agreedPrivacy: next));

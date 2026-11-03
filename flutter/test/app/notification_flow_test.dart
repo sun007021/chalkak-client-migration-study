@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:chalkak/app/feed_route.dart';
+import 'package:chalkak/core/copy/ko.g.dart';
+import 'package:chalkak/features/feed/presentation/feed_test_ids.dart';
 import 'package:chalkak/features/home/presentation/home_test_ids.dart';
 import 'package:chalkak/features/notification/presentation/notification_test_ids.dart';
 import 'package:flutter/material.dart';
@@ -71,6 +73,27 @@ void main() {
     expect(find.byType(FeedRoute), findsNothing);
     expect(byId(HomeTestIds.root), findsOneWidget);
   });
+
+  widgetTest(
+    'TC-PUSH-067 푸시로 열 게시물이 삭제·비공개라 상세가 404면 "게시물을 찾을 수 없어요" 상태를 보이고 뒤로 가면 홈이다',
+    (tester) async {
+      final h = await _enterMain(tester);
+      h.homeFakes.postRepository.onDetail(myPostId, [
+        Reply.fail(errorFx(detail404Fx)),
+      ]);
+      await _tap(tester, h, 'payload__post-approved');
+      expect(find.byType(FeedRoute), findsOneWidget);
+      expect(byId(FeedTestIds.notFoundState), findsOneWidget);
+      expect(find.text(Copy.feedErrorNotFound), findsOneWidget);
+      expect(byId(FeedTestIds.photo), findsNothing);
+      await tester.tap(byId(FeedTestIds.backButton));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byType(FeedRoute), findsNothing);
+      expect(byId(HomeTestIds.root), findsOneWidget);
+    },
+  );
 
   widgetTest('NOTICE 푸시는 알림 상세를 열고 알림함으로 버튼 없이 뒤로 가면 홈이다', (tester) async {
     final h = await _enterMain(tester);

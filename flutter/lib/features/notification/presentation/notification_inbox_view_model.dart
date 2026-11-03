@@ -105,6 +105,12 @@ class NotificationInboxViewModel extends ChangeNotifier {
   /// 조용한 갱신이라 실패해도 토스트가 없고 기존 목록을 유지한다.
   Future<void> reloadFirstPage() => onResumed();
 
+  /// 위에 쌓인 화면(상세·게시물)이 닫혀 알림함이 다시 보인다.
+  void onReturned() {
+    if (_disposed || !_screenViewLogged) return;
+    _analytics.logEvent(AnalyticsEvent.screenView(ScreenNames.notifications));
+  }
+
   Future<void> start() async {
     if (!_screenViewLogged) {
       _screenViewLogged = true;
