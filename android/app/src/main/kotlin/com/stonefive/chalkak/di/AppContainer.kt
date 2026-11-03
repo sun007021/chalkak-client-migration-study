@@ -263,6 +263,7 @@ class AppContainer(
     fun newDisplayHolder(scope: CoroutineScope, initialDate: LocalDate? = null, initialSort: PostSort? = null): DisplayStateHolder =
         DisplayStateHolder(
             scope, postRepository, likeController, postChanges, currentUser, kstCalendar, platform.analytics, initialDate, initialSort,
+            postCreations.events,
         )
 
     /** Holder for one post detail. */
@@ -445,6 +446,7 @@ class AppContainer(
                     analytics = NoScreenViews,
                     mode = mode,
                     diagnostics = { where, error -> Log.e(TAG, "unexpected failure in $where", error) },
+                    creations = postCreations.events,
                 )
             },
             likes = likeController,

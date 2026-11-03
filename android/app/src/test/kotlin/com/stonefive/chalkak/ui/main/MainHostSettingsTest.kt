@@ -588,6 +588,21 @@ class MainHostSettingsTest {
     }
 
     @Test
+    fun `TC-SET-046 탈퇴 요청 중 다른 탭으로 옮겨도 성공하면 바로 로그인 화면이 열린다`() {
+        val gate = CompletableDeferred<Unit>()
+        launch { settings.auth.withdrawGate = gate }
+        openSettings()
+        tap("settings.withdraw-row")
+        tap("settings.withdraw-confirm-button")
+        tap("bottom-bar.tab-home")
+        assertEquals(Route.TabRoot(Tab.Home), rig.nav.top)
+        gate.complete(Unit)
+        rule.waitForIdle()
+        assertEquals(Route.Login, rig.nav.top)
+        assertEquals(1, rig.analytics.screens.count { it == "login" })
+    }
+
+    @Test
     fun `이미 로그인 화면이면 로그아웃 효과가 다시 로그인 화면을 만들지 않는다`() {
         val gate = CompletableDeferred<Unit>()
         launch { settings.auth.withdrawGate = gate }

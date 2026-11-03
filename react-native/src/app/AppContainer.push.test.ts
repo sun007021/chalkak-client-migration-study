@@ -66,6 +66,19 @@ describe('AppContainer 푸시 조립', () => {
     expect(h.permission.requestCalls).toBe(1);
   });
 
+  it.each(['granted', 'denied'] as const)(
+    'TC-PUSH-005 REQ-PUSH-005 권한 결과 %s여도 PATCH /notification-settings를 보내지 않는다(스펙 우선)',
+    async (result) => {
+      const h = create();
+      h.permission.resultOnRequest = result;
+      h.container.startPush();
+      h.container.bootViewModel.toMain('member');
+      await settle();
+      expect(h.permission.requestCalls).toBe(1);
+      expect(h.net.transport.requestsTo('PATCH', '/notification-settings')).toHaveLength(0);
+    },
+  );
+
   it('TC-PUSH-032 로그아웃은 등록 중복 제거를 비우고 푸시 기기 해제 API를 부르지 않는다', async () => {
     const h = create();
     await h.net.signIn({

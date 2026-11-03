@@ -186,7 +186,7 @@ describe('DisplayViewModel 첫 로드', () => {
     expect(new URL(calls.at(-1)!.url).searchParams.has('randomSeed')).toBe(false);
   });
 
-  it('TC-DISP-050 오프라인 진입은 오류 + 다시 시도이고 온라인 복귀 뒤 다시 시도하면 성공한다', async () => {
+  it('TC-DISP-050 TC-NET-047 오프라인 진입은 오류 + 다시 시도이고 온라인 복귀 뒤 다시 시도하면 성공한다', async () => {
     const h = await createDisplayHarness({
       routes: {
         [TOPIC_TODAY]: [
@@ -219,20 +219,21 @@ describe('DisplayViewModel 첫 로드', () => {
 });
 
 describe('DisplayViewModel 게스트와 상세 진입', () => {
-  it('TC-DISP-053 게스트는 Authorization 없이 /topics·/posts만 불러 목록을 본다', async () => {
+  it('TC-DISP-053 TC-NAV-015 게스트는 Authorization 없이 /topics·/posts만 불러 isLiked·isMine=false로 목록을 본다', async () => {
     const h = await createDisplayHarness({
       mode: 'guest',
       routes: { [TODAY_RECENT]: 'display/posts-list__guest-page1' },
     });
     await h.viewModel.onShown();
     expect(h.viewModel.getSnapshot().photos).toHaveLength(20);
+    expect(h.viewModel.getSnapshot().photos.every((p) => !p.isLiked && !p.isMine)).toBe(true);
     expect(h.transport.requests.every((r) => r.headers.Authorization === undefined)).toBe(true);
     expect(h.transport.requests.map((r) => new URL(r.url).pathname.replace('/api/v1', ''))).toEqual(
       ['/topics', '/posts'],
     );
   });
 
-  it('TC-DISP-054 게스트가 사진을 누르면 토스트만 뜨고 상세 요청과 화면 이동이 없다', async () => {
+  it('TC-DISP-054 TC-NAV-018 게스트가 사진을 누르면 토스트만 뜨고 상세 요청과 화면 이동이 없다', async () => {
     const h = await createDisplayHarness({
       mode: 'guest',
       routes: { [TODAY_RECENT]: 'display/posts-list__guest-page1' },

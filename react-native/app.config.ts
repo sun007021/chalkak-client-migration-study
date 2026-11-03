@@ -56,7 +56,11 @@ const config: ExpoConfig = {
     // D-21: Android OkHttp의 자동 재시도(비멱등 요청 포함)를 끈다.
     './plugins/withOkHttpNoRetry',
     // 푸시 알림. 서버 푸시의 기본 Android 채널은 앱이 만드는 채널(moderation_push)과 같다.
-    ['expo-notifications', { defaultChannel: 'moderation_push' }],
+    // 상태 표시줄 아이콘은 단색(흰색+투명) 이미지여야 흰 네모로 깨지지 않는다(TC-PUSH-072).
+    [
+      'expo-notifications',
+      { defaultChannel: 'moderation_push', icon: './assets/android-icon-monochrome.png' },
+    ],
     [
       'expo-image-picker',
       {

@@ -23,7 +23,7 @@ class LogAnalyticsTracker : AnalyticsTracker {
     }
 }
 
-/** FCM registration arrives with the push PR; until then login and boot register nothing. */
+/** Registers nothing. Production registration goes through `PushRegistrationCoordinator` (AppContainer); this is for tests that need a port. */
 object NoopPushRegistrar : PushRegistrar, DeviceRegistrar {
     override suspend fun registerCurrentDevice() = Unit
 }

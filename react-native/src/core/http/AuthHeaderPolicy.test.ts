@@ -52,7 +52,7 @@ describe('authorizationHeaderFor', () => {
     ).toBe('Bearer tok');
   });
 
-  it('TC-NET-051 http(비 TLS) URL에는 붙이지 않는다', () => {
+  it('TC-NET-051 TC-AUTH-055 http(비 TLS) URL에는 붙이지 않는다', () => {
     expect(
       authorizationHeaderFor({
         url: 'http://api.test/api/v1/notifications',

@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import { createNetHarness } from '../../core/http/__testing__/createNetHarness';
 import { deferred } from '../../core/http/__testing__/FakeTransport';
-import { fixtureResponse } from '../../core/http/__testing__/loadFixture';
+import { fixtureBody, fixtureResponse } from '../../core/http/__testing__/loadFixture';
 import { FakeToastPresenter } from '../../core/toast/__testing__/FakeToastPresenter';
 import { SignatureRepository } from '../../data/signature/SignatureRepository';
 import { t } from '../../shared/copy';
@@ -25,7 +25,7 @@ async function setup(fixture: string) {
 }
 
 describe('SignatureCard', () => {
-  it('TC-SIGN-026 제목·사인 이미지·"변경하기"가 보이고 이미지는 썸네일 URL이다', async () => {
+  it('TC-SIGN-026 TC-SET-003 제목·사인 이미지·"변경하기"가 보이고 이미지는 썸네일 URL이다', async () => {
     const { vm, navigator } = await setup('signature/users-me-signature__get-success');
     await vm.refresh();
     await render(<SignatureCard viewModel={vm} />);
@@ -38,6 +38,16 @@ describe('SignatureCard', () => {
     );
     await fireEvent.press(screen.getByTestId('settings.signature-change-button'));
     expect(navigator.openSignatureChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('TC-SET-003 썸네일이 null이면 카드는 원본 이미지 URL을 그린다', async () => {
+    const { vm } = await setup('signature/users-me-signature__get-thumbnail-null');
+    await vm.refresh();
+    await render(<SignatureCard viewModel={vm} />);
+    const original = fixtureBody<Record<string, string>>(
+      'signature/users-me-signature__get-thumbnail-null',
+    ).signatureOriginalImageUrl;
+    expect(screen.getByTestId('settings.signature-image').props.source).toEqual({ uri: original });
   });
 
   it('TC-SIGN-040 재등록 필요(이미지 없음)여도 카드와 "변경하기"는 남고 이미지 자리는 비어 있다', async () => {

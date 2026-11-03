@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/analytics/screen_return_reporter.dart';
 import '../core/constants/app_constants.dart';
 import '../features/onboarding/domain/sign_up_submitter.dart';
 import '../features/onboarding/presentation/legal_document_view_model.dart';
@@ -31,21 +32,24 @@ GoRoute buildSignUpRoute(AppDependencies dependencies) {
         context: dependencies.signUpContext,
         analytics: dependencies.analytics,
       ),
-      builder: (context, viewModel) => TermsScreen(
-        viewModel: viewModel,
-        documentViewModelFactory: (document) => LegalDocumentViewModel(
-          document: document,
-          launcher: dependencies.externalLinkLauncher,
-          analytics: dependencies.analytics,
-        ),
-        webViewBuilder: dependencies.legalWebViewBuilder,
-        onEvent: (event) => switch (event) {
-          NavigateToSignature() => unawaited(
-            context.push<void>(AppRoutes.signUpSignature),
+      builder: (context, viewModel) => ScreenReturnReporter(
+        onReturn: viewModel.onReturned,
+        child: TermsScreen(
+          viewModel: viewModel,
+          documentViewModelFactory: (document) => LegalDocumentViewModel(
+            document: document,
+            launcher: dependencies.externalLinkLauncher,
+            analytics: dependencies.analytics,
           ),
-          ReturnToLogin() => context.go(AppRoutes.login),
-          OpenLegalDocument() => null, // 화면이 시트를 직접 연다.
-        },
+          webViewBuilder: dependencies.legalWebViewBuilder,
+          onEvent: (event) => switch (event) {
+            NavigateToSignature() => unawaited(
+              context.push<void>(AppRoutes.signUpSignature),
+            ),
+            ReturnToLogin() => context.go(AppRoutes.login),
+            OpenLegalDocument() => null, // 화면이 시트를 직접 연다.
+          },
+        ),
       ),
     ),
     routes: [
@@ -60,14 +64,17 @@ GoRoute buildSignUpRoute(AppDependencies dependencies) {
             canvasWidth: AppConstants.signaturePngWidth.toDouble(),
             canvasHeight: AppConstants.signaturePngHeight.toDouble(),
           ),
-          builder: (context, viewModel) => SignatureDrawScreen(
-            viewModel: viewModel,
-            onEvent: (event) => switch (event) {
-              NavigateToPreview(:final png) => unawaited(
-                _openPreview(context, viewModel, png),
-              ),
-              NavigateBackFromDrawing() => context.pop(),
-            },
+          builder: (context, viewModel) => ScreenReturnReporter(
+            onReturn: viewModel.onReturned,
+            child: SignatureDrawScreen(
+              viewModel: viewModel,
+              onEvent: (event) => switch (event) {
+                NavigateToPreview(:final png) => unawaited(
+                  _openPreview(context, viewModel, png),
+                ),
+                NavigateBackFromDrawing() => context.pop(),
+              },
+            ),
           ),
         ),
         routes: [

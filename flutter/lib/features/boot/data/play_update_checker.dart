@@ -13,13 +13,10 @@ class PlayUpdateInfo {
   final bool immediateAllowed;
 }
 
-/// Play In-App Update를 감싼 플랫폼 경계. 실제 구현은 구현 PR에서 채운다.
+/// Play In-App Update를 감싼 플랫폼 경계. 감지(updatePriority)에만 쓴다. 업데이트 실행은 스토어 페이지 열기([StoreUpdateLauncher]).
 abstract interface class PlayUpdateSource {
   /// 조회 실패는 예외.
   Future<PlayUpdateInfo> fetchInfo();
-
-  /// 즉시(IMMEDIATE) 업데이트 흐름. 취소·실패는 예외.
-  Future<void> startImmediateUpdate();
 }
 
 /// 업데이트가 있고 우선순위가 1 이상(그리고 즉시 업데이트 허용)이면 필수(REQ-BOOT-008).
@@ -40,14 +37,4 @@ class PlayUpdateChecker implements UpdateChecker {
       return UpdateStatus.unavailable;
     }
   }
-}
-
-/// 버튼이 누르면 Play 즉시 업데이트를 시작한다.
-class PlayUpdateLauncher implements UpdateLauncher {
-  PlayUpdateLauncher({required this._source});
-
-  final PlayUpdateSource _source;
-
-  @override
-  Future<void> launch() => _source.startImmediateUpdate();
 }

@@ -45,7 +45,7 @@ describe('UploadSuccessViewModel', () => {
     expect(viewModel.getSnapshot().statusMessage).toBe(t('upload.success.validating'));
   });
 
-  it('TC-UPL-088 start는 screen_view photo_upload_success를 한 번만 보낸다', () => {
+  it('TC-UPL-088 TC-ANL-008 start는 screen_view photo_upload_success를 한 번만 보낸다', () => {
     const { viewModel, analytics } = setup();
     viewModel.start();
     viewModel.start();

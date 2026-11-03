@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, act } from '@testing-library/react-native';
+import { fireEvent, render, screen, act, within } from '@testing-library/react-native';
 
 import { d } from '../../../core/time/__testing__/helpers';
 import { t } from '../../../shared/copy';
@@ -55,6 +55,20 @@ describe('AiReviewSection (상세 알약과 시트)', () => {
       expect(screen.getByTestId(id)).toBeOnTheScreen();
     }
     expect(screen.getByText(t('ai.start.title'))).toBeOnTheScreen();
+  });
+
+  it('TC-AIR-021 시작 시트에는 추가 동의·개인정보 체크 UI가 없다(회원가입 약관으로 갈음): 시작과 닫기 버튼뿐이다', async () => {
+    await mount({ routes: { [GET_AI]: NONE } }, 'feed', section);
+    await fireEvent.press(screen.getByTestId('feed.ai-request-button'));
+    const sheet = screen.getByTestId('ai-start-sheet.root');
+    expect(within(sheet).queryAllByRole('checkbox')).toHaveLength(0);
+    expect(within(sheet).queryAllByRole('switch')).toHaveLength(0);
+    expect(within(sheet).queryByText(/동의|개인정보/)).not.toBeOnTheScreen();
+    expect(
+      within(sheet)
+        .getAllByRole('button')
+        .map((button) => button.props.testID),
+    ).toEqual(['ai-start-sheet.start-button', 'ai-start-sheet.close-button']);
   });
 
   it('TC-AIR-020 시트를 닫으면 POST가 없고, "분석 시작하기"를 누르면 POST 1회 뒤 분석중이 된다', async () => {

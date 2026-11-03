@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kr.chalkak.core.common.DateFormats
@@ -21,6 +22,7 @@ import kr.chalkak.core.data.post.PostChanges
 import kr.chalkak.core.data.post.PostRepository
 import kr.chalkak.core.data.post.PostSort
 import kr.chalkak.core.data.post.PostSummary
+import kr.chalkak.core.data.upload.PostCreated
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
 import kr.chalkak.core.network.JobTracker
@@ -52,6 +54,8 @@ class DisplayStateHolder(
     /** Entry from another screen (record "전시 보러가기", upload success): open this date instead of today. */
     initialDate: LocalDate? = null,
     initialSort: PostSort? = null,
+    /** "A post was created" announcements (`PostCreations.events`): the shown date revalidates when it is the uploaded one (REQ-UPL-063). */
+    creations: Flow<PostCreated> = emptyFlow(),
 ) {
     private val view = DisplayView(calendar.today(), initialDate, initialSort)
     private var visible = false
@@ -73,6 +77,7 @@ class DisplayStateHolder(
         scope.launch(start = CoroutineStart.UNDISPATCHED) { changes.removed.collect { publish() } }
         scope.launch(start = CoroutineStart.UNDISPATCHED) { changes.titles.collect { publish() } }
         scope.launch(start = CoroutineStart.UNDISPATCHED) { likes.events.collect(::onLikeEvent) }
+        scope.launch(start = CoroutineStart.UNDISPATCHED) { creations.collect { onPostCreated(it.topicDate) } }
     }
 
     fun onScreenShown() {
@@ -197,6 +202,17 @@ class DisplayStateHolder(
     private fun onLikeEvent(event: LikeEvent) {
         if (event is LikeEvent.Failed) showToast(event.failure.copyKey)
         publish()
+    }
+
+    /**
+     * REQ-UPL-063: the first page of the uploaded date is asked again so the new photo shows. Other dates need nothing: moving to a
+     * date always loads it anew. Nothing to do before the first list is shown ([onScreenShown] loads it).
+     */
+    private fun onPostCreated(date: LocalDate) {
+        if (view.viewKey != null && view.date == date) {
+            navigator.refreshShown()
+            publish()
+        }
     }
 
     private fun showToast(copyKey: String) {

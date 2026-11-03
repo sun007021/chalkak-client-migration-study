@@ -18,8 +18,8 @@
 ### 강제 업데이트 다이얼로그
 
 - 진입 조건: 강제 업데이트 게이트가 "업데이트 필요"로 판정했을 때(Web 제외).
-- 구성 요소: 제목(`boot.update.title`), 본문(`boot.update.body`), 버튼 `update-button`("업데이트").
-- 동작: 닫을 수 없다(바깥 탭, 뒤로가기 무효). 버튼은 스토어(iOS 계열) 또는 Play 즉시 업데이트 흐름(Android 계열)을 연다.
+- 구성 요소: 제목(`boot.update.title`), 본문(`boot.update.body`), 버튼 `update-button`("업데이트"). Android 계열만 버튼 `cancel-button`(`boot.update.cancel`, "취소")이 추가로 있다.
+- 동작: 바깥 탭·뒤로가기로 닫을 수 없다. "업데이트"는 스토어 앱 상세로 바로 이동하고 다이얼로그는 남는다(D-15). Android 계열의 "취소"는 앱을 종료한다.
 
 ### 로그인
 
@@ -41,8 +41,8 @@
 | REQ-BOOT-005 | 강제 업데이트가 필요하다고 판정되면 닫을 수 없는 다이얼로그를 보이고, 사용자는 다이얼로그 뒤의 어떤 화면(로그인, 메인, 푸시 탭 이동 포함)에도 접근할 수 없다. | D-15, iOS §1.2 |
 | REQ-BOOT-006 | iOS 계열(iOS native, Flutter iOS, RN iOS)은 스토어 조회(iTunes lookup: 번들 ID, 스토어프론트 국가, software)로 얻은 버전의 major 또는 minor가 설치 버전보다 높을 때만 "업데이트 필요"로 판정하고, patch만 높으면 통과한다. | D-15, iOS §1.2, AppVersionGateTests |
 | REQ-BOOT-007 | iOS 계열의 스토어 조회 타임아웃은 3초이며 초과하면 조회 실패로 본다. | iOS §1.2 |
-| REQ-BOOT-008 | Android 계열(Android native, Flutter Android, RN Android)은 Play In-App Update의 `updatePriority`가 1 이상이면 즉시(IMMEDIATE) 업데이트를 시작하고, 0이면 통과한다. | D-15, AN §1.3-2 |
-| REQ-BOOT-009 | Android 계열에서 즉시 업데이트를 취소하거나 실패하면 앱을 종료하고, 업데이트 후에도 우선순위가 남아 있으면 다시 강제 업데이트를 시작한다. | AN §1.3-2 |
+| REQ-BOOT-008 | Android 계열(Android native, Flutter Android, RN Android)은 Play In-App Update의 `updatePriority`가 1 이상이면 강제 업데이트 다이얼로그를 보이고, 0이면 통과한다. "업데이트"는 Play 즉시 업데이트 흐름 대신 Play 스토어 앱 상세를 연다(D-15, 2026-11-03 갱신). | D-15, AN §1.3-2 |
+| REQ-BOOT-009 | Android 계열에서 다이얼로그의 "취소"를 누르거나 스토어를 열지 못하면 앱을 종료한다. 스토어에서 업데이트 없이 돌아오면 다이얼로그가 그대로 남는다. iOS 계열은 취소 버튼이 없고 다이얼로그가 닫히지 않는다. | AN §1.3-2, D-15 |
 | REQ-BOOT-010 | 스토어 조회가 실패하거나 기기가 오프라인이면 앱을 막지 않고 통과시키며, 이미 "업데이트 필요"로 확인된 상태는 이후 조회가 실패해도 유지한다. | D-15, iOS §1.2, AN §1.3 |
 | REQ-BOOT-011 | 온라인인데 확인에 실패해도(Android의 "업데이트를 확인할 수 없어요" 차단 화면) 앱을 막지 않고 통과시킨다. | D-15 |
 | REQ-BOOT-012 | iOS 계열은 앱이 다시 활성화될 때, Android 계열은 오프라인에서 온라인으로 바뀔 때 게이트를 다시 확인한다. | iOS §1.2, AN §1.3-2 |
@@ -210,6 +210,7 @@ D-08의 문구를 이 표의 키로 고정하고, 각 기능 문서는 이 키�
 | boot.update.title | 업데이트가 필요해요 | 강제 업데이트 다이얼로그 제목. iOS·D-15 동일 |
 | boot.update.body | 원활한 서비스 이용을 위해 최신 버전으로 업데이트해 주세요. | 같은 다이얼로그 본문 |
 | boot.update.button | 업데이트 | 같은 다이얼로그 버튼 |
+| boot.update.cancel | 취소 | 같은 다이얼로그의 취소 버튼. Android 계열만. 누르면 앱 종료 |
 | auth.login.tagline | 매일 하나의 주제,\n각자의 한 장 | 로그인 화면 상단. iOS·Android 동일 |
 | auth.login.kakao | 카카오로 계속하기 | 카카오 버튼 |
 | auth.login.guest | 로그인 없이 사진 둘러보기 | 게스트 링크 |

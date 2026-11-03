@@ -137,6 +137,38 @@ void main() {
       expect(byId(TestIds.loginRoot), findsNothing);
     });
 
+    widgetTest('TC-BOOT-028 iOS 정책: 취소 버튼이 없고 업데이트 버튼만 있다', (tester) async {
+      final h = AppHarness();
+      h.updateChecker.next = () => UpdateStatus.updateRequired;
+      await pumpApp(tester, h);
+      expect(byId(TestIds.updateGateUpdateButton), findsOneWidget);
+      expect(byId(TestIds.updateGateCancelButton), findsNothing);
+    });
+
+    widgetTest('TC-BOOT-028 Android 정책: 취소를 누르면 앱이 종료되고 다이얼로그는 그대로다', (
+      tester,
+    ) async {
+      final h = AppHarness(updateCancelAvailable: true);
+      h.updateChecker.next = () => UpdateStatus.updateRequired;
+      await pumpApp(tester, h);
+      expect(byId(TestIds.updateGateUpdateButton), findsOneWidget);
+      await tester.tap(byId(TestIds.updateGateCancelButton));
+      await settleUi(tester, frames: 3);
+      expect(h.appExit.calls, 1);
+      expect(byId(TestIds.updateGateDialog), findsOneWidget);
+    });
+
+    widgetTest('TC-BOOT-031 스토어에서 돌아와도 다이얼로그가 그대로 남는다', (tester) async {
+      final h = AppHarness(updateCancelAvailable: true);
+      h.updateChecker.next = () => UpdateStatus.updateRequired;
+      await pumpApp(tester, h);
+      await tester.tap(byId(TestIds.updateGateUpdateButton));
+      await settleUi(tester, frames: 3);
+      expect(h.launcher.calls, 1);
+      expect(h.appExit.calls, 0);
+      expect(byId(TestIds.updateGateDialog), findsOneWidget);
+    });
+
     widgetTest('TC-BOOT-029 "업데이트"를 연타해도 스토어 열기는 1회다', (tester) async {
       final h = AppHarness();
       h.updateChecker.next = () => UpdateStatus.updateRequired;

@@ -3,6 +3,7 @@ package com.stonefive.chalkak.ui.upload
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
@@ -13,6 +14,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import com.stonefive.chalkak.platform.PhotoPreview
@@ -64,6 +66,17 @@ class UploadScreenTest {
         show(PhotoUploadUiState(topic = loadedTopic, cameraAvailable = false))
         rule.onNodeWithTag("upload.camera-button").assertDoesNotExist()
         rule.onNodeWithTag("upload.album-button").assertIsDisplayed().assertIsEnabled()
+    }
+
+    @Test
+    fun `TC-UPL-015 앨범·카메라 버튼은 접근성 설명을 읽고 터치 영역이 48dp 이상이다`() {
+        show(PhotoUploadUiState(topic = loadedTopic, cameraAvailable = true))
+        rule.onNodeWithTag("upload.album-button").assertContentDescriptionEquals(copy["upload.album.a11y"])
+        rule.onNodeWithTag("upload.camera-button").assertContentDescriptionEquals(copy["upload.camera.a11y"])
+        for (tag in listOf("upload.album-button", "upload.camera-button")) {
+            val bounds = rule.onNodeWithTag(tag).getBoundsInRoot()
+            assertTrue(bounds.width >= 48.dp && bounds.height >= 48.dp, tag)
+        }
     }
 
     @Test

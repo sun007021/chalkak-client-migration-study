@@ -333,3 +333,13 @@ describe('PostRepository.getCalendar', () => {
     expect(h.transport.requests).toHaveLength(3);
   });
 });
+
+describe('PostRepository.getToday 응답 날짜 (TC-TIME-018, T11)', () => {
+  it('TC-TIME-018 now가 KST 10/28 01:00이어도 응답 topicDate(10/27)를 그대로 돌려준다', async () => {
+    const h = setup();
+    h.clock.set('2026-10-27T16:00:00Z');
+    h.transport.script(fixtureResponse('time/posts-today__cross-midnight'));
+    await expect(h.repository.getToday()).resolves.toEqual({ topicDate: TODAY, isPosted: false });
+    expect(queryOf(h.transport.requests[0])).toEqual({});
+  });
+});

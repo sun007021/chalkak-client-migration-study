@@ -69,12 +69,14 @@ describe('ForegroundPushHandler', () => {
     expect(h.home.unreadRefreshes).toBe(1);
   });
 
-  it('TC-PUSH-073 설정으로 거르지 않고 type과 상관없이 표시한다(AI 리뷰도 생략하지 않는다: 확인 필요 2번)', async () => {
+  it('TC-PUSH-073 TC-PUSH-070 설정으로 거르지 않고 type과 상관없이 표시한다(AI 리뷰도 생략하지 않는다: 확인 필요 2번)', async () => {
     const h = setup('granted');
     h.messages.receive(message('payload__ai-review-completed'));
     h.messages.receive(message('payload__topic'));
     await settle();
     expect(h.presenter.shown).toHaveLength(2);
+    // TC-PUSH-070: 카탈로그는 같은 게시물의 AI 화면을 보는 중 생략을 권하지만 스펙(확인 필요 2번)은 생략하지 않는 쪽이다.
+    expect(h.presenter.shown[0].title).toBe('AI 피드백이 도착했어요');
   });
 
   it('stop 뒤에는 구독이 없다', async () => {

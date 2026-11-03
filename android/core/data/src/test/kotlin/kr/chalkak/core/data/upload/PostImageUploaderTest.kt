@@ -7,6 +7,8 @@ import kr.chalkak.core.common.testing.FakeClock
 import kr.chalkak.core.network.ApiError
 import kr.chalkak.core.network.ApiResult
 import kr.chalkak.core.network.ConfigError
+import kr.chalkak.core.network.NetworkConfig
+import kr.chalkak.core.network.NetworkKind
 import kr.chalkak.core.network.OkHttpFactory
 import kr.chalkak.core.network.StoredSession
 import kr.chalkak.core.network.testing.MockResponses
@@ -14,6 +16,8 @@ import kr.chalkak.core.network.testing.NetHarness
 import kr.chalkak.core.network.testing.TestSessions
 import kr.chalkak.core.network.testing.error
 import kr.chalkak.core.network.testing.httpError
+import kr.chalkak.core.network.testing.loopbackUrl
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -34,7 +38,7 @@ class PostImageUploaderTest {
             h.dispatcher.enqueue(path, fx("s3-put__200.json"))
             val webp = ByteArray(2048) { (it * 7 % 251).toByte() }
             val result = PresignedPostImageUploader(h.client, OkHttpFactory.uploadClient())
-                .put(h.server.url("$path?X-Amz-Expires=300").toString(), "image/webp", webp)
+                .put(h.server.loopbackUrl("$path?X-Amz-Expires=300"), "image/webp", webp)
             assertEquals(ApiResult.Success(Unit), result)
             val req = h.dispatcher.recorded.single()
             assertEquals("PUT", req.method)
@@ -86,6 +90,30 @@ class PostImageUploaderTest {
             val config = assertIs<ApiError.Config>(result.error())
             assertEquals(ConfigError.INSECURE_HTTP, config.reason)
             assertTrue(h.dispatcher.recorded.isEmpty())
+        }
+    }
+
+    @Test
+    fun `TC-UPL-057 the PUT client waits 60 seconds while API calls wait 10 seconds to connect and 15 to answer`() {
+        val upload = OkHttpFactory.uploadClient()
+        assertEquals(60_000, upload.readTimeoutMillis)
+        assertEquals(60_000, upload.writeTimeoutMillis)
+        assertEquals(10_000, upload.connectTimeoutMillis)
+        val api = OkHttpFactory.apiClient()
+        assertEquals(10_000, api.connectTimeoutMillis)
+        assertEquals(15_000, api.readTimeoutMillis)
+    }
+
+    @Test
+    fun `TC-UPL-057 a PUT answer later than the upload timeout is a network timeout failure`() = runTest {
+        NetHarness(backgroundScope, StoredSession.User(TestSessions.user(clock)), clock = clock).use { h ->
+            // Same wiring as production, scaled down: real sockets cannot wait 61 seconds.
+            val client = OkHttpFactory.uploadClient(NetworkConfig(uploadTimeoutMs = 150))
+            // The PUT is idempotent, so a timeout is retried (twice) before it is reported.
+            h.dispatcher.enqueue(path, *Array(3) { fx("s3-put__200.json").setHeadersDelay(2, TimeUnit.SECONDS) })
+            val result = PresignedPostImageUploader(h.client, client)
+                .put(h.server.loopbackUrl("$path?X-Amz-Expires=300"), "image/webp", byteArrayOf(1))
+            assertEquals(ApiError.Network(NetworkKind.TIMEOUT), result.error())
         }
     }
 }

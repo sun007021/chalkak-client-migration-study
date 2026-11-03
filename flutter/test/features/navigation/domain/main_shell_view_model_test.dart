@@ -1,6 +1,7 @@
 import 'package:chalkak/core/analytics/analytics_constants.dart';
 import 'package:chalkak/core/copy/ko.g.dart';
 import 'package:chalkak/core/time/kst_date.dart';
+import 'package:chalkak/features/navigation/domain/guest_guard.dart';
 import 'package:chalkak/features/navigation/domain/main_shell_view_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -11,6 +12,29 @@ import '../../../support/net_harness.dart';
 const _wait = Duration(seconds: 5);
 
 void main() {
+  fakeTest(
+    'TC-ANL-017 스스로 보고하는 탭(설정)이 덮인 사이 선택돼도 위 화면이 닫히면 셸이 screen_view를 보낸다',
+    (async) {
+      final r = HomeRig();
+      final shell = MainShellViewModel(
+        guard: GuestGuard(isGuest: false, toast: r.toast),
+        analytics: r.analytics,
+        uploadGate: r.gate,
+        toast: r.toast,
+        selfReportedScreens: {BottomDestination.settings},
+      );
+      shell.start();
+      shell.onCovered();
+      shell.selectTab(
+        BottomDestination.settings,
+      ); // 설정 VM이 따로 보고하므로 셸은 보내지 않는다.
+      expect(r.analytics.screenNames, ['home']);
+      shell.onReturned();
+      expect(r.analytics.screenNames, ['home', 'settings']);
+      shell.dispose();
+    },
+  );
+
   fakeTest('TC-NAV-003 메인에 들어오면 홈이 선택되어 있고 screen_view home을 보낸다', (async) {
     final r = HomeRig();
     r.shell.start();

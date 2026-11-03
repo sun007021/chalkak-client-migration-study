@@ -1,24 +1,12 @@
 import { deferred, networkFailure } from '../../core/http/__testing__/FakeTransport';
+import { refreshOk } from '../../core/http/__testing__/createNetHarness';
 import { fixtureResponse } from '../../core/http/__testing__/loadFixture';
 import { t } from '../../shared/copy';
-import { createHomeHarness } from './__testing__/createHomeHarness';
-import type { HomeHarness } from './__testing__/createHomeHarness';
+import { createHomeHarness, routeNextDay } from './__testing__/createHomeHarness';
 
 const TODAY_POSTS = 'GET /posts?topicDate=2026-10-27&sort=popular&page=1&pageSize=20';
 const UNREAD = 'GET /notifications/unread-status';
 const settle = () => new Promise((resolve) => setImmediate(resolve));
-
-/** 새 날짜(10/28) 라우트. 자정 직후 재로드 테스트용. */
-function routeNextDay(h: HomeHarness) {
-  h.router
-    .set('GET /topics?date=2026-10-28', 'home/topics__open-2026-10-28')
-    .set('GET /topics?date=2026-10-27', 'home/topics__open-2026-10-27')
-    .set(
-      'GET /posts?topicDate=2026-10-28&sort=popular&page=1&pageSize=20',
-      'home/posts-list__popular-5',
-    )
-    .set('GET /posts/calendar?year=2026&month=10', 'home/posts-calendar__2026-10-week-approved');
-}
 
 describe('HomeViewModel 새로고침 (D-20)', () => {
   it('TC-HOME-035 REQ-HOME-038 새로고침 중에는 기존 내용을 유지하고 refreshing이 켜지며 성공하면 교체한다', async () => {
@@ -67,7 +55,7 @@ describe('HomeViewModel 새로고침 (D-20)', () => {
     );
   });
 
-  it('TC-HOME-035 REQ-HOME-039 연결 실패면 기존 내용을 유지하고 토스트 "네트워크 연결을 확인해 주세요."를 한 번만 띄운다', async () => {
+  it('TC-HOME-035 TC-NET-046 REQ-HOME-039 연결 실패면 기존 내용을 유지하고 토스트 "네트워크 연결을 확인해 주세요."를 한 번만 띄운다', async () => {
     const h = await createHomeHarness();
     await h.viewModel.onShown();
     h.router.set('GET /posts/today', networkFailure());
@@ -276,14 +264,18 @@ describe('HomeViewModel KST 날짜 변경 (REQ-HOME-041)', () => {
     expect(seenTopics).not.toContain('2026-10-27'); // 날짜가 바뀌면 먼저 비우고 새로 채운다
   });
 
-  it('TC-HOME-041 포그라운드 복귀로도 날짜 변경을 감지한다', async () => {
+  it('TC-HOME-041 TC-TIME-015 포그라운드 복귀로도 날짜 변경을 감지한다', async () => {
     const h = await createHomeHarness();
     await h.viewModel.onShown();
     routeNextDay(h);
     h.clock.set('2026-10-27T15:00:00Z');
     h.visibility.emit('foreground');
     await settle();
-    expect(h.viewModel.getSnapshot().todayDate.toString()).toBe('2026-10-28');
+    const state = h.viewModel.getSnapshot();
+    expect(state.todayDate.toString()).toBe('2026-10-28');
+    expect(state.yesterdayDate.toString()).toBe('2026-10-27');
+    expect(state.topic).toMatchObject({ status: 'ready', topic: { title: '골목길' } });
+    expect(h.router.calls('GET /topics?date=2026-10-28')).toHaveLength(1);
   });
 
   it('TC-HOME-042 자정 직후 새 주제가 아직 없으면 히어로 no-open-topic, 오늘 인기는 빈 ready, 어제 랭킹은 10/27 기준이다', async () => {
@@ -349,7 +341,7 @@ describe('HomeViewModel 알림 미읽음 (D-10)', () => {
     expect(h.viewModel.getSnapshot().hasUnread).toBe(false);
   });
 
-  it('TC-HOME-051 REQ-HOME-045 홈이 보일 때·포그라운드 복귀·알림함에서 돌아옴·푸시 수신마다 1회씩 재조회한다', async () => {
+  it('TC-HOME-051 TC-NOTI-050 REQ-HOME-045 홈이 보일 때·포그라운드 복귀·알림함에서 돌아옴·푸시 수신마다 1회씩 재조회한다', async () => {
     const h = await createHomeHarness();
     await h.viewModel.onShown();
     expect(h.router.calls(UNREAD)).toHaveLength(1);
@@ -369,7 +361,7 @@ describe('HomeViewModel 알림 미읽음 (D-10)', () => {
     expect(h.router.calls('GET /posts/today')).toHaveLength(3);
   });
 
-  it('TC-HOME-052 조회가 실패하면 점은 직전 값을 유지하고 토스트·오류 UI가 없다', async () => {
+  it('TC-HOME-052 TC-NOTI-052 조회가 실패하면 점은 직전 값을 유지하고 토스트·오류 UI가 없다', async () => {
     const h = await createHomeHarness();
     h.router.set(UNREAD, 'home/notifications-unread-status__true');
     await h.viewModel.onShown();
@@ -396,6 +388,45 @@ describe('HomeViewModel 알림 미읽음 (D-10)', () => {
     h.viewModel.onNotificationPress();
     expect(h.navigator.calls).toEqual([{ type: 'notifications' }]);
     expect(h.toast.messages).toEqual([]);
+  });
+});
+
+describe('HomeViewModel 미읽음 인증·계정 전환 (D-10, D-17)', () => {
+  it('TC-NOTI-053 로그아웃·계정 전환(clearAll)은 이전 계정의 점을 바로 지우고 늦게 온 이전 계정 응답은 반영하지 않는다', async () => {
+    const h = await createHomeHarness();
+    h.router.set(UNREAD, 'home/notifications-unread-status__true');
+    await h.viewModel.onShown();
+    expect(h.viewModel.getSnapshot().hasUnread).toBe(true);
+
+    const late = deferred<void>();
+    h.router.set(UNREAD, async () => {
+      await late.promise;
+      return fixtureResponse('home/notifications-unread-status__true');
+    });
+    const pending = h.viewModel.onPushReceived();
+    await settle();
+
+    h.viewModel.clearAll();
+    expect(h.viewModel.getSnapshot().hasUnread).toBe(false);
+
+    late.resolve();
+    await pending;
+    await settle();
+    expect(h.viewModel.getSnapshot().hasUnread).toBe(false);
+  });
+
+  it('TC-NOTI-055 unread-status 401은 refresh 1회 뒤 1회 재전송하고 점을 갱신한다', async () => {
+    const h = await createHomeHarness();
+    h.router.set(UNREAD, [
+      'notification/unread-status__unauthorized',
+      'home/notifications-unread-status__true',
+    ]);
+    h.router.set('POST /auth/refresh', async () => refreshOk());
+    await h.viewModel.onShown();
+    expect(h.router.calls('POST /auth/refresh')).toHaveLength(1);
+    expect(h.router.calls(UNREAD)).toHaveLength(2);
+    expect(h.viewModel.getSnapshot().hasUnread).toBe(true);
+    expect(h.authFlow.calls).toEqual([]);
   });
 });
 
