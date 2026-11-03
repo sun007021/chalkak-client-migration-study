@@ -92,9 +92,6 @@ class _BootScreenState extends State<BootScreen> {
   }
 }
 
-// TODO: 임시. `boot.update.cancel`이 shared에 들어오면 gen_copy 상수로 대체한다.
-const _tempCancelCopy = '취소';
-
 class _UpdateDialog extends StatelessWidget {
   const _UpdateDialog({required this.onUpdate, required this.onCancel});
 
@@ -121,8 +118,7 @@ class _UpdateDialog extends StatelessWidget {
                 TestIds.updateGateCancelButton,
                 child: TextButton(
                   onPressed: onCancel,
-                  // TODO: shared ko.json `boot.update.cancel` 추가 후 Copy.bootUpdateCancel로 교체.
-                  child: const Text(_tempCancelCopy),
+                  child: const Text(Copy.bootUpdateCancel),
                 ),
               ),
             TestId.button(
