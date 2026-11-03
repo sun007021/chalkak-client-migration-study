@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/analytics/screen_return_reporter.dart';
 import '../core/constants/app_constants.dart';
 import '../features/signature/domain/signature_mode.dart';
 import '../features/signature/presentation/signature_draw_screen.dart';
@@ -62,14 +63,17 @@ class _ChangeSignatureDraw extends StatelessWidget {
         canvasWidth: AppConstants.signaturePngWidth.toDouble(),
         canvasHeight: AppConstants.signaturePngHeight.toDouble(),
       ),
-      builder: (context, viewModel) => SignatureDrawScreen(
-        viewModel: viewModel,
-        onEvent: (event) => switch (event) {
-          NavigateToPreview(:final png) => unawaited(
-            _openPreview(context, viewModel, png),
-          ),
-          NavigateBackFromDrawing() => Navigator.of(context).pop(false),
-        },
+      builder: (context, viewModel) => ScreenReturnReporter(
+        onReturn: viewModel.onReturned,
+        child: SignatureDrawScreen(
+          viewModel: viewModel,
+          onEvent: (event) => switch (event) {
+            NavigateToPreview(:final png) => unawaited(
+              _openPreview(context, viewModel, png),
+            ),
+            NavigateBackFromDrawing() => Navigator.of(context).pop(false),
+          },
+        ),
       ),
     );
   }

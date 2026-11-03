@@ -58,6 +58,14 @@ class NotificationDetailViewModel extends ChangeNotifier {
 
   NotificationDetailState get state => _state;
 
+  /// 위에 쌓인 화면(게시물 등)이 닫혀 알림 상세가 다시 보인다.
+  void onReturned() {
+    if (_disposed || !_screenViewLogged) return;
+    _analytics.logEvent(
+      AnalyticsEvent.screenView(ScreenNames.notificationDetail),
+    );
+  }
+
   Future<void> start() async {
     if (!_screenViewLogged) {
       _screenViewLogged = true;
