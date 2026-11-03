@@ -1,5 +1,5 @@
 import { t } from '../../copy/ko';
-import { ApiError, NetworkError, SessionChangedError } from '../../core/net/errors';
+import { NetworkError, SessionChangedError } from '../../core/net/errors';
 import { RequestSlots } from '../../core/state/RequestSlots';
 import type { RequestPass } from '../../core/state/RequestSlots';
 import { ViewModel } from '../../core/state/ViewModel';
@@ -13,7 +13,8 @@ import type { PostChanges } from '../post/PostChanges';
 import type { PostChange } from '../post/postModels';
 import type { GuestGate } from '../shell/GuestGate';
 import type { UploadEntry } from '../shell/UploadEntry';
-import type { AiReviewStore } from '../aireview/AiReviewStore';
+import type { AiReviewEntry } from '../aireview/aiReviewModels';
+import type { AiReviewStore, AiReviewWatch } from '../aireview/AiReviewStore';
 import type { BannerFeed } from './BannerFeed';
 import type { HomeNavigator } from './HomeNavigator';
 import type { HomeRepository } from './HomeRepository';
@@ -92,11 +93,8 @@ export interface HomeViewModelDeps {
   likes: PostLikeStore;
   /** 게시물 변경 이벤트(like·title·removed)를 받아 랭킹·히어로·주간 기록에 반영한다. */
   changes: PostChanges;
-  /**
-   * AI 피드백 공용 저장소(W8). 홈 카드의 상태·폴링·요청을 이 저장소로 옮긴다(상세 알약과 같은 상태를 본다).
-   * 옮긴 뒤에는 필수다. 옮기기 전에는 비워 두면 기존 로직(repository.fetchAiReview/requestAiReview)을 쓴다.
-   */
-  aiReviews?: AiReviewStore;
+  /** AI 피드백 공용 저장소(W8). 홈 카드의 상태·폴링·요청·오류 안내를 이 저장소가 맡고 상세 알약과 같은 상태를 본다. */
+  aiReviews: AiReviewStore;
 }
 
 /** 랭킹에 담는 최대 개수(REQ-HOME-027). */
@@ -114,6 +112,20 @@ interface Failure {
 type LoadKey = 'topic' | 'popular' | 'yesterday' | 'hero' | 'weekly' | 'unread';
 
 type Pass = RequestPass;
+
+/** 저장소 항목 → 홈 카드. status가 확인된(ready) 항목만 카드가 된다. */
+function cardFromEntry(entry: AiReviewEntry): AiCardState {
+  if (entry.phase !== 'ready' || entry.status === null) return { kind: 'hidden' };
+  return {
+    kind: 'ready',
+    postId: entry.postId,
+    status: entry.status,
+    canRequestAgain: entry.canRequestAgain,
+    requesting: entry.requesting,
+    ...(entry.blocked ? { blocked: true as const } : {}),
+    ...(entry.stalled ? { stalled: true as const } : {}),
+  };
+}
 
 const isCancel = (error: unknown): boolean => (error instanceof Error && error.name === 'AbortError') || error instanceof SessionChangedError;
 
@@ -149,9 +161,10 @@ export class HomeViewModel extends ViewModel<HomeState> {
   private refreshPromise: Promise<void> | null = null;
   private hidden = false;
   private gone = false;
-  private aiRequestInFlight = false;
-  /** AI 요청 POST의 시작·완료마다 올린다. 그보다 먼저 시작한 GET 응답이 POST 결과를 덮지 않게 한다. */
-  private aiMutation = 0;
+  /** 히어로가 가리키는 오늘 사진의 AI 저장소 손잡이(홈이 보이는 동안 show 상태). 카드가 없으면 null. */
+  private aiWatch: AiReviewWatch | null = null;
+  /** aiWatch.show()를 보낸 뒤 hide 전까지 true. */
+  private aiShown = false;
   /** 계정 전환마다 올린다. 이전 계정의 늦은 응답(AI 요청 포함)이 새 상태를 바꾸지 않게 한다. */
   private generation = 0;
   /** 화면이 붙어 있고 보이는 동안 true(onShown~onHidden). */
@@ -160,10 +173,12 @@ export class HomeViewModel extends ViewModel<HomeState> {
   private today: TodayPost | null = null;
 
   private readonly unsubscribeChanges: () => void;
+  private readonly unsubscribeAi: () => void;
 
   constructor(protected readonly deps: HomeViewModelDeps) {
     super(HomeViewModel.initialState(deps));
     this.unsubscribeChanges = deps.changes.subscribe((change) => this.applyChange(change));
+    this.unsubscribeAi = deps.aiReviews.subscribe(() => this.syncAiCard());
   }
 
   /** ISSUE 배너 목록(화면이 구독한다). */
@@ -220,6 +235,8 @@ export class HomeViewModel extends ViewModel<HomeState> {
   onHidden(): void {
     this.hidden = true;
     this.shown = false;
+    this.aiWatch?.hide();
+    this.aiShown = false;
     this.cancelAll();
     this.runId += 1;
     this.refreshPromise = null;
@@ -258,8 +275,7 @@ export class HomeViewModel extends ViewModel<HomeState> {
   resetForAccountChange(): void {
     this.cancelAll();
     this.generation += 1;
-    this.aiRequestInFlight = false;
-    this.aiMutation += 1;
+    this.detachAi();
     this.runId += 1;
     this.refreshPromise = null;
     this.today = null;
@@ -270,6 +286,8 @@ export class HomeViewModel extends ViewModel<HomeState> {
 
   override dispose(): void {
     this.unsubscribeChanges();
+    this.unsubscribeAi();
+    this.detachAi();
     this.gone = true;
     this.cancelAll();
     this.deps.banners.dispose();
@@ -287,7 +305,8 @@ export class HomeViewModel extends ViewModel<HomeState> {
   async retryHero(): Promise<void> {
     if (!this.isMember) return;
     this.today = null;
-    this.setState({ hero: { kind: 'loading' }, ai: { kind: 'hidden' } });
+    this.detachAi();
+    this.setState({ hero: { kind: 'loading' } });
     await this.loadHero(this.currentDates());
   }
 
@@ -406,7 +425,7 @@ export class HomeViewModel extends ViewModel<HomeState> {
         // 업로드 직후(REQ-UPL-062): /posts/today를 다시 부르지 않고 이벤트만으로 히어로를 바꾼다. 홈이 다시 보이면 서버 상태로 맞춘다.
         if (change.topicDate !== this.state.todayDate) return;
         this.today = { kind: 'posted', topicDate: change.topicDate, postId: change.postId, moderationStatus: change.moderationStatus };
-        this.setState({ ai: { kind: 'hidden' } });
+        this.detachAi();
         this.publishHero();
         return;
     }
@@ -418,7 +437,8 @@ export class HomeViewModel extends ViewModel<HomeState> {
     const today = this.today;
     if (today?.kind === 'posted' && same(today.postId)) {
       this.today = { kind: 'not-posted', topicDate: today.topicDate };
-      this.setState({ hero: { kind: 'empty', banned: false }, ai: { kind: 'hidden' } });
+      this.detachAi();
+      this.setState({ hero: { kind: 'empty', banned: false } });
     }
     const weekly = this.state.weekly;
     if (weekly.status === 'ready' && weekly.days.some((day) => day.entry && same(day.entry.postId))) {
@@ -449,37 +469,11 @@ export class HomeViewModel extends ViewModel<HomeState> {
     this.deps.toast.show(t('banner.web.link-unavailable'));
   }
 
-  /** AI 카드 요청/재요청 버튼 → POST 1회(요청 중 연타 무시). 성공하면 PROCESSING. */
+  /**
+   * AI 카드 요청/재요청 버튼 → 저장소가 POST 1회(요청 중 연타·정지 차단·오류 안내는 저장소 규칙). 실패 재요청도 시트 없이 바로 보낸다(REQ-AIR-036).
+   */
   async onAiRequestPress(): Promise<void> {
-    const card = this.state.ai;
-    if (card.kind !== 'ready' || card.requesting || card.blocked || this.aiRequestInFlight) return;
-    if (!(card.status === 'NONE' || (card.status === 'FAILED' && card.canRequestAgain))) return;
-    const generation = this.generation;
-    const isCurrent = () => !this.gone && this.generation === generation;
-    this.aiRequestInFlight = true;
-    this.aiMutation += 1;
-    this.setState({ ai: { ...card, requesting: true } });
-    const update = (change: (current: Extract<AiCardState, { kind: 'ready' }>) => Extract<AiCardState, { kind: 'ready' }>) => {
-      const current = this.state.ai;
-      if (current.kind === 'ready' && current.postId === card.postId) this.setState({ ai: change(current) });
-    };
-    try {
-      const result = await this.deps.repository.requestAiReview(card.postId);
-      if (!isCurrent()) return;
-      this.aiMutation += 1;
-      update((current) => ({ ...current, status: result.status, canRequestAgain: result.canRequestAgain, requesting: false }));
-    } catch (error) {
-      if (!isCurrent()) return;
-      this.aiMutation += 1;
-      const banned = error instanceof ApiError && error.status === 403;
-      update((current) => ({ ...current, requesting: false, ...(banned ? { blocked: true as const } : {}) }));
-      if (isCancel(error)) return;
-      if (banned) this.deps.toast.show(t('ai.error.banned'));
-      else if (error instanceof NetworkError) this.deps.toast.show(t('ai.error.network'));
-      else this.deps.toast.show(t('common.error.generic'));
-    } finally {
-      if (isCurrent()) this.aiRequestInFlight = false;
-    }
+    await this.aiWatch?.request();
   }
 
   /** COMPLETED의 자세히 보기 → navigator.openAiReview(postId). */
@@ -511,8 +505,8 @@ export class HomeViewModel extends ViewModel<HomeState> {
       weekly: this.isMember ? { status: 'loading' } : emptyWeek(dates),
       yesterday: { status: 'loading' },
       popular: { status: 'loading' },
-      ai: { kind: 'hidden' },
     });
+    this.detachAi();
   }
 
   private begin(key: LoadKey): Pass {
@@ -622,42 +616,45 @@ export class HomeViewModel extends ViewModel<HomeState> {
     today = this.today;
     this.publishHero();
     if (today.kind === 'posted' && today.moderationStatus === 'APPROVED' && today.topicDate === dates.today) {
-      await this.loadAiCard(today.postId, pass);
+      await this.attachAi(today.postId, pass);
     } else {
-      this.setState({ ai: { kind: 'hidden' } });
+      this.detachAi();
     }
     return [];
   }
 
-  private async loadAiCard(postId: string, pass: Pass): Promise<void> {
-    const mutation = this.aiMutation;
-    try {
-      const review = await this.deps.repository.fetchAiReview(postId, pass.signal);
-      if (!pass.isCurrent()) return;
-      // 이 GET이 나간 뒤에 요청(POST)이 시작·완료됐다면 이 응답은 낡았다. POST 결과를 NONE 등으로 되돌리지 않는다.
-      if (mutation !== this.aiMutation) return;
-      if (!review) {
-        this.setState({ ai: { kind: 'hidden' } });
-        return;
-      }
-      const current = this.state.ai;
-      const same = current.kind === 'ready' && current.postId === postId ? current : null;
-      this.setState({
-        ai: {
-          kind: 'ready',
-          postId,
-          status: review.status,
-          canRequestAgain: review.canRequestAgain,
-          requesting: same?.requesting ?? false,
-          ...(same?.blocked ? { blocked: true as const } : {}),
-        },
-      });
-    } catch (error) {
-      if (!pass.isCurrent() || isCancel(error)) return;
-      const current = this.state.ai;
-      // 카드만 숨길 뿐 다른 섹션·토스트에는 영향이 없다. 같은 사진의 기존 카드는 유지한다.
-      if (!(current.kind === 'ready' && current.postId === postId)) this.setState({ ai: { kind: 'hidden' } });
+  /** 오늘 승인된 내 사진의 AI 카드를 저장소에 붙인다. 홈이 보이는 중이면 show(첫 GET 반영까지 기다린다). 사진이 바뀌면 이전 손잡이는 놓는다. */
+  private async attachAi(postId: string, pass: Pass): Promise<void> {
+    if (!this.aiWatch || this.aiWatch.postId !== postId) {
+      this.aiWatch?.release();
+      this.aiShown = false;
+      this.aiWatch = this.deps.aiReviews.watch(postId, { refreshCompleted: false, quietReads: true });
     }
+    const watch = this.aiWatch;
+    this.syncAiCard();
+    if (!this.shown) return;
+    // 이미 보이는 중의 다시 불러오기(새로고침 등)는 완료 결과도 GET으로 맞춘다. 복귀(onHidden 뒤 show)는 저장소 규칙을 따른다.
+    if (this.aiShown) await watch.recheck();
+    else {
+      this.aiShown = true;
+      await watch.show();
+    }
+    if (pass.isCurrent()) this.syncAiCard();
+  }
+
+  /** AI 카드를 숨기고 손잡이를 놓는다(사진이 없어졌거나 날짜·계정이 바뀜). 저장소의 게시물 상태는 캐시로 남는다. */
+  private detachAi(): void {
+    this.aiWatch?.release();
+    this.aiWatch = null;
+    this.aiShown = false;
+    this.setState({ ai: { kind: 'hidden' } });
+  }
+
+  /** 저장소 entry에서 카드 상태를 만든다(저장소가 바뀔 때마다). 확인 전·첫 확인 실패·404는 카드가 없다. */
+  private syncAiCard(): void {
+    const watch = this.aiWatch;
+    const entry = watch ? this.deps.aiReviews.entry(watch.postId) : null;
+    this.setState({ ai: entry ? cardFromEntry(entry) : { kind: 'hidden' } });
   }
 
   /** 마지막 /posts/today와 이번 주 기록에서 히어로를 만든다. 썸네일은 이번 주 기록의 같은 postId에서만 얻는다. */

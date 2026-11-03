@@ -22,6 +22,11 @@ export interface AiWatchOptions {
   refreshCompleted: boolean;
   /** 요청 자격(내 게시물 + 주제 날짜가 KST 오늘). request() 시점에 다시 평가해 false면 POST를 보내지 않는다(REQ-AIR-003). 기본 () => true. */
   canRequest?: () => boolean;
+  /**
+   * 조회(GET: show·recheck·폴링) 실패를 토스트로 알리지 않는다(홈 카드: 실패하면 카드만 숨긴다, REQ-HOME-035). 요청(POST) 오류 안내는 영향이 없다.
+   * 폴링 오류는 보이는 손잡이가 모두 조용할 때만 생략한다.
+   */
+  quietReads?: boolean;
 }
 
 /**
@@ -299,7 +304,8 @@ export class AiReviewStore {
       }
       if (!run.toasted) {
         run.toasted = true;
-        this.toastFor(error);
+        const quiet = [...slot.visible].every((watch) => slot.options.get(watch)?.quietReads === true);
+        if (!quiet) this.toastFor(error);
       }
       return;
     }
@@ -321,7 +327,7 @@ export class AiReviewStore {
     if (!slot.entry) this.commit(slot);
     const entry = slot.entry!;
     if (!options.refreshCompleted && entry.phase === 'ready' && entry.status === 'COMPLETED') return;
-    await this.refresh(slot);
+    await this.refresh(slot, options.quietReads === true);
   }
 
   private hide(watch: AiReviewWatch): void {
@@ -337,7 +343,7 @@ export class AiReviewStore {
     const slot = this.slotFor(watch.postId);
     slot.options.set(watch, options);
     if (!slot.entry) this.commit(slot);
-    await this.refresh(slot);
+    await this.refresh(slot, options.quietReads === true);
   }
 
   private async request(watch: AiReviewWatch, options: AiWatchOptions): Promise<void> {

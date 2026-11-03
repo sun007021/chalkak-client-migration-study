@@ -452,6 +452,7 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
             navigator,
             likes: this.likes,
             changes: this.postChanges,
+            aiReviews: this.aiReviews,
           }),
         };
       }
