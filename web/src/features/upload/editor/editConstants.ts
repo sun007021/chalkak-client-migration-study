@@ -46,6 +46,49 @@ export interface EditConstants {
   };
 }
 
+const CONSTANTS: EditConstants = {
+  exposureEvPerUnit: 1.5,
+  warmthGain: 0.25,
+  blackPointRange: 0.3,
+  toneAmount: 0.25,
+  contrastAmount: 0.6,
+  saturationLuma: [0.2125, 0.7154, 0.0721],
+  autoLuma: [0.2126, 0.7152, 0.0722],
+  auto: {
+    analysisLongEdge: 256,
+    exposureMinEv: -0.5,
+    exposureMaxEv: 1.0,
+    whitePercentile: 0.995,
+    whiteTarget: 0.96,
+    whiteMin: 0.05,
+    exposureTempering: 0.6,
+    brightMedian: 0.62,
+    brightSlope: 1.2,
+    blackPercentile: 0.005,
+    blackMargin: 0.01,
+    blackTempering: 0.8,
+    blackMax: 0.25,
+    shadowDark: 0.25,
+    shadowFull: 0.8,
+    shadowMax: 0.45,
+    highlightBright: 0.85,
+    highlightFull: 0.3,
+    highlightMax: -0.5,
+    toneResponseExponent: 0.7,
+    contrastLowQuantile: 0.25,
+    contrastHighQuantile: 0.75,
+    contrastTargetSpread: 0.42,
+    contrastSlope: 2.0,
+    contrastMax: 0.4,
+    saturationMonoLimit: 0.05,
+    saturationTarget: 0.7,
+    saturationSlope: 0.6,
+    saturationMax: 0.25,
+    saturationPercentile: 0.9,
+    order: ['exposure', 'blackPoint', 'shadows-highlights-contrast', 'saturation'],
+  },
+};
+
 export function editConstants(): EditConstants {
-  throw new Error('not implemented');
+  return CONSTANTS;
 }

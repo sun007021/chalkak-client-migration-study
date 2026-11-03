@@ -9,22 +9,32 @@ export const RULER_MAJOR_TICK_EVERY = 10;
 export const RULER_DETENT_RANGE = 0.03;
 
 /** 값 → 눈금자 위치(0이 기준 0) = value × 400. */
-export function valueToOffset(_value: number): number {
-  throw new Error('not implemented');
+export function valueToOffset(value: number): number {
+  return value * RULER_UNITS_PER_VALUE;
 }
-export function offsetToValue(_offset: number): number {
-  throw new Error('not implemented');
+export function offsetToValue(offset: number): number {
+  return offset / RULER_UNITS_PER_VALUE;
 }
 
 /** 값 → 가장 가까운 눈금 번호(0이 기준) = round(value × 50). */
-export function tickIndex(_value: number): number {
-  throw new Error('not implemented');
+export function tickIndex(value: number): number {
+  const index = Math.round(value * RULER_TICKS_PER_VALUE);
+  return index === 0 ? 0 : index;
 }
-export function isMajorTick(_index: number): boolean {
-  throw new Error('not implemented');
+export function isMajorTick(index: number): boolean {
+  return index % RULER_MAJOR_TICK_EVERY === 0;
 }
 
 /** value가 anchors 중 하나에서 range 이내이면 그 anchor로 붙이고(가장 가까운 것), 아니면 그대로. */
-export function snapToDetent(_value: number, _anchors: readonly number[], _range: number = RULER_DETENT_RANGE): number {
-  throw new Error('not implemented');
+export function snapToDetent(value: number, anchors: readonly number[], range: number = RULER_DETENT_RANGE): number {
+  let best = value;
+  let bestDistance = Infinity;
+  for (const anchor of anchors) {
+    const distance = Math.abs(value - anchor);
+    if (distance <= range + 1e-9 && distance < bestDistance) {
+      best = anchor;
+      bestDistance = distance;
+    }
+  }
+  return best;
 }
