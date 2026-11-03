@@ -46,6 +46,13 @@ REQ와 TC 카탈로그가 다르면 REQ를 따랐다.
 14. **버전정보 값은 접두 없는 문자열 (확인 필요 4).** 컨테이너 `appVersion`의 기본값은 `package.json`의 `version`(빌드 define으로 주입)이고 `makeHarness({ appVersion })`로 덮어쓴다. 행을 눌러도 아무 일도 일어나지 않는다(버튼이 아님).
 15. **사인 변경 성공 뒤 재조회는 `SignatureCardController.refreshAfterChange()`.** `refresh()`는 진행 중 요청에 올라타므로 변경 전에 시작된 조회 응답이 새 사인을 덮을 수 있다(TC-SET-009). `createSignaturePreviewViewModel('change')`의 `refreshSignatureCard`를 `refreshAfterChange`로 바꿔야 한다.
 16. **회원탈퇴 요청은 화면을 떠나도 abort하지 않는다.** 서버가 이미 삭제했을 수 있어 중간 취소로 로컬 세션과 서버 상태가 어긋나는 것을 피한다. `SettingsViewModel.confirmWithdraw`는 signal을 넘기지 않는다.
+17. **문서가 가려져도(visibilitychange hidden) 진행 중인 푸시 저장은 취소하지 않는다 (TC-SET-030 해석).** 취소·복원(`cancelPending`)은 설정 화면이 떠날 때(탭 이동·라우트 이동·언마운트)만 한다. 문서가 다시 보이면(visible) 서버 값을 다시 읽는다.
+18. **REQ-FDBK-014는 Web에 해당 없다.** 해당 요구는 모바일 전용 동작이라 Web에서는 구현·테스트하지 않는다.
+19. **탈퇴 DELETE는 응답을 잃은 뒤 재시도할 수 있다.** DELETE는 멱등이라 D-21에 따라 0.5초, 1초 백오프로 최대 2회 재시도한다. 첫 요청이 서버에서 이미 처리됐는데 응답만 잃었다면 재시도가 404/401로 끝날 수 있어 실패 토스트가 뜰 수 있다. 서버 동작 확인 대상이다.
+20. **피드백 화면을 닫으면 전송 중 POST를 abort하지만 회원탈퇴는 abort하지 않는다.** 피드백은 서버에 저장됐을 수 있어도 사용자 입력만 잃는 정도라 취소를 허용하고, 탈퇴는 서버 삭제와 로컬 세션이 어긋나지 않게 끝까지 기다린다(임시 결정 16).
+21. **TC-SET-048(문서 열기 실패)에는 다시 시도 버튼이 없다.** 행을 다시 누르면 다시 열고, 성공하면 메시지를 지운다.
+22. **버전 문자열의 출처는 `package.json`의 `version`이다.** 빌드 시점에 `vite.config.ts`의 `define`(`__APP_VERSION__`)으로 주입하고 컨테이너 옵션 `appVersion`으로 덮어쓸 수 있다.
+23. **조회 실패·조회 중 푸시 스위치는 `aria-checked="false"`이다.** 값이 없으면 켜짐을 지어내지 않는다. 다시 읽는 동안 이전 값이 있으면 그 값을 그대로 보이고 비활성만 한다.
 
 ## 백엔드·QA 확인 대상
 

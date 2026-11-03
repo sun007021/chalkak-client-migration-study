@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import { SIGNATURE_MAX_BYTES } from '../../constants';
 import { t } from '../../copy/ko';
@@ -204,8 +204,9 @@ describe('사인 그리기 이동·가드·분석', () => {
     await waitFor(() => expect(path()).toBe('/settings'));
     expect(await screen.findByTestId('settings.root')).toBeInTheDocument();
     await screen.findByTestId('settings.signature-image');
-    // 변경 흐름의 서버 호출은 0건이다(설정 화면이 읽는 조회만 있다).
-    expect(h.ff.calls.filter((c) => ![CARD_GET, SETTINGS_GET].includes(`${c.method} ${c.path}`))).toHaveLength(0);
+    await act(async () => void (await h.clock.advance(1_000)));
+    // 변경 흐름의 서버 호출은 0건이고 설정이 열릴 때의 조회(사인, 푸시)가 한 번씩만 있다.
+    expect(h.ff.calls.map((c) => `${c.method} ${c.path}`)).toEqual([CARD_GET, SETTINGS_GET]);
   });
 
   it('가입 컨텍스트가 없으면(새로고침) 그리기 화면 대신 로그인으로 replace 이동한다', async () => {
