@@ -7,6 +7,7 @@ import type { UpdateDialogViewModel } from './UpdateDialogViewModel';
 /**
  * 닫을 수 없는 강제 업데이트 다이얼로그. testID update-gate.*.
  * onRequestClose(안드로이드 뒤로가기)는 아무것도 하지 않고, 바깥 영역에는 닫기 동작이 없다.
+ * Android 계열에만 "취소"(앱 종료) 버튼이 있다.
  */
 export function UpdateGateDialog({ viewModel }: { viewModel: UpdateDialogViewModel }) {
   const { opening } = useViewModelState(viewModel);
@@ -35,6 +36,16 @@ export function UpdateGateDialog({ viewModel }: { viewModel: UpdateDialogViewMod
           >
             <Text style={styles.buttonText}>{t('boot.update.button')}</Text>
           </Pressable>
+          {viewModel.canCancel && (
+            <Pressable
+              testID="update-gate.cancel-button"
+              accessibilityRole="button"
+              onPress={() => viewModel.onCancelPress()}
+              style={[styles.button, styles.cancelButton]}
+            >
+              <Text style={styles.cancelButtonText}>{t('boot.update.cancel')}</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     </Modal>
@@ -62,6 +73,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#111111',
   },
+  cancelButton: { marginTop: 8, backgroundColor: '#EEEEEE' },
+  cancelButtonText: { color: '#111111', fontSize: 16, fontWeight: '600' },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
 });
