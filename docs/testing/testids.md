@@ -137,9 +137,13 @@
 | home | 랭킹 섹션                     | `home.ranking-section`              | "어제 랭킹"                                                                                      |
 | home | 랭킹 더 보기 링크             | `home.ranking-more-link`            | 해당 날짜 전시로 이동                                                                            |
 | home | 랭킹 항목                     | `home.ranking-item-{postId}`        | 최대 5개                                                                                         |
+| home | 랭킹 항목 사진                | `home.ranking-image-{postId}`       | 이미지를 불러오지 못하면 사라지고 아래 요소가 대신 존재 (RN 추가)                                |
+| home | 랭킹 항목 사진 오류           | `home.ranking-image-error-{postId}` | "{섹션 제목} 사진을 불러오지 못했어요", 그 항목만 (RN 추가)                                      |
 | home | 랭킹 빈 상태                  | `home.ranking-empty`                | "아직 올라온 사진이 없어요"                                                                      |
 | home | 오늘 인기 섹션                | `home.popular-section`              | "오늘 인기있는 사진"                                                                             |
 | home | 오늘 인기 항목                | `home.popular-item-{postId}`        |                                                                                                  |
+| home | 오늘 인기 항목 사진           | `home.popular-image-{postId}`       | 이미지를 불러오지 못하면 사라지고 아래 요소가 대신 존재 (RN 추가)                                |
+| home | 오늘 인기 항목 사진 오류      | `home.popular-image-error-{postId}` | "{섹션 제목} 사진을 불러오지 못했어요", 그 항목만 (RN 추가)                                      |
 | home | 오늘 인기 더 보기 링크        | `home.popular-more-link`            |                                                                                                  |
 | home | AI 카드                       | `home.ai-card`                      | 오늘 승인된 내 사진일 때만 존재                                                                  |
 | home | AI 카드: 요청 버튼            | `home.ai-request-button`            | "이 사진, AI에게 피드백 받아보기"                                                                |
@@ -201,7 +205,9 @@
 | display | 아카이브 항목 좋아요 버튼 | `display.featured-like-button-{postId}` | selected(isLiked) 상태 노출 (RN 추가)    |
 | display | 아카이브 항목 좋아요 수   | `display.featured-like-count-{postId}`  | (RN 추가)                                |
 | display | 그리드                    | `display.grid`                          | 스크롤·맨 위 이동 확인용                 |
+| display | 그리드 열                 | `display.column-{0\|1}`                 | 메이슨리 왼쪽(0)·오른쪽(1) 열 (RN 추가)  |
 | display | 그리드 항목               | `display.item-{postId}`                 | 탭하면 피드                              |
+| display | 그리드 항목 사진          | `display.item-{postId}-photo`           | 비율을 가진 이미지 (RN 추가)             |
 | display | 그리드 항목 좋아요 버튼   | `display.like-button-{postId}`          | selected(isLiked) 상태 노출              |
 | display | 그리드 항목 좋아요 수     | `display.like-count-{postId}`           |                                          |
 | display | 다음 페이지 로딩          | `display.load-more-indicator`           |                                          |

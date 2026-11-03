@@ -317,13 +317,15 @@ describe('NotificationInboxViewModel 행 탭', () => {
     expect(h.viewModel.getSnapshot().items[0].unread).toBe(true);
   });
 
-  it('TC-NOTI-033 읽음 404는 gone 토스트, 이동 없음, 목록을 다시 불러온다', async () => {
+  it('TC-NOTI-033 TC-NOTI-010 읽음 404는 D-24 문구(noti.gone)로 통일하고 이동 없이 목록을 다시 불러온다', async () => {
     const h = await setup({
       routes: { [readKey(nid('01'))]: 'notification/notification-read__not-found' },
     });
     await h.viewModel.onShown();
     await h.viewModel.onItemPressed(nid('01'));
     expect(h.toast.messages).toEqual([t('noti.gone')]);
+    expect(t('noti.gone')).toBe('더 이상 확인할 수 없는 알림이에요.');
+    expect(h.toast.messages.join()).not.toContain('만료되었거나 삭제됐어요');
     expect(h.navigator.calls).toEqual([]);
     await flush();
     expect(gets(h, LIST_P1)).toHaveLength(2);

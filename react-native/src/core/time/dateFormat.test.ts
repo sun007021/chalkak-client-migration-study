@@ -38,6 +38,38 @@ describe('TIME: 표시 포맷', () => {
     expect(formatNotificationTime(new Date(iso))).toBe(expected);
   });
 
+  // `npm run test:tz`가 이 파일을 UTC·America/Los_Angeles·Asia/Seoul 등 시간대마다 다시 실행한다.
+  // 어느 기기 시간대에서도 같은 createdAt은 같은 KST 문자열이어야 한다(D-09).
+  it('TC-NOTI-013 같은 createdAt은 기기 시간대(UTC·America/Los_Angeles·Asia/Seoul)와 무관하게 같은 문자열이다', () => {
+    const expected = new Map([
+      ['2026-10-26T14:59:59Z', '10월 26일 23:59'],
+      ['2026-10-26T15:00:00Z', '10월 27일 00:00'],
+      ['2026-11-01T09:00:00Z', '11월 1일 18:00'], // America/Los_Angeles 서머타임 종료 순간
+    ]);
+    expected.forEach((label, iso) => {
+      expect(formatNotificationTime(new Date(iso))).toBe(label);
+    });
+    // 기기 로컬 시각 API(getHours 등)는 쓰지 않는다: 시간대가 다른 기기를 흉내 내 모두 엉뚱한 값을 줘도 같다.
+    const local = ['getHours', 'getMinutes', 'getDate', 'getMonth', 'getFullYear'] as const;
+    const spies = local.map((m) => jest.spyOn(Date.prototype, m).mockReturnValue(7));
+    try {
+      expected.forEach((label, iso) => {
+        expect(formatNotificationTime(new Date(iso))).toBe(label);
+      });
+    } finally {
+      spies.forEach((spy) => spy.mockRestore());
+    }
+  });
+
+  it('TC-NOTI-014 TC-TIME-024 12시간제·아랍어·태국어 기기 설정과 무관하게 24시간제 ASCII 숫자다', () => {
+    withHostileLocale(() => {
+      const label = formatNotificationTime(new Date('2026-10-20T11:30:00Z'));
+      expect(label).toBe('10월 20일 20:30');
+      expect(label).toMatch(/^[0-9가-힣 :]+$/);
+      expect(label).not.toMatch(/AM|PM|오전|오후/);
+    });
+  });
+
   it('TC-TIME-024 시스템 로캘(아랍어·태국어·페르시아어)과 무관하게 같은 문자열', () => {
     withHostileLocale(() => {
       expect(formatNotificationTime(new Date('2026-10-20T05:00:00Z'))).toBe('10월 20일 14:00');

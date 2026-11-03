@@ -1,4 +1,5 @@
 import { deferred, networkFailure } from '../../core/http/__testing__/FakeTransport';
+import { refreshOk } from '../../core/http/__testing__/createNetHarness';
 import { fixtureResponse } from '../../core/http/__testing__/loadFixture';
 import { t } from '../../shared/copy';
 import { createHomeHarness, routeNextDay } from './__testing__/createHomeHarness';
@@ -340,7 +341,7 @@ describe('HomeViewModel 알림 미읽음 (D-10)', () => {
     expect(h.viewModel.getSnapshot().hasUnread).toBe(false);
   });
 
-  it('TC-HOME-051 REQ-HOME-045 홈이 보일 때·포그라운드 복귀·알림함에서 돌아옴·푸시 수신마다 1회씩 재조회한다', async () => {
+  it('TC-HOME-051 TC-NOTI-050 REQ-HOME-045 홈이 보일 때·포그라운드 복귀·알림함에서 돌아옴·푸시 수신마다 1회씩 재조회한다', async () => {
     const h = await createHomeHarness();
     await h.viewModel.onShown();
     expect(h.router.calls(UNREAD)).toHaveLength(1);
@@ -360,7 +361,7 @@ describe('HomeViewModel 알림 미읽음 (D-10)', () => {
     expect(h.router.calls('GET /posts/today')).toHaveLength(3);
   });
 
-  it('TC-HOME-052 조회가 실패하면 점은 직전 값을 유지하고 토스트·오류 UI가 없다', async () => {
+  it('TC-HOME-052 TC-NOTI-052 조회가 실패하면 점은 직전 값을 유지하고 토스트·오류 UI가 없다', async () => {
     const h = await createHomeHarness();
     h.router.set(UNREAD, 'home/notifications-unread-status__true');
     await h.viewModel.onShown();
@@ -387,6 +388,45 @@ describe('HomeViewModel 알림 미읽음 (D-10)', () => {
     h.viewModel.onNotificationPress();
     expect(h.navigator.calls).toEqual([{ type: 'notifications' }]);
     expect(h.toast.messages).toEqual([]);
+  });
+});
+
+describe('HomeViewModel 미읽음 인증·계정 전환 (D-10, D-17)', () => {
+  it('TC-NOTI-053 로그아웃·계정 전환(clearAll)은 이전 계정의 점을 바로 지우고 늦게 온 이전 계정 응답은 반영하지 않는다', async () => {
+    const h = await createHomeHarness();
+    h.router.set(UNREAD, 'home/notifications-unread-status__true');
+    await h.viewModel.onShown();
+    expect(h.viewModel.getSnapshot().hasUnread).toBe(true);
+
+    const late = deferred<void>();
+    h.router.set(UNREAD, async () => {
+      await late.promise;
+      return fixtureResponse('home/notifications-unread-status__true');
+    });
+    const pending = h.viewModel.onPushReceived();
+    await settle();
+
+    h.viewModel.clearAll();
+    expect(h.viewModel.getSnapshot().hasUnread).toBe(false);
+
+    late.resolve();
+    await pending;
+    await settle();
+    expect(h.viewModel.getSnapshot().hasUnread).toBe(false);
+  });
+
+  it('TC-NOTI-055 unread-status 401은 refresh 1회 뒤 1회 재전송하고 점을 갱신한다', async () => {
+    const h = await createHomeHarness();
+    h.router.set(UNREAD, [
+      'notification/unread-status__unauthorized',
+      'home/notifications-unread-status__true',
+    ]);
+    h.router.set('POST /auth/refresh', async () => refreshOk());
+    await h.viewModel.onShown();
+    expect(h.router.calls('POST /auth/refresh')).toHaveLength(1);
+    expect(h.router.calls(UNREAD)).toHaveLength(2);
+    expect(h.viewModel.getSnapshot().hasUnread).toBe(true);
+    expect(h.authFlow.calls).toEqual([]);
   });
 });
 

@@ -99,7 +99,7 @@ describe('FeedScreen 내용', () => {
     expect(screen.queryByTestId('feed.title')).not.toBeOnTheScreen();
   });
 
-  it('TC-FEED-007 404는 "게시물을 찾을 수 없어요" 화면이다', async () => {
+  it('TC-FEED-007 TC-PUSH-067 404는 "게시물을 찾을 수 없어요" 화면이다', async () => {
     const h = await openMine({ [GET_MINE]: 'feed/posts-detail__404-not-found' });
     await renderFeed(h, 'feed.not-found-state');
     expect(screen.getByTestId('feed.not-found-state')).toHaveTextContent(t('feed.error.not-found'));
