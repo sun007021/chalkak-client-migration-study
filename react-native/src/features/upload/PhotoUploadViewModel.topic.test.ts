@@ -19,7 +19,7 @@ async function setup(routes: Record<string, RouteValue> = {}) {
 }
 
 describe('PhotoUploadViewModel - 주제', () => {
-  it('TC-UPL-088 start는 screen_view photo_upload를 한 번만 보낸다(여러 번 불러도)', async () => {
+  it('TC-UPL-088 TC-ANL-008 start는 screen_view photo_upload를 한 번만 보낸다(여러 번 불러도)', async () => {
     const h = await setup();
     await h.viewModel.start();
     await h.viewModel.start();
@@ -109,7 +109,7 @@ describe('PhotoUploadViewModel - 주제', () => {
     expect(h.viewModel.getSnapshot().canSubmit).toBe(false);
   });
 
-  it('TC-UPL-013 진입 때 고정한 topicDate·topicId로 제출한다: 자정이 지나도 시계로 다시 계산하지 않는다', async () => {
+  it('TC-UPL-013 TC-TIME-017 진입 때 고정한 topicDate·topicId로 제출한다: 자정이 지나도 시계로 다시 계산하지 않는다', async () => {
     const h = await setup();
     h.clock.set('2026-10-27T14:59:30Z'); // KST 23:59:30
     await h.viewModel.start();

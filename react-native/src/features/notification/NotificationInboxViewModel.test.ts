@@ -70,7 +70,7 @@ describe('NotificationInboxViewModel 첫 로드', () => {
     expect(b.timeLabel).toBe('10월 26일 23:59');
   });
 
-  it('REQ-NOTI-014 TC-NOTI-001 화면이 보일 때마다 screen_view notifications를 보낸다', async () => {
+  it('REQ-NOTI-014 TC-NOTI-001 TC-ANL-006 화면이 보일 때마다 screen_view notifications를 보낸다', async () => {
     const h = await setup();
     await h.viewModel.onShown();
     expect(h.analytics.screenNames).toEqual(['notifications']);

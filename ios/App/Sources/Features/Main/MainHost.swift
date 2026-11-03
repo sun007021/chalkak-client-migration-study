@@ -39,28 +39,30 @@ struct MainView: View {
     var body: some View {
         let shell = session.shell
         NavigationStack(path: pathBinding) {
-            tabContent(shell.selectedTab)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(ChalkakColor.background.ignoresSafeArea())
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    if shell.isBottomBarVisible {
-                        ChalkakBottomBar(
-                            selectedTab: shell.selectedTab,
-                            onSelect: { tab in
-                                // 전시 탭을 다시 누르면 맨 위로 + 재검증(REQ-DISP-029).
-                                if shell.selectTab(tab) == .reselected, tab == .display {
-                                    Task { await session.display?.tabReselected() }
-                                }
-                            },
-                            onUpload: { Task { await shell.startUpload() } }
-                        )
-                    }
+            // 하단 바는 safeAreaInset이 아니라 내용 아래에 쌓는다. safeAreaInset은 스크롤 내용이 바 밑까지 이어져
+            // 첫 화면의 아래쪽 하트가 바에 가려 눌리지 않는다. 쌓으면 스크롤 영역이 바 위에서 끝난다.
+            VStack(spacing: 0) {
+                tabContent(shell.selectedTab)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if shell.isBottomBarVisible {
+                    ChalkakBottomBar(
+                        selectedTab: shell.selectedTab,
+                        onSelect: { tab in
+                            // 전시 탭을 다시 누르면 맨 위로 + 재검증(REQ-DISP-029).
+                            if shell.selectTab(tab) == .reselected, tab == .display {
+                                Task { await session.display?.tabReselected() }
+                            }
+                        },
+                        onUpload: { Task { await shell.startUpload() } }
+                    )
                 }
-                .toolbar(.hidden, for: .navigationBar)
-                .navigationDestination(for: StackEntry.self) { entry in
-                    destination(for: entry.route)
-                        .toolbar(.hidden, for: .navigationBar)
-                }
+            }
+            .background(ChalkakColor.background.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: StackEntry.self) { entry in
+                destination(for: entry.route)
+                    .toolbar(.hidden, for: .navigationBar)
+            }
         }
         .overlay { SettingsAccountDialogs(account: session.settings.account) }
         .accessibilityElement(children: .contain)

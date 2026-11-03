@@ -115,7 +115,7 @@ describe('SignUpSubmitter', () => {
     expect(sleeper.calls).toEqual([SIGNUP_PENDING_RETRY.intervalMs]);
   });
 
-  it('TC-ONB-027 PENDING 2회 뒤 200이면 1초 간격 두 번 기다리고 총 signup 요청은 3회이다', async () => {
+  it('TC-ONB-027 TC-TIME-030 PENDING 2회 뒤 200이면 1초 간격 두 번 기다리고 총 signup 요청은 3회이다', async () => {
     routeFixtures(h.transport, {
       ...OK_ROUTES,
       'POST /auth/social-signup': [PENDING_STEP, PENDING_STEP, 'onboarding/signup__success'],
