@@ -108,7 +108,8 @@ function MonthHeader({ vm, state }: { vm: RecordViewModel; state: RecordState })
           aria-haspopup="dialog"
           style={plainButton}
           onClick={() => {
-            // 사파리 등은 버튼을 눌러도 포커스가 옮겨 오지 않는다: 시트가 닫힐 때 돌아올 자리를 분명히 한다.
+            // 사파리 등은 버튼을 눌러도 포커스가 옮겨 오지 않고 jsdom의 fireEvent.click도 마찬가지다.
+            // 이 줄이 없으면 시트를 닫을 때 포커스가 body로 돌아가므로 명시적으로 옮긴다(제거하지 말 것).
             pickerButton.current?.focus();
             setPickerOpen(true);
           }}

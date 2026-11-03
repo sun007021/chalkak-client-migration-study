@@ -31,15 +31,12 @@ export function FeedScreen(): ReactNode {
   const navigate = useNavigate();
   const location = useLocation();
   useScreenView('feed');
-  // 시드도 진입 때 한 번만 읽는다: 브라우저가 history.state를 복제해 돌려주므로(openAiReview 정리용 replace 등) 참조가 바뀌어 상세가 다시 만들어지지 않게 한다.
-  const [seedBox, setSeedBox] = useState(() => ({ postId, seed: readFeedSeed(location.state, postId) }));
-  if (seedBox.postId !== postId) setSeedBox({ postId, seed: readFeedSeed(location.state, postId) });
-  const seed = seedBox.postId === postId ? seedBox.seed : readFeedSeed(location.state, postId);
-
-  // 기록에서 연 상세(assumeMine, 썸네일)도 진입 때 한 번만 읽는다.
-  const [recordEntryBox, setRecordEntryBox] = useState(() => ({ postId, entry: readRecordFeedEntry(location.state) }));
-  if (recordEntryBox.postId !== postId) setRecordEntryBox({ postId, entry: readRecordFeedEntry(location.state) });
-  const recordEntry = recordEntryBox.postId === postId ? recordEntryBox.entry : readRecordFeedEntry(location.state);
+  // 진입 때 한 번만 읽는다: 브라우저가 history.state를 복제해 돌려주므로(openAiReview 정리용 replace 등) 참조가 바뀌어 상세가 다시 만들어지지 않게 한다.
+  // 시드와 기록에서 연 상세(assumeMine, 썸네일)를 한 상자에 담는다.
+  const readEntry = () => ({ postId, seed: readFeedSeed(location.state, postId), recordEntry: readRecordFeedEntry(location.state) });
+  const [entryBox, setEntryBox] = useState(readEntry);
+  if (entryBox.postId !== postId) setEntryBox(readEntry());
+  const { seed, recordEntry } = entryBox.postId === postId ? entryBox : readEntry();
   const assumeMine = recordEntry ? true : undefined;
   const previewUrl = recordEntry?.thumbnailImageUrl ?? null;
 
