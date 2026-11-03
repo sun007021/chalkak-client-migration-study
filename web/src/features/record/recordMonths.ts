@@ -122,3 +122,29 @@ export function planRecordUrlWrite(search: string, selectedDate: DateString | nu
   params.set('date', selectedDate);
   return `?${params.toString()}`;
 }
+
+export type GridKey = 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown' | 'Home' | 'End';
+
+/**
+ * 달력 격자의 방향키 이동(사진이 있는 날만 갈 수 있다). dates는 같은 달 사진 날짜(오름차순).
+ * ←/→는 이웃한 사진 날, ↑/↓는 7일 위/아래 방향에서 가장 가까운 사진 날(없으면 제자리), Home/End는 처음/끝.
+ */
+export function nextPhotoDate(dates: readonly DateString[], current: DateString, key: GridKey): DateString {
+  const index = dates.indexOf(current);
+  if (index < 0 || dates.length === 0) return current;
+  const day = (date: DateString): number => Number(date.slice(8, 10));
+  switch (key) {
+    case 'ArrowLeft':
+      return dates[Math.max(0, index - 1)]!;
+    case 'ArrowRight':
+      return dates[Math.min(dates.length - 1, index + 1)]!;
+    case 'Home':
+      return dates[0]!;
+    case 'End':
+      return dates[dates.length - 1]!;
+    case 'ArrowUp':
+      return dates.filter((date) => day(date) <= day(current) - 7).at(-1) ?? current;
+    case 'ArrowDown':
+      return dates.find((date) => day(date) >= day(current) + 7) ?? current;
+  }
+}

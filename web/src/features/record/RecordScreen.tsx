@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import { memo, useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { useContainer } from '../../app/AppContext';
 import { ROUTES } from '../../app/paths';
@@ -10,9 +10,11 @@ import { useViewModel } from '../../core/state/useViewModel';
 import { formatDateString } from '../../core/time/kst';
 import { LoadingIndicator } from '../../core/ui/StateViews';
 import { useDialogFocus } from '../../core/ui/useDialogFocus';
+import { useRovingTabIndex } from '../../core/ui/useRovingTabIndex';
 import { useShellContext } from '../shell/MainShell';
 import type { CalendarPost, YearMonth } from './recordModels';
-import { monthGrid, monthKey, monthLabel } from './recordMonths';
+import { monthGrid, monthKey, monthLabel, nextPhotoDate } from './recordMonths';
+import type { GridKey } from './recordMonths';
 import { RouterRecordNavigator } from './recordNavigation';
 import type { RecordErrorKind, RecordState, RecordViewModel } from './RecordViewModel';
 import { useRecordUrlSync } from './useRecordUrlSync';
@@ -136,20 +138,27 @@ function MonthHeader({ vm, state }: { vm: RecordViewModel; state: RecordState })
 function MonthPickerSheet({ months, current, onSelect, onClose }: { months: YearMonth[]; current: YearMonth; onSelect: (ym: YearMonth) => void; onClose: () => void }): ReactNode {
   const ref = useRef<HTMLDivElement | null>(null);
   const titleId = useId();
-  useDialogFocus(ref, onClose);
+  const selectedItem = useRef<HTMLButtonElement | null>(null);
+  useDialogFocus(ref, onClose, selectedItem);
+  useEffect(() => {
+    selectedItem.current?.scrollIntoView?.({ block: 'nearest' });
+  }, []);
+  const onListKeyDown = useRovingTabIndex('option');
   return (
     <div ref={ref} data-testid="record.month-picker-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} style={{ padding: 12, background: '#fff', border: '1px solid #e5e5e5', borderRadius: 8 }}>
       <h2 id={titleId} style={{ margin: '0 0 8px', fontSize: 16 }}>
         {t('record.picker.title')}
       </h2>
-      <div role="listbox" aria-labelledby={titleId} style={{ display: 'flex', flexDirection: 'column', maxHeight: '50vh', overflowY: 'auto' }}>
+      <div role="listbox" aria-labelledby={titleId} onKeyDown={onListKeyDown} style={{ display: 'flex', flexDirection: 'column', maxHeight: '50vh', overflowY: 'auto' }}>
         {months.map((ym) => {
           const selected = ym.year === current.year && ym.month === current.month;
           return (
             <button
               key={monthKey(ym)}
+              ref={selected ? selectedItem : undefined}
               type="button"
               role="option"
+              tabIndex={selected ? 0 : -1}
               data-testid={`record.month-picker-item-${monthKey(ym)}`}
               aria-selected={selected}
               style={{ ...plainButton, padding: '8px 4px', textAlign: 'left', fontWeight: selected ? 700 : 400 }}
@@ -169,9 +178,31 @@ function MonthPickerSheet({ months, current, onSelect, onClose }: { months: Year
   );
 }
 
+const GRID_KEYS: readonly string[] = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+
 function Calendar({ vm, state, posts }: { vm: RecordViewModel; state: RecordState; posts: CalendarPost[] }): ReactNode {
   const { year, month } = state.month;
-  const byDate = new Map(posts.map((post) => [post.topicDate, post]));
+  const byDate = useMemo(() => new Map(posts.map((post) => [post.topicDate, post])), [posts]);
+  const cells = useMemo(() => monthGrid({ year, month }).cells, [year, month]);
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const date = (event.target as HTMLElement).closest<HTMLElement>('[data-date]')?.dataset['date'];
+    if (!date) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      vm.selectDate(date);
+      return;
+    }
+    if (!GRID_KEYS.includes(event.key)) return;
+    event.preventDefault();
+    const next = nextPhotoDate(
+      posts.map((post) => post.topicDate),
+      date,
+      event.key as GridKey,
+    );
+    vm.selectDate(next);
+    gridRef.current?.querySelector<HTMLElement>(`[data-date="${next}"]`)?.focus();
+  };
   return (
     <section style={{ padding: '0 16px' }}>
       <div data-testid="record.weekday-header" style={weekdayRowStyle}>
@@ -179,9 +210,10 @@ function Calendar({ vm, state, posts }: { vm: RecordViewModel; state: RecordStat
           <span key={index}>{weekday}</span>
         ))}
       </div>
-      <div data-testid="record.calendar-grid" role="listbox" aria-label={monthLabel(state.month)} style={gridStyle}>
-        {monthGrid(state.month).cells.map((day, index) => {
-          if (day === null) return <div key={`blank-${index}`} aria-hidden="true" />;
+      {/* 칸이 격자의 직접 자식이어야 해서(7열) 행(row) 래퍼 없이 gridcell을 나열한다. 초점은 선택된 사진 날 하나만 받는다(roving tabindex). */}
+      <div ref={gridRef} data-testid="record.calendar-grid" role="grid" aria-label={monthLabel(state.month)} style={gridStyle} onKeyDown={onKeyDown}>
+        {cells.map((day, index) => {
+          if (day === null) return <div key={`blank-${index}`} role="gridcell" aria-hidden="true" />;
           const date = formatDateString(year, month, day);
           return <DayCell key={date} vm={vm} date={date} day={day} month={month} post={byDate.get(date)} selected={state.selectedDate === date} today={state.today === date} />;
         })}
@@ -190,16 +222,21 @@ function Calendar({ vm, state, posts }: { vm: RecordViewModel; state: RecordStat
   );
 }
 
-function DayCell({ vm, date, day, month, post, selected, today }: { vm: RecordViewModel; date: string; day: number; month: number; post: CalendarPost | undefined; selected: boolean; today: boolean }): ReactNode {
+interface DayCellProps {
+  vm: RecordViewModel;
+  date: string;
+  day: number;
+  month: number;
+  post: CalendarPost | undefined;
+  selected: boolean;
+  today: boolean;
+}
+
+const DayCell = memo(function DayCell({ vm, date, day, month, post, selected, today }: DayCellProps): ReactNode {
   const marker = today ? <span data-testid="record.today-marker" aria-hidden="true" style={{ position: 'absolute', right: 4, bottom: 4, width: 8, height: 8, borderRadius: '50%', background: '#e5484d' }} /> : null;
-  const number = (
-    <span aria-hidden="true" style={dayNumberStyle}>
-      {day}
-    </span>
-  );
   if (!post) {
     return (
-      <div data-testid={`record.day-${date}`} aria-current={today ? 'date' : undefined} style={cellStyle}>
+      <div role="gridcell" data-testid={`record.day-${date}`} aria-current={today ? 'date' : undefined} style={cellStyle}>
         <span style={{ ...dayNumberStyle, background: 'none', color: '#666' }}>{day}</span>
         {marker}
       </div>
@@ -207,34 +244,38 @@ function DayCell({ vm, date, day, month, post, selected, today }: { vm: RecordVi
   }
   const label = `${t('display.picker.month', { n: month })} ${t('display.picker.day', { n: day })}${today ? ` ${webOnlyCopy['record.today']}` : ''}`;
   return (
-    <button
-      type="button"
-      role="option"
+    <div
+      role="gridcell"
+      tabIndex={selected ? 0 : -1}
       data-testid={`record.day-${date}`}
+      data-date={date}
       aria-selected={selected}
       aria-current={today ? 'date' : undefined}
       aria-label={label}
-      style={{ ...cellStyle, ...plainButton, outline: selected ? '3px solid #111' : 'none', outlineOffset: -3 }}
+      style={{ ...cellStyle, cursor: 'pointer', outlineOffset: -3, ...(selected ? { outline: '3px solid #111' } : {}) }}
       onClick={() => vm.selectDate(date)}
     >
-      <img data-testid={`record.day-photo-${date}`} src={post.thumbnailImageUrl} alt="" style={thumbStyle} />
-      {number}
+      {/* crossOrigin: 달력 이미지(canvas)와 같은 캐시 항목을 쓰도록 CORS 모드로 읽는다. */}
+      <img data-testid={`record.day-photo-${date}`} src={post.thumbnailImageUrl} alt="" crossOrigin="anonymous" style={thumbStyle} />
+      <span aria-hidden="true" style={dayNumberStyle}>
+        {day}
+      </span>
       {post.status === 'PENDING' ? (
         <span data-testid={`record.day-pending-${date}`} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 2, fontSize: 10, textAlign: 'center', background: 'rgba(0,0,0,0.6)', color: '#fff' }}>
           {t('record.pending.badge')}
         </span>
       ) : null}
       {marker}
-    </button>
+    </div>
   );
-}
+});
 
 function SelectedPhoto({ vm, state, post }: { vm: RecordViewModel; state: RecordState; post: CalendarPost }): ReactNode {
   const tooltipId = useId();
   const pending = post.status === 'PENDING';
   return (
     <section data-testid="record.selected-photo" style={{ position: 'relative', padding: '12px 16px' }}>
-      <img src={post.thumbnailImageUrl} alt={webOnlyCopy['record.selected-photo-alt']} style={{ display: 'block', width: '100%', borderRadius: 8, background: '#e5e5e5' }} />
+      <img src={post.thumbnailImageUrl} alt={webOnlyCopy['record.selected-photo-alt']} crossOrigin="anonymous" style={{ display: 'block', width: '100%', borderRadius: 8, background: '#e5e5e5' }} />
       {pending ? (
         <div style={{ position: 'absolute', top: 20, left: 24 }}>
           <button
