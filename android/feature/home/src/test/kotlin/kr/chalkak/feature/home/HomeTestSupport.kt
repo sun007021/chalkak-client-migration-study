@@ -60,12 +60,13 @@ fun TestScope.rig(
     mode: HomeMode = HomeMode.Member,
     clock: FakeClock = FakeClock(),
     diagnostics: HomeDiagnostics = HomeDiagnostics.Ignore,
+    creations: kotlinx.coroutines.flow.Flow<kr.chalkak.core.data.upload.PostCreated> = kotlinx.coroutines.flow.emptyFlow(),
 ): Rig {
     val home = FakeHomeRepository()
     val banners = FakeBannerRepository()
     val likes = RecordingLikeToggler()
     val analytics = RecordingAnalytics()
-    val holder = HomeStateHolder(holderScope(), clock, home, banners, likes, analytics, mode, diagnostics)
+    val holder = HomeStateHolder(holderScope(), clock, home, banners, likes, analytics, mode, diagnostics, creations)
     return Rig(holder, home, banners, likes, analytics, clock, collectAll(holder.state), collectAll(holder.effects))
 }
 

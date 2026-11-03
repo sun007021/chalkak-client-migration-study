@@ -24,6 +24,8 @@ class UpdateGate extends ChangeNotifier {
     required this._checker,
     required this._launcher,
     required this._enabled,
+    required this._exit,
+    required this.cancelAvailable,
     Stream<void>? recheckSignals,
   }) {
     _signalSubscription = recheckSignals?.listen((_) => unawaited(check()));
@@ -32,6 +34,10 @@ class UpdateGate extends ChangeNotifier {
   final UpdateChecker _checker;
   final UpdateLauncher _launcher;
   final bool _enabled;
+  final AppExit _exit;
+
+  /// "취소" 버튼을 보이는 플랫폼 정책(Android true, iOS false). 주입값이다.
+  final bool cancelAvailable;
   StreamSubscription<void>? _signalSubscription;
   UpdateGateStatus _status = UpdateGateStatus.checking;
   Future<void>? _checking;
@@ -72,16 +78,32 @@ class UpdateGate extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// "업데이트" 버튼. 진행 중이면 무시(연타해도 launcher 1회). 끝난 뒤에도
-  /// 강제 상태가 남아 있으면 forced 유지(Android 취소·실패 포함, 앱을 종료하지 않는다).
+  /// "업데이트" 버튼. 진행 중이면 무시(연타해도 launcher 1회). 스토어를 열었든 아니든 다이얼로그는
+  /// 닫히지 않고, 돌아온 뒤에도 강제 상태가 남아 있으면 forced 유지. 어떤 스토어 주소도 열지 못하면
+  /// [cancelAvailable]인 플랫폼(Android)에서는 앱을 종료한다.
   Future<void> openStore() =>
       _opening ??= _open().whenComplete(() => _opening = null);
 
   Future<void> _open() async {
+    var opened = false;
     try {
-      await _launcher.launch();
+      opened = await _launcher.launch();
     } on Object {
-      // 취소·실패해도 강제 상태는 그대로 둔다.
+      opened = false;
+    }
+    if (!opened && cancelAvailable) await _quit();
+  }
+
+  /// "취소" 버튼. [cancelAvailable]인 플랫폼(Android)에서만 앱을 종료한다. iOS는 아무 일도 없다.
+  Future<void> cancel() async {
+    if (cancelAvailable) await _quit();
+  }
+
+  Future<void> _quit() async {
+    try {
+      await _exit.exit();
+    } on Object {
+      // 종료 호출이 실패해도 강제 상태는 그대로 둔다.
     }
   }
 

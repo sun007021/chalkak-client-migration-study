@@ -138,12 +138,15 @@ class FakeSignatureRenderer implements SignatureRenderer {
 
 class FakeExternalLinkLauncher implements ExternalLinkLauncher {
   bool result = true;
+
+  /// 있으면 호출 순서대로 하나씩 꺼내 쓴다(비면 [result]).
+  List<bool> results = [];
   final List<Uri> opened = [];
 
   @override
   Future<bool> open(Uri url) async {
     opened.add(url);
-    return result;
+    return results.isNotEmpty ? results.removeAt(0) : result;
   }
 }
 

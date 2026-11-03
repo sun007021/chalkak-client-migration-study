@@ -36,15 +36,17 @@ describe('PushPermissionCoordinator', () => {
     expect(h.gateway.requestCalls).toBe(1);
   });
 
-  it('TC-PUSH-009 요청함 표시가 있으면(앱 재시작 포함) 다시 요청하지 않는다', async () => {
-    const h = setup('undetermined', true);
-    h.boot.toMain('member');
-    await settle();
-    expect(h.gateway.requestCalls).toBe(0);
+  it('TC-PUSH-009 TC-PUSH-003 요청함 표시가 있으면(앱 재시작 포함) 권한 상태와 관계없이 다시 묻지 않는다', async () => {
+    for (const status of ['undetermined', 'granted', 'denied'] as const) {
+      const h = setup(status, true);
+      h.boot.toMain('member');
+      await settle();
+      expect(h.gateway.requestCalls).toBe(0);
+    }
   });
 
   it.each(['granted', 'denied'] as const)(
-    'REQ-PUSH-004 이미 %s로 결정된 상태면 대화상자 없이 요청함 표시만 저장한다',
+    'TC-PUSH-002 REQ-PUSH-004 이미 %s로 결정된 상태면 앱 안내·OS 대화상자 없이 요청함 표시만 저장한다(스펙 우선: 카탈로그의 앱 안내 다이얼로그는 만들지 않는다)',
     async (status) => {
       const h = setup(status);
       h.boot.toMain('member');
@@ -77,13 +79,25 @@ describe('PushPermissionCoordinator', () => {
     expect(h.gateway.requestCalls).toBe(1);
   });
 
-  it('REQ-PUSH-005 권한 결과(허용·거부)와 상관없이 서버 설정을 바꾸지 않는다(코디네이터는 설정 API 의존성이 없다)', async () => {
+  it('TC-PUSH-005 REQ-PUSH-005 권한 결과(허용·거부)와 상관없이 서버 설정을 바꾸지 않는다(코디네이터는 설정 API 의존성이 없다)', async () => {
     const h = setup();
     h.gateway.resultOnRequest = 'denied';
     h.boot.toMain('member');
     await settle();
     expect(h.toast.messages).toEqual([]);
   });
+
+  it.each(['granted', 'denied'] as const)(
+    'TC-PUSH-006 스펙 우선: 권한 결과 %s에도 설정 저장 단계가 없어 저장 실패 문구를 보이지 않는다',
+    async (result) => {
+      const h = setup();
+      h.gateway.resultOnRequest = result;
+      h.boot.toMain('member');
+      await settle();
+      expect(h.toast.messages).toEqual([]);
+      expect(h.flags.requested).toBe(true);
+    },
+  );
 
   it('TC-PUSH-007 REQ-PUSH-006 요청 호출이 실패하면 noti.perm.error 토스트를 보이고 요청함 표시는 저장한다', async () => {
     const h = setup();

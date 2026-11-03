@@ -64,6 +64,8 @@ GoRouter createAppRouter(
                   : AppRoutes.main,
             ),
             onUpdatePressed: dependencies.updateGate.openStore,
+            onCancelPressed: dependencies.updateGate.cancel,
+            showCancel: dependencies.updateGate.cancelAvailable,
           ),
         ),
       ),

@@ -82,9 +82,9 @@ class FakeUpdateChecker(var result: UpdateCheckResult = UpdateCheckResult.UpToDa
     override suspend fun check(): UpdateCheckResult = result
 }
 
-class FakeUpdateLauncher : UpdateLauncher {
+class FakeUpdateLauncher(var result: UpdateFlowResult = UpdateFlowResult.Cancelled) : UpdateLauncher {
     var calls = 0
-    override suspend fun launch(): UpdateFlowResult { calls++; return UpdateFlowResult.Cancelled }
+    override suspend fun launch(): UpdateFlowResult { calls++; return result }
 }
 
 class FakePreloader : HomePreloader {

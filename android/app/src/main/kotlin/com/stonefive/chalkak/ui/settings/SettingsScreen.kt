@@ -55,7 +55,6 @@ import com.stonefive.chalkak.ui.components.Loading
 import com.stonefive.chalkak.ui.components.ScreenGoneEffect
 import com.stonefive.chalkak.ui.theme.ChalkakTheme
 import kr.chalkak.core.data.settings.PushSetting
-import kr.chalkak.feature.auth.AccountEffect
 import kr.chalkak.feature.auth.AccountUiState
 import kr.chalkak.feature.auth.ConfirmDialog
 import kr.chalkak.feature.auth.ConfirmKind
@@ -372,7 +371,8 @@ private fun ConfirmDialogCard(dialog: ConfirmDialog, busy: Boolean, callbacks: S
  * - effects: settings (`OpenFeedback` -> [onOpenFeedback], `Toast` -> [showToast], `ShowDocument` -> [onShowDocument],
  *   `DocumentCannotOpen` -> toast), signature card (`Toast` -> [showToast] and the inline error, `GoLogin` -> [onLoginRequired]),
  *   push (`Toast` -> [showToast] and, for the load error, the inline error; `GoLogin` -> [onLoginRequired];
- *   `OpenSystemNotificationSettings` -> [onOpenSystemNotificationSettings]), account (`GoToLogin` -> [onAccountEnded]).
+ *   `OpenSystemNotificationSettings` -> [onOpenSystemNotificationSettings]),
+ *   the account effect (`GoToLogin`) is collected by the host, which stays composed while another tab is open.
  * - the account toast (`AccountUiState.toastKey`) is shown through [showToast] and then consumed with `account.onToastShown()`.
  * - "변경하기" -> [onChangeSignature]; the signature / push retry buttons call the respective holder's `onTabShown()`.
  */
@@ -385,7 +385,6 @@ fun SettingsRoute(
     onChangeSignature: () -> Unit,
     onShowDocument: (kind: TermsKind, url: String) -> Unit,
     onOpenSystemNotificationSettings: () -> Unit,
-    onAccountEnded: () -> Unit,
     onLoginRequired: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -399,7 +398,6 @@ fun SettingsRoute(
     val latestFeedback by rememberUpdatedState(onOpenFeedback)
     val latestDocument by rememberUpdatedState(onShowDocument)
     val latestSystem by rememberUpdatedState(onOpenSystemNotificationSettings)
-    val latestEnded by rememberUpdatedState(onAccountEnded)
     val latestLogin by rememberUpdatedState(onLoginRequired)
     val latestChange by rememberUpdatedState(onChangeSignature)
 
@@ -433,13 +431,6 @@ fun SettingsRoute(
                 }
                 PushSettingsEffect.GoLogin -> latestLogin()
                 PushSettingsEffect.OpenSystemNotificationSettings -> latestSystem()
-            }
-        }
-    }
-    LaunchedEffect(holders.account) {
-        holders.account.effects.collect { effect ->
-            when (effect) {
-                AccountEffect.GoToLogin -> latestEnded()
             }
         }
     }
