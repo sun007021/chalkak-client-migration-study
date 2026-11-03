@@ -16,6 +16,7 @@ import kr.chalkak.core.network.testing.NetHarness
 import kr.chalkak.core.network.testing.TestSessions
 import kr.chalkak.core.network.testing.error
 import kr.chalkak.core.network.testing.httpError
+import kr.chalkak.core.network.testing.loopbackUrl
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -37,7 +38,7 @@ class PostImageUploaderTest {
             h.dispatcher.enqueue(path, fx("s3-put__200.json"))
             val webp = ByteArray(2048) { (it * 7 % 251).toByte() }
             val result = PresignedPostImageUploader(h.client, OkHttpFactory.uploadClient())
-                .put(h.server.url("$path?X-Amz-Expires=300").toString(), "image/webp", webp)
+                .put(h.server.loopbackUrl("$path?X-Amz-Expires=300"), "image/webp", webp)
             assertEquals(ApiResult.Success(Unit), result)
             val req = h.dispatcher.recorded.single()
             assertEquals("PUT", req.method)
@@ -111,7 +112,7 @@ class PostImageUploaderTest {
             // The PUT is idempotent, so a timeout is retried (twice) before it is reported.
             h.dispatcher.enqueue(path, *Array(3) { fx("s3-put__200.json").setHeadersDelay(2, TimeUnit.SECONDS) })
             val result = PresignedPostImageUploader(h.client, client)
-                .put(h.server.url("$path?X-Amz-Expires=300").toString(), "image/webp", byteArrayOf(1))
+                .put(h.server.loopbackUrl("$path?X-Amz-Expires=300"), "image/webp", byteArrayOf(1))
             assertEquals(ApiError.Network(NetworkKind.TIMEOUT), result.error())
         }
     }

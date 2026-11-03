@@ -95,7 +95,7 @@ class SignupDependencies(
  *   onExitApp)` instead of [mainContent]; null keeps [mainContent] (A2 tests).
  * - [signup]: the drawing/preview holders; null leaves the signature routes unreachable (tests that stop at the terms screen).
  * - [authEvents]: `AuthEvent.GoToLogin` (a 401 that survived the refresh) ends the session on the navigation controller too.
- * - [onExitApp]: system back on a root screen.
+ * - [onExitApp]: system back on a root screen, and a cancelled or failed update flow (REQ-BOOT-009).
  */
 class RootDependencies(
     val bootGate: BootGate,
@@ -134,6 +134,8 @@ fun ChalkakRoot(copy: Copy, deps: RootDependencies, modifier: Modifier = Modifie
     ProvideCopy(copy) {
         val session = rememberStateHolder { RootSession() }
         val boot by deps.bootGate.state.collectAsState()
+        // REQ-BOOT-009: a cancelled or failed update flow closes the app.
+        LaunchedEffect(deps.bootGate) { deps.bootGate.exitRequests.collect { deps.onExitApp() } }
         Box(
             modifier = modifier
                 .fillMaxSize()
@@ -142,7 +144,7 @@ fun ChalkakRoot(copy: Copy, deps: RootDependencies, modifier: Modifier = Modifie
         ) {
             when (val current = boot) {
                 BootState.Splash -> SplashScreen()
-                BootState.UpdateRequired -> UpdateGateDialog(onUpdateClick = deps.bootGate::onUpdateClicked)
+                BootState.UpdateRequired -> UpdateGateDialog(onUpdateClick = deps.bootGate::onUpdateClicked, onCancelClick = deps.bootGate::onCancelClicked)
                 is BootState.Login, is BootState.Home -> RoutedScreens(current, deps, session)
             }
             ToastLayer(toast = session.toast, onExpired = session::expireToast)
