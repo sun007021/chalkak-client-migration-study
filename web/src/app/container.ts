@@ -68,6 +68,11 @@ import { SignaturePreviewViewModel } from '../features/signature/SignaturePrevie
 import { CanvasSignatureRasterizer } from '../features/signature/SignatureRasterizer';
 import type { SignatureRasterizer } from '../features/signature/SignatureRasterizer';
 import { SignatureRepository } from '../features/signature/SignatureRepository';
+import { FeedbackRepository } from '../features/feedback/FeedbackRepository';
+import { FeedbackViewModel } from '../features/feedback/FeedbackViewModel';
+import { NotificationSettingsRepository } from '../features/settings/NotificationSettingsRepository';
+import { NotificationSettingsStore } from '../features/settings/NotificationSettingsStore';
+import { SettingsViewModel } from '../features/settings/SettingsViewModel';
 import { GuestGate } from '../features/shell/GuestGate';
 import { MainShellViewModel } from '../features/shell/MainShellViewModel';
 import type { UploadEntry } from '../features/shell/UploadEntry';
@@ -128,6 +133,8 @@ export interface AppContainerOptions {
   visibilityObserver?: VisibilityObserverFactory | null;
   /** presigned 업로드 URL에 loopback http를 허용할지. 기본은 개발 빌드(__UPLOAD_PROXY_ENABLED__)에서만 true, 배포 빌드는 https만. */
   allowLoopbackUploadHttp?: boolean;
+  /** 설정 버전정보 행의 값(빌드 버전 문자열). 기본은 package.json의 version(빌드 define). */
+  appVersion?: string;
   /** 업로드 버튼(회원)이 부르는 진입. 기본 UploadGate(container.uploadGate). 테스트가 Fake로 덮어쓰면 uploadGate는 null. */
   uploadEntry?: UploadEntry;
   /** 사진 디코드(EXIF 반영·다운샘플). 기본 BrowserImageDecoder. */
@@ -204,6 +211,11 @@ export interface AppContainer {
   /** 설정 사인 카드가 쓸 데이터. 사인 변경 성공 뒤 재조회한다. UserCaches에 등록되어 계정 전환 시 비워진다. */
   signatureCard: SignatureCardController;
   homeRepository: HomeRepository;
+  /** 설정 버전정보 행의 값. */
+  appVersion: string;
+  /** 푸시 수신 설정(W11). UserCaches에 등록되어 계정 전환 시 비워진다. */
+  notificationSettings: NotificationSettingsStore;
+  feedbackRepository: FeedbackRepository;
   /** 공개 API(/banners). 토큰을 붙이지 않는다. */
   bannerRepository: BannerRepository;
   signupService: SignupService;
@@ -228,6 +240,10 @@ export interface AppContainer {
   /** 메인 셸이 마운트될 때마다 새 ViewModel을 만든다. */
   createMainShellViewModel(mode: SessionMode): MainShellViewModel;
   createTermsViewModel(): TermsViewModel;
+  /** 설정 탭이 마운트될 때마다 새 ViewModel을 만든다. */
+  createSettingsViewModel(mode: SessionMode): SettingsViewModel;
+  /** 피드백 화면이 마운트될 때마다 새 ViewModel을 만든다. */
+  createFeedbackViewModel(): FeedbackViewModel;
   /**
    * 홈 ViewModel은 모드별로 하나를 보관한다(REQ-HOME-040: 탭을 오가도 화면을 비우지 않고 다시 보일 때 조용히 갱신).
    * 다른 모드(게스트 ↔ 회원)를 요청하면 이전 것은 dispose한다. 계정 전환·로그아웃 때는 UserCaches가 처음 상태로 돌린다(보이고 있으면 곧바로 재로드).
@@ -329,6 +345,9 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
   const signatureRepository = new SignatureRepository({ api });
   const signatureCard = new SignatureCardController({ repository: signatureRepository, toast });
   userCaches.register(signatureCard);
+  const notificationSettings = new NotificationSettingsStore({ repository: new NotificationSettingsRepository({ api }), toast });
+  userCaches.register(notificationSettings);
+  const feedbackRepository = new FeedbackRepository({ api });
   let homeSession: { mode: SessionMode; viewModel: HomeViewModel; navigator: AttachableHomeNavigator } | null = null;
   userCaches.register({ clear: () => homeSession?.viewModel.resetForAccountChange() });
   const postChanges = new PostChanges();
@@ -426,6 +445,9 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     signatureRepository,
     signatureCard,
     homeRepository,
+    appVersion: options.appVersion ?? '0.0.0',
+    notificationSettings,
+    feedbackRepository,
     displayRepository: new DisplayRepository({ api }),
     feedRepository: new FeedRepository({ api }),
     aiReviews,
@@ -463,6 +485,20 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     },
     createTermsViewModel() {
       return new TermsViewModel({ launcher: new LegalDocumentLauncher({ opener: this.externalLinkOpener }), signupDraft: this.signupDraft });
+    },
+    createSettingsViewModel(mode) {
+      return new SettingsViewModel({
+        mode,
+        signatureCard: this.signatureCard,
+        notifications: this.notificationSettings,
+        account: this.accountService,
+        launcher: new LegalDocumentLauncher({ opener: this.externalLinkOpener }),
+        session: this.store,
+        appVersion: this.appVersion,
+      });
+    },
+    createFeedbackViewModel() {
+      return new FeedbackViewModel({ repository: this.feedbackRepository, toast: this.toast });
     },
     homeSession(mode) {
       if (homeSession?.mode !== mode) {
