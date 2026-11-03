@@ -31,10 +31,11 @@
 | 화면   | 요소                | testID                      | 비고                                                       |
 | ------ | ------------------- | --------------------------- | ---------------------------------------------------------- |
 | splash | 스플래시 로고       | `splash.logo`               | 스플래시 동안만 존재 (BOOT)                                |
-| splash | 업데이트 다이얼로그 | `update-gate.dialog`        | 닫을 수 없음. iOS 계열·Android 계열에서만 존재, Web은 없음 |
+| splash | 업데이트 다이얼로그 | `update-gate.dialog`        | 바깥 탭·뒤로가기로 닫을 수 없음. iOS 계열·Android 계열에서만 존재, Web은 없음 |
 | splash | 업데이트 제목       | `update-gate.title`         | "업데이트가 필요해요"                                      |
 | splash | 업데이트 본문       | `update-gate.message`       |                                                            |
-| splash | 업데이트 버튼       | `update-gate.update-button` | 스토어 열기                                                |
+| splash | 업데이트 버튼       | `update-gate.update-button` | 스토어 앱 상세 열기                                         |
+| splash | 업데이트 취소 버튼    | `update-gate.cancel-button` | Android 계열만. 누르면 앱 종료                                 |
 
 ### 로그인
 

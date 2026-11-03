@@ -226,6 +226,9 @@ abstract final class Copy {
   /// `boot.update.button`
   static const bootUpdateButton = '업데이트';
 
+  /// `boot.update.cancel`
+  static const bootUpdateCancel = '취소';
+
   /// `boot.update.title`
   static const bootUpdateTitle = '업데이트가 필요해요';
 

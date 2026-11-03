@@ -156,7 +156,10 @@
 
 - 배경: iOS는 iTunes lookup으로 major/minor만 비교, Android는 Play In-App Update priority ≥ 1(iOS §1.2, AN §1.3). 서버 규칙 없음(API §8.2-17).
 - 결정: 플랫폼별로 둔다. iOS native·Flutter(iOS)·RN(iOS)는 iTunes lookup 방식, Android native·Flutter(Android)·RN(Android)는 Play In-App Update 방식, Web은 게이트 없음(새 배포는 새로고침으로 반영). 조회 실패·오프라인이면 통과한다(Android의 "온라인인데 확인 실패면 차단"은 따르지 않는다. 스토어 장애로 앱을 막지 않기 위해). 이 레포 앱은 스토어에 올리지 않으므로 **게이트 로직과 테스트만 만들고 실제 조회는 설정으로 끈다**.
-- 다이얼로그 문구: "업데이트가 필요해요" / "원활한 서비스 이용을 위해 최신 버전으로 업데이트해 주세요." / "업데이트". 닫을 수 없다.
+- 다이얼로그 문구: "업데이트가 필요해요" / "원활한 서비스 이용을 위해 최신 버전으로 업데이트해 주세요." / "업데이트". 바깥 탭·뒤로가기로 닫을 수 없다.
+- 갱신(2026-11-03, 사용자 결정): "업데이트" 버튼은 모든 플랫폼에서 스토어 앱 상세로 바로 이동한다(Android 계열은 Play In-App Update 흐름을 쓰지 않고 `market://details?id=<패키지>`, 실패하면 `https://play.google.com/store/apps/details?id=<패키지>`). 스토어에서 업데이트 없이 돌아오면 다이얼로그가 그대로 남는다.
+  - iOS 계열: 버튼은 "업데이트" 하나뿐이며 대화상자는 닫히지 않는다.
+  - Android 계열: "취소" 버튼(`boot.update.cancel`, testID `update-gate.cancel-button`)이 추가로 있고, 누르면 앱을 종료한다. 스토어를 열지 못해도 앱을 종료한다.
 
 ## D-16 로그아웃·탈퇴
 
