@@ -13,6 +13,8 @@ export const ROUTES = {
   /** 설정에서 들어오는 사인 변경 화면(탭 셸 밖, 하단 바 없음). */
   changeSignature: '/settings/signature',
   changeSignaturePreview: '/settings/signature/preview',
+  /** 피드백 보내기(설정에서 push, 회원만, 탭 셸 밖). */
+  feedback: '/feedback',
   /** 알림함(홈 벨). 회원만, 탭 셸 밖. */
   notifications: '/notifications',
   /** 알림 상세 라우트 패턴. 실제 경로는 notificationDetailPath. */

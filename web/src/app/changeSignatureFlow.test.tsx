@@ -5,12 +5,14 @@ import { loadFixture, memberSession } from '../test/fixtures';
 import { screenViews } from '../test/screenViews';
 import { CARD_GET, CHANGE_CONFIRM, CHANGE_PUT, CHANGE_UPLOADS, fx, routeChange, sequence } from '../test/signatureRoutes';
 import { drawStroke, stubCanvasRect } from '../test/signatureDrawing';
+import { SETTINGS_GET, routeSettings } from '../test/settingsHarness';
 
 const STROKE = [{ x: 100, y: 100 }, { x: 300, y: 220 }, { x: 520, y: 140 }];
 
-/** 설정 탭에서 시작해(설정 화면은 다음 PR이라 자리표시) 사인 변경 화면을 push로 연다. */
+/** 설정 탭에서 시작해 사인 변경 화면을 push로 연다. 설정 화면이 진입 때 사인(GET /users/me/signature)과 푸시 설정(GET /notification-settings)을 조회하므로 먼저 등록한다. */
 async function startFromSettings(options: { strict?: boolean } = {}) {
   const h = makeHarness({ session: memberSession() });
+  routeSettings(h.ff);
   const view = renderApp(h.container, '/settings', options);
   await screen.findByTestId('settings.root');
   await act(async () => view.router.navigate('/settings/signature', { state: SETTINGS_BELOW_STATE }));
@@ -33,8 +35,11 @@ describe('사인 변경 전체 흐름 (설정 → 그리기 → 미리보기 →
     fireEvent.click(screen.getByTestId('signature-preview.confirm-button'));
     await waitFor(() => expect(path()).toBe('/settings'));
     expect(await screen.findByTestId('toast.message')).toHaveTextContent('사인 반영까지 시간이 좀 걸릴 수 있어요!');
-    await waitFor(() => expect(h.ff.callsTo(CARD_GET)).toHaveLength(1));
-    expect(sequence(h.ff).slice(0, 4)).toEqual([CHANGE_UPLOADS, CHANGE_PUT, CHANGE_CONFIRM, CARD_GET]);
+    await act(async () => void (await h.clock.advance(1_000)));
+    await act(async () => void (await h.clock.advance(1_000)));
+    // 설정 첫 진입(사인, 푸시) → 변경 3단계 → 설정 복귀 시 재진입 조회와 변경 성공 뒤 재조회(사인 2회) + 푸시 1회.
+    expect(sequence(h.ff)).toEqual([CARD_GET, SETTINGS_GET, CHANGE_UPLOADS, CHANGE_PUT, CHANGE_CONFIRM, CARD_GET, CARD_GET, SETTINGS_GET]);
+    expect(h.ff.callsTo(CARD_GET)).toHaveLength(3);
     expect(h.container.signatureCard.state.status).toBe('content');
   });
 
@@ -62,11 +67,16 @@ describe('사인 변경 전체 흐름 (설정 → 그리기 → 미리보기 →
 
   it('TC-SIGN-042 그리기 도중 뒤로 가기로 설정에 돌아오면 서버 호출이 0건이고 사인 카드는 그대로이다', async () => {
     const { h, canvas, router, path } = await startFromSettings();
+    await waitFor(() => expect(h.container.signatureCard.state.status).toBe('content'));
+    const before = h.container.signatureCard.state.imageUrl;
     drawStroke(canvas, STROKE);
     await act(async () => router.navigate(-1));
     await waitFor(() => expect(path()).toBe('/settings'));
-    expect(h.ff.calls).toHaveLength(0);
-    expect(h.container.signatureCard.state).toEqual({ status: 'idle', imageUrl: null });
+    await screen.findByTestId('settings.signature-image');
+    await act(async () => void (await h.clock.advance(1_000)));
+    // 변경 흐름의 서버 호출은 0건이다: 설정 첫 진입과 복귀 때의 조회(사인, 푸시)가 두 번씩뿐이다.
+    expect(sequence(h.ff)).toEqual([CARD_GET, SETTINGS_GET, CARD_GET, SETTINGS_GET]);
+    expect(h.container.signatureCard.state).toEqual({ status: 'content', imageUrl: before });
   });
 
   it('TC-SIGN-029 서버가 사인을 거절하면 그리기 화면으로 돌아가 빈 패드에서 다시 그려 변경할 수 있다', async () => {
@@ -107,7 +117,7 @@ describe('사인 변경 전체 흐름 (설정 → 그리기 → 미리보기 →
       release();
       await h.clock.advance(0);
     });
-    expect(h.ff.callsTo(CARD_GET)).toHaveLength(0);
+    expect(h.ff.callsTo(CARD_GET)).toHaveLength(1); // 설정이 처음 열릴 때의 조회뿐이고 변경 성공 뒤 재조회는 없다
     expect(h.container.signatureCard.state).toEqual({ status: 'idle', imageUrl: null });
     expect(screen.queryByText('사인 반영까지 시간이 좀 걸릴 수 있어요!')).not.toBeInTheDocument();
   });

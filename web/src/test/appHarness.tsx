@@ -76,6 +76,8 @@ export function makeHarness(
     photoEditor?: PhotoEditorComponent | null;
     /** true면 photoEditor를 생략해 컨테이너의 실제 편집기(Fake 디코더·미리보기·분석기 위)를 쓴다. */
     realEditor?: boolean;
+    /** 설정 버전정보 행의 값. 생략하면 컨테이너 기본값. */
+    appVersion?: string;
   } = {},
 ): Harness {
   const clock = new FakeClock(NOW);
@@ -122,6 +124,7 @@ export function makeHarness(
     externalLinkOpener: opener,
     signatureRasterizer: rasterizer,
     blobUrls,
+    appVersion: options.appVersion,
     calendarImageExporter: calendarExporter,
     fileDownloader: downloader,
   });

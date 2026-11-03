@@ -2,10 +2,14 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { uploadProxyPlugin } from './vite/uploadProxyPlugin.ts';
 
 // 개발 서버는 /api/v1/admin 외에는 CORS를 열지 않는다(open-questions Q-01).
 // 브라우저는 같은 출처의 /api 로 부르고, dev·preview 서버가 PROXY_TARGET 으로 넘긴다.
+// 설정 화면의 버전정보 행. package.json의 version을 빌드 시점에 넣는다.
+const appVersion = (JSON.parse(readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf8')) as { version: string }).version;
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   // PROXY_TARGET은 공개 개발 서버 주소이며 비밀이 아니다(.env.example 참고).
@@ -19,6 +23,7 @@ export default defineConfig(({ mode }) => {
   const devSessionEnabled = mode !== 'production' || env.VITE_ENABLE_DEV_SESSION === 'true';
   return {
     define: {
+      __APP_VERSION__: JSON.stringify(appVersion),
       __DEV_SESSION_ENABLED__: JSON.stringify(devSessionEnabled),
       // presigned PUT 개발 프록시 경유 여부. 꺼진 빌드(기본 배포 빌드)에서는 DevProxyUploadUrlRewriter와 /__upload-proxy 접두가 번들에서 빠진다.
       __UPLOAD_PROXY_ENABLED__: JSON.stringify(mode !== 'production' || env.VITE_UPLOAD_PROXY === 'true'),

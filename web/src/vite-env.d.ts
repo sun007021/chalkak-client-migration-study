@@ -14,3 +14,6 @@ declare const __DEV_SESSION_ENABLED__: boolean;
 
 /** vite.config.ts의 define이 치환한다(`mode !== 'production' || VITE_UPLOAD_PROXY === 'true'`). src/app/bootstrap.tsx 한 곳에서만 읽는다. */
 declare const __UPLOAD_PROXY_ENABLED__: boolean;
+
+/** vite.config.ts의 define이 package.json의 version으로 치환한다. src/app/container.ts의 appVersion 기본값에만 쓴다. */
+declare const __APP_VERSION__: string;
