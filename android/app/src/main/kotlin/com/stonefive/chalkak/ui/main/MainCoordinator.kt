@@ -12,9 +12,19 @@ import kr.chalkak.feature.home.HomeEffect
 import kr.chalkak.feature.navigation.FeedSource
 import kr.chalkak.feature.navigation.NavOutcome
 import kr.chalkak.feature.navigation.NavigationController
+import kr.chalkak.feature.navigation.OpenVia
+import kr.chalkak.feature.navigation.RouteRules
 import kr.chalkak.feature.navigation.Route
 import kr.chalkak.feature.navigation.Tab
+import kr.chalkak.feature.navigation.TermsDocumentKind
+import kr.chalkak.feature.navigation.AccessMode
+import kr.chalkak.feature.onboarding.TermsKind
+import com.stonefive.chalkak.ui.settings.SettingsHolders
 import java.time.LocalDate
+import kr.chalkak.feature.notification.NavCommand
+import kr.chalkak.feature.notification.NavMode
+import kr.chalkak.feature.notification.NotificationDestination
+import kr.chalkak.feature.notification.PushNavigationEvent
 import kr.chalkak.feature.upload.UploadCopyKeys
 import kr.chalkak.feature.upload.SuccessInfo
 import kr.chalkak.feature.upload.UploadGateEffect
@@ -152,13 +162,143 @@ class MainCoordinator(
      */
     fun onFeedLoginRequired() = Unit
 
-    private fun open(route: Route) {
+    // ---- notifications and push taps -------------------------------------------------------------------------------------
+
+    /**
+     * Executes a destination of the notification table (D-11): an inbox row's `Navigate` effect and a queue-released push tap.
+     * [NavMode.Push] adds the screen, [NavMode.ReplaceTop] replaces the same post / notification on top with a fresh one,
+     * [NavMode.AlreadyThere] only runs the side effects of being on home.
+     */
+    fun onNotificationNavigate(command: NavCommand) {
+        when (val destination = command.destination) {
+            is NotificationDestination.Home -> goHome(destination, command.mode)
+            is NotificationDestination.PostDetail -> openPostDetail(destination)
+            is NotificationDestination.NotificationDetail -> {
+                val route = Route.NotificationDetail(destination.notificationId)
+                val replacing = RouteRules.sameDestination(nav.top, route)
+                if (replacing) session.notificationDetailSerial++
+                openFromNotification(route)
+            }
+            NotificationDestination.Inbox -> {
+                val replacing = nav.top == Route.Notifications
+                if (replacing) session.inboxSerial++
+                openFromNotification(Route.Notifications)
+            }
+        }
+    }
+
+    /** What `PushTapQueue` released: the queue decided when, this decides how. */
+    fun onPushEvent(event: PushNavigationEvent) {
+        when (event) {
+            is PushNavigationEvent.Go -> {
+                event.toastCopyKey?.let { showToast(copy[it]) }
+                onNotificationNavigate(event.command)
+            }
+            is PushNavigationEvent.Toast -> showToast(copy[event.copyKey])
+            // The login screen is reached through AuthEvent.GoToLogin (the network layer reports the same 401); nothing to do here.
+            PushNavigationEvent.RequireLogin -> Unit
+        }
+    }
+
+    /** "알림함으로" on a detail that has no inbox below it: the inbox takes the detail's place. */
+    fun onOpenInboxInsteadOfDetail() {
+        if (nav.top is Route.NotificationDetail) nav.onSystemBack()
+        open(Route.Notifications)
+    }
+
+    private fun goHome(destination: NotificationDestination.Home, mode: NavMode) {
+        val home = Route.TabRoot(Tab.Home)
+        val already = mode == NavMode.AlreadyThere || nav.top == home
+        // Pop to home; the home route's own `onShown` refreshes it silently, so only the already-there case asks for a refresh.
+        while (nav.top != home && nav.stack.size > 1 && nav.onSystemBack() is NavOutcome.Navigated) Unit
+        if (destination.scrollToTopAndRefresh) {
+            session.homeScroll.request()
+            if (already) session.homeRefresh.request()
+        }
+    }
+
+    private fun openPostDetail(destination: NotificationDestination.PostDetail) {
+        val route = Route.Feed(destination.postId, FeedSource.ById)
+        if (RouteRules.sameDestination(nav.top, route)) {
+            session.feeds.invalidate(nav.stack.lastIndex)
+            session.feedReplaceSerial++
+        }
+        session.aiSheetOnEntry[destination.postId] = destination.openAiFeedbackSheet
+        val outcome = nav.open(route, OpenVia.Push)
+        if (outcome is NavOutcome.Blocked) {
+            session.aiSheetOnEntry.remove(destination.postId)
+            showToast(copy[outcome.copyKey])
+        }
+    }
+
+    private fun openFromNotification(route: Route) {
+        val outcome = nav.open(route, OpenVia.Push)
+        if (outcome is NavOutcome.Blocked) showToast(copy[outcome.copyKey])
+    }
+
+    /** Settings "피드백 보내기": a fresh feedback holder for this visit. */
+    fun onOpenFeedback() {
+        if (open(Route.Feedback) is NavOutcome.Navigated) session.feedbackSerial++
+    }
+
+    /** Settings signature card "변경하기": the drawing screen with a blank pad. */
+    fun onOpenChangeSignature() {
+        if (open(Route.ChangeSignature) is NavOutcome.Navigated) {
+            session.changeSerial++
+            session.changePreviewSerial = 0
+            session.changePng = null
+        }
+    }
+
+    /** The pad produced [png]: the preview (a fresh upload holder) opens on top of the drawing screen. */
+    fun onChangeSignatureDrawn(png: ByteArray) {
+        session.changePng = png
+        if (open(Route.ChangeSignaturePreview) is NavOutcome.Navigated) session.changePreviewSerial++
+    }
+
+    /**
+     * Signature changed (REQ-NAV-033): drawing and preview leave the stack, the success toast shows and the settings card re-reads the
+     * signature. [settings] is null only when the settings tab is not wired.
+     */
+    fun onSignatureChanged(toastCopyKey: String, settings: SettingsHolders?) {
+        nav.onSignatureChanged()
+        session.changePng = null
+        showToast(copy[toastCopyKey])
+        settings?.settings?.onSignatureChangeFinished(true)
+    }
+
+    /**
+     * 401 on the signature change that survived the refresh: the login screen with the expiry toast. The network layer reports the same
+     * 401 as `AuthEvent.GoToLogin`, so the session may already be over; the toast shows either way.
+     */
+    fun onChangeSignatureExpired(copyKey: String) {
+        if (nav.top != Route.Login) nav.onSessionEnded()
+        showToast(copy[copyKey])
+    }
+
+    /** Settings terms / privacy row: the document sheet opens over the settings screen (an overlay: no new `screen_view` on close). */
+    fun onShowDocument(kind: TermsKind, url: String) {
+        session.documentUrl = url
+        open(Route.TermsDocument(if (kind == TermsKind.Service) TermsDocumentKind.TermsOfService else TermsDocumentKind.PrivacyPolicy))
+    }
+
+    /**
+     * Logout, withdrawal or the guest's login button finished: the login screen. Skipped when it is already there (the 401 that ends
+     * the session at the same time); members end the session, guests just go to login.
+     */
+    fun onAccountEnded() {
+        if (nav.top == Route.Login) return
+        if (nav.accessMode == AccessMode.Member) nav.onSessionEnded() else nav.onGuestLoginClicked()
+    }
+
+    private fun open(route: Route): NavOutcome {
         val outcome = nav.open(route)
         if (outcome is NavOutcome.Blocked) showToast(copy[outcome.copyKey])
         if (outcome !is NavOutcome.Navigated && outcome !is NavOutcome.Replaced && route is Route.Feed) {
             session.feedSeeds.remove(route.postId)
             session.recordSeeds.remove(route.postId)
         }
+        return outcome
     }
 
     private fun HomePost.toSeed() = PostSummary(

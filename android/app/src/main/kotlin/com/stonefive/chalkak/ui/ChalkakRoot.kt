@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import com.stonefive.chalkak.copy.Copy
 import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.copy.ProvideCopy
+import com.stonefive.chalkak.push.PushTapWiring
 import com.stonefive.chalkak.ui.boot.SplashScreen
 import com.stonefive.chalkak.ui.boot.UpdateGateDialog
 import com.stonefive.chalkak.ui.components.ToastLayer
@@ -108,6 +109,8 @@ class RootDependencies(
     val authEvents: Flow<AuthEvent> = emptyFlow(),
     val onExitApp: () -> Unit = {},
     val main: MainDependencies? = null,
+    /** Push tap queue and the navigation view it reads; null = push taps are not handled. */
+    val pushTaps: PushTapWiring? = null,
 )
 
 /** `home.root` placeholder until the home PR lands. */
@@ -163,6 +166,8 @@ private fun RoutedScreens(boot: BootState, deps: RootDependencies, session: Root
         }
     }
     val navState by nav.state.collectAsState()
+    // The push tap queue reads the navigation (top screen, blocking screens) on every screen, the login screen included.
+    LaunchedEffect(navState) { deps.pushTaps?.nav?.update(navState) }
 
     LaunchedEffect(nav) {
         deps.authEvents.collect { event ->
@@ -182,7 +187,7 @@ private fun RoutedScreens(boot: BootState, deps: RootDependencies, session: Root
         Route.OnboardingSignature -> SignatureScreenHost(nav, deps, session)
         Route.OnboardingSignaturePreview -> SignaturePreviewHost(nav, deps, session)
         else -> deps.main?.let { main ->
-            MainHost(nav, main, showToast = session::showToast, onExitApp = deps.onExitApp, sessionKey = session.mainEpoch)
+            MainHost(nav, main, showToast = session::showToast, onExitApp = deps.onExitApp, sessionKey = session.mainEpoch, pushEvents = deps.pushTaps?.queue?.events)
         } ?: deps.mainContent(navState.accessMode)
     }
 }

@@ -31,6 +31,15 @@ private struct DisplayScreen: View {
     @State private var isActive = false
     @State private var runTask: Task<Void, Never>?
     @State private var showsDatePicker = false
+    /// 스크롤 위치. 탭을 오가 뷰가 다시 만들어져도 ViewModel이 쥔 마지막 위치에서 시작한다(REQ-DISP-030).
+    @State private var scrollPosition: ScrollPosition
+
+    init(container: AppContainer, session: MainSession, viewModel: DisplayViewModel) {
+        self.container = container
+        self.session = session
+        self.viewModel = viewModel
+        _scrollPosition = State(initialValue: ScrollPosition(point: CGPoint(x: 0, y: viewModel.savedScrollOffset)))
+    }
 
     private var shell: MainShellViewModel { session.shell }
 
@@ -208,36 +217,42 @@ private struct DisplayScreen: View {
     }
 
     private var loadedContent: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: ChalkakSpacing.lg) {
-                    Color.clear.frame(height: 0).id(Self.topAnchor)
-                    header
-                    if viewModel.isRefreshing {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .accessibilityIdentifier("display.refresh-indicator")
-                    }
-                    if !viewModel.availableSorts.isEmpty { sortTabs }
-                    if !viewModel.featured.isEmpty { featuredPager }
-                    grid
-                    if viewModel.isPaging {
-                        ProgressView()
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .accessibilityIdentifier("display.load-more-indicator")
-                    }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: ChalkakSpacing.lg) {
+                header
+                if !viewModel.availableSorts.isEmpty { sortTabs }
+                if !viewModel.featured.isEmpty { featuredPager }
+                grid
+                if viewModel.isPaging {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .accessibilityIdentifier("display.load-more-indicator")
                 }
-                .padding(.horizontal, ChalkakSpacing.screenHorizontal)
-                .padding(.bottom, ChalkakSpacing.xl)
             }
-            .accessibilityIdentifier("display.scroll")
-            .onChange(of: viewModel.scrollToTopToken) { _, _ in
-                withAnimation { proxy.scrollTo(Self.topAnchor, anchor: .top) }
+            .padding(.horizontal, ChalkakSpacing.screenHorizontal)
+            .padding(.bottom, ChalkakSpacing.xl)
+        }
+        .scrollPosition($scrollPosition)
+        .onScrollGeometryChange(for: Double.self) { Double($0.contentOffset.y) } action: { _, offset in
+            viewModel.saveScrollOffset(offset)
+        }
+        // 재검증 표시는 내용 위에 띄워 둔다. 레이아웃에 끼워 넣으면 내용이 밀려 보던 위치가 튄다.
+        .overlay(alignment: .top) {
+            if viewModel.isRefreshing {
+                ProgressView()
+                    .padding(ChalkakSpacing.sm)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .padding(.top, ChalkakSpacing.sm)
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier("display.refresh-indicator")
             }
         }
+        .accessibilityIdentifier("display.scroll")
+        // 날짜·정렬 변경, 탭 재선택에서만 맨 위로 간다. 같은 날짜·정렬의 재검증은 위치를 건드리지 않는다.
+        .onChange(of: viewModel.scrollToTopToken) { _, _ in
+            withAnimation { scrollPosition.scrollTo(edge: .top) }
+        }
     }
-
-    private static let topAnchor = "display.top"
 
     // MARK: 정렬 탭
 

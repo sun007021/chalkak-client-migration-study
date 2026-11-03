@@ -21,6 +21,7 @@ import com.stonefive.chalkak.ui.main.MainHost
 import com.stonefive.chalkak.ui.main.TabPlaceholder
 import com.stonefive.chalkak.ui.main.UploadEntryGate
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.receiveAsFlow
 import kr.chalkak.core.data.post.LikeController
 import kr.chalkak.core.common.KstCalendar
 import kr.chalkak.core.common.testing.FakeClock
@@ -104,6 +105,9 @@ class MainRig(val mode: AccessMode = AccessMode.Member) {
     val recordRenderer = RecordingCalendarRenderer()
     val recordSaver = RecordingCalendarSaver()
 
+    /** Settings tab, feedback screen and change-signature flow (A9): fixture-like fakes behind the real holders. */
+    val settings = SettingsFakes()
+
     /** Every display holder / feed entry the host asked for, in order (a holder per request, not per recomposition). */
     val displayRequests = CopyOnWriteArrayList<Pair<LocalDate?, PostSort?>>()
     val feedEntries = CopyOnWriteArrayList<FeedEntry>()
@@ -118,6 +122,9 @@ class MainRig(val mode: AccessMode = AccessMode.Member) {
     /** AI feedback side: scripted repository and every holder the host asked for (one per stacked feed). */
     val aiRepo = FakeAiReviewRepository()
     val aiHolders = CopyOnWriteArrayList<AiReviewStateHolder>()
+
+    /** Notification side (inbox/detail holders, OS permission flow, push event channel). */
+    val noti = NotificationRig()
 
     init {
         posts.autoRespond()
@@ -154,6 +161,20 @@ class MainRig(val mode: AccessMode = AccessMode.Member) {
         newRecordHolder = { scope, recordMode ->
             RecordStateHolder(scope, postClock, recordRepo, changes, NoAnalytics, recordMode, recordRenderer, recordSaver)
         },
+        newNotificationInboxHolder = noti::newInboxHolder,
+        newNotificationDetailHolder = noti::newDetailHolder,
+        newAiReviewHolderOnEntry = { scope, openSheetOnEntry ->
+            noti.aiOpenFlags += openSheetOnEntry
+            AiReviewStateHolder(scope, aiRepo, user, KstCalendar(postClock), FakeMonotonicClock(), true, openSheetOnEntry).also { aiHolders += it }
+        },
+        notificationPermission = noti.permissionFlow,
+        homeUnread = noti.homeUnread,
+        newSettingsHolders = { scope, settingsMode -> settings.holders(scope, settingsMode) },
+        newFeedbackHolder = { scope -> settings.feedbackHolder(scope) },
+        newChangeSignaturePad = { settings.newPad() },
+        newSignatureChangeHolder = { scope -> settings.changeHolder(scope) },
+        legalWeb = settings.legalWeb,
+        openSystemNotificationSettings = { settings.systemSettingsOpened.incrementAndGet() },
     )
 
     @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
@@ -169,6 +190,7 @@ class MainRig(val mode: AccessMode = AccessMode.Member) {
                         toast = ToastUi(++toastIds, it)
                     },
                     onExitApp = { exits++ },
+                    pushEvents = noti.pushEvents.receiveAsFlow(),
                 )
                 ToastLayer(toast = toast, onExpired = { id -> if (toast?.id == id) toast = null })
             }
