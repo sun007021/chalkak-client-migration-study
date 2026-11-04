@@ -6,6 +6,9 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_dialog.dart';
+import '../../../core/ui/components/chalkak_states.dart';
 import '../../../core/ui/selectable_test_id.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/adjustment.dart';
@@ -49,11 +52,30 @@ class _PhotoEditScreenState extends State<PhotoEditScreen> {
   Widget build(BuildContext context) {
     final vm = widget.viewModel;
     // 사진 편집기는 어두운 배경에서 색을 보는 화면이라 앱 테마와 별개로 어둡게 쓴다.
-    final theme = ThemeData(
+    final tokens = context.tokens;
+    final c = tokens.colors;
+    final base = Theme.of(context);
+    final theme = base.copyWith(
       brightness: Brightness.dark,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: Theme.of(context).colorScheme.primary,
+      scaffoldBackgroundColor: c.editorBackground,
+      colorScheme: base.colorScheme.copyWith(
         brightness: Brightness.dark,
+        primary: c.editorContent,
+        onPrimary: c.editorBackground,
+        surface: c.editorBackground,
+        onSurface: c.editorContent,
+        onSurfaceVariant: c.editorContentMuted,
+        surfaceContainerHighest: c.editorContent.withValues(alpha: 0.14),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: c.editorContent,
+          disabledForegroundColor: c.editorContentMuted,
+          textStyle: tokens.text.body,
+        ),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: c.editorContent,
       ),
     );
     return Theme(
@@ -137,14 +159,14 @@ class _RenderingOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Positioned.fill(
+    return Positioned.fill(
       child: AbsorbPointer(
         child: ColoredBox(
-          color: Colors.black45,
+          color: context.tokens.colors.editorScrim,
           child: Center(
             child: TestId(
               PhotoEditTestIds.renderingIndicator,
-              child: CircularProgressIndicator(),
+              child: ChalkakSpinner(color: context.tokens.colors.editorContent),
             ),
           ),
         ),
@@ -163,26 +185,24 @@ class _ErrorOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Positioned.fill(
       child: ColoredBox(
-        color: Colors.black54,
+        color: context.tokens.colors.editorScrim,
         child: Center(
           child: TestId(
             PhotoEditTestIds.errorDialog,
-            child: Card(
-              margin: const EdgeInsets.symmetric(horizontal: 32),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(message, textAlign: TextAlign.center),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: onClose,
-                      child: const Text(Copy.commonConfirm),
-                    ),
-                  ],
+            child: ChalkakDialog(
+              content: Text(
+                message,
+                textAlign: TextAlign.center,
+                style: context.tokens.text.callout.copyWith(
+                  color: context.tokens.colors.textNeutral,
                 ),
               ),
+              actions: [
+                ChalkakDialogButton(
+                  label: Copy.commonConfirm,
+                  onPressed: onClose,
+                ),
+              ],
             ),
           ),
         ),
@@ -430,7 +450,7 @@ class _ChipButton extends StatelessWidget {
           ),
           child: Text(
             label,
-            style: TextStyle(
+            style: context.tokens.text.subheadline.copyWith(
               color: selected ? scheme.onPrimary : scheme.onSurface,
             ),
           ),
@@ -612,7 +632,7 @@ class _AdjustChip extends StatelessWidget {
           ),
           child: Text(
             item.label,
-            style: TextStyle(
+            style: context.tokens.text.subheadline.copyWith(
               color: selected ? scheme.onPrimary : scheme.onSurface,
             ),
           ),
@@ -715,8 +735,8 @@ class _TabBar extends StatelessWidget {
     Widget item(String id, EditTab value, IconData icon, String label) {
       final selected = tab == value;
       final color = selected
-          ? Theme.of(context).colorScheme.primary
-          : Theme.of(context).colorScheme.onSurfaceVariant;
+          ? context.tokens.colors.editorContent
+          : context.tokens.colors.editorContentMuted;
       return Expanded(
         child: SelectableTestId(
           id,
@@ -730,7 +750,10 @@ class _TabBar extends StatelessWidget {
                 children: [
                   Icon(icon, color: color),
                   const SizedBox(height: 2),
-                  Text(label, style: TextStyle(color: color, fontSize: 12)),
+                  Text(
+                    label,
+                    style: context.tokens.text.caption.copyWith(color: color),
+                  ),
                 ],
               ),
             ),

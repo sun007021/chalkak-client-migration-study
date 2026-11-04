@@ -3,7 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/ui/app_network_image.dart';
+import '../../../core/ui/components/chalkak_button.dart';
+import '../../../core/ui/components/chalkak_nav_button.dart';
+import '../../../core/ui/components/chalkak_states.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/notification_models.dart';
 import 'notification_detail_view_model.dart';
@@ -55,12 +59,12 @@ class NotificationDetailScreen extends StatelessWidget {
       case DetailStatus.loading:
         return const TestId(
           NotificationTestIds.detailLoading,
-          child: Center(child: CircularProgressIndicator()),
+          child: Center(child: ChalkakSpinner()),
         );
       case DetailStatus.notFound:
         return const TestId(
           NotificationTestIds.detailNotFound,
-          child: Center(child: Text(Copy.notiGone)),
+          child: Center(child: ChalkakStatusText(Copy.notiGone)),
         );
       case DetailStatus.error:
         return TestId(
@@ -69,16 +73,17 @@ class NotificationDetailScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
+                ChalkakStatusText(
                   state.errorMessage ?? Copy.notiDetailError,
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 TestId.button(
                   NotificationTestIds.detailRetryButton,
-                  child: FilledButton(
+                  child: ChalkakOutlinedButton(
                     onPressed: () => unawaited(viewModel.retry()),
-                    child: const Text(Copy.notiInboxRetry),
+                    label: Copy.notiInboxRetry,
+                    fillsWidth: false,
                   ),
                 ),
               ],
@@ -107,17 +112,16 @@ class _TitleBar extends StatelessWidget {
       children: [
         TestId.button(
           NotificationTestIds.detailBackButton,
-          child: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: onBack,
-          ),
+          child: ChalkakNavButton.back(onPressed: onBack),
         ),
         Expanded(
           child: TestId(
             NotificationTestIds.detailScreenTitle,
             child: Text(
               Copy.notiDetailTitle,
-              style: Theme.of(context).textTheme.titleMedium,
+              style: context.tokens.text.headline.copyWith(
+                color: context.tokens.colors.textPrimary,
+              ),
             ),
           ),
         ),
@@ -134,27 +138,40 @@ class _Content extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final tokens = context.tokens;
     final photo = detail.originalImageUrl;
     final reason = detail.rejectionReason;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.fromLTRB(
+        tokens.spacing.screenHorizontal,
+        tokens.spacing.lg,
+        tokens.spacing.screenHorizontal,
+        tokens.spacing.xl,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           TestId(
             NotificationTestIds.detailTitle,
-            child: Text(detail.title, style: theme.textTheme.titleLarge),
+            child: Text(
+              detail.title,
+              style: tokens.text.headline.copyWith(
+                color: tokens.colors.textPrimary,
+              ),
+            ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: tokens.spacing.sm),
           if (photo != null) ...[
             TestId(
               NotificationTestIds.detailPhoto,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  height: 320,
-                  child: AppNetworkImage(url: photo, fit: BoxFit.contain),
+                borderRadius: BorderRadius.circular(tokens.radius.photoCard),
+                child: ColoredBox(
+                  color: tokens.colors.surface,
+                  child: SizedBox(
+                    height: 320,
+                    child: AppNetworkImage(url: photo, fit: BoxFit.contain),
+                  ),
                 ),
               ),
             ),
@@ -162,7 +179,12 @@ class _Content extends StatelessWidget {
           ],
           TestId(
             NotificationTestIds.detailBody,
-            child: Text(detail.body, style: theme.textTheme.bodyMedium),
+            child: Text(
+              detail.body,
+              style: tokens.text.subheadline.copyWith(
+                color: tokens.colors.textSecondary,
+              ),
+            ),
           ),
           if (reason != null && reason.isNotEmpty) ...[
             const SizedBox(height: 20),
@@ -173,12 +195,19 @@ class _Content extends StatelessWidget {
                 children: [
                   Text(
                     Copy.notiDetailReason,
-                    style: theme.textTheme.titleSmall,
+                    style: tokens.text.caption.copyWith(
+                      color: tokens.colors.textInactive,
+                    ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: tokens.spacing.sm),
                   TestId(
                     NotificationTestIds.detailRejectionReason,
-                    child: Text(reason, style: theme.textTheme.bodyMedium),
+                    child: Text(
+                      reason,
+                      style: tokens.text.body.copyWith(
+                        color: tokens.colors.textPrimary,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -188,9 +217,9 @@ class _Content extends StatelessWidget {
             const SizedBox(height: 24),
             TestId.button(
               NotificationTestIds.detailBackToInboxButton,
-              child: FilledButton(
+              child: ChalkakButton(
                 onPressed: onBackToInbox,
-                child: const Text(Copy.notiDetailToInbox),
+                label: Copy.notiDetailToInbox,
               ),
             ),
           ],

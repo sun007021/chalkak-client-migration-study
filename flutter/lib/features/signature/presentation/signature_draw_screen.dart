@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_button.dart';
+import '../../../core/ui/components/chalkak_nav_button.dart';
 import '../../../core/ui/test_id.dart';
 import '../data/signature_path.dart';
 import '../domain/signature_drawing.dart';
@@ -98,9 +101,11 @@ class _Content extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = viewModel.state;
-    final textTheme = Theme.of(context).textTheme;
+    final tokens = context.tokens;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: tokens.spacing.screenHorizontal,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -108,20 +113,27 @@ class _Content extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: TestId.button(
               SignatureTestIds.drawBackButton,
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: viewModel.onBackPressed,
-              ),
+              child: ChalkakNavButton.back(onPressed: viewModel.onBackPressed),
             ),
           ),
           TestId(
             SignatureTestIds.drawTitle,
-            child: Text(Copy.onbSignTitle, style: textTheme.headlineSmall),
+            child: Text(
+              Copy.onbSignTitle,
+              style: tokens.text.title1.copyWith(
+                color: tokens.colors.textPrimary,
+              ),
+            ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: tokens.spacing.sm),
           TestId(
             SignatureTestIds.drawGuideText,
-            child: Text(Copy.onbSignGuide, style: textTheme.bodyMedium),
+            child: Text(
+              Copy.onbSignGuide,
+              style: tokens.text.subheadline.copyWith(
+                color: tokens.colors.textSecondary,
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           Expanded(
@@ -139,19 +151,19 @@ class _Content extends StatelessWidget {
               Expanded(
                 child: TestId.button(
                   SignatureTestIds.drawUndoButton,
-                  child: OutlinedButton(
+                  child: ChalkakOutlinedButton(
                     onPressed: state.canUndo ? viewModel.undo : null,
-                    child: const Text(Copy.onbSignUndo),
+                    label: Copy.onbSignUndo,
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Expanded(
                 child: TestId.button(
                   SignatureTestIds.drawClearButton,
-                  child: OutlinedButton(
+                  child: ChalkakOutlinedButton(
                     onPressed: state.canClear ? viewModel.clear : null,
-                    child: const Text(Copy.onbSignClear),
+                    label: Copy.onbSignClear,
                   ),
                 ),
               ),
@@ -167,8 +179,8 @@ class _Content extends StatelessWidget {
                       child: Text(
                         state.error!.text,
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+                        style: tokens.text.footnote.copyWith(
+                          color: tokens.colors.error,
                         ),
                       ),
                     ),
@@ -176,15 +188,12 @@ class _Content extends StatelessWidget {
           ),
           TestId.button(
             SignatureTestIds.drawSubmitButton,
-            child: FilledButton(
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(52),
-              ),
+            child: ChalkakButton(
               onPressed: state.canConfirm ? viewModel.onConfirmPressed : null,
-              child: const Text(Copy.onbSignConfirm),
+              label: Copy.onbSignConfirm,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
         ],
       ),
     );
@@ -203,7 +212,6 @@ class _Canvas extends StatefulWidget {
 }
 
 class _CanvasState extends State<_Canvas> {
-  static const _background = Color(0xFF2B2B30);
   static const _strokeWidth = 5.0;
 
   int? _activePointer;
@@ -232,7 +240,7 @@ class _CanvasState extends State<_Canvas> {
     return TestId(
       SignatureTestIds.drawCanvas,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(context.tokens.radius.button),
         child: LayoutBuilder(
           builder: (context, constraints) {
             _syncCanvasSize(constraints.biggest);
@@ -251,6 +259,8 @@ class _CanvasState extends State<_Canvas> {
                       painter: _StrokePainter(
                         drawing: _vm.state.drawing,
                         strokeWidth: _strokeWidth,
+                        background: context.tokens.colors.actionPrimary,
+                        ink: context.tokens.colors.textOnImage,
                       ),
                       child: const SizedBox.expand(),
                     ),
@@ -259,13 +269,17 @@ class _CanvasState extends State<_Canvas> {
                     listenable: _vm,
                     builder: (context, _) => _vm.state.drawing.hasSignature
                         ? const SizedBox.shrink()
-                        : const IgnorePointer(
+                        : IgnorePointer(
                             child: Center(
                               child: TestId(
                                 SignatureTestIds.drawCanvasHint,
                                 child: Text(
                                   Copy.onbSignPadHint,
-                                  style: TextStyle(color: Colors.white54),
+                                  style: context.tokens.text.subheadline
+                                      .copyWith(
+                                        color: context.tokens.colors.textOnImage
+                                            .withValues(alpha: 0.56),
+                                      ),
                                 ),
                               ),
                             ),
@@ -291,25 +305,29 @@ class _CanvasState extends State<_Canvas> {
 }
 
 class _StrokePainter extends CustomPainter {
-  _StrokePainter({required this.drawing, required this.strokeWidth});
+  _StrokePainter({
+    required this.drawing,
+    required this.strokeWidth,
+    required this.background,
+    required this.ink,
+  });
 
   final SignatureDrawing drawing;
   final double strokeWidth;
+  final Color background;
+  final Color ink;
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..color = _CanvasState._background,
-    );
+    canvas.drawRect(Offset.zero & size, Paint()..color = background);
     final line = Paint()
-      ..color = Colors.white
+      ..color = ink
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..isAntiAlias = true;
-    final dot = Paint()..color = Colors.white;
+    final dot = Paint()..color = ink;
     for (final stroke in drawing.strokes) {
       final points = stroke.points;
       if (points.isEmpty) continue;
@@ -326,5 +344,6 @@ class _StrokePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_StrokePainter old) => old.drawing != drawing;
+  bool shouldRepaint(_StrokePainter old) =>
+      old.drawing != drawing || old.background != background || old.ink != ink;
 }

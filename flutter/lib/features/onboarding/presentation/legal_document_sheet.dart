@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_nav_button.dart';
+import '../../../core/ui/components/chalkak_states.dart';
 import '../../../core/ui/test_id.dart';
-
 import 'legal_document_view_model.dart';
 import 'onboarding_test_ids.dart';
 
@@ -107,15 +109,15 @@ class _LegalDocumentSheetState extends State<LegalDocumentSheet> {
                       OnboardingTestIds.legalDocTitle,
                       child: Text(
                         viewModel.document.title,
-                        style: Theme.of(context).textTheme.titleMedium,
+                        style: context.tokens.text.headline.copyWith(
+                          color: context.tokens.colors.textPrimary,
+                        ),
                       ),
                     ),
                   ),
                   TestId.button(
                     OnboardingTestIds.legalDocCloseButton,
-                    child: IconButton(
-                      icon: const Icon(Icons.close),
-                      tooltip: Copy.commonClose,
+                    child: ChalkakNavButton.close(
                       onPressed: viewModel.onClosePressed,
                     ),
                   ),
@@ -181,13 +183,13 @@ class _Body extends StatelessWidget {
           const Center(
             child: TestId(
               OnboardingTestIds.legalDocLoading,
-              child: CircularProgressIndicator(),
+              child: ChalkakSpinner(),
             ),
           ),
         if (failed)
           Positioned.fill(
             child: ColoredBox(
-              color: Theme.of(context).colorScheme.surface,
+              color: context.tokens.colors.background,
               child: Center(
                 child: TestId(
                   OnboardingTestIds.legalDocErrorState,

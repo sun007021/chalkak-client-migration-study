@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_nav_button.dart';
+import '../../../core/ui/components/chalkak_states.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/banner_web_view_model.dart';
 import 'banner_test_ids.dart';
@@ -41,11 +44,7 @@ class _BannerWebScreenState extends State<BannerWebScreen> {
         appBar: AppBar(
           leading: TestId.button(
             BannerTestIds.issueBackButton,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-              onPressed: widget.onBack,
-            ),
+            child: ChalkakNavButton.back(onPressed: widget.onBack),
           ),
           title: const TestId(
             BannerTestIds.issueTitle,
@@ -93,7 +92,7 @@ class _BannerWebScreenState extends State<BannerWebScreen> {
             child: Center(
               child: TestId(
                 BannerTestIds.issueLoading,
-                child: CircularProgressIndicator(),
+                child: ChalkakSpinner(),
               ),
             ),
           ),
@@ -112,7 +111,7 @@ class _LoadError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: Theme.of(context).colorScheme.surface,
+      color: context.tokens.colors.background,
       child: Center(
         child: TestId(
           BannerTestIds.issueErrorState,
