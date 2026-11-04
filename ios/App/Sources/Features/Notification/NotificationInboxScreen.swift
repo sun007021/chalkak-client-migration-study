@@ -40,8 +40,8 @@ struct NotificationInboxScreen: View {
     private var content: some View {
         switch viewModel.phase {
         case .loading:
-            VStack(spacing: ChalkakSpacing.md) {
-                ProgressView()
+            VStack(spacing: ChalkakSpacing.lg) {
+                ProgressView().tint(ChalkakColor.actionPrimary)
                 Text(NotificationCopy.loading)
                     .font(ChalkakFont.subheadline)
                     .foregroundStyle(ChalkakColor.textSecondary)
@@ -52,36 +52,40 @@ struct NotificationInboxScreen: View {
             // 비어 있어도 당겨서 새로고침은 할 수 있어야 한다.
             ScrollView {
                 VStack(spacing: ChalkakSpacing.sm) {
+                    Image(systemName: "bell")
+                        .font(.system(size: 34))
+                        .foregroundStyle(ChalkakColor.iconSecondary)
+                        .accessibilityHidden(true)
                     Text(NotificationCopy.emptyTitle)
-                        .font(ChalkakFont.headline)
-                        .foregroundStyle(ChalkakColor.textPrimary)
+                        .font(ChalkakFont.body)
+                        .foregroundStyle(ChalkakColor.textSecondary)
                     Text(NotificationCopy.emptyBody)
                         .font(ChalkakFont.subheadline)
-                        .foregroundStyle(ChalkakColor.textSecondary)
+                        .foregroundStyle(ChalkakColor.textMuted)
                         .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.top, 120)
+                .padding(.top, 144)
                 .padding(.horizontal, ChalkakSpacing.screenHorizontal)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("notifications.empty-state")
             }
             .refreshable { await viewModel.refresh() }
         case .error(let message):
-            VStack(spacing: ChalkakSpacing.md) {
+            VStack(spacing: ChalkakSpacing.xl) {
                 Text(message)
-                    .font(ChalkakFont.callout)
+                    .font(ChalkakFont.body)
                     .foregroundStyle(ChalkakColor.textSecondary)
                     .multilineTextAlignment(.center)
                 Button { Task { await viewModel.retry() } } label: {
-                    Text(NotificationCopy.retry)
-                        .font(ChalkakFont.callout)
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(ChalkakColor.onActionPrimary)
-                        .padding(.horizontal, ChalkakSpacing.xl)
-                        .frame(minHeight: 44)
-                        .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
+                        .frame(width: 48, height: 48)
+                        .background(ChalkakColor.actionPrimary, in: Circle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(NotificationCopy.retry)
                 .accessibilityIdentifier("notifications.retry-button")
             }
             .padding(.horizontal, ChalkakSpacing.screenHorizontal)
@@ -107,8 +111,9 @@ struct NotificationInboxScreen: View {
                 }
                 if viewModel.isLoadingMore {
                     ProgressView()
+                        .tint(ChalkakColor.actionPrimary)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, ChalkakSpacing.lg)
+                        .padding(.vertical, ChalkakSpacing.xl)
                         .accessibilityIdentifier("notifications.load-more-indicator")
                 }
             }
@@ -118,7 +123,7 @@ struct NotificationInboxScreen: View {
     }
 }
 
-/// 알림 한 줄: 썸네일, 제목, 본문, 시각, 미읽음 점.
+/// 알림 한 줄(screens-c.md 3.1.2): 미읽음 점 칸(12), 제목(subheadline 2줄)·본문(caption)·시각(caption/textInactive), 썸네일 44, 아래 구분선.
 private struct NotificationRowView: View {
     let row: NotificationRow
     let onTap: () -> Void
@@ -126,40 +131,54 @@ private struct NotificationRowView: View {
     var body: some View {
         let key = row.id.uuidString.lowercased()
         Button(action: onTap) {
-            HStack(alignment: .top, spacing: ChalkakSpacing.md) {
-                ChalkakRemoteImage(url: row.thumbnailURL)
-                    .frame(width: 56, height: 56)
-                    .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.small))
-                    .accessibilityIdentifier("notifications.item-thumbnail-\(key)")
-                VStack(alignment: .leading, spacing: ChalkakSpacing.xs) {
+            HStack(alignment: .top, spacing: 0) {
+                ZStack(alignment: .top) {
+                    if row.isUnread {
+                        Circle()
+                            .fill(ChalkakColor.inputCursor)
+                            .frame(width: 8, height: 8)
+                            .accessibilityIdentifier("notifications.item-unread-\(key)")
+                    }
+                }
+                .frame(width: ChalkakSpacing.md)
+                .padding(.top, ChalkakSpacing.xs)
+                VStack(alignment: .leading, spacing: ChalkakSpacing.sm) {
                     Text(row.title)
-                        .font(ChalkakFont.headline)
-                        .foregroundStyle(ChalkakColor.textPrimary)
-                        .lineLimit(1)
-                        .accessibilityIdentifier("notifications.item-title-\(key)")
-                    Text(row.body)
                         .font(ChalkakFont.subheadline)
-                        .foregroundStyle(ChalkakColor.textSecondary)
+                        .foregroundStyle(ChalkakColor.textPrimary)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
-                        .accessibilityIdentifier("notifications.item-body-\(key)")
+                        .accessibilityIdentifier("notifications.item-title-\(key)")
+                    if !row.body.isEmpty {
+                        Text(row.body)
+                            .font(ChalkakFont.caption)
+                            .foregroundStyle(ChalkakColor.textSecondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .accessibilityIdentifier("notifications.item-body-\(key)")
+                    }
                     Text(row.timeText)
                         .font(ChalkakFont.caption)
-                        .foregroundStyle(ChalkakColor.textSecondary)
+                        .foregroundStyle(ChalkakColor.textInactive)
                         .accessibilityIdentifier("notifications.item-time-\(key)")
                 }
-                Spacer(minLength: 0)
-                if row.isUnread {
-                    Circle()
-                        .fill(ChalkakColor.accent)
-                        .frame(width: 8, height: 8)
-                        .padding(.top, ChalkakSpacing.xs)
-                        .accessibilityIdentifier("notifications.item-unread-\(key)")
+                .padding(.leading, ChalkakSpacing.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if row.thumbnailURL != nil {
+                    ChalkakRemoteImage(url: row.thumbnailURL)
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .padding(.leading, ChalkakSpacing.lg)
+                        .accessibilityIdentifier("notifications.item-thumbnail-\(key)")
                 }
             }
+            .padding(.vertical, ChalkakSpacing.xl)
             .padding(.horizontal, ChalkakSpacing.screenHorizontal)
-            .padding(.vertical, ChalkakSpacing.md)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(ChalkakColor.border).frame(height: 1)
+                    .padding(.horizontal, ChalkakSpacing.screenHorizontal)
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -52,12 +52,14 @@ private struct FeedContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // 원본 FeedTopBar(screens-b.md 4.1): 왼쪽 뒤로, 오른쪽 수정(actionPrimary)·삭제(error) 아이콘 48pt 원 버튼
             ChalkakNavBar(
                 title: viewModel.dateLabel ?? "",
                 backIdentifier: "feed.back-button",
                 titleIdentifier: "feed.date-label",
                 onBack: { shell.pop() }
             )
+            .overlay(alignment: .trailing) { topBarActions }
             content
         }
         .overlay { dialogs }
@@ -108,19 +110,18 @@ private struct FeedContentView: View {
     }
 
     private func stateMessage(_ text: String, identifier: String, retry: Bool) -> some View {
-        VStack(spacing: ChalkakSpacing.md) {
+        VStack(spacing: ChalkakSpacing.xl) {
             Text(text)
-                .font(ChalkakFont.subheadline)
+                .font(ChalkakFont.body)
                 .foregroundStyle(ChalkakColor.textSecondary)
                 .multilineTextAlignment(.center)
             if retry {
                 Button { Task { await viewModel.retry() } } label: {
                     Text(DisplayCopy.retry)
-                        .font(ChalkakFont.footnote)
-                        .foregroundStyle(ChalkakColor.onActionPrimary)
-                        .padding(.horizontal, ChalkakSpacing.lg)
-                        .frame(minHeight: 36)
-                        .background(ChalkakColor.actionPrimary, in: Capsule())
+                        .font(ChalkakFont.body)
+                        .foregroundStyle(ChalkakColor.actionPrimary)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("feed.retry-button")
@@ -134,7 +135,7 @@ private struct FeedContentView: View {
 
     private var detail: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: ChalkakSpacing.lg) {
+            VStack(alignment: .leading, spacing: 0) {
                 FeedZoomablePhoto(
                     imageURL: viewModel.imageURL,
                     signatureURL: viewModel.signatureURL,
@@ -142,52 +143,68 @@ private struct FeedContentView: View {
                     isLoading: viewModel.state == .loading
                 )
                 if viewModel.state == .content {
-                    titleRow
-                    if let like = viewModel.like {
-                        PostLikeButton(
-                            like: like,
-                            buttonIdentifier: "feed.like-button",
-                            countIdentifier: "feed.like-count",
-                            isEnabled: viewModel.isLikeEnabled,
-                            action: { viewModel.likeTapped() }
-                        )
-                    }
+                    likeRow
                     if let aiReview {
                         FeedAIReviewSection(session: session, container: container, viewModel: aiReview, isRunning: isRunning)
+                            .padding(.horizontal, ChalkakSpacing.screenHorizontal)
+                            .padding(.top, ChalkakSpacing.lg)
                     }
                 }
             }
-            .padding(.horizontal, ChalkakSpacing.screenHorizontal)
-            .padding(.vertical, ChalkakSpacing.sm)
+            .padding(.top, ChalkakSpacing.sm)
+            .padding(.bottom, 40)
         }
     }
 
-    private var titleRow: some View {
-        HStack(alignment: .top, spacing: ChalkakSpacing.sm) {
+    /// 좋아요 행(screens-b.md 4.1 FeedLikeRow): 높이 57, 좌우 14, 하트+숫자 왼쪽, 제목 body/textSecondary 오른쪽(1줄), 바닥 0.5 선.
+    private var likeRow: some View {
+        HStack(spacing: ChalkakSpacing.md) {
+            if let like = viewModel.like {
+                PostLikeButton(
+                    like: like,
+                    buttonIdentifier: "feed.like-button",
+                    countIdentifier: "feed.like-count",
+                    isEnabled: viewModel.isLikeEnabled,
+                    action: { viewModel.likeTapped() }
+                )
+            }
             Text(viewModel.displayTitle)
-                .font(ChalkakFont.headlineBold)
-                .foregroundStyle(ChalkakColor.textPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .font(ChalkakFont.body)
+                .foregroundStyle(ChalkakColor.textSecondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .trailing)
                 .accessibilityIdentifier("feed.title")
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 57)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(ChalkakColor.border).frame(height: 0.5)
+        }
+    }
+
+    private var topBarActions: some View {
+        HStack(spacing: ChalkakSpacing.xs) {
             if viewModel.canEditTitle {
-                iconButton("ic_edit", label: FeedDialogCopy.editTitle, identifier: "feed.edit-title-button") { viewModel.editTapped() }
+                iconButton("ic_edit", label: FeedDialogCopy.editTitle, color: ChalkakColor.actionPrimary, identifier: "feed.edit-title-button") { viewModel.editTapped() }
             }
             if viewModel.canDelete {
-                iconButton("ic_delete", label: FeedDialogCopy.deleteTitle, identifier: "feed.delete-button") { viewModel.deleteTapped() }
+                iconButton("ic_delete", label: FeedDialogCopy.deleteTitle, color: ChalkakColor.error, identifier: "feed.delete-button") { viewModel.deleteTapped() }
             }
         }
+        .padding(.trailing, ChalkakSpacing.md)
     }
 
-    private func iconButton(_ asset: String, label: String, identifier: String, action: @escaping () -> Void) -> some View {
+    private func iconButton(_ asset: String, label: String, color: Color, identifier: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(asset)
                 .renderingMode(.template)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 22, height: 22)
-                .foregroundStyle(ChalkakColor.iconPrimary)
-                .frame(width: 40, height: 40)
-                .contentShape(Rectangle())
+                .frame(width: 24, height: 24)
+                .foregroundStyle(color)
+                .frame(width: 48, height: 48)
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
@@ -207,17 +224,11 @@ private struct FeedContentView: View {
                     titleIdentifier: "feed.delete-title",
                     messageIdentifier: "feed.delete-body"
                 ) {
-                    HStack(spacing: ChalkakSpacing.sm) {
-                        Button { viewModel.cancelDelete() } label: {
-                            Text(prompt.cancelTitle)
-                                .font(ChalkakFont.callout)
-                                .foregroundStyle(ChalkakColor.textPrimary)
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                                .overlay(RoundedRectangle(cornerRadius: ChalkakRadius.button).stroke(ChalkakColor.border, lineWidth: 1))
+                    HStack(spacing: 10) {
+                        ChalkakDialogButton(title: prompt.cancelTitle, identifier: "feed.delete-cancel-button", style: .secondary) {
+                            viewModel.cancelDelete()
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("feed.delete-cancel-button")
-                        ChalkakDialogButton(title: prompt.confirmTitle, identifier: "feed.delete-confirm-button") {
+                        ChalkakDialogButton(title: prompt.confirmTitle, identifier: "feed.delete-confirm-button", style: .destructive) {
                             Task { await viewModel.confirmDelete() }
                         }
                     }
@@ -229,7 +240,7 @@ private struct FeedContentView: View {
             if viewModel.isDeleting {
                 ProgressView()
                     .padding(ChalkakSpacing.lg)
-                    .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.card))
+                    .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.large))
                     .accessibilityIdentifier("feed.deleting")
             }
         }
@@ -261,24 +272,25 @@ private struct FeedTitleEditDialog: View {
         let isSaving = edit?.isSaving ?? false
         ZStack {
             ChalkakColor.scrim.ignoresSafeArea()
+            // 원본 FeedTitleEditDialog(screens-b.md 4.4): 카드 라운드 16, 패딩 24, 제목 title3, 입력 ChalkakTextField(subheadline), 버튼 간격 10
             VStack(spacing: ChalkakSpacing.lg) {
                 Text(FeedDialogCopy.editTitle)
-                    .font(ChalkakFont.headline)
+                    .font(ChalkakFont.title3)
                     .foregroundStyle(ChalkakColor.textPrimary)
                 TextField(
-                    FeedDialogCopy.editPlaceholder,
+                    "",
                     text: Binding(
                         get: { viewModel.edit?.text ?? "" },
                         set: { viewModel.editTextChanged($0) }
-                    )
+                    ),
+                    prompt: Text(FeedDialogCopy.editPlaceholder).foregroundStyle(ChalkakColor.textInactive)
                 )
-                .font(ChalkakFont.callout)
+                .font(ChalkakFont.subheadline)
+                .foregroundStyle(ChalkakColor.textPrimary)
                 .focused($isFocused)
                 .disabled(isSaving)
-                .padding(.horizontal, ChalkakSpacing.md)
-                .frame(minHeight: 44)
-                .background(ChalkakColor.inputBackground, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
-                .overlay(RoundedRectangle(cornerRadius: ChalkakRadius.button).stroke(ChalkakColor.border, lineWidth: 1))
+                .chalkakInputChrome(isFocused: isFocused)
+                .accessibilityLabel(FeedDialogCopy.editPlaceholder)
                 .accessibilityIdentifier("feed.title-input")
                 if let error = edit?.error {
                     Text(error.message)
@@ -287,40 +299,28 @@ private struct FeedTitleEditDialog: View {
                         .multilineTextAlignment(.center)
                         .accessibilityIdentifier("feed.title-error")
                 }
-                HStack(spacing: ChalkakSpacing.sm) {
-                    Button { viewModel.cancelEdit() } label: {
-                        Text(FeedDialogCopy.editCancel)
-                            .font(ChalkakFont.callout)
-                            .foregroundStyle(ChalkakColor.textPrimary)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .overlay(RoundedRectangle(cornerRadius: ChalkakRadius.button).stroke(ChalkakColor.border, lineWidth: 1))
+                HStack(spacing: 10) {
+                    ChalkakDialogButton(title: FeedDialogCopy.editCancel, identifier: "feed.title-cancel-button", style: .secondary) {
+                        viewModel.cancelEdit()
                     }
-                    .buttonStyle(.plain)
                     .disabled(isSaving)
-                    .accessibilityIdentifier("feed.title-cancel-button")
-                    Button { Task { await viewModel.saveEdit() } } label: {
-                        HStack(spacing: ChalkakSpacing.xs) {
-                            if isSaving {
-                                ProgressView()
-                                    .tint(ChalkakColor.onActionPrimary)
-                                    .accessibilityIdentifier("feed.title-saving")
-                            }
-                            Text(edit?.saveButtonTitle ?? FeedDialogCopy.editSave)
-                                .font(ChalkakFont.callout)
+                    HStack(spacing: ChalkakSpacing.xs) {
+                        if isSaving {
+                            ProgressView()
+                                .tint(ChalkakColor.onActionPrimary)
+                                .accessibilityIdentifier("feed.title-saving")
                         }
-                        .foregroundStyle(ChalkakColor.onActionPrimary)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
-                        .opacity(isSaving ? 0.6 : 1)
+                        ChalkakDialogButton(title: edit?.saveButtonTitle ?? FeedDialogCopy.editSave, identifier: "feed.title-save-button") {
+                            Task { await viewModel.saveEdit() }
+                        }
+                        .disabled(isSaving)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(isSaving)
-                    .accessibilityIdentifier("feed.title-save-button")
+                    .opacity(isSaving ? 0.6 : 1)
                 }
             }
             .padding(ChalkakSpacing.xl)
             .frame(maxWidth: 320)
-            .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.dialog))
+            .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.large))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("feed.title-dialog")
             .accessibilityAddTraits(.isModal)
@@ -343,14 +343,21 @@ private struct FeedAIReviewSection: View {
             Color.clear.frame(height: 0)
             if let pill = viewModel.pill {
                 Button { Task { await viewModel.tapPill() } } label: {
-                    Text(pill.title)
-                        .font(ChalkakFont.subheadline)
-                        .foregroundStyle(pill.isEnabled ? ChalkakColor.onActionPrimary : ChalkakColor.textSecondary)
-                        .padding(.horizontal, ChalkakSpacing.lg)
-                        .frame(minHeight: 36)
-                        .background(
-                            Capsule().fill(pill.isEnabled ? ChalkakColor.actionPrimary : ChalkakColor.calendarCell)
-                        )
+                    HStack(spacing: ChalkakSpacing.sm) {
+                        if viewModel.phase == .processing || viewModel.phase == .requesting {
+                            ChalkakAudioWaveIcon(isAnimating: true)
+                                .frame(height: 18)
+                        }
+                        Text(pill.title)
+                            .font(ChalkakFont.subheadlineSemibold)
+                    }
+                    .foregroundStyle(pill.isEnabled ? ChalkakColor.onActionPrimary : ChalkakColor.textSecondary)
+                    .padding(.horizontal, ChalkakSpacing.lg)
+                    .frame(minHeight: 44)
+                    .background(
+                        Capsule().fill(pill.isEnabled ? ChalkakColor.actionPrimary : ChalkakColor.calendarCell)
+                    )
+                    .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 2)
                 }
                 .buttonStyle(.plain)
                 .disabled(!pill.isEnabled)
@@ -418,8 +425,8 @@ private struct FeedZoomablePhoto: View {
                             .clipped()
                             .accessibilityLabel(accessibilityText)
                         FeedSignatureImage(url: signatureURL)
-                            .frame(width: geo.size.width * 0.4)
-                            .padding(ChalkakSpacing.md)
+                            .frame(width: 70, height: 52)
+                            .padding(ChalkakSpacing.sm)
                             .accessibilityIdentifier("feed.signature-image")
                         if isLoading {
                             ProgressView()
@@ -430,7 +437,7 @@ private struct FeedZoomablePhoto: View {
                     .frame(width: geo.size.width, height: geo.size.height)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.card))
+            .background(ChalkakColor.surfaceElevated)
             .scaleEffect(scale, anchor: anchor)
             .zIndex(scale > 1 ? 1 : 0)
             .gesture(

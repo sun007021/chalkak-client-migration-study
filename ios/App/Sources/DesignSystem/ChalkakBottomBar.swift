@@ -15,8 +15,9 @@ struct ChalkakBottomBar: View {
             tabButton(.record)
             tabButton(.settings)
         }
-        .padding(.top, 8)
-        .padding(.bottom, 4)
+        // 원본 Flat 바(screens-a.md 3.3): 패딩 top 15 / bottom 12, 배경 surfaceElevated
+        .padding(.top, 15)
+        .padding(.bottom, 12)
         .background(ChalkakColor.surfaceElevated.ignoresSafeArea(edges: .bottom))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("bottom-bar.root")
@@ -25,16 +26,16 @@ struct ChalkakBottomBar: View {
     private func tabButton(_ tab: MainTab) -> some View {
         let isSelected = tab == selectedTab
         return Button { onSelect(tab) } label: {
-            VStack(spacing: 4) {
+            VStack(spacing: 7) {
                 Image(iconName(for: tab, isSelected: isSelected))
                     .renderingMode(.template)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 24, height: 24)
+                    .frame(width: 23, height: 23)
                 Text(NavCopy.label(for: tab))
-                    .font(ChalkakFont.footnote)
+                    .font(isSelected ? ChalkakFont.footnoteBold : ChalkakFont.footnote)
             }
-            .foregroundStyle(isSelected ? ChalkakColor.actionPrimary : ChalkakColor.bottomBarInactive)
+            .foregroundStyle(isSelected ? ChalkakColor.actionPrimary : ChalkakColor.bottomBar)
             .frame(maxWidth: .infinity, minHeight: 48)
             .contentShape(Rectangle())
         }
@@ -47,6 +48,9 @@ struct ChalkakBottomBar: View {
         Button(action: onUpload) {
             Image("ic_bottom_write")
                 .renderingMode(.original)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 40, height: 40)
                 .frame(maxWidth: .infinity, minHeight: 48)
                 .contentShape(Rectangle())
         }

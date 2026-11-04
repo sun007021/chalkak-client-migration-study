@@ -23,24 +23,30 @@ struct FeedbackScreen: View {
                 onBack: { session.shell.pop() }
             )
             ScrollView {
-                VStack(alignment: .leading, spacing: ChalkakSpacing.lg) {
+                // 원본 피드백(screens-c.md 5.2): 위 24, title2, 제목→설명 12, 설명→입력 28, 입력→안내 8
+                VStack(alignment: .leading, spacing: 0) {
                     Text(FeedbackCopy.introTitle)
-                        .font(ChalkakFont.display)
+                        .font(ChalkakFont.title2)
                         .foregroundStyle(ChalkakColor.textPrimary)
                     Text(FeedbackCopy.introBody)
                         .font(ChalkakFont.subheadline)
                         .foregroundStyle(ChalkakColor.textSecondary)
+                        .padding(.top, ChalkakSpacing.md)
                         .accessibilityIdentifier("feedback.guide-text")
                     inputField
+                        .padding(.top, 28)
                     footer
+                        .padding(.top, ChalkakSpacing.sm)
                 }
                 .padding(.horizontal, ChalkakSpacing.screenHorizontal)
-                .padding(.top, ChalkakSpacing.lg)
+                .padding(.top, ChalkakSpacing.xl)
             }
             .scrollDismissesKeyboard(.interactively)
             sendButton
                 .padding(.horizontal, ChalkakSpacing.screenHorizontal)
-                .padding(.vertical, ChalkakSpacing.lg)
+                .padding(.top, ChalkakSpacing.sm)
+                .padding(.bottom, ChalkakSpacing.lg)
+                .background(ChalkakColor.background)
         }
         .background(ChalkakColor.background.ignoresSafeArea())
         .accessibilityElement(children: .contain)
@@ -67,26 +73,33 @@ struct FeedbackScreen: View {
             Text(FeedbackCopy.fieldLabel)
                 .font(ChalkakFont.subheadline)
                 .foregroundStyle(ChalkakColor.textPrimary)
+            // ChalkakTextField 공통 스펙(screens-a.md 1.6): 라운드 input 14, 포커스 테두리, 커서 inputCursor, 안쪽 카운터
             ZStack(alignment: .topLeading) {
                 TextEditor(text: textBinding)
-                    .font(ChalkakFont.callout)
+                    .font(ChalkakFont.subheadline)
                     .foregroundStyle(ChalkakColor.textPrimary)
                     .scrollContentBackground(.hidden)
                     .focused($isFocused)
-                    .padding(ChalkakSpacing.sm)
+                    .padding(.horizontal, -5)
+                    .padding(.vertical, -8)
                     .accessibilityIdentifier("feedback.input")
                 if viewModel.text.isEmpty {
                     Text(FeedbackCopy.fieldPlaceholder)
-                        .font(ChalkakFont.callout)
-                        .foregroundStyle(ChalkakColor.textSecondary)
-                        .padding(.horizontal, ChalkakSpacing.md)
-                        .padding(.vertical, ChalkakSpacing.md + 1)
+                        .font(ChalkakFont.subheadline)
+                        .foregroundStyle(ChalkakColor.textInactive)
                         .allowsHitTesting(false)
                 }
             }
-            .frame(minHeight: 200)
-            .background(ChalkakColor.inputBackground, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
-            .overlay(RoundedRectangle(cornerRadius: ChalkakRadius.button).stroke(ChalkakColor.border, lineWidth: 1))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .chalkakInputChrome(isFocused: isFocused)
+            .frame(height: 240)
+            .overlay(alignment: .bottomTrailing) {
+                Text(viewModel.counterText)
+                    .font(ChalkakFont.subheadline)
+                    .foregroundStyle(ChalkakColor.textInactive)
+                    .padding(ChalkakSpacing.lg)
+                    .accessibilityIdentifier("feedback.counter")
+            }
         }
     }
 
@@ -102,28 +115,14 @@ struct FeedbackScreen: View {
                         notice.message == FeedbackCopy.errorInvalid ? "feedback.validation-message" : "feedback.error-message"
                     )
             }
-            Spacer(minLength: 0)
-            Text(viewModel.counterText)
-                .font(ChalkakFont.footnote)
-                .foregroundStyle(ChalkakColor.textSecondary)
-                .accessibilityIdentifier("feedback.counter")
         }
     }
 
     private var sendButton: some View {
-        Button {
+        ChalkakButton(title: viewModel.sendButtonTitle, action: {
             isFocused = false
             Task { await viewModel.send() }
-        } label: {
-            Text(viewModel.sendButtonTitle)
-                .font(ChalkakFont.callout)
-                .foregroundStyle(ChalkakColor.onActionPrimary)
-                .frame(maxWidth: .infinity, minHeight: 56)
-                .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
-                .opacity(viewModel.canSend ? 1 : 0.3)
-        }
-        .buttonStyle(.plain)
-        .disabled(!viewModel.canSend)
+        }, isEnabled: viewModel.canSend, fillsWidth: true)
         .accessibilityIdentifier("feedback.submit-button")
     }
 }

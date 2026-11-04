@@ -30,6 +30,8 @@ extension View {
             AIReviewSheetContent(viewModel: viewModel, sheet: item.sheet)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+                .presentationCornerRadius(ChalkakRadius.sheet)
+                .presentationBackground(ChalkakColor.surfaceElevated)
         }
     }
 }
@@ -72,41 +74,52 @@ private struct AIStartSheet: View {
     let viewModel: AIReviewViewModel
     let isRetry: Bool
 
+    /// 안내 줄 앞 아이콘(screens-b.md 7.2): clock / iphone / bell.
+    private static let icons = ["clock", "iphone", "bell"]
+
     var body: some View {
-        VStack(spacing: ChalkakSpacing.lg) {
+        VStack(alignment: .leading, spacing: ChalkakSpacing.lg) {
             Text(isRetry ? AIReviewCopy.startTitleRetry : AIReviewCopy.startTitle)
-                .font(ChalkakFont.headlineBold)
+                .font(ChalkakFont.title3)
                 .foregroundStyle(ChalkakColor.textPrimary)
-                .multilineTextAlignment(.center)
-                .padding(.top, ChalkakSpacing.xl)
-            VStack(spacing: ChalkakSpacing.sm) {
-                ForEach(AIReviewCopy.startLines, id: \.self) { line in
-                    Text(line)
-                        .font(ChalkakFont.subheadline)
-                        .foregroundStyle(ChalkakColor.textSecondary)
-                        .multilineTextAlignment(.center)
+                .padding(.top, ChalkakSpacing.sm)
+            VStack(alignment: .leading, spacing: ChalkakSpacing.lg) {
+                ForEach(Array(AIReviewCopy.startLines.enumerated()), id: \.element) { index, line in
+                    HStack(spacing: ChalkakSpacing.md) {
+                        Image(systemName: Self.icons[min(index, Self.icons.count - 1)])
+                            .font(.system(size: 17))
+                            .foregroundStyle(ChalkakColor.iconSecondary)
+                            .frame(width: 36, height: 36)
+                            .background(ChalkakColor.surfaceElevated, in: Circle())
+                            .accessibilityHidden(true)
+                        Text(line)
+                            .font(ChalkakFont.subheadlineSemibold)
+                            .foregroundStyle(ChalkakColor.textPrimary)
+                            .multilineTextAlignment(.leading)
+                        Spacer(minLength: 0)
+                    }
                 }
             }
+            .padding(ChalkakSpacing.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(ChalkakColor.background, in: RoundedRectangle(cornerRadius: ChalkakRadius.large))
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("ai-start-sheet.description")
             Spacer(minLength: ChalkakSpacing.md)
-            Button { Task { await viewModel.confirmStart() } } label: {
-                Text(AIReviewCopy.startConfirm)
-                    .font(ChalkakFont.callout)
-                    .foregroundStyle(ChalkakColor.onActionPrimary)
-                    .frame(maxWidth: .infinity, minHeight: 48)
-                    .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
-            }
-            .buttonStyle(.plain)
-            .disabled(viewModel.phase == .requesting)
-            .opacity(viewModel.phase == .requesting ? 0.4 : 1)
+            ChalkakButton(
+                title: AIReviewCopy.startConfirm,
+                action: { Task { await viewModel.confirmStart() } },
+                isEnabled: viewModel.phase != .requesting,
+                fillsWidth: true
+            )
             .accessibilityIdentifier("ai-start-sheet.start-button")
             AISheetCloseButton(identifier: "ai-start-sheet.close-button") { viewModel.dismissSheet() }
         }
-        .padding(.horizontal, ChalkakSpacing.screenHorizontal)
+        .padding(.horizontal, ChalkakSpacing.xl)
+        .padding(.top, ChalkakSpacing.xl)
         .padding(.bottom, ChalkakSpacing.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(ChalkakColor.background.ignoresSafeArea())
+        .background(ChalkakColor.surfaceElevated.ignoresSafeArea())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ai-start-sheet.root")
     }
@@ -128,15 +141,15 @@ private struct AIResultSheet: View {
                         criteriaList
                         if result.distinctivePerspective {
                             Text(AIReviewCopy.perspectiveBadge)
-                                .font(ChalkakFont.footnote)
-                                .foregroundStyle(ChalkakColor.accent)
-                                .padding(.horizontal, ChalkakSpacing.md)
+                                .font(ChalkakFont.captionSemibold)
+                                .foregroundStyle(ChalkakColor.onActionPrimary)
+                                .padding(.horizontal, ChalkakSpacing.sm)
                                 .padding(.vertical, ChalkakSpacing.xs)
-                                .background(ChalkakColor.accent.opacity(0.12), in: Capsule())
+                                .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.small))
                                 .accessibilityIdentifier("ai-result-sheet.distinctive-badge")
                         }
                         Text(result.feedback.summary)
-                            .font(ChalkakFont.headlineBold)
+                            .font(ChalkakFont.title3)
                             .foregroundStyle(ChalkakColor.textPrimary)
                             .accessibilityIdentifier("ai-result-sheet.feedback-summary")
                         section(AIReviewCopy.strengthTitle, text: result.feedback.strength, identifier: "ai-result-sheet.feedback-strength")
@@ -163,18 +176,27 @@ private struct AIResultSheet: View {
                 }
             }
         }
-        .background(ChalkakColor.background.ignoresSafeArea())
+        .background(ChalkakColor.surfaceElevated.ignoresSafeArea())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ai-result-sheet.root")
     }
 
+    /// 점수 링(84, 선 8, 트랙 calendarCell, 진행 actionPrimary, 12시 시작) + 숫자 title1. screens-b.md 7.3
     private var scoreHeader: some View {
-        HStack(alignment: .firstTextBaseline, spacing: ChalkakSpacing.xs) {
-            Text(AIReviewCopy.scoreText(result.overallScore))
-                .font(ChalkakFont.display)
-                .foregroundStyle(ChalkakColor.textPrimary)
-                .accessibilityLabel(AIReviewCopy.scoreAccessibility(result.overallScore))
-                .accessibilityIdentifier("ai-result-sheet.overall-score")
+        HStack(spacing: ChalkakSpacing.lg) {
+            ZStack {
+                Circle().stroke(ChalkakColor.calendarCell, lineWidth: 8)
+                Circle()
+                    .trim(from: 0, to: CGFloat(min(max(result.overallScore, 0), 10) / 10))
+                    .stroke(ChalkakColor.actionPrimary, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Text(AIReviewCopy.scoreText(result.overallScore))
+                    .font(ChalkakFont.title1)
+                    .foregroundStyle(ChalkakColor.textPrimary)
+                    .accessibilityLabel(AIReviewCopy.scoreAccessibility(result.overallScore))
+                    .accessibilityIdentifier("ai-result-sheet.overall-score")
+            }
+            .frame(width: 84, height: 84)
             Text("/ 10")
                 .font(ChalkakFont.callout)
                 .foregroundStyle(ChalkakColor.textSecondary)
@@ -226,11 +248,12 @@ private struct AIResultSheet: View {
     private func section(_ title: String, text: String, identifier: String) -> some View {
         VStack(alignment: .leading, spacing: ChalkakSpacing.xs) {
             Text(title)
-                .font(ChalkakFont.headline)
+                .font(ChalkakFont.footnoteSemibold)
                 .foregroundStyle(ChalkakColor.textPrimary)
             Text(text)
-                .font(ChalkakFont.callout)
+                .font(ChalkakFont.subheadline)
                 .foregroundStyle(ChalkakColor.textSecondary)
+                .lineSpacing(ChalkakSpacing.xs)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier(identifier)
         }
@@ -246,7 +269,7 @@ private struct AIFailedSheet: View {
     var body: some View {
         VStack(spacing: ChalkakSpacing.lg) {
             Text(AIReviewCopy.failedTitle)
-                .font(ChalkakFont.headlineBold)
+                .font(ChalkakFont.title3)
                 .foregroundStyle(ChalkakColor.textPrimary)
                 .multilineTextAlignment(.center)
                 .padding(.top, ChalkakSpacing.xl)
@@ -262,10 +285,10 @@ private struct AIFailedSheet: View {
                 viewModel.dismissSheet()
             }
         }
-        .padding(.horizontal, ChalkakSpacing.screenHorizontal)
+        .padding(.horizontal, ChalkakSpacing.xl)
         .padding(.bottom, ChalkakSpacing.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(ChalkakColor.background.ignoresSafeArea())
+        .background(ChalkakColor.surfaceElevated.ignoresSafeArea())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ai-failed-sheet.root")
     }

@@ -54,7 +54,9 @@ struct PhotoEditScreen: View {
             tools
             tabBar
         }
-        .background(ChalkakColor.background.ignoresSafeArea())
+        // 원본 편집기(screens-b.md 6.5): 어두운 편집기 색(editor*)과 다크 컨트롤
+        .background(ChalkakColor.editorBackground.ignoresSafeArea())
+        .preferredColorScheme(.dark)
         .overlay { errorDialog }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("photo-edit.root")
@@ -81,12 +83,12 @@ struct PhotoEditScreen: View {
         HStack {
             Button(EditCopy.cancel) { viewModel.cancel() }
                 .font(ChalkakFont.body)
-                .foregroundStyle(ChalkakColor.textPrimary)
+                .foregroundStyle(ChalkakColor.editorContent)
                 .frame(minWidth: 44, minHeight: 44)
                 .accessibilityIdentifier("photo-edit.cancel-button")
             Spacer()
             if isFinishing {
-                ProgressView().accessibilityIdentifier("photo-edit.rendering-indicator")
+                ProgressView().tint(ChalkakColor.editorContent).accessibilityIdentifier("photo-edit.rendering-indicator")
             }
             Spacer()
             Button(EditCopy.done) {
@@ -98,13 +100,14 @@ struct PhotoEditScreen: View {
                 }
             }
             .font(ChalkakFont.headline)
-            .foregroundStyle(ChalkakColor.accent)
+            .foregroundStyle(isReady && !isFinishing ? ChalkakColor.editorContent : ChalkakColor.editorContentMuted)
             .frame(minWidth: 44, minHeight: 44)
             .disabled(!isReady)
             .accessibilityIdentifier("photo-edit.done-button")
         }
         .padding(.horizontal, ChalkakSpacing.lg)
-        .frame(height: 52)
+        .padding(.top, ChalkakSpacing.sm)
+        .frame(height: 56)
     }
 
     private var tabBar: some View {
@@ -113,7 +116,7 @@ struct PhotoEditScreen: View {
             tabButton(.adjust, title: EditCopy.tabAdjust, identifier: "photo-edit.tab-adjust")
             tabButton(.filter, title: EditCopy.tabFilter, identifier: "photo-edit.tab-filter")
         }
-        .background(ChalkakColor.surfaceElevated.ignoresSafeArea(edges: .bottom))
+        .background(ChalkakColor.editorBackground.ignoresSafeArea(edges: .bottom))
     }
 
     private func tabButton(_ tab: PhotoEditTab, title: String, identifier: String) -> some View {
@@ -121,7 +124,7 @@ struct PhotoEditScreen: View {
         return Button { Task { await viewModel.selectTab(tab) } } label: {
             Text(title)
                 .font(isSelected ? ChalkakFont.headline : ChalkakFont.body)
-                .foregroundStyle(isSelected ? ChalkakColor.textPrimary : ChalkakColor.bottomBarInactive)
+                .foregroundStyle(isSelected ? ChalkakColor.editorContent : ChalkakColor.editorContentMuted)
                 .frame(maxWidth: .infinity, minHeight: 48)
         }
         .buttonStyle(.plain)
@@ -147,7 +150,7 @@ struct PhotoEditScreen: View {
                     }
                     .frame(width: shown.width, height: shown.height)
                 } else {
-                    ProgressView()
+                    ProgressView().tint(ChalkakColor.editorContent)
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
@@ -175,7 +178,7 @@ struct PhotoEditScreen: View {
         }
         .frame(height: 150)
         .frame(maxWidth: .infinity)
-        .background(ChalkakColor.surfaceElevated)
+        .background(ChalkakColor.editorBackground)
     }
 
     private var cropTools: some View {
@@ -213,6 +216,7 @@ struct PhotoEditScreen: View {
                 .padding(.horizontal, ChalkakSpacing.lg)
             }
             adjustSlider
+                .tint(ChalkakColor.editorContent)
                 .padding(.horizontal, ChalkakSpacing.lg)
             textButton(EditCopy.adjustReset, systemName: "arrow.counterclockwise", identifier: "photo-edit.reset-button") { viewModel.resetAdjustments() }
         }
@@ -246,7 +250,7 @@ struct PhotoEditScreen: View {
                 .accessibilityIdentifier("photo-edit.adjust-" + Self.slug(for: .value(kind)) + "-slider")
                 Text("\(Int((viewModel.adjustments.value(of: kind) * 100).rounded()))")
                     .font(ChalkakFont.footnote)
-                    .foregroundStyle(ChalkakColor.textSecondary)
+                    .foregroundStyle(ChalkakColor.editorContentMuted)
                     .frame(width: 44, alignment: .trailing)
             }
         }
@@ -284,10 +288,10 @@ struct PhotoEditScreen: View {
         Button(action: action) {
             Text(title)
                 .font(ChalkakFont.subheadline)
-                .foregroundStyle(isSelected ? ChalkakColor.onActionPrimary : ChalkakColor.textPrimary)
+                .foregroundStyle(isSelected ? ChalkakColor.editorBackground : ChalkakColor.editorContent)
                 .padding(.horizontal, ChalkakSpacing.md)
                 .frame(minHeight: 36)
-                .background(isSelected ? ChalkakColor.actionPrimary : ChalkakColor.calendarCell, in: Capsule())
+                .background(isSelected ? ChalkakColor.editorContent : ChalkakColor.editorContent.opacity(0.12), in: Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -298,7 +302,7 @@ struct PhotoEditScreen: View {
         Button(action: action) {
             Label(title, systemImage: systemName)
                 .font(ChalkakFont.subheadline)
-                .foregroundStyle(ChalkakColor.textPrimary)
+                .foregroundStyle(ChalkakColor.editorContent)
                 .frame(minHeight: 36)
         }
         .buttonStyle(.plain)
@@ -350,7 +354,7 @@ private struct FilterThumbnail: View {
         Button { viewModel.selectFilter(filter) } label: {
             VStack(spacing: ChalkakSpacing.xs) {
                 ZStack {
-                    ChalkakColor.calendarCell
+                    ChalkakColor.editorContentMuted.opacity(0.3)
                     if let image {
                         Image(uiImage: image).resizable().scaledToFill()
                     }
@@ -359,11 +363,11 @@ private struct FilterThumbnail: View {
                 .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.small))
                 .overlay(
                     RoundedRectangle(cornerRadius: ChalkakRadius.small)
-                        .stroke(isSelected ? ChalkakColor.accent : Color.clear, lineWidth: 2)
+                        .stroke(isSelected ? ChalkakColor.editorContent : Color.clear, lineWidth: 2)
                 )
                 Text(EditCopy.label(for: filter))
                     .font(ChalkakFont.caption)
-                    .foregroundStyle(isSelected ? ChalkakColor.textPrimary : ChalkakColor.textSecondary)
+                    .foregroundStyle(isSelected ? ChalkakColor.editorContent : ChalkakColor.editorContentMuted)
             }
         }
         .buttonStyle(.plain)
@@ -398,11 +402,11 @@ private struct CropOverlay: View {
                 path.addRect(CGRect(origin: .zero, size: displaySize))
                 path.addRect(rect)
             }
-            .fill(Color.black.opacity(0.5), style: FillStyle(eoFill: true))
+            .fill(ChalkakColor.editorScrim, style: FillStyle(eoFill: true))
             .allowsHitTesting(false)
 
             Rectangle()
-                .stroke(Color.white, lineWidth: 1.5)
+                .stroke(ChalkakColor.editorContent, lineWidth: 1.5)
                 .frame(width: rect.width, height: rect.height)
                 .offset(x: rect.minX, y: rect.minY)
                 .allowsHitTesting(false)
@@ -428,7 +432,7 @@ private struct CropOverlay: View {
             ForEach(CropHandle.allCases, id: \.self) { handle in
                 let point = position(of: handle, in: rect)
                 Circle()
-                    .fill(Color.white)
+                    .fill(ChalkakColor.editorContent)
                     .frame(width: 14, height: 14)
                     .frame(width: handleSize, height: handleSize)
                     .contentShape(Rectangle())
@@ -465,6 +469,6 @@ private struct CropOverlay: View {
                 path.addLine(to: CGPoint(x: rect.maxX, y: y))
             }
         }
-        .stroke(Color.white.opacity(0.6), lineWidth: 0.5)
+        .stroke(ChalkakColor.editorContentMuted, lineWidth: 0.5)
     }
 }

@@ -135,7 +135,7 @@ struct LoginView: View {
                 Image("img_kakao_logo")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 24, height: 24)
+                    .frame(width: 20, height: 20)
                 Text(AuthCopy.loginKakao)
                     .font(ChalkakFont.callout)
                     .foregroundStyle(ChalkakColor.textPrimary)
@@ -144,7 +144,7 @@ struct LoginView: View {
             .background(ChalkakColor.inputBackground, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
             .overlay(RoundedRectangle(cornerRadius: ChalkakRadius.button).stroke(ChalkakColor.border, lineWidth: 1))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ChalkakPressOpacityButtonStyle(pressedOpacity: 0.7))
         .disabled(!viewModel.isInteractionEnabled)
         .accessibilityLabel(AuthCopy.loginKakao)
         .accessibilityIdentifier("login.kakao-button")
