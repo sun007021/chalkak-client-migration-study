@@ -176,7 +176,7 @@ struct PhotoEditScreen: View {
             case .filter: filterTools
             }
         }
-        .frame(height: 150)
+        .frame(height: viewModel.tab == .adjust ? 200 : 150)
         .frame(maxWidth: .infinity)
         .background(ChalkakColor.editorBackground)
     }
@@ -202,58 +202,56 @@ struct PhotoEditScreen: View {
         .padding(.vertical, ChalkakSpacing.md)
     }
 
+    /// 조정 탭: 위쪽 줄(자동 토글, 초기화) + 항목 링 + 눈금자(screens-b.md 6.2).
     private var adjustTools: some View {
         VStack(spacing: ChalkakSpacing.sm) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: ChalkakSpacing.sm) {
-                    ForEach(AdjustmentItem.ordered, id: \.self) { item in
-                        chip(
-                            title: EditCopy.label(for: item), isSelected: viewModel.adjustmentItem == item,
-                            identifier: item == .auto ? "photo-edit.adjust-item-auto" : "photo-edit.adjust-item-" + Self.slug(for: item)
-                        ) { Task { await viewModel.selectAdjustmentItem(item) } }
-                    }
+            HStack {
+                if viewModel.adjustmentItem == .auto {
+                    Toggle(EditCopy.label(for: AdjustmentItem.auto), isOn: Binding(
+                        get: { viewModel.adjustments.autoStrength > 0 },
+                        // "자동"이 선택된 상태에서 다시 누르면 켜짐/꺼짐이 번갈아 바뀐다(REQ-EDIT-021).
+                        set: { _ in Task { await viewModel.selectAdjustmentItem(.auto) } }
+                    ))
+                    .labelsHidden()
+                    .tint(ChalkakColor.editorAccent)
+                    .scaleEffect(0.85, anchor: .leading)
+                    .accessibilityIdentifier("photo-edit.adjust-auto-toggle")
                 }
-                .padding(.horizontal, ChalkakSpacing.lg)
+                Spacer()
+                textButton(EditCopy.adjustReset, systemName: "arrow.counterclockwise", identifier: "photo-edit.reset-button") { viewModel.resetAdjustments() }
             }
-            adjustSlider
-                .tint(ChalkakColor.editorContent)
-                .padding(.horizontal, ChalkakSpacing.lg)
-            textButton(EditCopy.adjustReset, systemName: "arrow.counterclockwise", identifier: "photo-edit.reset-button") { viewModel.resetAdjustments() }
+            .frame(height: 32)
+            .padding(.horizontal, ChalkakSpacing.lg)
+            PhotoEditAdjustControls(
+                selectedItem: viewModel.adjustmentItem,
+                value: { item in
+                    switch item {
+                    case .auto: viewModel.adjustments.autoStrength
+                    case .value(let kind): viewModel.adjustments.value(of: kind)
+                    }
+                },
+                automaticValue: { item in
+                    guard case .value(let kind) = item, viewModel.adjustments.autoStrength > 0 else { return nil }
+                    let share = viewModel.adjustments.autoShare(of: kind)
+                    return share == 0 ? nil : share
+                },
+                onSelect: { item in Task { await viewModel.selectAdjustmentItem(item) } },
+                onValueChange: { newValue in
+                    // 눈금자가 이미 정수 값으로 맞춰 보내고, 기준값(자동 보정 몫)은 반올림하지 않은 채로 온다.
+                    switch viewModel.adjustmentItem {
+                    case .auto: viewModel.setAutoStrength(newValue)
+                    case .value(let kind): viewModel.setAdjustment(kind, to: newValue)
+                    }
+                },
+                rulerIdentifier: { item in
+                    item == .auto ? "photo-edit.adjust-auto-strength-slider" : "photo-edit.adjust-" + Self.slug(for: item) + "-slider"
+                },
+                itemIdentifier: { item in
+                    item == .auto ? "photo-edit.adjust-item-auto" : "photo-edit.adjust-item-" + Self.slug(for: item)
+                }
+            )
         }
-        .padding(.vertical, ChalkakSpacing.md)
-    }
-
-    @ViewBuilder
-    private var adjustSlider: some View {
-        switch viewModel.adjustmentItem {
-        case .auto:
-            HStack(spacing: ChalkakSpacing.md) {
-                Toggle(EditCopy.label(for: AdjustmentItem.auto), isOn: Binding(
-                    get: { viewModel.adjustments.autoStrength > 0 },
-                    // "자동"이 선택된 상태에서 다시 누르면 켜짐/꺼짐이 번갈아 바뀐다(REQ-EDIT-021).
-                    set: { _ in Task { await viewModel.selectAdjustmentItem(.auto) } }
-                ))
-                .labelsHidden()
-                .accessibilityIdentifier("photo-edit.adjust-auto-toggle")
-                Slider(value: Binding(
-                    get: { viewModel.adjustments.autoStrength },
-                    set: { viewModel.setAutoStrength(($0 * 100).rounded() / 100) }
-                ), in: 0...1)
-                .accessibilityIdentifier("photo-edit.adjust-auto-strength-slider")
-            }
-        case .value(let kind):
-            HStack(spacing: ChalkakSpacing.md) {
-                Slider(value: Binding(
-                    get: { viewModel.adjustments.value(of: kind) },
-                    set: { viewModel.setAdjustment(kind, to: ($0 * 100).rounded() / 100) }
-                ), in: AdjustmentLayers.range)
-                .accessibilityIdentifier("photo-edit.adjust-" + Self.slug(for: .value(kind)) + "-slider")
-                Text("\(Int((viewModel.adjustments.value(of: kind) * 100).rounded()))")
-                    .font(ChalkakFont.footnote)
-                    .foregroundStyle(ChalkakColor.editorContentMuted)
-                    .frame(width: 44, alignment: .trailing)
-            }
-        }
+        .padding(.vertical, ChalkakSpacing.sm)
     }
 
     private var filterTools: some View {

@@ -6,6 +6,7 @@ import ChalkakData
 struct RootView: View {
     let container: AppContainer
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let launch = container.launch
@@ -16,6 +17,8 @@ struct RootView: View {
             }
             ToastOverlay(center: container.toast)
         }
+        // 라우트 전환은 기본 cross-fade(screens-a.md 2.1). 동작 줄이기에서는 바로 바꾼다.
+        .animation(reduceMotion ? nil : .default, value: launch.root)
         .task { await container.pushHub.attachToEntryPoint() }
         .task { await launch.start() }
         .onChange(of: scenePhase) { _, phase in
@@ -38,6 +41,7 @@ struct RootView: View {
     }
 }
 
+/// 런치 스크린과 같은 배경·로고(220×220)라 시작 화면이 끊김 없이 이어진다.
 struct SplashView: View {
     var body: some View {
         ZStack {
@@ -45,7 +49,7 @@ struct SplashView: View {
             Image("ChalkakLaunchLogo")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 160)
+                .frame(width: 220, height: 220)
                 .accessibilityIdentifier("splash.logo")
         }
     }
@@ -72,16 +76,25 @@ struct ConfigurationErrorView: View {
     var body: some View {
         ZStack {
             ChalkakColor.background.ignoresSafeArea()
-            VStack(spacing: ChalkakSpacing.md) {
-                Text("앱 설정 오류")
-                    .font(ChalkakFont.headline)
+            VStack(spacing: 0) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 34))
                     .foregroundStyle(ChalkakColor.error)
+                    .accessibilityHidden(true)
+                Text("앱 설정 오류")
+                    .font(ChalkakFont.title3)
+                    .foregroundStyle(ChalkakColor.textPrimary)
+                    .padding(.top, ChalkakSpacing.md)
+                    .accessibilityIdentifier("config-error.title")
                 Text(message)
                     .font(ChalkakFont.callout)
                     .foregroundStyle(ChalkakColor.textSecondary)
                     .multilineTextAlignment(.center)
+                    .padding(.top, ChalkakSpacing.sm)
+                    .accessibilityIdentifier("config-error.message")
             }
-            .padding(ChalkakSpacing.xl)
+            .padding(.horizontal, ChalkakSpacing.screenHorizontal)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("config-error.root")

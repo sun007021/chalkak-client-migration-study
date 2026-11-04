@@ -1,4 +1,5 @@
 import SwiftUI
+import ImageIO
 import ChalkakCore
 import ChalkakData
 import ChalkakFeatures
@@ -31,6 +32,9 @@ private struct DisplayScreen: View {
     @State private var isActive = false
     @State private var runTask: Task<Void, Never>?
     @State private var showsDatePicker = false
+    /// 불러오며 측정한 사진별 세로/가로 비율. 측정 전에는 기본 비율(4/3)로 배치한다.
+    @State private var ratioByID: [UUID: CGFloat] = [:]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// 스크롤 위치. 탭을 오가 뷰가 다시 만들어져도 ViewModel이 쥔 마지막 위치에서 시작한다(REQ-DISP-030).
     @State private var scrollPosition: ScrollPosition
 
@@ -303,6 +307,8 @@ private struct DisplayScreen: View {
                 ForEach(Array(viewModel.featured.enumerated()), id: \.element.id) { index, item in
                     PostCell(
                         item: item, aspect: 3.0 / 4.0,
+                        // 같은 게시물이 그리드에도 있으면 그리드 카드가 출발 뷰다(출발 id 중복 방지).
+                        zoomSourceID: viewModel.items.contains(where: { $0.id == item.id }) ? nil : item.id,
                         itemIdentifier: "display.featured-item-\(Self.idString(item.id))",
                         likeIdentifier: "display.featured-like-button-\(Self.idString(item.id))",
                         countIdentifier: "display.featured-like-count-\(Self.idString(item.id))",
@@ -339,25 +345,43 @@ private struct DisplayScreen: View {
 
     // MARK: 그리드
 
+    /// 2열 마손리 그리드(screens-b.md 2.2). 항상 더 짧은 열에 다음 사진을 넣는 그리디 패킹이라
+    /// i번째 사진의 열은 앞 사진들의 비율에만 의존한다. 위에서 아래로 불러오는 동안 재배치가 눈에 띄지 않는다.
     private var grid: some View {
-        LazyVGrid(
-            columns: [GridItem(.flexible(), spacing: ChalkakSpacing.md), GridItem(.flexible(), spacing: ChalkakSpacing.md)],
-            spacing: ChalkakSpacing.md
-        ) {
-            ForEach(viewModel.items) { item in
+        let columns = MasonryLayout.distribute(viewModel.items, ratios: ratioByID)
+        return HStack(alignment: .top, spacing: ChalkakSpacing.md) {
+            masonryColumn(columns.left)
+            masonryColumn(columns.right)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("display.grid")
+    }
+
+    private func masonryColumn(_ items: [PostListItem]) -> some View {
+        LazyVStack(spacing: ChalkakSpacing.md) {
+            ForEach(items) { item in
                 PostCell(
-                    item: item, aspect: 3.0 / 4.0,
+                    item: item, aspect: 1 / (ratioByID[item.id] ?? MasonryLayout.defaultRatio),
+                    signatureURL: item.signatureThumbnailImageURL ?? item.signatureOriginalImageURL,
+                    zoomSourceID: item.id,
                     itemIdentifier: "display.item-\(Self.idString(item.id))",
                     likeIdentifier: "display.like-button-\(Self.idString(item.id))",
                     countIdentifier: "display.like-count-\(Self.idString(item.id))",
                     onOpen: { open(item.id) },
                     onLike: { viewModel.likeTapped(item.id) }
                 )
+                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                .task(id: item.id) {
+                    guard ratioByID[item.id] == nil,
+                          let measured = await ImageRatioLoader.ratio(for: item.thumbnailImageURL ?? item.originalImageURL)
+                    else { return }
+                    ratioByID[item.id] = measured
+                }
                 .onAppear { Task { await viewModel.itemAppeared(item.id) } }
             }
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("display.grid")
+        .frame(maxWidth: .infinity, alignment: .top)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: items.map(\.id))
     }
 
     private func open(_ postId: UUID) {
@@ -374,6 +398,9 @@ private struct DisplayScreen: View {
 private struct PostCell: View {
     let item: PostListItem
     let aspect: CGFloat
+    var signatureURL: URL? = nil
+    /// 줌 전환 출발 뷰로 등록할 게시물 id. nil이면 등록하지 않는다.
+    var zoomSourceID: UUID? = nil
     let itemIdentifier: String
     let likeIdentifier: String
     let countIdentifier: String
@@ -385,7 +412,11 @@ private struct PostCell: View {
             .aspectRatio(aspect, contentMode: .fit)
             .overlay {
                 GeometryReader { geo in
-                    ChalkakRemoteImage(url: item.thumbnailImageURL ?? item.originalImageURL)
+                    ChalkakSignedImage(
+                        imageURL: item.thumbnailImageURL ?? item.originalImageURL,
+                        signatureURL: signatureURL,
+                        signatureSize: CGSize(width: 40, height: 30)
+                    )
                         .frame(width: geo.size.width, height: geo.size.height)
                         .clipped()
                         .contentShape(Rectangle())
@@ -402,6 +433,7 @@ private struct PostCell: View {
             }
             .background(Color.black)
             .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.photoCard))
+            .feedZoomSource(id: zoomSourceID)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(itemIdentifier)
     }
@@ -464,5 +496,48 @@ private struct DisplayDatePickerSheet: View {
         if resolved.month != month { month = resolved.month }
         if resolved.day != day { day = resolved.day }
         if resolved.year != year { year = resolved.year }
+    }
+}
+
+// MARK: 마손리 배치
+
+/// 2열 그리디 패킹. 열 높이 추정 = (세로/가로 비율, 모르면 4/3) + 간격 보정 0.06(원본 DisplayPhotoGrid).
+enum MasonryLayout {
+    static let defaultRatio: CGFloat = 4.0 / 3.0
+    static let spacingRatio: CGFloat = 0.06
+
+    static func distribute(_ items: [PostListItem], ratios: [UUID: CGFloat]) -> (left: [PostListItem], right: [PostListItem]) {
+        var left: [PostListItem] = []
+        var right: [PostListItem] = []
+        var leftHeight: CGFloat = 0
+        var rightHeight: CGFloat = 0
+        for item in items {
+            let unit = (ratios[item.id] ?? defaultRatio) + spacingRatio
+            if leftHeight <= rightHeight {
+                left.append(item)
+                leftHeight += unit
+            } else {
+                right.append(item)
+                rightHeight += unit
+            }
+        }
+        return (left, right)
+    }
+}
+
+/// 이미지의 EXIF 방향을 반영한 세로/가로 비율(height / width)을 한 번 측정한다(원본 ImageRatioLoader).
+/// 화면에 그리는 요청과 같은 URLSession.shared 캐시를 쓰고, 픽셀 디코딩 없이 헤더 크기만 읽는다.
+enum ImageRatioLoader {
+    static func ratio(for url: URL) async -> CGFloat? {
+        guard let (data, _) = try? await URLSession.shared.data(from: url),
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = (props[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue,
+              let height = (props[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue,
+              width > 0, height > 0
+        else { return nil }
+        let orientation = (props[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        let swapped = (5...8).contains(orientation)
+        return CGFloat(swapped ? width / height : height / width)
     }
 }
