@@ -1,9 +1,13 @@
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import type { KstDate } from '../../../core/time/KstDate';
 import { format, t } from '../../../shared/copy';
-import { colors, spacing } from '../../../shared/ui/theme';
+import { colors, spacing, typography } from '../../../shared/design/tokens';
+import { BottomSheet } from '../../../shared/ui/BottomSheet';
+import { ChalkakButton } from '../../../shared/ui/Button';
+import { Text } from '../../../shared/ui/Text';
+import { WheelPicker } from '../../../shared/ui/WheelPicker';
 import {
   availableDays,
   availableMonths,
@@ -25,7 +29,10 @@ function nearest(options: readonly number[], value: number): number {
   return value < options[0] ? options[0] : options[options.length - 1];
 }
 
-/** "날짜 선택" 시트: 연·월·일 세 열에서 하한~상한 안의 값만 고른다. 마운트될 때마다 현재 날짜에서 시작한다. */
+/**
+ * "날짜 선택" 시트: 연·월·일 세 휠에서 하한~상한 안의 값만 고른다. 마운트될 때마다 현재 날짜에서 시작한다.
+ * 원본 피커 시트(screens-b.md §1.2): 위 모서리 28, 안쪽 좌우 24, 제목 title3 왼쪽, 휠, 아래 큰 확인 버튼.
+ */
 export function DatePickerSheet({ range, initial, onConfirm, onClose }: Props) {
   const [picked, setPicked] = useState({
     year: initial.year,
@@ -40,102 +47,55 @@ export function DatePickerSheet({ range, initial, onConfirm, onClose }: Props) {
   const day = nearest(days, picked.day);
 
   return (
-    <Modal transparent animationType="slide" visible onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View testID="display.date-picker-sheet" style={styles.sheet}>
-          <Text style={styles.title}>{t('display.picker.title')}</Text>
-          <View style={styles.columns}>
-            <Column
-              testID="display.date-picker-year"
-              values={years}
-              selected={year}
-              label={(n) => format(t('display.picker.year'), { n })}
-              onSelect={(value) => setPicked({ ...picked, year: value })}
-            />
-            <Column
-              testID="display.date-picker-month"
-              values={months}
-              selected={month}
-              label={(n) => format(t('display.picker.month'), { n })}
-              onSelect={(value) => setPicked({ ...picked, month: value })}
-            />
-            <Column
-              testID="display.date-picker-day"
-              values={days}
-              selected={day}
-              label={(n) => format(t('display.picker.day'), { n })}
-              onSelect={(value) => setPicked({ ...picked, day: value })}
-            />
-          </View>
-          <Pressable
+    <BottomSheet testID="display.date-picker-sheet" onRequestClose={onClose}>
+      <View style={styles.content}>
+        <Text style={styles.title}>{t('display.picker.title')}</Text>
+        <View style={styles.wheels}>
+          <WheelPicker
+            testID="display.date-picker-year"
+            accessibilityLabel="연도"
+            values={years}
+            selected={year}
+            label={(n) => format(t('display.picker.year'), { n })}
+            onSelect={(value) => setPicked({ ...picked, year: value })}
+          />
+          <WheelPicker
+            testID="display.date-picker-month"
+            accessibilityLabel="월"
+            values={months}
+            selected={month}
+            label={(n) => format(t('display.picker.month'), { n })}
+            onSelect={(value) => setPicked({ ...picked, month: value })}
+          />
+          <WheelPicker
+            testID="display.date-picker-day"
+            accessibilityLabel="일"
+            values={days}
+            selected={day}
+            label={(n) => format(t('display.picker.day'), { n })}
+            onSelect={(value) => setPicked({ ...picked, day: value })}
+          />
+        </View>
+        <View style={styles.confirm}>
+          <ChalkakButton
             testID="display.date-picker-confirm-button"
-            accessibilityRole="button"
+            label={t('common.confirm')}
             onPress={() => onConfirm(resolvePickedDate(range, year, month, day))}
-            style={styles.confirm}
-          >
-            <Text style={styles.confirmText}>{t('common.confirm')}</Text>
-          </Pressable>
+          />
         </View>
       </View>
-    </Modal>
-  );
-}
-
-function Column({
-  testID,
-  values,
-  selected,
-  label,
-  onSelect,
-}: {
-  testID: string;
-  values: readonly number[];
-  selected: number;
-  label: (n: number) => string;
-  onSelect: (value: number) => void;
-}) {
-  return (
-    <ScrollView testID={testID} style={styles.column} showsVerticalScrollIndicator={false}>
-      {values.map((value) => (
-        <Pressable
-          key={value}
-          testID={`${testID}-${value}`}
-          accessibilityRole="button"
-          accessibilityState={{ selected: value === selected }}
-          onPress={() => onSelect(value)}
-          style={[styles.option, value === selected && styles.optionSelected]}
-        >
-          <Text style={[styles.optionText, value === selected && styles.optionTextSelected]}>
-            {label(value)}
-          </Text>
-        </Pressable>
-      ))}
-    </ScrollView>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheet: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: spacing.lg,
-    gap: spacing.md,
+  content: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
+    gap: spacing.lg,
   },
-  title: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-  columns: { flexDirection: 'row', height: 200, gap: spacing.sm },
-  column: { flex: 1 },
-  option: { paddingVertical: spacing.sm, alignItems: 'center', borderRadius: 8 },
-  optionSelected: { backgroundColor: colors.surface },
-  optionText: { fontSize: 16, color: colors.textSecondary },
-  optionTextSelected: { color: colors.textPrimary, fontWeight: '700' },
-  confirm: {
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.accent,
-  },
-  confirmText: { color: '#FFFFFF', fontWeight: '700', fontSize: 16 },
+  title: { ...typography.title3, color: colors.textPrimary },
+  wheels: { flexDirection: 'row', gap: spacing.lg },
+  confirm: { paddingTop: spacing.sm },
 });

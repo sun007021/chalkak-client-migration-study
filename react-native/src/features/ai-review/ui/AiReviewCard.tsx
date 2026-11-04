@@ -1,10 +1,13 @@
 import { useEffect } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useViewModelState } from '../../../core/state/useViewModelState';
-import { colors, spacing } from '../../../shared/ui/theme';
+import { colors, radius, spacing, typography } from '../../../shared/design/tokens';
+import { AudioWaveIcon } from '../../../shared/ui/AudioWaveIcon';
+import { Icon } from '../../../shared/ui/icons/Icon';
 import type { AiReviewViewModel } from '../AiReviewViewModel';
 import { AiReviewSheets } from './AiReviewSheets';
+import { Text } from '../../../shared/ui/Text';
 
 const ACTION_TEST_IDS = {
   start: 'home.ai-request-button',
@@ -22,6 +25,7 @@ export function AiReviewCard({ viewModel }: { viewModel: AiReviewViewModel }) {
   }, [viewModel]);
 
   const { card } = state;
+  const busy = state.pill?.kind === 'processing' || state.pill?.kind === 'requesting';
   return (
     <View style={styles.root}>
       {card ? (
@@ -37,10 +41,22 @@ export function AiReviewCard({ viewModel }: { viewModel: AiReviewViewModel }) {
               testID={ACTION_TEST_IDS[card.action.kind]}
               accessibilityRole="button"
               onPress={() => void viewModel.onCardActionPress()}
-              style={styles.action}
+              style={({ pressed }) => [
+                card.action?.kind === 'start' ? styles.startAction : styles.textAction,
+                pressed && styles.pressed,
+              ]}
             >
-              <Text style={styles.actionText}>{card.action.label}</Text>
+              <Text style={card.action.kind === 'start' ? styles.startText : styles.actionText}>
+                {card.action.label}
+              </Text>
+              {card.action.kind === 'detail' ? (
+                <Icon name="ic_chevron_down" size={16} color={colors.iconSecondary} />
+              ) : null}
             </Pressable>
+          ) : busy ? (
+            <View style={styles.waveCircle}>
+              <AudioWaveIcon color={colors.onActionPrimary} animating />
+            </View>
           ) : null}
         </View>
       ) : null}
@@ -63,21 +79,45 @@ function messageTestId(
   return undefined;
 }
 
+// 원본 근거: docs/design/screens-a.md §7.5, screens-b.md §8.1 (카드 18 + border 1, 그림자 actionPrimary 0.08/12/y5, 헤더 최소 64).
 const styles = StyleSheet.create({
   root: {},
   card: {
+    minHeight: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing.sm,
-    padding: spacing.lg,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
+    paddingLeft: spacing.lg,
+    paddingRight: spacing.sm,
+    borderRadius: radius.xlarge,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceElevated,
+    shadowColor: colors.actionPrimary,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
   },
-  message: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  action: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.lg,
+  message: { ...typography.callout, fontWeight: '600', color: colors.textPrimary, flex: 1 },
+  pressed: { opacity: 0.8 },
+  startAction: {
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: 20,
-    backgroundColor: colors.accent,
+    borderRadius: radius.pill,
+    backgroundColor: colors.actionPrimary,
   },
-  actionText: { color: colors.onOverlay, fontWeight: '600' },
+  startText: { ...typography.footnote, color: colors.onActionPrimary },
+  textAction: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  actionText: { ...typography.footnote, color: colors.textSecondary },
+  waveCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.actionPrimary,
+  },
 });

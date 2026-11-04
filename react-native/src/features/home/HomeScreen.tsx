@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import {
-  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -14,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { KstDate } from '../../core/time/KstDate';
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
-import { colors } from '../../shared/ui/theme';
+import { colors, spacing } from '../../shared/design/tokens';
 import { HeroCard } from './ui/HeroCard';
 import { IssueSection } from './ui/IssueSection';
 import { RankingRow } from './ui/RankingRow';
@@ -72,51 +71,65 @@ export function HomeScreen({ viewModel, renderAiCard }: HomeScreenProps) {
         onLayout={issue.onScrollLayout}
         onScroll={issue.onScroll}
         scrollEventThrottle={100}
+        contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl
             refreshing={state.refreshing}
+            tintColor={colors.actionPrimary}
+            colors={[colors.actionPrimary]}
+            progressBackgroundColor={colors.surfaceElevated}
             onRefresh={() => void viewModel.refresh()}
           />
         }
       >
-        {state.refreshing ? (
-          <ActivityIndicator testID="home.refresh-indicator" style={styles.indicator} />
-        ) : null}
-        <TopicHeader topic={state.topic} onRetry={() => void viewModel.retryTopic()} />
-        <HeroCard
-          hero={state.hero}
-          topicTitle={topicTitle}
-          onPress={() => viewModel.onHeroPress()}
-          onRetry={() => void viewModel.retryHero()}
-        />
-        {state.aiCardPostId !== null ? (
-          <View testID="home.ai-card">{renderAiCard?.(state.aiCardPostId, state.todayDate)}</View>
-        ) : null}
-        <WeeklySection
-          weekly={state.weekly}
-          onDayPress={(date) => viewModel.onWeekDayPress(date)}
-          onMorePress={() => viewModel.onWeeklyMorePress()}
-          onRetry={() => void viewModel.retryWeekly()}
-        />
-        {(['yesterday', 'popular'] as const).map((key) => (
-          <RankingRow
-            key={key}
-            rankingKey={key}
-            title={t(key === 'yesterday' ? 'home.ranking.yesterday' : 'home.ranking.today')}
-            section={state[key]}
-            onItemPress={(postId) => viewModel.onRankingItemPress(key, postId)}
-            onLikePress={(postId) => viewModel.onRankingLikePress(key, postId)}
-            onMorePress={() => viewModel.onRankingMorePress(key)}
-            onRetry={() => void viewModel.retryRanking(key)}
+        {/* 당겨서 새로고침 표시는 RefreshControl(네이티브)이 그린다. 이 요소는 갱신 중임을 알리는 자리표시자다. */}
+        {state.refreshing ? <View testID="home.refresh-indicator" /> : null}
+        <View style={styles.topic}>
+          <TopicHeader topic={state.topic} onRetry={() => void viewModel.retryTopic()} />
+        </View>
+        <View style={styles.hero}>
+          <HeroCard
+            hero={state.hero}
+            topicTitle={topicTitle}
+            onPress={() => viewModel.onHeroPress()}
+            onRetry={() => void viewModel.retryHero()}
           />
+        </View>
+        {state.aiCardPostId !== null ? (
+          <View testID="home.ai-card" style={styles.aiCard}>
+            {renderAiCard?.(state.aiCardPostId, state.todayDate)}
+          </View>
+        ) : null}
+        <View style={state.aiCardPostId !== null ? styles.afterAi : styles.section}>
+          <WeeklySection
+            weekly={state.weekly}
+            onDayPress={(date) => viewModel.onWeekDayPress(date)}
+            onMorePress={() => viewModel.onWeeklyMorePress()}
+            onRetry={() => void viewModel.retryWeekly()}
+          />
+        </View>
+        {(['yesterday', 'popular'] as const).map((key) => (
+          <View key={key} style={styles.section}>
+            <RankingRow
+              rankingKey={key}
+              title={t(key === 'yesterday' ? 'home.ranking.yesterday' : 'home.ranking.today')}
+              section={state[key]}
+              onItemPress={(postId) => viewModel.onRankingItemPress(key, postId)}
+              onLikePress={(postId) => viewModel.onRankingLikePress(key, postId)}
+              onMorePress={() => viewModel.onRankingMorePress(key)}
+              onRetry={() => void viewModel.retryRanking(key)}
+            />
+          </View>
         ))}
-        <IssueSection
-          feed={feed}
-          onBannerPress={(id) => viewModel.onBannerPress(id)}
-          onRetry={() => void viewModel.retryBanners()}
-          onSectionLayout={issue.onSectionLayout}
-          onCardLayout={issue.onCardLayout}
-        />
+        <View style={styles.section}>
+          <IssueSection
+            feed={feed}
+            onBannerPress={(id) => viewModel.onBannerPress(id)}
+            onRetry={() => void viewModel.retryBanners()}
+            onSectionLayout={issue.onSectionLayout}
+            onCardLayout={issue.onCardLayout}
+          />
+        </View>
       </ScrollView>
     </View>
   );
@@ -168,7 +181,13 @@ function useIssuePrefetch(viewModel: HomeViewModel) {
   };
 }
 
+// 섹션 사이 간격은 원본 홈(screens-a.md §7.1): 주제 위 xl+sm, 히어로 위 xl, 피드백 카드 위 lg, 나머지 섹션 위 xxl.
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  indicator: { paddingVertical: 8 },
+  content: { paddingBottom: spacing.xxl },
+  topic: { marginTop: spacing.xl + spacing.sm },
+  hero: { marginTop: spacing.xl },
+  aiCard: { marginTop: spacing.lg },
+  afterAi: { marginTop: spacing.xl },
+  section: { marginTop: spacing.xxl },
 });

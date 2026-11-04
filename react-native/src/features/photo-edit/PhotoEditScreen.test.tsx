@@ -61,7 +61,10 @@ describe('PhotoEditScreen 공통 구성', () => {
   it('TC-EDIT-002 자르기 탭에는 "90도 회전", "초기화", 자르기 영역이 있다', async () => {
     await renderEditor();
     expect(screen.getByTestId('photo-edit.crop-area')).toBeOnTheScreen();
-    expect(screen.getByTestId('photo-edit.rotate-button')).toHaveTextContent(t('edit.crop.rotate'));
+    // 원본 디자인: 회전은 아이콘 버튼이라 문구는 접근성 라벨에 있다.
+    expect(screen.getByTestId('photo-edit.rotate-button').props.accessibilityLabel).toBe(
+      t('edit.crop.rotate'),
+    );
     expect(screen.getByTestId('photo-edit.reset-button')).toHaveTextContent(t('edit.crop.reset'));
   });
 

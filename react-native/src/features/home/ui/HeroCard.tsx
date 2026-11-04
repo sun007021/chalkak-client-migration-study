@@ -1,7 +1,12 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { format, t } from '../../../shared/copy';
-import { colors, spacing } from '../../../shared/ui/theme';
+import { colors, pretendardFor, radius, spacing, typography } from '../../../shared/design/tokens';
+import { Icon } from '../../../shared/ui/icons/Icon';
+import { RemoteImage } from '../../../shared/ui/RemoteImage';
+import { RoundIconButton } from '../../../shared/ui/RoundIconButton';
+import { Skeleton } from '../../../shared/ui/Skeleton';
+import { Text } from '../../../shared/ui/Text';
 import type { HeroState } from '../HomeState';
 
 /** 주제 제목이 없을 때 Empty 문구에 들어가는 말(home.md). 문구 키가 없어 여기 한 곳에 둔다(공용 문구 파일은 client가 고치지 않는다). */
@@ -15,36 +20,45 @@ type Props = {
   onRetry: () => void;
 };
 
+// 원본 HomeHeroCard(screens-a.md §7.4): 5:6 비율, 라운드 photoCard(12), 안내 상태는 surface 바탕 + 1px border.
+const ASPECT = 5 / 6;
+const PLUS_SIZE = 36;
+
 /** D-06 히어로 7상태. 상태마다 testIDs.md의 서로 다른 요소 하나만 그린다. */
 export function HeroCard({ hero, topicTitle, onPress, onRetry }: Props) {
   switch (hero.kind) {
     case 'loading':
-      return <Card testID="home.hero-loading" message={t('home.topic.loading')} />;
+      // 스피너 대신 스켈레톤(쉬머) 위에 안내 문구를 얹는다.
+      return (
+        <View testID="home.hero-loading" style={[styles.card, styles.center]}>
+          <Skeleton style={StyleSheet.absoluteFill} />
+          <Text style={styles.statusMessage}>{t('home.topic.loading')}</Text>
+        </View>
+      );
     case 'no-open-topic':
-      return <Card testID="home.hero-no-open-topic" message={t('home.hero.no-topic')} />;
+      return <StatusCard testID="home.hero-no-open-topic" message={t('home.hero.no-topic')} />;
     case 'processing':
-      return <Card testID="home.hero-processing" message={t('home.hero.processing')} />;
+      return <StatusCard testID="home.hero-processing" message={t('home.hero.processing')} />;
     case 'empty':
       return (
-        <View testID="home.hero-empty" style={styles.card}>
+        <View testID="home.hero-empty" style={[styles.card, styles.outlined]}>
           <Pressable
             testID="home.hero-upload-button"
             accessibilityRole="button"
             onPress={onPress}
             style={styles.fill}
           >
-            <Text style={styles.message}>
+            <Text style={styles.emptyMessage}>
               {format(t('home.hero.empty'), { 주제: topicTitle ?? TOPIC_TITLE_FALLBACK })}
             </Text>
+            <Icon name="ic_bottom_write" size={PLUS_SIZE} />
           </Pressable>
         </View>
       );
     case 'photo':
       return (
-        <View testID="home.hero-photo" style={styles.card}>
-          {hero.thumbnailUrl ? (
-            <Image source={{ uri: hero.thumbnailUrl }} style={styles.fill} resizeMode="cover" />
-          ) : null}
+        <View testID="home.hero-photo" style={[styles.card, styles.photoBackdrop]}>
+          <RemoteImage uri={hero.thumbnailUrl} style={StyleSheet.absoluteFill} />
           {hero.pending ? (
             <View style={styles.badge}>
               <Text testID="home.hero-pending-badge" style={styles.badgeText}>
@@ -56,62 +70,61 @@ export function HeroCard({ hero, topicTitle, onPress, onRetry }: Props) {
       );
     case 'error':
       return (
-        <View style={styles.card}>
-          <Text testID="home.hero-error" style={styles.message}>
+        <View style={[styles.card, styles.outlined, styles.center]}>
+          <Text testID="home.hero-error" style={styles.statusMessage}>
             {t('home.hero.error')}
           </Text>
-          <Pressable
+          <RoundIconButton
             testID="home.hero-retry-button"
-            accessibilityRole="button"
+            accessibilityLabel={t('home.hero.retry')}
             onPress={onRetry}
-            style={styles.retry}
-          >
-            <Text style={styles.retryText}>{t('home.hero.retry')}</Text>
-          </Pressable>
+          />
         </View>
       );
   }
 }
 
-function Card({ testID, message }: { testID: string; message: string }) {
+function StatusCard({ testID, message }: { testID: string; message: string }) {
   return (
-    <View testID={testID} style={styles.card}>
-      <Text style={styles.message}>{message}</Text>
+    <View testID={testID} style={[styles.card, styles.outlined, styles.center]}>
+      <Text style={styles.statusMessage}>{message}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: spacing.lg,
-    aspectRatio: 1,
-    borderRadius: 16,
+    marginHorizontal: spacing.screenHorizontal,
+    aspectRatio: ASPECT,
+    borderRadius: radius.photoCard,
     overflow: 'hidden',
     backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
   },
+  outlined: { borderWidth: 1, borderColor: colors.border },
+  photoBackdrop: { backgroundColor: colors.surfaceElevated },
+  center: { alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   fill: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.xl,
   },
-  message: { fontSize: 16, color: colors.textSecondary, textAlign: 'center', padding: spacing.lg },
+  statusMessage: { ...typography.subheadline, color: colors.textSecondary, textAlign: 'center' },
+  emptyMessage: {
+    ...typography.subheadline,
+    fontFamily: pretendardFor('600'),
+    color: colors.textPrimary,
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
+  },
   badge: {
     position: 'absolute',
     top: spacing.md,
-    left: spacing.md,
-    borderRadius: 12,
+    right: spacing.md,
+    borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: colors.scrim,
   },
-  badgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
-  retry: { paddingVertical: spacing.xs },
-  retryText: { color: colors.accent, fontWeight: '600' },
+  badgeText: { ...typography.caption, fontFamily: pretendardFor('600'), color: colors.textOnImage },
 });

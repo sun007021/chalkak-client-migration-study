@@ -1,9 +1,10 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 
 import { t } from '../../../shared/copy';
-import { colors } from '../../../shared/ui/theme';
+import { colors, radius, typography } from '../../../shared/design/tokens';
 import { buildCalendarGrid, formatRecordMonthLabel } from '../calendarGrid';
 import type { CalendarImageInput } from '../CalendarImage';
+import { Text } from '../../../shared/ui/Text';
 
 /** 저장용 달력 이미지의 레이아웃(dp). 기기 화면 크기와 무관하게 같은 모양으로 그린다. */
 export const CALENDAR_IMAGE = { width: 360, cell: 48, padding: 12 } as const;
@@ -66,8 +67,7 @@ const { width, cell, padding } = CALENDAR_IMAGE;
 const styles = StyleSheet.create({
   root: { width, padding, backgroundColor: colors.background },
   title: {
-    fontSize: 22,
-    fontWeight: '700',
+    ...typography.title2,
     color: colors.textPrimary,
     textAlign: 'center',
     paddingVertical: 12,
@@ -77,22 +77,22 @@ const styles = StyleSheet.create({
     width: cell,
     paddingVertical: 6,
     textAlign: 'center',
-    fontSize: 13,
-    color: colors.textSecondary,
+    ...typography.caption,
+    color: colors.textMuted,
   },
   cell: {
     width: cell,
     height: cell,
     padding: 2,
     overflow: 'hidden',
-    borderRadius: 8,
+    borderRadius: radius.small,
+    backgroundColor: colors.calendarCell,
   },
-  today: { borderWidth: 2, borderColor: colors.accent },
-  photo: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 8 },
-  day: { fontSize: 11, color: colors.textSecondary },
+  today: { borderWidth: 2, borderColor: colors.calendarSelection },
+  photo: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius.small },
+  day: { ...typography.caption, color: colors.textSecondary },
   dayOnPhoto: {
-    color: '#FFFFFF',
-    fontWeight: '700',
+    color: colors.textOnImage,
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowRadius: 2,
   },

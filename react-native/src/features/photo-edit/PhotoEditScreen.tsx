@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   type LayoutChangeEvent,
 } from 'react-native';
@@ -15,7 +14,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { bytesToBase64 } from '../../core/encoding/base64';
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t, type CopyKey } from '../../shared/copy';
-import { colors, spacing } from '../../shared/ui/theme';
+import { colors, pretendardFor, radius, spacing, typography } from '../../shared/design/tokens';
+import { Dialog, DialogButton } from '../../shared/ui/Dialog';
+import { Icon } from '../../shared/ui/icons/Icon';
+import type { IconName } from '../../shared/ui/icons/iconData';
 import { encodePng } from '../../core/image/png';
 import { localCopy } from '../upload/localCopy';
 import { ASPECT_KEYS, fitScale, type AspectKey } from './CropGeometry';
@@ -26,6 +28,7 @@ import { PHOTO_FILTERS } from './PhotoFilters';
 import { rotatedSize } from './PhotoEditTransform';
 import { CropFrame } from './ui/CropFrame';
 import { RulerSlider } from './ui/RulerSlider';
+import { Text } from '../../shared/ui/Text';
 
 type Props = { viewModel: PhotoEditViewModel };
 
@@ -131,7 +134,7 @@ export function PhotoEditScreen({ viewModel }: Props): ReactNode {
           onPress={() => void viewModel.done()}
           hitSlop={8}
         >
-          <Text style={[styles.topText, styles.done]}>{t('edit.top.done')}</Text>
+          <Text style={styles.topText}>{t('edit.top.done')}</Text>
         </Pressable>
       </View>
 
@@ -174,30 +177,30 @@ export function PhotoEditScreen({ viewModel }: Props): ReactNode {
           </>
         ) : state.status === 'loading' ? (
           <View style={styles.center}>
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={colors.editorContent} />
             <Text style={styles.hint}>{localCopy.editorLoading}</Text>
           </View>
         ) : null}
         {state.rendering ? (
           <View testID="photo-edit.rendering-indicator" style={styles.rendering}>
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={colors.editorContent} />
             <Text style={styles.hint}>{localCopy.editorRendering}</Text>
           </View>
         ) : null}
         {state.status === 'error' ? (
-          <View style={styles.error} accessibilityRole="alert">
-            <Text testID="photo-edit.error-dialog" style={styles.errorText}>
-              {state.errorMessage ?? t('edit.error.render')}
-            </Text>
-            <Pressable
-              testID="photo-edit.error-retry-button"
-              accessibilityRole="button"
-              onPress={() => void viewModel.start()}
-              style={styles.retry}
-            >
-              <Text style={styles.retryText}>{localCopy.editorErrorRetry}</Text>
-            </Pressable>
-          </View>
+          <Dialog
+            messageTestID="photo-edit.error-dialog"
+            title=""
+            message={state.errorMessage ?? t('edit.error.render')}
+            onRequestClose={() => void viewModel.start()}
+            actions={
+              <DialogButton
+                testID="photo-edit.error-retry-button"
+                label={localCopy.editorErrorRetry}
+                onPress={() => void viewModel.start()}
+              />
+            }
+          />
         ) : null}
       </View>
 
@@ -257,6 +260,31 @@ function useColorPreview(viewModel: PhotoEditViewModel): string | null {
   return key !== null && result !== null ? result.uri : null;
 }
 
+const ADJUST_ICONS: Record<'auto' | AdjustItem, IconName> = {
+  auto: 'ic_adjust_auto',
+  exposure: 'ic_adjust_exposure',
+  contrast: 'ic_adjust_contrast',
+  highlights: 'ic_adjust_highlights',
+  shadows: 'ic_adjust_shadows',
+  blackPoint: 'ic_adjust_black_point',
+  saturation: 'ic_adjust_saturation',
+  warmth: 'ic_adjust_warmth',
+};
+
+/** 비율 프레임 상자 변(원본 Android AspectRatioFrames: 28 박스). 원본·자유는 4:3 / 3:4 모양으로 둔다. */
+const FRAME_BOX = 28;
+const ASPECT_SHAPE: Record<AspectKey, { w: number; h: number }> = {
+  original: { w: 4, h: 3 },
+  free: { w: 3, h: 4 },
+  '1:1': { w: 1, h: 1 },
+  '4:5': { w: 4, h: 5 },
+  '5:4': { w: 5, h: 4 },
+  '3:4': { w: 3, h: 4 },
+  '4:3': { w: 4, h: 3 },
+  '9:16': { w: 9, h: 16 },
+  '16:9': { w: 16, h: 9 },
+};
+
 function CropTools({ viewModel }: Props) {
   const aspect = useViewModelState(viewModel, (s) => s.aspect);
   return (
@@ -266,27 +294,53 @@ function CropTools({ viewModel }: Props) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.row}
       >
-        {ASPECT_KEYS.map((key) => (
-          <Chip
-            key={key}
-            testID={`photo-edit.ratio-${key.replace(':', '-')}`}
-            label={t(RATIO_KEYS[key])}
-            selected={aspect === key}
-            onPress={() => viewModel.selectAspect(key)}
-          />
-        ))}
+        {ASPECT_KEYS.map((key) => {
+          const shape = ASPECT_SHAPE[key];
+          const long = Math.max(shape.w, shape.h);
+          const color = aspect === key ? colors.editorContent : colors.editorContentMuted;
+          return (
+            <ToolItem
+              key={key}
+              testID={`photo-edit.ratio-${key.replace(':', '-')}`}
+              label={t(RATIO_KEYS[key])}
+              selected={aspect === key}
+              onPress={() => viewModel.selectAspect(key)}
+              glyph={
+                <View style={styles.frameBox}>
+                  <View
+                    style={{
+                      width: (FRAME_BOX * shape.w) / long,
+                      height: (FRAME_BOX * shape.h) / long,
+                      borderWidth: 1.5,
+                      borderRadius: 2,
+                      borderColor: color,
+                      borderStyle: key === 'free' ? 'dashed' : 'solid',
+                    }}
+                  />
+                </View>
+              }
+            />
+          );
+        })}
       </ScrollView>
-      <View style={styles.row}>
-        <Chip
+      <View style={styles.cropActions}>
+        <Pressable
           testID="photo-edit.rotate-button"
-          label={t('edit.crop.rotate')}
+          accessibilityRole="button"
+          accessibilityLabel={t('edit.crop.rotate')}
           onPress={() => viewModel.rotate()}
-        />
-        <Chip
+          style={styles.iconButton}
+        >
+          <Icon name="ic_rotate_right" size={24} color={colors.editorContent} />
+        </Pressable>
+        <Pressable
           testID="photo-edit.reset-button"
-          label={t('edit.crop.reset')}
+          accessibilityRole="button"
           onPress={() => viewModel.resetCrop()}
-        />
+          style={styles.textButton}
+        >
+          <Text style={styles.resetText}>{t('edit.crop.reset')}</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -297,26 +351,6 @@ function AdjustTools({ viewModel }: Props) {
   const selected = state.selectedAdjust;
   return (
     <View style={styles.toolBox}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.row}
-      >
-        {ADJUST_ROWS.map(({ id, item, key }) => (
-          <Chip
-            key={id}
-            testID={`photo-edit.adjust-item-${id}`}
-            label={t(key)}
-            selected={selected === item}
-            onPress={() => void viewModel.selectAdjust(item)}
-          />
-        ))}
-        <Chip
-          testID="photo-edit.adjust-reset-button"
-          label={t('edit.adjust.reset')}
-          onPress={() => viewModel.resetAdjustments()}
-        />
-      </ScrollView>
       {selected === 'auto' ? (
         <View>
           <Pressable
@@ -327,7 +361,9 @@ function AdjustTools({ viewModel }: Props) {
             onPress={() => void viewModel.selectAdjust('auto')}
             style={[styles.toggle, state.autoOn && styles.toggleOn]}
           >
-            <Text style={styles.toggleText}>{t('edit.adjust.auto')}</Text>
+            <Text style={[styles.toggleText, state.autoOn && styles.toggleTextOn]}>
+              {t('edit.adjust.auto')}
+            </Text>
           </Pressable>
           <RulerSlider
             testID="photo-edit.adjust-auto-strength-slider"
@@ -341,6 +377,40 @@ function AdjustTools({ viewModel }: Props) {
       ) : (
         <ItemSlider viewModel={viewModel} item={selected} />
       )}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.row}
+      >
+        {ADJUST_ROWS.map(({ id, item, key }) => {
+          const changed = item === 'auto' ? state.autoOn : state.adjustValues[item] !== 0;
+          return (
+            <ToolItem
+              key={id}
+              testID={`photo-edit.adjust-item-${id}`}
+              label={t(key)}
+              selected={selected === item}
+              onPress={() => void viewModel.selectAdjust(item)}
+              dot={changed}
+              glyph={
+                <Icon
+                  name={ADJUST_ICONS[item]}
+                  size={24}
+                  color={selected === item ? colors.editorContent : colors.editorContentMuted}
+                />
+              }
+            />
+          );
+        })}
+        <Pressable
+          testID="photo-edit.adjust-reset-button"
+          accessibilityRole="button"
+          onPress={() => viewModel.resetAdjustments()}
+          style={styles.textButton}
+        >
+          <Text style={styles.resetText}>{t('edit.adjust.reset')}</Text>
+        </Pressable>
+      </ScrollView>
     </View>
   );
 }
@@ -371,96 +441,122 @@ function FilterTools({ viewModel }: Props) {
       contentContainerStyle={styles.row}
     >
       {PHOTO_FILTERS.map((id) => (
-        <Chip
+        <Pressable
           key={id}
           testID={`photo-edit.filter-${id}`}
-          label={t(FILTER_KEYS[id])}
-          selected={filter === id}
+          accessibilityRole="button"
+          accessibilityState={{ selected: filter === id }}
           onPress={() => viewModel.selectFilter(id)}
-        />
+          style={styles.filterItem}
+        >
+          <View style={[styles.filterTile, filter === id && styles.filterTileSelected]} />
+          <Text style={[styles.itemLabel, filter === id && styles.itemLabelSelected]}>
+            {t(FILTER_KEYS[id])}
+          </Text>
+        </Pressable>
       ))}
     </ScrollView>
   );
 }
 
-function Chip(props: { testID: string; label: string; selected?: boolean; onPress: () => void }) {
+/** 편집기 도구 항목: 위에 아이콘/비율 프레임, 아래 caption 라벨, 값이 바뀐 항목은 4 점. 선택은 editorContent, 아니면 muted. */
+function ToolItem(props: {
+  testID: string;
+  label: string;
+  selected?: boolean;
+  glyph: ReactNode;
+  dot?: boolean;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       testID={props.testID}
       accessibilityRole="button"
       accessibilityState={{ selected: props.selected ?? false }}
       onPress={props.onPress}
-      style={[styles.chip, props.selected && styles.chipSelected]}
+      style={styles.item}
     >
-      <Text style={[styles.chipText, props.selected && styles.chipTextSelected]}>
+      {props.glyph}
+      <Text style={[styles.itemLabel, props.selected && styles.itemLabelSelected]}>
         {props.label}
       </Text>
+      <View style={[styles.dot, props.dot && styles.dotOn]} />
     </Pressable>
   );
 }
 
-const DARK = '#111111';
-
+// 편집기 색(tokens.color.editor*, screens-b.md §6.5)과 원본 Android 레이아웃: 컨트롤 영역 높이 156, 탭은 균등 3칸 subheadline.
 const styles = StyleSheet.create({
-  root: { ...StyleSheet.absoluteFill, backgroundColor: DARK },
+  root: { ...StyleSheet.absoluteFill, backgroundColor: colors.editorBackground },
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
   },
-  topText: { color: '#FFFFFF', fontSize: 16 },
-  done: { color: colors.accent, fontWeight: '700' },
+  topText: {
+    ...typography.body,
+    color: colors.editorContent,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
   preview: { flex: 1, overflow: 'hidden' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  hint: { color: '#CCCCCC', fontSize: 13, marginTop: spacing.sm },
+  hint: { ...typography.footnote, color: colors.editorContentMuted, marginTop: spacing.sm },
   rendering: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.editorScrim,
   },
-  error: {
-    position: 'absolute',
-    left: spacing.xl,
-    right: spacing.xl,
-    top: '35%',
-    padding: spacing.lg,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    gap: spacing.md,
-  },
-  errorText: { color: colors.textPrimary, fontSize: 15, textAlign: 'center' },
-  retry: { alignSelf: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
-  retryText: { color: colors.accent, fontWeight: '700' },
-  tools: { minHeight: 128, justifyContent: 'center' },
+  tools: { height: 156, justifyContent: 'center' },
   toolBox: { gap: spacing.sm },
   row: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.md,
     paddingHorizontal: spacing.lg,
+    alignItems: 'flex-start',
+  },
+  item: { minWidth: 56, alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs },
+  itemLabel: { ...typography.caption, color: colors.editorContentMuted },
+  itemLabelSelected: { color: colors.editorContent },
+  dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'transparent' },
+  dotOn: { backgroundColor: colors.editorContent },
+  frameBox: { width: FRAME_BOX, height: FRAME_BOX, alignItems: 'center', justifyContent: 'center' },
+  cropActions: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
   },
-  chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 16,
-    backgroundColor: '#2A2A2A',
+  iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  textButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.sm },
+  resetText: { ...typography.footnote, color: colors.editorContent },
+  filterItem: { alignItems: 'center', gap: spacing.xs },
+  filterTile: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.small,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
-  chipSelected: { backgroundColor: '#FFFFFF' },
-  chipText: { color: '#FFFFFF', fontSize: 14 },
-  chipTextSelected: { color: DARK, fontWeight: '700' },
+  filterTileSelected: { borderColor: colors.editorContent },
   toggle: {
     alignSelf: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    borderRadius: 16,
-    backgroundColor: '#2A2A2A',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.editorContentMuted,
   },
-  toggleOn: { backgroundColor: colors.accent },
-  toggleText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
-  tabs: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#333333' },
+  toggleOn: { backgroundColor: colors.editorContent, borderColor: colors.editorContent },
+  toggleText: { ...typography.footnote, color: colors.editorContent },
+  toggleTextOn: { color: colors.editorBackground, fontFamily: pretendardFor('600') },
+  tabs: { flexDirection: 'row' },
   tab: { flex: 1, alignItems: 'center', paddingVertical: spacing.md },
-  tabText: { color: '#8A8A8A', fontSize: 15 },
-  tabSelected: { color: '#FFFFFF', fontWeight: '700' },
+  tabText: { ...typography.subheadline, color: colors.editorContentMuted },
+  tabSelected: { color: colors.editorContent },
 });

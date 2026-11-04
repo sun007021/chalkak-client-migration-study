@@ -3,6 +3,7 @@ import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useCallback, useEffect } from 'react';
 import { BackHandler, View } from 'react-native';
 
+import { colors } from '../shared/design/tokens';
 import { useViewModelState } from '../core/state/useViewModelState';
 import { KstDate } from '../core/time/KstDate';
 import { DisplayScreen } from '../features/display/DisplayScreen';
@@ -23,7 +24,7 @@ export function MainTabs() {
   return (
     <Tab.Navigator
       tabBar={(props) => <BottomBar {...props} />}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.background } }}
     >
       <Tab.Screen name="Home" component={HomeTab} />
       <Tab.Screen name="Display" component={DisplayTab} />

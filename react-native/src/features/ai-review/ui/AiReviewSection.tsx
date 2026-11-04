@@ -1,12 +1,14 @@
 import { useEffect } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useViewModelState } from '../../../core/state/useViewModelState';
 import { t } from '../../../shared/copy';
-import { colors, spacing } from '../../../shared/ui/theme';
+import { colors, spacing, typography } from '../../../shared/design/tokens';
 import type { AiPillKind } from '../AiReviewViewModelState';
 import type { AiReviewViewModel } from '../AiReviewViewModel';
 import { AiReviewSheets } from './AiReviewSheets';
+import { AudioWaveIcon } from '../../../shared/ui/AudioWaveIcon';
+import { Text } from '../../../shared/ui/Text';
 
 const PILL_TEST_IDS: Record<AiPillKind, string> = {
   checking: 'feed.ai-checking',
@@ -40,6 +42,11 @@ export function AiReviewSection({ viewModel }: { viewModel: AiReviewViewModel })
           onPress={() => viewModel.onPillPress()}
           style={[styles.pill, !pill.enabled && styles.pillDisabled]}
         >
+          <AudioWaveIcon
+            color={colors.textPrimary}
+            animating={pill.kind === 'processing' || pill.kind === 'requesting'}
+            scale={24 / 18}
+          />
           <Text style={styles.pillText}>{pill.label}</Text>
         </Pressable>
       ) : null}
@@ -69,17 +76,23 @@ export function AiReviewSection({ viewModel }: { viewModel: AiReviewViewModel })
   );
 }
 
+// 원본 근거: docs/design/screens-b.md §8.2 (캡슐 surfaceElevated + border 1, 최소 높이 44, 좌우 16, 웨이브 24 + 간격 8 + subheadline semibold).
 const styles = StyleSheet.create({
   root: { gap: spacing.sm, alignItems: 'flex-start' },
   pill: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: 20,
-    backgroundColor: colors.accent,
+    borderRadius: 9999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceElevated,
   },
-  pillDisabled: { backgroundColor: colors.textSecondary },
-  pillText: { color: colors.onOverlay, fontWeight: '600' },
+  pillDisabled: { opacity: 0.7 },
+  pillText: { ...typography.subheadline, fontWeight: '600', color: colors.textPrimary },
   notice: { gap: spacing.xs },
-  noticeText: { fontSize: 13, color: colors.textSecondary },
-  recheck: { fontSize: 13, fontWeight: '600', color: colors.accent },
+  noticeText: { ...typography.footnote, color: colors.textSecondary },
+  recheck: { ...typography.footnote, fontWeight: '600', color: colors.actionPrimary },
 });

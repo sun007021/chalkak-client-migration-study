@@ -1,8 +1,12 @@
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { BannerFeedState } from '../../banner/BannerFeedViewModel';
 import { t } from '../../../shared/copy';
-import { colors, spacing } from '../../../shared/ui/theme';
+import { colors, pretendardFor, radius, spacing, typography } from '../../../shared/design/tokens';
+import { RemoteImage } from '../../../shared/ui/RemoteImage';
+import { RoundIconButton } from '../../../shared/ui/RoundIconButton';
+import { Skeleton } from '../../../shared/ui/Skeleton';
+import { Text } from '../../../shared/ui/Text';
 
 type Props = {
   feed: Readonly<BannerFeedState>;
@@ -12,6 +16,10 @@ type Props = {
   onSectionLayout: (y: number) => void;
   onCardLayout: (index: number, y: number) => void;
 };
+
+// 원본 HomeIssueSection(screens-a.md §7.8): 헤더 "ISSUE"(headline bold) 아래 16, 카드 = 이미지(1672:941, 라운드 large 16)
+// + 제목 subheadline bold + 부제 caption textSecondary, 카드 간격 40.
+const IMAGE_ASPECT = 1672 / 941;
 
 /**
  * ISSUE 섹션. 배너가 0건이면 섹션 전체를 그리지 않고, 최초 조회 실패는 섹션 대신 오류 문구와 다시 시도를 그린다.
@@ -24,16 +32,27 @@ export function IssueSection({
   onSectionLayout,
   onCardLayout,
 }: Props) {
-  if (feed.status === 'loading') return <ActivityIndicator style={styles.loading} />;
+  if (feed.status === 'loading') {
+    return (
+      <View style={styles.root} accessible accessibilityLabel="배너 불러오는 중">
+        <Text style={styles.title}>{t('home.banner.title')}</Text>
+        <Skeleton style={styles.image} />
+      </View>
+    );
+  }
   if (feed.status === 'error') {
     return (
       <View style={styles.error}>
         <Text testID="home.issue-error" style={styles.errorText}>
           {t('home.banner.error')}
         </Text>
-        <Pressable testID="home.issue-retry-button" accessibilityRole="button" onPress={onRetry}>
-          <Text style={styles.retryText}>{t('common.retry')}</Text>
-        </Pressable>
+        <RoundIconButton
+          testID="home.issue-retry-button"
+          accessibilityLabel={t('common.retry')}
+          size={32}
+          iconSize={15}
+          onPress={onRetry}
+        />
       </View>
     );
   }
@@ -44,7 +63,9 @@ export function IssueSection({
       style={styles.root}
       onLayout={(e) => onSectionLayout(e.nativeEvent.layout.y)}
     >
-      <Text style={styles.title}>{t('home.banner.title')}</Text>
+      <Text accessibilityRole="header" style={styles.title}>
+        {t('home.banner.title')}
+      </Text>
       {feed.banners.map((banner, index) => (
         <Pressable
           key={banner.id}
@@ -55,32 +76,41 @@ export function IssueSection({
           onLayout={(e) => onCardLayout(index, e.nativeEvent.layout.y)}
           style={styles.card}
         >
-          {banner.thumbnailUrl ? (
-            <Image source={{ uri: banner.thumbnailUrl }} style={styles.thumb} resizeMode="cover" />
-          ) : (
-            <View style={styles.thumb} />
-          )}
+          <RemoteImage uri={banner.thumbnailUrl} style={styles.image} />
           <View style={styles.texts}>
             <Text style={styles.cardTitle}>{banner.title}</Text>
             <Text style={styles.cardSubtitle}>{banner.subtitle}</Text>
           </View>
         </Pressable>
       ))}
-      {feed.loadingMore ? <ActivityIndicator style={styles.loading} /> : null}
+      {feed.loadingMore ? <Skeleton style={styles.image} /> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { paddingHorizontal: spacing.lg, paddingVertical: spacing.lg, gap: spacing.md },
-  title: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  card: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
-  thumb: { width: 72, height: 72, borderRadius: 12, backgroundColor: colors.surface },
-  texts: { flex: 1, gap: spacing.xs },
-  cardTitle: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  cardSubtitle: { fontSize: 13, color: colors.textSecondary },
-  loading: { padding: spacing.lg },
-  error: { paddingHorizontal: spacing.lg, paddingVertical: spacing.lg, gap: spacing.xs },
-  errorText: { color: colors.textSecondary },
-  retryText: { color: colors.accent, fontWeight: '600' },
+  root: { paddingHorizontal: spacing.screenHorizontal, gap: spacing.lg },
+  title: { ...typography.headline, fontFamily: pretendardFor('700'), color: colors.textPrimary },
+  card: { gap: spacing.lg, marginBottom: spacing.xxl - spacing.lg },
+  image: {
+    aspectRatio: IMAGE_ASPECT,
+    borderRadius: radius.large,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceElevated,
+  },
+  texts: { gap: spacing.sm },
+  cardTitle: {
+    ...typography.subheadline,
+    fontFamily: pretendardFor('700'),
+    color: colors.textPrimary,
+  },
+  cardSubtitle: { ...typography.caption, color: colors.textSecondary },
+  error: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.screenHorizontal,
+  },
+  errorText: { ...typography.subheadline, color: colors.textSecondary },
 });

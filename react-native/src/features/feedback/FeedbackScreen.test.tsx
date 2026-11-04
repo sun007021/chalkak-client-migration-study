@@ -32,7 +32,7 @@ describe('FeedbackScreen', () => {
     expect(screen.getByTestId('feedback.input').props.placeholder).toBe(
       t('fdbk.field.placeholder'),
     );
-    expect(screen.getByTestId('feedback.counter')).toHaveTextContent('0/1000');
+    expect(screen.getByTestId('feedback.counter')).toHaveTextContent('0 / 1000');
     expect(screen.getByTestId('feedback.submit-button')).toHaveTextContent(t('fdbk.send'));
     expect(screen.getByTestId('feedback.close-button')).toBeOnTheScreen();
   });
@@ -53,15 +53,15 @@ describe('FeedbackScreen', () => {
   it('TC-FDBK-013 카운터는 trim 후 code point 수와 항상 같고 1000 초과도 그대로 표시한다', async () => {
     await renderFeedback();
     await type('  😀😀 ');
-    expect(screen.getByTestId('feedback.counter')).toHaveTextContent('2/1000');
+    expect(screen.getByTestId('feedback.counter')).toHaveTextContent('2 / 1000');
     await type('a'.repeat(1001));
-    expect(screen.getByTestId('feedback.counter')).toHaveTextContent('1001/1000');
+    expect(screen.getByTestId('feedback.counter')).toHaveTextContent('1001 / 1000');
   });
 
   it('TC-FDBK-014 10만 자를 붙여넣어도 화면이 멈추지 않고 카운터가 정확하며 전송은 거부된다', async () => {
     const { h } = await renderFeedback();
     await type('a'.repeat(100_000));
-    expect(screen.getByTestId('feedback.counter')).toHaveTextContent('100000/1000');
+    expect(screen.getByTestId('feedback.counter')).toHaveTextContent('100000 / 1000');
     await fireEvent.press(screen.getByTestId('feedback.submit-button'));
     await flush();
     expect(h.posts()).toHaveLength(0);

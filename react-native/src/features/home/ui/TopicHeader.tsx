@@ -1,13 +1,15 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { formatTodayTopicLabel } from '../../../core/time/dateFormat';
 import { t } from '../../../shared/copy';
-import { colors, spacing } from '../../../shared/ui/theme';
+import { colors, spacing, typography } from '../../../shared/design/tokens';
+import { RoundIconButton } from '../../../shared/ui/RoundIconButton';
+import { Text } from '../../../shared/ui/Text';
 import type { TopicSection } from '../HomeState';
 
 type Props = { topic: TopicSection; onRetry: () => void };
 
-/** 오늘 주제 머리글. 날짜 라벨은 주제가 있을 때만, 로딩·404·실패는 제목 자리에 문구 하나만 보인다. */
+/** 오늘 주제 머리글(screens-a.md §7.3). 날짜 라벨 subheadline, 주제명 title2. 로딩·404·실패는 제목 자리에 문구 하나만 보인다. */
 export function TopicHeader({ topic, onRetry }: Props) {
   if (topic.status === 'ready' && topic.topic) {
     return (
@@ -33,24 +35,24 @@ export function TopicHeader({ topic, onRetry }: Props) {
         {message}
       </Text>
       {topic.status === 'error' ? (
-        <Pressable
-          testID="home.retry-button"
-          accessibilityRole="button"
-          onPress={onRetry}
-          style={styles.retry}
-        >
-          <Text style={styles.retryText}>{t('common.retry')}</Text>
-        </Pressable>
+        <View style={styles.retry}>
+          <RoundIconButton
+            testID="home.retry-button"
+            accessibilityLabel={t('common.retry')}
+            size={32}
+            iconSize={15}
+            onPress={onRetry}
+          />
+        </View>
       ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.xs },
-  date: { fontSize: 13, color: colors.textSecondary },
-  title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary },
-  muted: { color: colors.textSecondary, fontSize: 16, fontWeight: '500' },
-  retry: { alignSelf: 'flex-start', paddingVertical: spacing.xs },
-  retryText: { color: colors.accent, fontWeight: '600' },
+  root: { paddingHorizontal: spacing.screenHorizontal, gap: spacing.sm },
+  date: { ...typography.subheadline, color: colors.textPrimary },
+  title: { ...typography.title2, color: colors.textPrimary },
+  muted: { color: colors.textMuted },
+  retry: { alignSelf: 'flex-start', marginTop: spacing.xs },
 });

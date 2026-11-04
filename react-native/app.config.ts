@@ -64,7 +64,19 @@ const config: ExpoConfig = {
     // 꺼져 있을 땐 키를 넣지 않아 기존 설정과 같다.
     iosFcmEnabled: iosFcmEnabled ? true : undefined,
   },
+  backgroundColor: '#F7F6F3',
   plugins: [
+    // 네이티브 스플래시: 원본 앱과 같은 런치 배경(#FCFAF6, tokens.color.logoBackground) + 런치 로고 220pt.
+    // JS 번들과 글꼴이 준비될 때까지 index.ts가 이 화면을 유지한다.
+    [
+      'expo-splash-screen',
+      {
+        image: './assets/images/ChalkakLaunchLogo.png',
+        imageWidth: 220,
+        backgroundColor: '#FCFAF6',
+        resizeMode: 'contain',
+      },
+    ],
     // D-21: Android OkHttp의 자동 재시도(비멱등 요청 포함)를 끈다.
     './plugins/withOkHttpNoRetry',
     // 푸시 알림. 서버 푸시의 기본 Android 채널은 앱이 만드는 채널(moderation_push)과 같다.
