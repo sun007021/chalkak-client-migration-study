@@ -49,7 +49,11 @@ targets:
       path: Sources/Info.plist
       properties:
         CFBundleDisplayName: 찰캌
-        UILaunchScreen: {}
+        # 런치 스크린: 로고 배경색과 로고 이미지(원본 Info.plist와 같다). 스플래시 화면(SplashView)이 같은 모양으로 이어 받는다.
+        UILaunchScreen:
+          UIColorName: ChalkakLogoBackground
+          UIImageName: ChalkakLaunchLogo
+          UIImageRespectsSafeAreaInsets: false
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIUserInterfaceStyle: Light
         # APNs 토큰을 AppDelegate에서 Firebase에 직접 넘기므로 자동 프록시(스위즐링)는 끈다.
