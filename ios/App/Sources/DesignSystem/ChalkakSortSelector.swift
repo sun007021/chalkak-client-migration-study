@@ -6,6 +6,7 @@ struct ChalkakSortSelector<Option: Hashable>: View {
     let selectedOption: Option
     let label: (Option) -> String
     let onSelect: (Option) -> Void
+    var identifier: ((Option) -> String)?
 
     var body: some View {
         HStack(spacing: ChalkakSpacing.lg) {
@@ -35,6 +36,8 @@ struct ChalkakSortSelector<Option: Hashable>: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .accessibilityValue(isSelected ? "선택됨" : "")
+        .accessibilityIdentifier(identifier?(option) ?? "")
     }
 }
