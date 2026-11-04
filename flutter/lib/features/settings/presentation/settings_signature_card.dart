@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/ui/app_network_image.dart';
+import '../../../core/ui/components/chalkak_card.dart';
+import '../../../core/ui/components/chalkak_skeleton.dart';
 import '../../../core/ui/test_id.dart';
 import '../../signature/presentation/signature_card_view_model.dart';
 import 'settings_test_ids.dart';
@@ -29,60 +32,91 @@ class SettingsSignatureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final tokens = context.tokens;
     return TestId(
       SettingsTestIds.signatureCard,
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: ListenableBuilder(
-            listenable: viewModel,
-            builder: (context, _) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(Copy.signCardTitle, style: theme.textTheme.titleMedium),
-                const SizedBox(height: 12),
-                _content(context, viewModel.state),
-                const SizedBox(height: 12),
-                TestId.button(
-                  SettingsTestIds.signatureChangeButton,
-                  child: OutlinedButton(
-                    onPressed: onChange,
-                    child: const Text(Copy.signCardChange),
-                  ),
+      child: ChalkakCard(
+        child: ListenableBuilder(
+          listenable: viewModel,
+          builder: (context, _) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 헤더 행(screens-c §4.2): 사인 재설정 + 변경하기(밑줄), 좌우 20, 위 18.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        Copy.signCardTitle,
+                        style: tokens.text.callout.copyWith(
+                          color: tokens.colors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    TestId.button(
+                      SettingsTestIds.signatureChangeButton,
+                      child: Semantics(
+                        button: true,
+                        label: Copy.signCardChange,
+                        excludeSemantics: true,
+                        onTap: onChange,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: onChange,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 44),
+                            child: Center(
+                              child: Text(
+                                Copy.signCardChange,
+                                style: tokens.text.callout.copyWith(
+                                  color: tokens.colors.textSecondary,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(20, tokens.spacing.lg, 20, 20),
+                child: _canvas(context, viewModel.state),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  /// 상태마다 하나만 그린다. 보일 사인이 있으면 조회 중에도 그 사인을 유지한다.
-  Widget _content(BuildContext context, SignatureCardState state) {
+  /// 사인 캔버스: 높이 112, actionPrimary 바탕, 라운드 button(12), 점선 1(textOnImage 28%).
+  Widget _canvas(BuildContext context, SignatureCardState state) {
+    final tokens = context.tokens;
     final imageUrl = state.imageUrl;
+    final Widget child;
     if (imageUrl != null) {
-      return TestId(
+      child = TestId(
         SettingsTestIds.signatureImage,
         child: SizedBox(
-          height: 120,
+          width: 120,
+          height: 48,
           child: AppNetworkImage(url: imageUrl, fit: BoxFit.contain),
         ),
       );
-    }
-    if (state.loadFailed) {
-      final theme = Theme.of(context);
-      return Row(
+    } else if (state.loadFailed) {
+      child = Row(
         children: [
           Expanded(
             child: TestId(
               SettingsTestIds.signatureError,
               child: Text(
                 Copy.signLoadError,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.error,
+                style: tokens.text.footnote.copyWith(
+                  color: tokens.colors.onActionPrimary,
                 ),
               ),
             ),
@@ -90,24 +124,77 @@ class SettingsSignatureCard extends StatelessWidget {
           TestId.button(
             SettingsTestIds.signatureRetryButton,
             child: TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: tokens.colors.onActionPrimary,
+              ),
               onPressed: () => unawaited(viewModel.load()),
               child: const Text(Copy.commonRetry),
             ),
           ),
         ],
       );
-    }
-    if (state.status == SignatureCardStatus.loading ||
+    } else if (state.status == SignatureCardStatus.loading ||
         state.status == SignatureCardStatus.idle) {
-      return const TestId(
+      child = const TestId(
         SettingsTestIds.signatureLoading,
+        child: SizedBox(width: 120, height: 48, child: ChalkakSkeleton()),
+      );
+    } else {
+      // 재등록이 필요한 계정: 빈 캔버스.
+      child = const SizedBox.shrink();
+    }
+    return CustomPaint(
+      foregroundPainter: _DashedBorderPainter(
+        color: tokens.colors.textOnImage.withValues(alpha: 0.28),
+        radius: tokens.radius.button,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: tokens.colors.actionPrimary,
+          borderRadius: BorderRadius.circular(tokens.radius.button),
+        ),
         child: SizedBox(
-          height: 120,
-          child: Center(child: CircularProgressIndicator()),
+          height: 112,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Center(child: child),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 점선 테두리: 두께 1, dash [4, 3] (SettingsComponents.swift:331-339).
+class _DashedBorderPainter extends CustomPainter {
+  _DashedBorderPainter({required this.color, required this.radius});
+
+  final Color color;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          (Offset.zero & size).deflate(0.5),
+          Radius.circular(radius),
         ),
       );
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        canvas.drawPath(metric.extractPath(distance, distance + 4), paint);
+        distance += 7;
+      }
     }
-    // 재등록이 필요한 계정: 이미지 없이 "변경하기"만 보인다.
-    return const SizedBox.shrink();
   }
+
+  @override
+  bool shouldRepaint(_DashedBorderPainter old) =>
+      old.color != color || old.radius != radius;
 }

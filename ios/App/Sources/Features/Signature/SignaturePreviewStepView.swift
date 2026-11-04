@@ -25,24 +25,29 @@ struct SignaturePreviewStepView: View {
         ZStack {
             VStack(alignment: .leading, spacing: 0) {
                 Text(OnboardingCopy.signPreviewTitle)
-                    .font(ChalkakFont.display)
+                    .font(ChalkakFont.title1)
                     .foregroundStyle(ChalkakColor.textPrimary)
-                    .padding(.top, 68)
+                    .padding(.top, 50)
                     .accessibilityIdentifier("signature-preview.title")
 
-                // 내보내는 PNG의 획이 흰색이라 어두운 배경 위에 보인다(REQ-SIGN-010).
-                ZStack {
-                    ChalkakColor.actionPrimary
+                // 원본 OnboardingSignaturePreviewScreen(screens-a.md 6.2): 샘플 사진 5/6, 라운드 xlarge, 사인 112×84 우하단
+                ZStack(alignment: .bottomTrailing) {
+                    Image("preview_sunset")
+                        .resizable()
+                        .scaledToFill()
                     if let image {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFit()
+                            .frame(width: 112, height: 84)
+                            .padding(ChalkakSpacing.sm)
                             .accessibilityIdentifier("signature-preview.image")
                     }
                 }
-                .aspectRatio(SignaturePadMetrics.aspectRatio, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.card))
-                .padding(.top, 48)
+                .aspectRatio(5.0 / 6.0, contentMode: .fit)
+                .background(ChalkakColor.inputBackground)
+                .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.xlarge))
+                .padding(.top, 50)
 
                 Spacer(minLength: 0)
 
@@ -53,35 +58,15 @@ struct SignaturePreviewStepView: View {
                         .accessibilityIdentifier("signature-preview.loading")
                 }
 
-                HStack(spacing: ChalkakSpacing.md) {
-                    Button { viewModel.redrawTapped() } label: {
-                        Text(OnboardingCopy.signPreviewRedraw)
-                            .font(ChalkakFont.callout)
-                            .foregroundStyle(ChalkakColor.textPrimary)
-                            .frame(maxWidth: .infinity, minHeight: 56)
-                            .background(ChalkakColor.inputBackground, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
-                            .overlay(RoundedRectangle(cornerRadius: ChalkakRadius.button).stroke(ChalkakColor.border, lineWidth: 1))
-                            .opacity(viewModel.isStartEnabled ? 1 : 0.3)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!viewModel.isStartEnabled)
-                    .accessibilityIdentifier("signature-preview.redraw-button")
-
-                    Button { Task { await viewModel.startTapped() } } label: {
-                        Text(OnboardingCopy.signPreviewStart)
-                            .font(ChalkakFont.callout)
-                            .foregroundStyle(ChalkakColor.onActionPrimary)
-                            .frame(maxWidth: .infinity, minHeight: 56)
-                            .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
-                            .opacity(viewModel.isStartEnabled ? 1 : 0.3)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!viewModel.isStartEnabled)
-                    .accessibilityIdentifier("signature-preview.confirm-button")
+                HStack(spacing: 20) {
+                    ChalkakOutlinedButton(title: OnboardingCopy.signPreviewRedraw, action: { viewModel.redrawTapped() }, isEnabled: viewModel.isStartEnabled, fillsWidth: true)
+                        .accessibilityIdentifier("signature-preview.redraw-button")
+                    ChalkakButton(title: OnboardingCopy.signPreviewStart, action: { Task { await viewModel.startTapped() } }, isEnabled: viewModel.isStartEnabled, fillsWidth: true)
+                        .accessibilityIdentifier("signature-preview.confirm-button")
                 }
             }
             .padding(.horizontal, ChalkakSpacing.screenHorizontal)
-            .padding(.bottom, ChalkakSpacing.xl)
+            .padding(.bottom, 18)
 
             if case .failed(let notice) = viewModel.state {
                 ChalkakDialog(

@@ -3,6 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_button.dart';
+import '../../../core/ui/components/chalkak_checkbox.dart';
+import '../../../core/ui/components/chalkak_nav_button.dart';
 import '../../../core/ui/test_id.dart';
 
 import '../domain/legal_document.dart';
@@ -84,6 +88,7 @@ class _TermsScreenState extends State<TermsScreen> {
   @override
   Widget build(BuildContext context) {
     final viewModel = widget.viewModel;
+    final tokens = context.tokens;
     // 시스템 뒤로 가기도 버튼과 같이 컨텍스트를 폐기하고 로그인으로 돌아간다.
     return PopScope(
       canPop: false,
@@ -93,43 +98,51 @@ class _TermsScreenState extends State<TermsScreen> {
       child: TestId(
         OnboardingTestIds.termsRoot,
         child: Scaffold(
+          // 약관 화면 바탕은 inputBackground다(screens-a §5.1).
+          backgroundColor: tokens.colors.inputBackground,
           body: SafeArea(
             child: ListenableBuilder(
               listenable: viewModel,
               builder: (context, _) {
                 final state = viewModel.state;
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: tokens.spacing.screenHorizontal,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Align(
                         alignment: Alignment.centerLeft,
-                        child: TestId.button(
-                          OnboardingTestIds.termsBackButton,
-                          child: IconButton(
-                            icon: const Icon(Icons.arrow_back),
-                            onPressed: viewModel.onBackPressed,
+                        child: Transform.translate(
+                          offset: const Offset(-12, 0),
+                          child: TestId.button(
+                            OnboardingTestIds.termsBackButton,
+                            child: ChalkakNavButton.back(
+                              onPressed: viewModel.onBackPressed,
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 2),
                       TestId(
                         OnboardingTestIds.termsTitle,
                         child: Text(
                           Copy.onbTermsTitle,
-                          style: Theme.of(context).textTheme.headlineMedium,
+                          style: tokens.text.title1.copyWith(
+                            color: tokens.colors.textPrimary,
+                          ),
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(height: 57),
                       _AgreementRow(
                         id: OnboardingTestIds.termsAgreeAllCheckbox,
                         label: Copy.onbTermsAgreeAll,
                         checked: state.agreedAll,
                         onToggle: viewModel.toggleAll,
-                        bold: true,
+                        all: true,
                       ),
-                      const Divider(),
+                      const SizedBox(height: 3),
                       _AgreementRow(
                         id: OnboardingTestIds.termsServiceCheckbox,
                         label: Copy.onbTermsService,
@@ -148,20 +161,17 @@ class _TermsScreenState extends State<TermsScreen> {
                         onView: () =>
                             viewModel.openDocument(LegalDocument.privacy),
                       ),
-                      const SizedBox(height: 24),
+                      const Spacer(),
                       TestId.button(
                         OnboardingTestIds.termsNextButton,
-                        child: FilledButton(
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(52),
-                          ),
+                        child: ChalkakButton(
+                          label: Copy.onbTermsNext,
                           onPressed: state.canProceed
                               ? viewModel.onNextPressed
                               : null,
-                          child: const Text(Copy.onbTermsNext),
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
                     ],
                   ),
                 );
@@ -175,6 +185,7 @@ class _TermsScreenState extends State<TermsScreen> {
 }
 
 /// 체크 한 줄. 줄 전체가 체크 영역이고, [viewId]가 있으면 오른쪽에 "보기"가 붙는다.
+/// [all]이면 전체 동의 카드(테두리 1 #E3E1DD, 라운드 large), 아니면 필수 행 + 아래 구분선이다.
 class _AgreementRow extends StatelessWidget {
   const _AgreementRow({
     required this.id,
@@ -183,7 +194,7 @@ class _AgreementRow extends StatelessWidget {
     required this.onToggle,
     this.viewId,
     this.onView,
-    this.bold = false,
+    this.all = false,
   });
 
   final String id;
@@ -192,45 +203,82 @@ class _AgreementRow extends StatelessWidget {
   final VoidCallback onToggle;
   final String? viewId;
   final VoidCallback? onView;
-  final bool bold;
+  final bool all;
+
+  /// TermsAllConsentRow 테두리 색(OnboardingTermsScreen.swift).
+  static const _allBorder = Color(0xFFE3E1DD);
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: TestId.button(
-            id,
-            child: InkWell(
-              onTap: onToggle,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    Checkbox(value: checked, onChanged: (_) => onToggle()),
-                    Expanded(
-                      child: Text(
-                        label,
-                        style: bold
-                            ? Theme.of(context).textTheme.titleMedium
-                            : null,
-                      ),
+    final tokens = context.tokens;
+    final toggle = TestId.button(
+      id,
+      child: Semantics(
+        checked: checked,
+        onTap: onToggle,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onToggle,
+          child: Padding(
+            padding: all
+                ? const EdgeInsets.symmetric(horizontal: 16, vertical: 19)
+                : const EdgeInsets.only(left: 4, top: 16, bottom: 16),
+            child: Row(
+              children: [
+                ChalkakCheckbox(checked: checked),
+                SizedBox(width: all ? 16 : 14),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: tokens.text.body.copyWith(
+                      color: all
+                          ? tokens.colors.textPrimary
+                          : tokens.colors.textPrimary.withValues(alpha: 0.85),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
-        if (viewId != null)
-          TestId.button(
-            viewId!,
-            child: TextButton(
-              onPressed: onView,
-              child: const Text(Copy.onbTermsView),
+      ),
+    );
+    if (all) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: tokens.colors.inputBackground,
+          borderRadius: BorderRadius.circular(tokens.radius.large),
+          border: Border.all(color: _allBorder),
+        ),
+        child: toggle,
+      );
+    }
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: tokens.colors.border)),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: toggle),
+          if (viewId != null)
+            TestId.button(
+              viewId!,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onView,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 16, 4, 16),
+                  child: Text(
+                    Copy.onbTermsView,
+                    style: tokens.text.callout.copyWith(
+                      color: tokens.colors.textMuted,
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

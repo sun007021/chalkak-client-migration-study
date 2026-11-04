@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_button.dart';
+import '../../../core/ui/components/chalkak_dialog.dart';
+import '../../../core/ui/components/chalkak_nav_button.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/ai_review_session.dart';
 import '../domain/ai_review_state.dart';
@@ -85,11 +89,7 @@ class _CloseButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return TestId.button(
       id,
-      child: IconButton(
-        tooltip: Copy.commonClose,
-        icon: const Icon(Icons.close),
-        onPressed: onPressed,
-      ),
+      child: ChalkakNavButton.close(onPressed: onPressed),
     );
   }
 }
@@ -107,7 +107,7 @@ class _StartSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final tokens = context.tokens;
     return _SheetFrame(
       id: AiReviewTestIds.startSheetRoot,
       children: [
@@ -116,7 +116,9 @@ class _StartSheet extends StatelessWidget {
             Expanded(
               child: Text(
                 retry ? Copy.aiStartTitleRetry : Copy.aiStartTitle,
-                style: theme.textTheme.titleLarge,
+                style: tokens.text.title3.copyWith(
+                  color: tokens.colors.textPrimary,
+                ),
               ),
             ),
             _CloseButton(
@@ -138,7 +140,12 @@ class _StartSheet extends StatelessWidget {
               ])
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(line, style: theme.textTheme.bodyMedium),
+                  child: Text(
+                    line,
+                    style: tokens.text.subheadline.copyWith(
+                      color: tokens.colors.textSecondary,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -146,10 +153,7 @@ class _StartSheet extends StatelessWidget {
         const SizedBox(height: 16),
         TestId.button(
           AiReviewTestIds.startSheetStartButton,
-          child: FilledButton(
-            onPressed: onStart,
-            child: const Text(Copy.aiStartConfirm),
-          ),
+          child: ChalkakButton(onPressed: onStart, label: Copy.aiStartConfirm),
         ),
       ],
     );
@@ -169,7 +173,7 @@ class _ResultSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final tokens = context.tokens;
     return _SheetFrame(
       id: AiReviewTestIds.resultSheetRoot,
       children: [
@@ -187,10 +191,17 @@ class _ResultSheet extends StatelessWidget {
                     children: [
                       Text(
                         content.scoreText,
-                        style: theme.textTheme.displaySmall,
+                        style: tokens.text.title1.copyWith(
+                          color: tokens.colors.textPrimary,
+                        ),
                       ),
                       const SizedBox(width: 4),
-                      Text('/ 10', style: theme.textTheme.titleMedium),
+                      Text(
+                        '/ 10',
+                        style: tokens.text.headline.copyWith(
+                          color: tokens.colors.textMuted,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -218,8 +229,20 @@ class _ResultSheet extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
                 children: [
-                  Expanded(child: Text(row.label)),
-                  Text(row.scoreText, style: theme.textTheme.titleSmall),
+                  Expanded(
+                    child: Text(
+                      row.label,
+                      style: tokens.text.subheadline.copyWith(
+                        color: tokens.colors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    row.scoreText,
+                    style: tokens.text.subheadline.copyWith(
+                      color: tokens.colors.textPrimary,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -233,7 +256,7 @@ class _ResultSheet extends StatelessWidget {
                 AiReviewTestIds.resultSheetDistinctiveBadge,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.secondaryContainer,
+                    color: tokens.colors.calendarCell,
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Padding(
@@ -243,7 +266,9 @@ class _ResultSheet extends StatelessWidget {
                     ),
                     child: Text(
                       Copy.aiResultPerspectiveBadge,
-                      style: theme.textTheme.labelMedium,
+                      style: tokens.text.caption.copyWith(
+                        color: tokens.colors.textSecondary,
+                      ),
                     ),
                   ),
                 ),
@@ -255,9 +280,9 @@ class _ResultSheet extends StatelessWidget {
           AiReviewTestIds.resultSheetFeedbackSummary,
           child: Text(
             content.summary,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+            style: tokens.text.headline
+                .copyWith(color: tokens.colors.textPrimary)
+                .copyWith(fontWeight: FontWeight.w700),
           ),
         ),
         for (var i = 0; i < content.sections.length; i++)
@@ -270,10 +295,17 @@ class _ResultSheet extends StatelessWidget {
                 children: [
                   Text(
                     content.sections[i].title,
-                    style: theme.textTheme.labelLarge,
+                    style: tokens.text.footnote.copyWith(
+                      color: tokens.colors.textPrimary,
+                    ),
                   ),
                   const SizedBox(height: 4),
-                  Text(content.sections[i].body),
+                  Text(
+                    content.sections[i].body,
+                    style: tokens.text.subheadline.copyWith(
+                      color: tokens.colors.textSecondary,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -297,24 +329,32 @@ class _FailedSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final tokens = context.tokens;
     return _SheetFrame(
       id: AiReviewTestIds.failedSheetRoot,
       children: [
-        Text(Copy.aiFailedTitle, style: theme.textTheme.titleLarge),
+        Text(
+          Copy.aiFailedTitle,
+          style: tokens.text.title3.copyWith(color: tokens.colors.textPrimary),
+        ),
         if (reason != null) ...[
           const SizedBox(height: 8),
           TestId(
             AiReviewTestIds.failedSheetMessage,
-            child: Text(reason!, style: theme.textTheme.bodyMedium),
+            child: Text(
+              reason!,
+              style: tokens.text.subheadline.copyWith(
+                color: tokens.colors.textSecondary,
+              ),
+            ),
           ),
         ],
         const SizedBox(height: 16),
         TestId.button(
           AiReviewTestIds.failedSheetConfirmButton,
-          child: FilledButton(
+          child: ChalkakButton(
             onPressed: onConfirm,
-            child: const Text(Copy.aiFailedConfirm),
+            label: Copy.aiFailedConfirm,
           ),
         ),
       ],
@@ -331,12 +371,12 @@ class AiReviewCriteriaDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return TestId(
       AiReviewTestIds.resultSheetCriteriaDialog,
-      child: AlertDialog(
-        title: const Text(Copy.aiResultCriteriaDialogTitle),
+      child: ChalkakDialog(
+        title: Copy.aiResultCriteriaDialogTitle,
         actions: [
-          TextButton(
+          ChalkakDialogButton(
+            label: Copy.commonConfirm,
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text(Copy.commonConfirm),
           ),
         ],
       ),

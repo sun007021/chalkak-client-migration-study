@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_dialog.dart';
 import '../../../core/ui/test_id.dart';
 import '../../../core/ui/test_ids.dart';
 import '../domain/boot_view_model.dart';
@@ -65,19 +67,26 @@ class _BootScreenState extends State<BootScreen> {
         return PopScope(
           canPop: !forced,
           child: Scaffold(
+            // 런치 화면과 이어지도록 같은 바탕색·로고(Info.plist ChalkakLogoBackground, 220x220).
+            backgroundColor: context.tokens.colors.logoBackground,
             body: Stack(
               children: [
                 Center(
                   child: TestId(
                     TestIds.splashLogo,
-                    child: Text(
-                      Copy.appName,
-                      style: Theme.of(context).textTheme.displayMedium,
+                    child: Image.asset(
+                      'assets/images/ChalkakLaunchLogo.png',
+                      width: 220,
+                      height: 220,
+                      semanticLabel: Copy.appName,
                     ),
                   ),
                 ),
                 if (forced) ...[
-                  const ModalBarrier(dismissible: false, color: Colors.black54),
+                  ModalBarrier(
+                    dismissible: false,
+                    color: context.tokens.colors.scrim,
+                  ),
                   _UpdateDialog(
                     onUpdate: widget.onUpdatePressed,
                     onCancel: widget.showCancel ? widget.onCancelPressed : null,
@@ -103,29 +112,26 @@ class _UpdateDialog extends StatelessWidget {
     return Center(
       child: TestId(
         TestIds.updateGateDialog,
-        child: AlertDialog(
-          title: const TestId(
-            TestIds.updateGateTitle,
-            child: Text(Copy.bootUpdateTitle),
-          ),
-          content: const TestId(
-            TestIds.updateGateMessage,
-            child: Text(Copy.bootUpdateBody),
-          ),
+        child: ChalkakDialog(
+          title: Copy.bootUpdateTitle,
+          titleId: TestIds.updateGateTitle,
+          message: Copy.bootUpdateBody,
+          messageId: TestIds.updateGateMessage,
           actions: [
             if (onCancel != null)
               TestId.button(
                 TestIds.updateGateCancelButton,
-                child: TextButton(
+                child: ChalkakDialogButton(
+                  kind: ChalkakDialogButtonKind.cancel,
+                  label: Copy.bootUpdateCancel,
                   onPressed: onCancel,
-                  child: const Text(Copy.bootUpdateCancel),
                 ),
               ),
             TestId.button(
               TestIds.updateGateUpdateButton,
-              child: FilledButton(
+              child: ChalkakDialogButton(
+                label: Copy.bootUpdateButton,
                 onPressed: onUpdate,
-                child: const Text(Copy.bootUpdateButton),
               ),
             ),
           ],

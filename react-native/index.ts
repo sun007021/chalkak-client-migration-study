@@ -1,8 +1,9 @@
 import Constants from 'expo-constants';
 import { registerRootComponent } from 'expo';
 import { createElement } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
 
-import { App } from './src/app/App';
+import { AppRoot } from './src/app/AppRoot';
 import { readAppConfig } from './src/core/config/AppConfig';
 import { readAppInfo } from './src/core/config/AppInfo';
 import { readFeatureFlags } from './src/core/config/FeatureFlags';
@@ -18,4 +19,7 @@ const overrides = {
 // 포그라운드 알림 표시 정책과 Android 채널은 앱 시작 때 한 번 설정한다.
 configureExpoNotifications();
 
-registerRootComponent(() => createElement(App, { configResult, overrides }));
+// 글꼴 로딩이 끝날 때까지 네이티브 스플래시를 유지한다(AppRoot가 숨긴다).
+void SplashScreen.preventAutoHideAsync().catch(() => undefined);
+
+registerRootComponent(() => createElement(AppRoot, { configResult, overrides }));

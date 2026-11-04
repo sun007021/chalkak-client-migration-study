@@ -44,6 +44,10 @@ Future<_Screen> _open(
   script?.call(rig);
   addTearDown(rig.vm.dispose);
   final s = _Screen(rig);
+  // 원본 카드 비율(3:4)로 그리므로 휴대폰 크기 화면에서 확인한다.
+  tester.view.physicalSize = const Size(1170, 2532);
+  tester.view.devicePixelRatio = 3;
+  addTearDown(tester.view.reset);
   await pumpScreen(
     tester,
     DisplayScreen(
@@ -109,7 +113,8 @@ void main() {
       expect(byId(DisplayTestIds.errorState), findsOneWidget);
       expect(find.text(Copy.displayError), findsOneWidget);
       expect(byId(DisplayTestIds.retryButton), findsOneWidget);
-      expect(find.text(Copy.displayRetry), findsOneWidget);
+      // 원본은 글자 없는 원형 새로고침 버튼이다(접근성 이름이 다시 시도).
+      expect(find.text(Copy.displayRetry), findsNothing);
       expect(byId(DisplayTestIds.grid), findsNothing);
       await tester.tap(byId(DisplayTestIds.retryButton));
       await settleUi(tester);

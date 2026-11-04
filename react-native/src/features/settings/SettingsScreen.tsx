@@ -1,11 +1,15 @@
 import { useEffect, type ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import type { PushSettingKey } from '../../data/settings/NotificationSettingsRepository';
 import { t } from '../../shared/copy';
-import { colors, spacing } from '../../shared/ui/theme';
+import { colors, radius, spacing, typography } from '../../shared/design/tokens';
+import { Dialog, DialogButton } from '../../shared/ui/Dialog';
+import { Icon } from '../../shared/ui/icons/Icon';
+import { Skeleton } from '../../shared/ui/Skeleton';
+import { Text } from '../../shared/ui/Text';
 import { LegalDocSheet, type LegalDocWebView } from '../onboarding/LegalDocSheet';
 import { SignatureCard } from '../signature/SignatureCard';
 import type { SettingsViewModel } from './SettingsViewModel';
@@ -38,15 +42,17 @@ export function SettingsScreen({ viewModel, WebView }: Props) {
 }
 
 function GuestBody({ viewModel }: { viewModel: SettingsViewModel }) {
+  // 게스트: 행 전체가 actionPrimary인 로그인 버튼(screens-c.md §4.6).
   return (
     <View style={styles.guest}>
       <Pressable
         testID="settings.login-button"
         accessibilityRole="button"
         onPress={() => void viewModel.onLoginPress()}
-        style={styles.loginButton}
+        style={({ pressed }) => [styles.loginButton, pressed && styles.pressed]}
       >
         <Text style={styles.loginText}>{t('settings.guest.login')}</Text>
+        <Icon name="ic_display_arrow_right" size={24} color={colors.onActionPrimary} />
       </Pressable>
     </View>
   );
@@ -55,41 +61,49 @@ function GuestBody({ viewModel }: { viewModel: SettingsViewModel }) {
 function MemberBody({ viewModel }: { viewModel: SettingsViewModel }) {
   const { version } = useViewModelState(viewModel);
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <Section title={t('settings.section.app')}>
         <SignatureCard viewModel={viewModel.signatureCard} />
       </Section>
       <PushSection viewModel={viewModel} />
-      <Section title={t('settings.section.account')}>
+      <Section title={t('settings.section.account')} card>
         <Row
           testID="settings.logout-row"
           label={t('settings.row.logout')}
           onPress={() => viewModel.onLogoutPress()}
+          trailing={<Icon name="ic_log_out" size={12} />}
         />
+        <Divider />
         <Row
           testID="settings.withdraw-row"
           label={t('settings.row.withdraw')}
           onPress={() => viewModel.onWithdrawPress()}
+          destructive
         />
       </Section>
-      <Section title={t('settings.section.feedback')}>
+      <Section title={t('settings.section.feedback')} card>
         <Row
           testID="settings.feedback-row"
           label={t('settings.row.feedback')}
           onPress={() => viewModel.onFeedbackPress()}
+          chevron
         />
       </Section>
-      <Section title={t('settings.section.info')}>
+      <Section title={t('settings.section.info')} card>
         <Row
           testID="settings.privacy-row"
           label={t('settings.row.privacy')}
           onPress={() => viewModel.onPrivacyPress()}
+          chevron
         />
+        <Divider />
         <Row
           testID="settings.terms-row"
           label={t('settings.row.terms')}
           onPress={() => viewModel.onTermsPress()}
+          chevron
         />
+        <Divider />
         <Row
           testID="settings.version-row"
           label={t('settings.row.version')}
@@ -116,12 +130,39 @@ function PushSection({ viewModel }: { viewModel: SettingsViewModel }) {
   const { push } = useViewModelState(viewModel);
   const usable = push.status === 'ready' && push.values !== null;
   return (
-    <View testID="settings.push-section">
+    <View testID="settings.push-section" style={styles.section}>
       <Text style={styles.sectionTitle}>{t('settings.section.push')}</Text>
-      <View style={styles.sectionBody}>
-        {push.status === 'loading' ? <Text testID="settings.push-loading">…</Text> : null}
+      <View style={styles.card}>
+        {push.status === 'loading' ? (
+          <View testID="settings.push-loading">
+            <Skeleton style={styles.pushSkeleton} />
+          </View>
+        ) : null}
+        {SWITCHES.map(({ key, testID, labelKey }, index) => (
+          <View key={key}>
+            {index > 0 ? <Divider /> : null}
+            <Pressable
+              disabled={!usable}
+              onPress={() => void viewModel.onPushToggle(key)}
+              style={[styles.row, styles.switchRow]}
+            >
+              <Text style={styles.rowLabel}>{t(labelKey)}</Text>
+              <Switch
+                testID={testID}
+                accessibilityRole="switch"
+                value={push.values?.[key] ?? false}
+                disabled={!usable}
+                accessibilityState={{ disabled: !usable }}
+                trackColor={{ false: colors.border, true: colors.actionPrimary }}
+                ios_backgroundColor={colors.border}
+                thumbColor={colors.surfaceElevated}
+                onValueChange={() => void viewModel.onPushToggle(key)}
+              />
+            </Pressable>
+          </View>
+        ))}
         {push.status === 'error' ? (
-          <View>
+          <View style={styles.pushError}>
             <Text testID="settings.push-error" style={styles.error}>
               {t('settings.push.load-error')}
             </Text>
@@ -129,24 +170,12 @@ function PushSection({ viewModel }: { viewModel: SettingsViewModel }) {
               testID="settings.push-retry-button"
               accessibilityRole="button"
               onPress={() => void viewModel.retryPush()}
+              style={styles.retryButton}
             >
               <Text style={styles.retry}>{t('common.retry')}</Text>
             </Pressable>
           </View>
         ) : null}
-        {SWITCHES.map(({ key, testID, labelKey }) => (
-          <View key={key} style={styles.row}>
-            <Text style={styles.rowLabel}>{t(labelKey)}</Text>
-            <Switch
-              testID={testID}
-              accessibilityRole="switch"
-              value={push.values?.[key] ?? false}
-              disabled={!usable}
-              accessibilityState={{ disabled: !usable }}
-              onValueChange={() => void viewModel.onPushToggle(key)}
-            />
-          </View>
-        ))}
       </View>
     </View>
   );
@@ -158,42 +187,31 @@ function ConfirmDialogs({ viewModel }: { viewModel: SettingsViewModel }) {
   if (dialog === 'none') return null;
   const kind = dialog;
   return (
-    <Modal
-      transparent
-      animationType="fade"
-      visible
+    <Dialog
+      messageTestID={`settings.${kind}-dialog`}
+      title={kind === 'logout' ? t('settings.row.logout') : t('settings.row.withdraw')}
+      message={
+        kind === 'logout' ? t('auth.logout.confirm.message') : t('auth.withdraw.confirm.message')
+      }
       onRequestClose={() => viewModel.onDialogCancel()}
-    >
-      <View style={styles.backdrop}>
-        <View style={styles.dialog}>
-          <Text testID={`settings.${kind}-dialog`} style={styles.dialogText}>
-            {kind === 'logout'
-              ? t('auth.logout.confirm.message')
-              : t('auth.withdraw.confirm.message')}
-          </Text>
-          <View style={styles.dialogButtons}>
-            <Pressable
-              testID={`settings.${kind}-cancel-button`}
-              accessibilityRole="button"
-              onPress={() => viewModel.onDialogCancel()}
-            >
-              <Text style={styles.dialogCancel}>{t('auth.confirm.cancel')}</Text>
-            </Pressable>
-            <Pressable
-              testID={`settings.${kind}-confirm-button`}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: pending !== 'none' }}
-              disabled={pending !== 'none'}
-              onPress={() => void viewModel.onDialogConfirm()}
-            >
-              <Text style={[styles.dialogConfirm, kind === 'withdraw' && styles.danger]}>
-                {kind === 'logout' ? t('auth.logout.confirm.ok') : t('auth.withdraw.confirm.ok')}
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
-    </Modal>
+      actions={
+        <>
+          <DialogButton
+            testID={`settings.${kind}-cancel-button`}
+            tone="cancel"
+            label={t('auth.confirm.cancel')}
+            onPress={() => viewModel.onDialogCancel()}
+          />
+          <DialogButton
+            testID={`settings.${kind}-confirm-button`}
+            tone={kind === 'withdraw' ? 'destructive' : 'primary'}
+            disabled={pending !== 'none'}
+            label={kind === 'logout' ? t('auth.logout.confirm.ok') : t('auth.withdraw.confirm.ok')}
+            onPress={() => void viewModel.onDialogConfirm()}
+          />
+        </>
+      }
+    />
   );
 }
 
@@ -210,13 +228,25 @@ function DocumentSheet({ viewModel, WebView }: Props) {
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+  title,
+  children,
+  card = false,
+}: {
+  title: string;
+  children: ReactNode;
+  card?: boolean;
+}) {
   return (
-    <View>
+    <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionBody}>{children}</View>
+      {card ? <View style={styles.card}>{children}</View> : children}
     </View>
   );
+}
+
+function Divider() {
+  return <View style={styles.divider} />;
 }
 
 function Row(props: {
@@ -225,8 +255,11 @@ function Row(props: {
   onPress?: () => void;
   value?: string;
   valueTestID?: string;
+  chevron?: boolean;
+  destructive?: boolean;
+  trailing?: ReactNode;
 }) {
-  const { testID, label, onPress, value, valueTestID } = props;
+  const { testID, label, onPress, value, valueTestID, chevron, destructive, trailing } = props;
   return (
     <Pressable
       testID={testID}
@@ -234,58 +267,73 @@ function Row(props: {
       onPress={onPress}
       style={styles.row}
     >
-      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={[styles.rowLabel, destructive && styles.destructive]}>{label}</Text>
       {value !== undefined ? (
         <Text testID={valueTestID} style={styles.rowValue}>
           {value}
         </Text>
       ) : null}
+      {chevron ? <Icon name="ic_display_arrow_right" size={24} color={colors.textMuted} /> : null}
+      {trailing}
     </Pressable>
   );
 }
 
+// 원본 근거: docs/design/screens-c.md §1.5, §4.1 (카드 16, 행 좌우 20/위아래 16, 구분선 border, 섹션 라벨 callout textMuted).
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, gap: spacing.xl },
-  guest: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-  loginButton: {
-    height: 52,
-    alignSelf: 'stretch',
-    borderRadius: 14,
-    backgroundColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
+  content: {
+    paddingHorizontal: spacing.screenHorizontal,
+    paddingTop: 48,
+    paddingBottom: spacing.xxl,
+    gap: 36,
   },
-  loginText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  sectionTitle: { fontSize: 13, color: colors.textSecondary, marginBottom: spacing.sm },
-  sectionBody: { gap: spacing.sm },
-  row: {
-    minHeight: 48,
+  guest: { flex: 1, justifyContent: 'center', paddingHorizontal: spacing.screenHorizontal },
+  loginButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: radius.large,
+    backgroundColor: colors.actionPrimary,
   },
-  rowLabel: { fontSize: 16, color: colors.textPrimary },
-  rowValue: { fontSize: 15, color: colors.textSecondary },
-  error: { color: colors.danger, fontSize: 14 },
-  retry: { color: colors.accent, fontSize: 14, fontWeight: '700' },
-  backdrop: {
-    flex: 1,
-    backgroundColor: colors.overlay,
+  pressed: { opacity: 0.85 },
+  loginText: { ...typography.callout, color: colors.onActionPrimary },
+  section: { gap: spacing.lg },
+  sectionTitle: { ...typography.callout, color: colors.textMuted },
+  card: {
+    borderRadius: radius.large,
+    backgroundColor: colors.surfaceElevated,
+    shadowColor: '#000000',
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+  row: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
-  dialog: {
-    alignSelf: 'stretch',
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    padding: spacing.xl,
-    gap: spacing.xl,
+  switchRow: { paddingVertical: 10.5 },
+  rowLabel: { ...typography.callout, color: colors.textPrimary, flex: 1 },
+  rowValue: { ...typography.callout, color: colors.textMuted },
+  destructive: { color: colors.destructive },
+  divider: { height: 1, backgroundColor: colors.border, marginHorizontal: 20 },
+  pushSkeleton: { height: 56, margin: spacing.md, borderRadius: radius.button },
+  pushError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    paddingHorizontal: 20,
+    paddingBottom: spacing.md,
   },
-  dialogText: { fontSize: 16, color: colors.textPrimary },
-  dialogButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.xl },
-  dialogCancel: { fontSize: 15, color: colors.textSecondary },
-  dialogConfirm: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  danger: { color: colors.danger },
+  error: { ...typography.caption, color: colors.error },
+  retryButton: { minHeight: 44, minWidth: 44, justifyContent: 'center' },
+  retry: { ...typography.caption, color: colors.textSecondary, textDecorationLine: 'underline' },
 });

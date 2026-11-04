@@ -4,7 +4,12 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/text/code_points.dart';
+import '../../../core/ui/components/chalkak_icon.dart';
+import '../../../core/ui/components/chalkak_nav_button.dart';
+import '../../../core/ui/components/chalkak_states.dart';
+import '../../../core/ui/components/chalkak_text_field.dart';
 import '../../../core/ui/test_id.dart';
 import '../../edit/presentation/photo_edit_screen.dart';
 import '../../edit/presentation/photo_edit_view_model.dart';
@@ -115,10 +120,10 @@ class _UploadScreenState extends State<UploadScreen> {
       child: Scaffold(
         appBar: AppBar(
           automaticallyImplyLeading: false,
+          leadingWidth: 56,
           leading: TestId.button(
             UploadTestIds.closeButton,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back),
+            child: ChalkakNavButton.back(
               onPressed: () => Navigator.of(context).maybePop(),
             ),
           ),
@@ -208,7 +213,7 @@ class _Body extends StatelessWidget {
           ] else if (s.topicStatus == UploadTopicStatus.loading)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: ChalkakSpinner()),
             ),
           if (s.topicStatus == UploadTopicStatus.failed &&
               s.topicError != null) ...[
@@ -264,7 +269,7 @@ class _PhotoArea extends StatelessWidget {
           Expanded(
             child: _PickButton(
               id: UploadTestIds.albumButton,
-              icon: Icons.photo_library_outlined,
+              icon: ChalkakIcon.photoLibrary,
               onPressed: viewModel.onAlbumPressed,
             ),
           ),
@@ -273,7 +278,7 @@ class _PhotoArea extends StatelessWidget {
             Expanded(
               child: _PickButton(
                 id: UploadTestIds.cameraButton,
-                icon: Icons.photo_camera_outlined,
+                icon: ChalkakIcon.photoCamera,
                 onPressed: viewModel.onCameraPressed,
               ),
             ),
@@ -301,7 +306,9 @@ class _PhotoArea extends StatelessWidget {
                     child: RgbaImageView(
                       image: preview,
                       fit: BoxFit.cover,
-                      placeholder: const ColoredBox(color: Colors.black12),
+                      placeholder: ColoredBox(
+                        color: context.tokens.colors.skeletonBase,
+                      ),
                     ),
                   ),
                   if (s.preparation == PreparationStatus.preparing)
@@ -310,11 +317,7 @@ class _PhotoArea extends StatelessWidget {
                       bottom: 8,
                       child: TestId(
                         UploadTestIds.preparingIndicator,
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
+                        child: ChalkakSpinner(size: 20),
                       ),
                     ),
                 ],
@@ -335,22 +338,29 @@ class _PickButton extends StatelessWidget {
   });
 
   final String id;
-  final IconData icon;
+  final String icon;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     return TestId.button(
       id,
-      child: OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(120),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onPressed,
+        child: Container(
+          height: 120,
+          decoration: BoxDecoration(
+            color: context.tokens.colors.skeletonBase,
+            borderRadius: BorderRadius.circular(context.tokens.radius.large),
+          ),
+          alignment: Alignment.center,
+          child: ChalkakIcon(
+            icon,
+            size: 36,
+            color: context.tokens.colors.iconPrimary,
           ),
         ),
-        onPressed: onPressed,
-        child: Icon(icon, size: 36),
       ),
     );
   }
@@ -378,7 +388,7 @@ class _TitleField extends StatelessWidget {
       children: [
         TestId(
           UploadTestIds.titleInput,
-          child: TextField(
+          child: ChalkakTextField(
             controller: controller,
             enabled: !s.isSubmitting,
             minLines: 1,
@@ -386,10 +396,7 @@ class _TitleField extends StatelessWidget {
             keyboardType: TextInputType.multiline,
             inputFormatters: [PostTitleInputFormatter()],
             onChanged: viewModel.onTitleChanged,
-            decoration: const InputDecoration(
-              hintText: Copy.uploadCaptionPlaceholder,
-              border: OutlineInputBorder(),
-            ),
+            hintText: Copy.uploadCaptionPlaceholder,
           ),
         ),
         const SizedBox(height: 4),
@@ -399,7 +406,9 @@ class _TitleField extends StatelessWidget {
             UploadTestIds.titleCounter,
             child: Text(
               '$count/${AppConstants.postTitleMax}',
-              style: Theme.of(context).textTheme.bodySmall,
+              style: context.tokens.text.footnote.copyWith(
+                color: context.tokens.colors.textMuted,
+              ),
             ),
           ),
         ),
@@ -419,23 +428,25 @@ class _SubmitButton extends StatelessWidget {
     return TestId.button(
       UploadTestIds.submitButton,
       child: FilledButton(
-        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 17),
+          minimumSize: const Size.fromHeight(52),
+        ),
         onPressed: s.canSubmit ? viewModel.onSubmitPressed : null,
         child: s.isSubmitting
-            ? const Row(
+            ? Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TestId(
                     UploadTestIds.submittingIndicator,
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                    child: ChalkakSpinner(
+                      size: 18,
+                      color: context.tokens.colors.onActionPrimary,
                     ),
                   ),
-                  SizedBox(width: 8),
-                  Text(Copy.uploadSubmitting),
+                  const SizedBox(width: 8),
+                  const Text(Copy.uploadSubmitting),
                 ],
               )
             : const Text(Copy.uploadSubmit),

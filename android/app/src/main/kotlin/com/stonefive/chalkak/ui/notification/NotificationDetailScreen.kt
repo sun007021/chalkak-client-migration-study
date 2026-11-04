@@ -33,7 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.ui.common.RemoteImage
-import com.stonefive.chalkak.ui.components.BackAction
+import com.stonefive.chalkak.ui.components.ChalkakTopBar
 import com.stonefive.chalkak.ui.components.ChalkakOutlinedButton
 import com.stonefive.chalkak.ui.components.Loading
 import com.stonefive.chalkak.ui.components.ScreenGoneEffect
@@ -70,24 +70,19 @@ fun NotificationDetailScreen(
     val copy = LocalCopy.current
     val colors = ChalkakTheme.colors
     Column(modifier.fillMaxSize().background(colors.background).testTag("notification-detail.root")) {
-        TopBar {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                BackAction(callbacks.onBack, Modifier.testTag("notification-detail.back-button").semantics { contentDescription = copy["common.close"] })
-                Text(
-                    text = copy[NotiCopyKeys.DETAIL_TITLE],
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.textPrimary,
-                    modifier = Modifier.padding(start = 4.dp).testTag("notification-detail.screen-title"),
-                )
-            }
-        }
+        ChalkakTopBar(
+            title = copy[NotiCopyKeys.DETAIL_TITLE],
+            onBack = callbacks.onBack,
+            backModifier = Modifier.testTag("notification-detail.back-button").semantics { contentDescription = copy["common.close"] },
+            titleModifier = Modifier.testTag("notification-detail.screen-title"),
+        )
         val detail = state.detail
         when {
             state.phase == DetailPhase.Loading ->
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Loading(Modifier.testTag("notification-detail.loading")) }
             state.phase == DetailPhase.Gone ->
                 Box(Modifier.fillMaxSize().padding(32.dp).testTag("notification-detail.not-found-state"), contentAlignment = Alignment.Center) {
-                    Text(copy[NotiCopyKeys.GONE], style = MaterialTheme.typography.bodyLarge, color = colors.textPrimary, textAlign = TextAlign.Center)
+                    Text(copy[NotiCopyKeys.GONE], style = ChalkakTheme.typography.subheadline, color = colors.textSecondary, textAlign = TextAlign.Center)
                 }
             state.phase == DetailPhase.Error || detail == null ->
                 Column(
@@ -97,20 +92,14 @@ fun NotificationDetailScreen(
                 ) {
                     Text(
                         copy[state.errorCopyKey ?: NotiCopyKeys.DETAIL_ERROR],
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = colors.textPrimary,
+                        style = ChalkakTheme.typography.body,
+                        color = colors.textSecondary,
                         textAlign = TextAlign.Center,
                     )
-                    Text(
+                    ChalkakOutlinedButton(
                         text = copy[NotiCopyKeys.INBOX_RETRY],
-                        style = MaterialTheme.typography.titleSmall,
-                        color = colors.textPrimary,
-                        modifier = Modifier
-                            .padding(top = 12.dp)
-                            .testTag("notification-detail.retry-button")
-                            .tapTarget(callbacks.onRetry)
-                            .heightIn(min = 48.dp)
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        onClick = callbacks.onRetry,
+                        modifier = Modifier.padding(top = ChalkakTheme.spacing.lg).testTag("notification-detail.retry-button"),
                     )
                 }
             else -> DetailContent(state, detail, callbacks, image)
@@ -122,45 +111,45 @@ fun NotificationDetailScreen(
 private fun DetailContent(state: DetailUiState, detail: NotificationDetail, callbacks: NotificationDetailCallbacks, image: RemoteImage) {
     val copy = LocalCopy.current
     val colors = ChalkakTheme.colors
-    Column(Modifier.fillMaxSize().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = ScreenPadding)) {
+    Column(Modifier.fillMaxSize().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = ChalkakTheme.spacing.screenHorizontal)) {
         Text(
             text = detail.title,
-            style = MaterialTheme.typography.headlineSmall,
+            style = ChalkakTheme.typography.headline,
             color = colors.textPrimary,
-            modifier = Modifier.padding(top = 8.dp).testTag("notification-detail.title"),
+            modifier = Modifier.padding(top = ChalkakTheme.spacing.lg).testTag("notification-detail.title"),
         )
         Text(
             text = detail.body,
-            style = MaterialTheme.typography.bodyLarge,
-            color = colors.textPrimary,
-            modifier = Modifier.padding(top = 12.dp).testTag("notification-detail.body"),
+            style = ChalkakTheme.typography.subheadline,
+            color = colors.textSecondary,
+            modifier = Modifier.padding(top = ChalkakTheme.spacing.sm).testTag("notification-detail.body"),
         )
         if (state.showOriginalPhoto) {
             image(
                 detail.originalImageUrl,
                 Modifier
-                    .padding(top = 16.dp)
+                    .padding(top = ChalkakTheme.spacing.xl)
                     .fillMaxWidth()
                     .height(PHOTO_HEIGHT)
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(ChalkakTheme.shapes.large)
                     .testTag("notification-detail.photo"),
             )
         }
         if (state.showRejectionReason && detail.rejectionReason != null) {
             Column(
                 Modifier
-                    .padding(top = 16.dp)
+                    .padding(top = ChalkakTheme.spacing.xl)
                     .fillMaxWidth()
-                    .background(colors.inputBackground, RoundedCornerShape(14.dp))
-                    .padding(16.dp)
+                    .background(colors.inputBackground, ChalkakTheme.shapes.large)
+                    .padding(ChalkakTheme.spacing.lg)
                     .testTag("notification-detail.rejection-section"),
             ) {
-                Text(copy[NotiCopyKeys.DETAIL_REASON], style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)
+                Text(copy[NotiCopyKeys.DETAIL_REASON], style = ChalkakTheme.typography.caption, color = colors.textInactive)
                 Text(
                     text = detail.rejectionReason!!,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.textNeutral,
-                    modifier = Modifier.padding(top = 8.dp).testTag("notification-detail.rejection-reason"),
+                    style = ChalkakTheme.typography.body,
+                    color = colors.textPrimary,
+                    modifier = Modifier.padding(top = ChalkakTheme.spacing.sm).testTag("notification-detail.rejection-reason"),
                 )
             }
         }
@@ -168,7 +157,7 @@ private fun DetailContent(state: DetailUiState, detail: NotificationDetail, call
             ChalkakOutlinedButton(
                 text = copy[NotiCopyKeys.DETAIL_TO_INBOX],
                 onClick = callbacks.onToInbox,
-                modifier = Modifier.padding(top = 20.dp).fillMaxWidth().testTag("notification-detail.back-to-inbox-button"),
+                modifier = Modifier.padding(top = ChalkakTheme.spacing.xl).fillMaxWidth().testTag("notification-detail.back-to-inbox-button"),
             )
         }
         Spacer(Modifier.height(16.dp))

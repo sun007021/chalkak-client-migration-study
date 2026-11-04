@@ -15,19 +15,16 @@ struct HomeRankingSection: View {
         VStack(alignment: .leading, spacing: ChalkakSpacing.lg) {
             HomeSectionHeader(title: title) {
                 Button { viewModel.moreTapped(section) } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(ChalkakColor.iconPrimary)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+                    HomeMoreLabel()
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(title)
                 .accessibilityIdentifier("home.\(identifierPrefix)-more-link")
             }
+            .padding(.horizontal, ChalkakSpacing.screenHorizontal)
             switch state {
             case .loading:
-                ProgressView().frame(maxWidth: .infinity, minHeight: 120)
+                ProgressView().frame(maxWidth: .infinity, minHeight: 48)
             case .failed(let message):
                 HomeSectionError(
                     message: message,
@@ -35,20 +32,24 @@ struct HomeRankingSection: View {
                     retryIdentifier: "home.\(identifierPrefix)-retry-button",
                     onRetry: { Task { await viewModel.retry(section) } }
                 )
+                .padding(.horizontal, ChalkakSpacing.screenHorizontal)
             case .ready(let items):
                 if items.isEmpty {
                     Text(HomeCopy.rankingEmpty)
                         .font(ChalkakFont.footnote)
                         .foregroundStyle(ChalkakColor.textSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 64)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .padding(.horizontal, ChalkakSpacing.screenHorizontal)
                         .accessibilityIdentifier("home.\(identifierPrefix)-empty")
                 } else {
+                    // 가로 스크롤은 화면 끝까지 흐르고 첫 카드만 screenHorizontal에서 시작한다.
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: ChalkakSpacing.md) {
+                        HStack(spacing: ChalkakSpacing.lg) {
                             ForEach(items) { item in
                                 itemView(item)
                             }
                         }
+                        .padding(.horizontal, ChalkakSpacing.screenHorizontal)
                     }
                 }
             }
@@ -61,7 +62,8 @@ struct HomeRankingSection: View {
         let postId = item.id.uuidString.lowercased()
         return VStack(alignment: .leading, spacing: ChalkakSpacing.xs) {
             ChalkakRemoteImage(url: item.thumbnailImageURL ?? item.originalImageURL)
-                .frame(width: 140, height: 168)
+                .frame(width: 82, height: 82)
+                .background(ChalkakColor.calendarCell)
                 .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.small))
             HStack(spacing: ChalkakSpacing.xs) {
                 Image(item.isLiked ? "ic_heart_filled" : "ic_heart")

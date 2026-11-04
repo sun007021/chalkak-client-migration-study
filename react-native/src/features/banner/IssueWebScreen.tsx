@@ -1,12 +1,15 @@
 import { useEffect, type ComponentType } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
-import { colors, spacing } from '../../shared/ui/theme';
+import { colors, spacing, typography } from '../../shared/design/tokens';
+import { BackButton } from '../../shared/ui/BackButton';
+import { ChalkakOutlinedButton } from '../../shared/ui/Button';
 import { IssueWebContent, type IssueWebContentProps } from './IssueWebContent';
 import type { IssueWebViewModel } from './IssueWebViewModel';
+import { Text } from '../../shared/ui/Text';
 
 export type IssueWebScreenProps = {
   viewModel: IssueWebViewModel;
@@ -30,15 +33,9 @@ export function IssueWebScreen({
   return (
     <View testID="issue.root" style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.bar}>
-        <Pressable
-          testID="issue.back-button"
-          accessibilityRole="button"
-          onPress={onBack}
-          hitSlop={8}
-          style={styles.back}
-        >
-          <Text style={styles.backText}>{'<'}</Text>
-        </Pressable>
+        <View style={styles.barBack}>
+          <BackButton testID="issue.back-button" onPress={onBack} />
+        </View>
         <Text testID="issue.title" style={styles.title}>
           {t('home.banner.title')}
         </Text>
@@ -54,14 +51,12 @@ export function IssueWebScreen({
             <Text testID="issue.error-state" style={styles.message}>
               {t('banner.web.load-error')}
             </Text>
-            <Pressable
+            <ChalkakOutlinedButton
               testID="issue.retry-button"
-              accessibilityRole="button"
+              label={t('banner.web.retry')}
+              fillsWidth={false}
               onPress={() => viewModel.retry()}
-              style={styles.retry}
-            >
-              <Text style={styles.retryText}>{t('banner.web.retry')}</Text>
-            </Pressable>
+            />
           </View>
         ) : null}
         {state.sourceUrl !== null && state.errorKind === null ? (
@@ -76,7 +71,11 @@ export function IssueWebScreen({
               }
             />
             {state.phase === 'loading' ? (
-              <ActivityIndicator testID="issue.loading" style={styles.loading} />
+              <ActivityIndicator
+                testID="issue.loading"
+                color={colors.actionPrimary}
+                style={styles.loading}
+              />
             ) : null}
           </View>
         ) : null}
@@ -87,15 +86,17 @@ export function IssueWebScreen({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  bar: { height: 48, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.sm },
-  back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  backText: { fontSize: 22, color: colors.textPrimary },
-  title: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  bar: { height: 72, justifyContent: 'center', paddingHorizontal: 20 },
+  barBack: { position: 'absolute', left: 20 },
+  title: { ...typography.headline, color: colors.textPrimary, textAlign: 'center' },
   body: { flex: 1 },
   fill: { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-  message: { padding: spacing.lg, textAlign: 'center', color: colors.textSecondary },
-  retry: { paddingVertical: spacing.sm },
-  retryText: { color: colors.accent, fontWeight: '600' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
+  message: {
+    ...typography.body,
+    padding: spacing.lg,
+    textAlign: 'center',
+    color: colors.textSecondary,
+  },
   loading: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
 });

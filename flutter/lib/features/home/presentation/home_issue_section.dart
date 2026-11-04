@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/ui/app_network_image.dart';
+import '../../../core/ui/components/chalkak_states.dart';
 import '../../../core/ui/test_id.dart';
 import '../../banner/domain/banner_models.dart';
 import 'home_test_ids.dart';
@@ -16,10 +18,18 @@ class HomeIssueHeader extends StatelessWidget {
     return TestId(
       HomeTestIds.issueSection,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+        // ISSUE 헤더: 위 xxl, 아래 lg, headline bold.
+        padding: EdgeInsets.fromLTRB(
+          context.tokens.spacing.screenHorizontal,
+          context.tokens.spacing.xxl,
+          context.tokens.spacing.screenHorizontal,
+          context.tokens.spacing.lg,
+        ),
         child: Text(
           Copy.homeBannerTitle,
-          style: Theme.of(context).textTheme.titleMedium,
+          style: context.tokens.text.headline.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );
@@ -35,20 +45,32 @@ class HomeIssueError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+      padding: EdgeInsets.fromLTRB(
+        context.tokens.spacing.screenHorizontal,
+        context.tokens.spacing.xxl,
+        context.tokens.spacing.screenHorizontal,
+        0,
+      ),
       child: Row(
         children: [
           const Expanded(
             child: TestId(
               HomeTestIds.issueError,
-              child: Text(Copy.homeBannerError),
+              child: ChalkakStatusText(Copy.homeBannerError),
             ),
           ),
           TestId.button(
             HomeTestIds.issueRetryButton,
-            child: TextButton(
-              onPressed: onRetry,
-              child: const Text(Copy.commonRetry),
+            child: Semantics(
+              button: true,
+              label: Copy.commonRetry,
+              excludeSemantics: true,
+              onTap: onRetry,
+              child: ChalkakRetryCircleButton(
+                onPressed: onRetry,
+                size: 32,
+                iconSize: 15,
+              ),
             ),
           ),
         ],
@@ -91,9 +113,15 @@ class _HomeIssueCardState extends State<HomeIssueCard> {
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
-    final theme = Theme.of(context);
+    final tokens = context.tokens;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      // 배너 하나: 좌우 screenHorizontal, 아래 xxl(HomeIssueSection.swift).
+      padding: EdgeInsets.fromLTRB(
+        tokens.spacing.screenHorizontal,
+        0,
+        tokens.spacing.screenHorizontal,
+        tokens.spacing.xxl,
+      ),
       child: Semantics(
         key: Key(HomeTestIds.issueItem(item.id)),
         identifier: HomeTestIds.issueItem(item.id),
@@ -102,31 +130,38 @@ class _HomeIssueCardState extends State<HomeIssueCard> {
         label: '${item.title}\n${item.subtitle}',
         onTap: widget.onPressed,
         excludeSemantics: true,
-        child: Card(
-          clipBehavior: Clip.antiAlias,
-          margin: EdgeInsets.zero,
-          child: InkWell(
-            onTap: widget.onPressed,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: AppNetworkImage(url: item.thumbnailUrl?.toString()),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(item.title, style: theme.textTheme.titleSmall),
-                      const SizedBox(height: 4),
-                      Text(item.subtitle, style: theme.textTheme.bodySmall),
-                    ],
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onPressed,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(tokens.radius.large),
+                child: ColoredBox(
+                  color: tokens.colors.surfaceElevated,
+                  child: AspectRatio(
+                    aspectRatio: 1672 / 941,
+                    child: AppNetworkImage(url: item.thumbnailUrl?.toString()),
                   ),
                 ),
-              ],
-            ),
+              ),
+              SizedBox(height: tokens.spacing.lg),
+              Text(
+                item.title,
+                style: tokens.text.subheadline.copyWith(
+                  color: tokens.colors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(height: tokens.spacing.sm),
+              Text(
+                item.subtitle,
+                style: tokens.text.caption.copyWith(
+                  color: tokens.colors.textSecondary,
+                ),
+              ),
+            ],
           ),
         ),
       ),

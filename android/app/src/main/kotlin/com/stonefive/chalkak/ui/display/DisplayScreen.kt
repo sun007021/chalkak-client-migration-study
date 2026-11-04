@@ -2,6 +2,12 @@ package com.stonefive.chalkak.ui.display
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.aspectRatio
+import com.stonefive.chalkak.ui.components.ChalkakSortSelector
+import com.stonefive.chalkak.ui.components.ChalkakSkeleton
+import com.stonefive.chalkak.ui.components.ChalkakSheet
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -97,7 +103,8 @@ data class DisplayCallbacks(
 )
 
 private const val END_THRESHOLD = 3
-private val GridGap = 8.dp
+/** Grid gutters (screens-a 9.3: iOS and Android unified on 25 / 12 / 12). */
+private val GridGap = 12.dp
 
 /** Stateless exhibition tab. The only local state is the date picker sheet (open flag). */
 @Composable
@@ -115,21 +122,19 @@ fun DisplayScreen(
             Header(state, callbacks, onPickDate = { pickerOpen = true })
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 when (state.status) {
-                    DisplayStatus.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Loading(Modifier.testTag("display.loading"))
-                    }
+                    DisplayStatus.Loading -> DisplaySkeleton(Modifier.testTag("display.loading"))
                     DisplayStatus.Empty -> Message(Modifier.testTag("display.empty-state")) {
-                        Text(copy["display.empty"], style = MaterialTheme.typography.bodyLarge, color = ChalkakTheme.colors.textInactive)
+                        Text(copy["display.empty"], style = ChalkakTheme.typography.body, color = ChalkakTheme.colors.textSecondary)
                     }
                     DisplayStatus.Error -> Message(Modifier.testTag("display.error-state")) {
                         Text(
                             copy[state.errorCopyKey ?: "display.error"],
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = ChalkakTheme.colors.textPrimary,
+                            style = ChalkakTheme.typography.body,
+                            color = ChalkakTheme.colors.textSecondary,
                             textAlign = TextAlign.Center,
                         )
                         if (state.showRetry) {
-                            Spacer(Modifier.height(16.dp))
+                            Spacer(Modifier.height(ChalkakTheme.spacing.xl))
                             ChalkakButton(copy["display.retry"], callbacks.onRetry, Modifier.testTag("display.retry-button"))
                         }
                     }
@@ -175,13 +180,31 @@ private fun Message(modifier: Modifier, content: @Composable () -> Unit) {
     ) { content() }
 }
 
+/** Loading stand-in: two columns of shimmering photo tiles with the staggered heights of the real grid (screens-b 1.5). */
+@Composable
+private fun DisplaySkeleton(modifier: Modifier = Modifier) {
+    val ratios = listOf(listOf(3f / 4, 1f, 4f / 5), listOf(1f, 3f / 4, 1f))
+    Row(
+        modifier.fillMaxSize().padding(horizontal = ChalkakTheme.spacing.screenHorizontal, vertical = ChalkakTheme.spacing.lg),
+        horizontalArrangement = Arrangement.spacedBy(GridGap),
+    ) {
+        ratios.forEach { column ->
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GridGap)) {
+                column.forEach { ratio -> ChalkakSkeleton(Modifier.fillMaxWidth().aspectRatio(ratio).clip(ChalkakTheme.shapes.photoCard)) }
+            }
+        }
+    }
+}
+
+/** Date row, topic, description and sort selector (screens-b 2.1): headline date between 24dp arrows, hairline under the topic block. */
 @Composable
 private fun Header(state: DisplayUiState, callbacks: DisplayCallbacks, onPickDate: () -> Unit) {
     val copy = LocalCopy.current
     val colors = ChalkakTheme.colors
-    Column(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ArrowButton(R.drawable.ic_chevron_left, copy["display.nav.previous"], state.canGoPrevious, callbacks.onPreviousDate, "display.prev-date-button")
+    val side = ChalkakTheme.spacing.screenHorizontal
+    Column(Modifier.fillMaxWidth().background(colors.background).statusBarsPadding()) {
+        Row(Modifier.padding(start = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            ArrowButton(R.drawable.ic_display_arrow_left, copy["display.nav.previous"], state.canGoPrevious, callbacks.onPreviousDate, "display.prev-date-button")
             Box(
                 Modifier
                     .testTag("display.date-picker-button")
@@ -193,30 +216,52 @@ private fun Header(state: DisplayUiState, callbacks: DisplayCallbacks, onPickDat
             ) {
                 Text(
                     text = state.dateLabel ?: DateFormats.monthDay(state.date),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = ChalkakTheme.typography.headline,
                     color = colors.textPrimary,
+                    maxLines = 1,
                     modifier = Modifier.testTag("display.date-label"),
                 )
             }
-            ArrowButton(R.drawable.ic_chevron_right, copy["display.nav.next"], state.canGoNext, callbacks.onNextDate, "display.next-date-button")
+            ArrowButton(R.drawable.ic_display_arrow_right, copy["display.nav.next"], state.canGoNext, callbacks.onNextDate, "display.next-date-button")
         }
         state.topic?.let {
-            Text(it.title, style = MaterialTheme.typography.titleMedium, color = colors.textPrimary, modifier = Modifier.testTag("display.topic-title"))
+            Text(
+                it.title,
+                style = ChalkakTheme.typography.title2,
+                color = colors.textPrimary,
+                modifier = Modifier.padding(start = side, top = ChalkakTheme.spacing.xs, end = side).testTag("display.topic-title"),
+            )
         }
         Text(
             copy[state.descriptionKey],
-            style = MaterialTheme.typography.bodyMedium,
-            color = colors.textNeutral,
-            modifier = Modifier.padding(top = 2.dp).testTag("display.description"),
+            style = ChalkakTheme.typography.subheadline,
+            color = colors.textInactive,
+            modifier = Modifier.padding(start = side, top = ChalkakTheme.spacing.md, end = side, bottom = ChalkakTheme.spacing.xl).testTag("display.description"),
         )
+        HorizontalDivider(thickness = 0.5.dp, color = colors.border)
         if (state.sortOptions.isNotEmpty()) {
-            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                state.sortOptions.forEach { sort ->
-                    SortTab(sort, selected = sort == state.sort, onClick = { callbacks.onSortSelected(sort) })
-                }
-            }
+            ChalkakSortSelector(
+                options = state.sortOptions,
+                selected = state.sort,
+                label = { copy[sortKey(it)] },
+                tag = ::sortTag,
+                onSelect = callbacks.onSortSelected,
+                modifier = Modifier.padding(horizontal = side),
+            )
         }
     }
+}
+
+private fun sortTag(sort: PostSort) = when (sort) {
+    PostSort.RECENT -> "display.sort-recent-tab"
+    PostSort.POPULAR -> "display.sort-popular-tab"
+    PostSort.RANDOM -> "display.sort-random-tab"
+}
+
+private fun sortKey(sort: PostSort) = when (sort) {
+    PostSort.RECENT -> "display.sort.recent"
+    PostSort.POPULAR -> "display.sort.popular"
+    PostSort.RANDOM -> "display.sort.random"
 }
 
 @Composable
@@ -226,6 +271,7 @@ private fun ArrowButton(icon: Int, description: String, enabled: Boolean, onClic
             .size(48.dp)
             .testTag(tag)
             .semantics { contentDescription = description }
+            .clip(CircleShape)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -233,36 +279,7 @@ private fun ArrowButton(icon: Int, description: String, enabled: Boolean, onClic
             painterResource(icon),
             contentDescription = null,
             modifier = Modifier.size(24.dp),
-            alpha = if (enabled) 1f else 0.28f,
-        )
-    }
-}
-
-@Composable
-private fun SortTab(sort: PostSort, selected: Boolean, onClick: () -> Unit) {
-    val copy = LocalCopy.current
-    val colors = ChalkakTheme.colors
-    val (tag, key) = when (sort) {
-        PostSort.RECENT -> "display.sort-recent-tab" to "display.sort.recent"
-        PostSort.POPULAR -> "display.sort-popular-tab" to "display.sort.popular"
-        PostSort.RANDOM -> "display.sort-random-tab" to "display.sort.random"
-    }
-    // The tappable area is >= 48dp high; the pill drawn inside it keeps the compact look.
-    Box(
-        Modifier
-            .testTag(tag)
-            .defaultMinSize(minHeight = 48.dp)
-            .selectable(selected = selected, role = Role.Tab, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            copy[key],
-            style = MaterialTheme.typography.labelLarge,
-            color = if (selected) colors.onActionPrimary else colors.textPrimary,
-            modifier = Modifier
-                .clip(CircleShape)
-                .background(if (selected) colors.actionPrimary else colors.inputBackground)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+            alpha = if (enabled) 1f else 0.35f,
         )
     }
 }
@@ -286,7 +303,7 @@ private fun Content(state: DisplayUiState, callbacks: DisplayCallbacks, remoteIm
         columns = StaggeredGridCells.Fixed(2),
         modifier = Modifier.fillMaxSize().testTag("display.grid"),
         state = gridState,
-        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(start = ChalkakTheme.spacing.screenHorizontal, end = ChalkakTheme.spacing.screenHorizontal, top = ChalkakTheme.spacing.lg, bottom = ChalkakTheme.spacing.xxl),
         horizontalArrangement = Arrangement.spacedBy(GridGap),
         verticalItemSpacing = GridGap,
     ) {
@@ -297,9 +314,9 @@ private fun Content(state: DisplayUiState, callbacks: DisplayCallbacks, remoteIm
             item(key = "grid-title", span = StaggeredGridItemSpan.FullLine) {
                 Text(
                     copy["display.grid.title"],
-                    style = MaterialTheme.typography.titleSmall,
+                    style = ChalkakTheme.typography.callout,
                     color = ChalkakTheme.colors.textPrimary,
-                    modifier = Modifier.padding(vertical = 8.dp),
+                    modifier = Modifier.padding(vertical = ChalkakTheme.spacing.sm),
                 )
             }
         }
@@ -314,8 +331,8 @@ private fun PhotoCard(post: PostSummary, callbacks: DisplayCallbacks, remoteImag
     Box(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(ChalkakTheme.colors.inputBackground)
+            .clip(ChalkakTheme.shapes.photoCard)
+            .background(Color.Black)
             .testTag("display.item-${post.id}"),
     ) {
         Box(Modifier.fillMaxWidth().clickable { callbacks.onPhotoClick(post.id) }) {
@@ -326,11 +343,12 @@ private fun PhotoCard(post: PostSummary, callbacks: DisplayCallbacks, remoteImag
             onClick = { callbacks.onLikeClick(post.id) },
             buttonTag = "display.like-button-${post.id}",
             countTag = "display.like-count-${post.id}",
-            modifier = Modifier.align(Alignment.BottomStart).padding(4.dp),
+            modifier = Modifier.align(Alignment.BottomStart),
         )
     }
 }
 
+/** Heart + count over the photo (screens-b 2.2): white on the image with a soft shadow, no dark chip; 10dp from the corner. */
 @Composable
 private fun LikeOverlay(post: PostSummary, onClick: () -> Unit, buttonTag: String, countTag: String, modifier: Modifier) {
     LikeButton(
@@ -340,10 +358,10 @@ private fun LikeOverlay(post: PostSummary, onClick: () -> Unit, buttonTag: Strin
         onClick = onClick,
         buttonTag = buttonTag,
         countTag = countTag,
-        modifier = modifier
-            .background(Color(0x66000000), CircleShape)
-            .padding(end = 10.dp),
-        tint = Color.White,
+        modifier = modifier,
+        tint = ChalkakTheme.colors.textOnImage,
+        liked = ChalkakTheme.colors.textOnImage,
+        onImage = true,
     )
 }
 
@@ -359,17 +377,17 @@ private fun FeaturedPager(state: DisplayUiState, callbacks: DisplayCallbacks, re
     Column(Modifier.fillMaxWidth().testTag("display.featured-pager")) {
         Text(
             copy["display.featured.title"],
-            style = MaterialTheme.typography.titleSmall,
+            style = ChalkakTheme.typography.callout,
             color = ChalkakTheme.colors.textPrimary,
-            modifier = Modifier.padding(vertical = 8.dp),
+            modifier = Modifier.padding(vertical = ChalkakTheme.spacing.sm),
         )
         HorizontalPager(pagerState, Modifier.fillMaxWidth(), pageSpacing = GridGap) { index ->
             val post = featured[index]
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(ChalkakTheme.colors.inputBackground)
+                    .clip(ChalkakTheme.shapes.photoCard)
+                    .background(Color.Black)
                     .testTag("display.featured-item-${post.id}"),
             ) {
                 Box(Modifier.fillMaxWidth().clickable { callbacks.onPhotoClick(post.id) }) {
@@ -380,17 +398,21 @@ private fun FeaturedPager(state: DisplayUiState, callbacks: DisplayCallbacks, re
                     onClick = { callbacks.onLikeClick(post.id) },
                     buttonTag = "display.featured-like-button-${post.id}",
                     countTag = "display.featured-like-count-${post.id}",
-                    modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
+                    modifier = Modifier.align(Alignment.BottomStart),
                 )
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.Center) {
+        // Page indicator (screens-b 2.3): selected 24 x 7 capsule in actionPrimary, others 7dp dots in textMuted at 45%.
+        Row(Modifier.fillMaxWidth().padding(top = ChalkakTheme.spacing.lg), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
             repeat(featured.size) { i ->
+                val current = i == pagerState.currentPage
                 Box(
                     Modifier
-                        .padding(3.dp)
-                        .size(6.dp)
-                        .background(if (i == pagerState.currentPage) ChalkakTheme.colors.actionPrimary else ChalkakTheme.colors.border, CircleShape),
+                        .size(width = if (current) 24.dp else 7.dp, height = 7.dp)
+                        .background(
+                            if (current) ChalkakTheme.colors.actionPrimary else ChalkakTheme.colors.textMuted.copy(alpha = ChalkakTheme.colors.textMuted.alpha * 0.45f),
+                            ChalkakTheme.shapes.pill,
+                        ),
                 )
             }
         }
@@ -412,63 +434,62 @@ private fun DatePickerSheet(range: TopicDateRange, initial: LocalDate, onConfirm
     val days = DatePickerOptions.days(shownYear, shownMonth, range)
     val shownDay = day.coerceIn(days.first(), days.last())
 
-    BackHandler(onBack = onDismiss)
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Color(0x66000000))
-            .pointerInput(Unit) { detectTapGestures { onDismiss() } },
-        contentAlignment = Alignment.BottomCenter,
-    ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .background(colors.inputBackground, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                .pointerInput(Unit) { detectTapGestures { } }
-                .padding(horizontal = 20.dp, vertical = 20.dp)
-                .testTag("display.date-picker-sheet"),
-        ) {
-            Text(copy["display.picker.title"], style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
-            Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Wheel(years, shownYear, "display.picker.year", "display.date-picker-year", Modifier.weight(1f)) { year = it }
-                Wheel(months, shownMonth, "display.picker.month", "display.date-picker-month", Modifier.weight(1f)) { month = it }
-                Wheel(days, shownDay, "display.picker.day", "display.date-picker-day", Modifier.weight(1f)) { day = it }
-            }
-            ChalkakButton(
-                text = copy["common.confirm"],
-                onClick = { onConfirm(DatePickerOptions.pick(shownYear, shownMonth, shownDay, range)) },
-                modifier = Modifier.fillMaxWidth().testTag("display.date-picker-confirm-button"),
-            )
+    ChalkakSheet(onDismiss = onDismiss, tag = "display.date-picker-sheet") {
+        Text(copy["display.picker.title"], style = ChalkakTheme.typography.title3, color = colors.textPrimary)
+        Row(Modifier.fillMaxWidth().padding(vertical = ChalkakTheme.spacing.lg), horizontalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.lg)) {
+            Wheel(years, shownYear, "display.picker.year", "display.date-picker-year", Modifier.weight(1f)) { year = it }
+            Wheel(months, shownMonth, "display.picker.month", "display.date-picker-month", Modifier.weight(1f)) { month = it }
+            Wheel(days, shownDay, "display.picker.day", "display.date-picker-day", Modifier.weight(1f)) { day = it }
         }
+        ChalkakButton(
+            text = copy["common.confirm"],
+            onClick = { onConfirm(DatePickerOptions.pick(shownYear, shownMonth, shownDay, range)) },
+            modifier = Modifier.fillMaxWidth().testTag("display.date-picker-confirm-button"),
+        )
     }
 }
 
-private val RowHeight = 40.dp
+/** Wheel row height and visible rows (screens-b 1.3: 44dp x 5). The selected row is kept in the middle, between two `border` hairlines. */
+private val RowHeight = 44.dp
 
 @Composable
 private fun Wheel(options: List<Int>, selected: Int, copyKey: String, tag: String, modifier: Modifier, onSelect: (Int) -> Unit) {
     val copy = LocalCopy.current
     val colors = ChalkakTheme.colors
-    val state: LazyListState = rememberLazyListState(
-        initialFirstVisibleItemIndex = (options.indexOf(selected) - 2).coerceAtLeast(0),
-    )
-    LazyColumn(modifier.height(RowHeight * 5).testTag(tag), state = state) {
-        items(options) { n ->
-            val isSelected = n == selected
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(RowHeight)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (isSelected) colors.background else Color.Transparent)
-                    .selectable(selected = isSelected, role = Role.RadioButton, onClick = { onSelect(n) }),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    copy.format(copyKey, "n" to n),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (isSelected) colors.textPrimary else colors.textInactive,
-                )
+    val selectedIndex = options.indexOf(selected).coerceAtLeast(0)
+    val state: LazyListState = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex)
+    LaunchedEffect(selectedIndex, options.size) { state.animateScrollToItem(selectedIndex) }
+    Box(modifier.height(RowHeight * 5)) {
+        Column(Modifier.align(Alignment.Center)) {
+            HorizontalDivider(thickness = 1.dp, color = colors.border)
+            Spacer(Modifier.height(RowHeight - 2.dp))
+            HorizontalDivider(thickness = 1.dp, color = colors.border)
+        }
+        LazyColumn(Modifier.fillMaxSize().testTag(tag), state = state, contentPadding = PaddingValues(vertical = RowHeight * 2)) {
+            itemsIndexed(options) { index, n ->
+                val isSelected = n == selected
+                val distance = kotlin.math.abs(index - selectedIndex)
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(RowHeight)
+                        .selectable(selected = isSelected, role = Role.RadioButton, onClick = { onSelect(n) }),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        copy.format(copyKey, "n" to n),
+                        style = when (distance) {
+                            0 -> ChalkakTheme.typography.title3
+                            1 -> ChalkakTheme.typography.body
+                            else -> ChalkakTheme.typography.callout
+                        },
+                        color = when (distance) {
+                            0 -> colors.textPrimary
+                            1 -> colors.textMuted
+                            else -> colors.textPrimary.copy(alpha = 0.22f)
+                        },
+                    )
+                }
             }
         }
     }

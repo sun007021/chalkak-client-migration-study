@@ -85,7 +85,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text(Copy.fdbkFieldPlaceholder), findsOneWidget);
-    expect(_text(FeedbackTestIds.counter, '0/1000'), findsOneWidget);
+    expect(_text(FeedbackTestIds.counter, '0 / 1000'), findsOneWidget);
     expect(_text(FeedbackTestIds.submitButton, Copy.fdbkSend), findsOneWidget);
     expect(byId(FeedbackTestIds.validationMessage), findsNothing);
     expect(byId(FeedbackTestIds.errorMessage), findsNothing);
@@ -106,11 +106,11 @@ void main() {
     final r = FeedbackRig();
     await _pump(tester, r);
     await _type(tester, '  ab  ');
-    expect(_text(FeedbackTestIds.counter, '2/1000'), findsOneWidget);
+    expect(_text(FeedbackTestIds.counter, '2 / 1000'), findsOneWidget);
     await _type(tester, familyEmoji);
-    expect(_text(FeedbackTestIds.counter, '5/1000'), findsOneWidget);
+    expect(_text(FeedbackTestIds.counter, '5 / 1000'), findsOneWidget);
     await _type(tester, repeat('a', 1001));
-    expect(_text(FeedbackTestIds.counter, '1001/1000'), findsOneWidget);
+    expect(_text(FeedbackTestIds.counter, '1001 / 1000'), findsOneWidget);
   });
 
   widgetTest('TC-FDBK-007 1001자를 보내면 검증 문구가 보이고 요청이 없다', (tester) async {
@@ -130,7 +130,7 @@ void main() {
     final r = FeedbackRig(repository: fake);
     await _pump(tester, r);
     await _type(tester, repeat('a', 100000));
-    expect(_text(FeedbackTestIds.counter, '100000/1000'), findsOneWidget);
+    expect(_text(FeedbackTestIds.counter, '100000 / 1000'), findsOneWidget);
     await _submit(tester);
     expect(fake.calls, 0);
     expect(byId(FeedbackTestIds.validationMessage), findsOneWidget);

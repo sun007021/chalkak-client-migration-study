@@ -19,7 +19,7 @@ struct HomeIssueSection: View {
         case .items(let banners):
             VStack(alignment: .leading, spacing: ChalkakSpacing.lg) {
                 HomeSectionHeader(title: HomeCopy.issueTitle) { EmptyView() }
-                LazyVStack(alignment: .leading, spacing: ChalkakSpacing.xl) {
+                LazyVStack(alignment: .leading, spacing: ChalkakSpacing.xxl) {
                     ForEach(Array(banners.enumerated()), id: \.element.id) { index, banner in
                         card(banner)
                             .onAppear { Task { await viewModel.banners.itemAppeared(index: index) } }
@@ -32,18 +32,21 @@ struct HomeIssueSection: View {
     }
 
     private func card(_ banner: Banner) -> some View {
-        VStack(alignment: .leading, spacing: ChalkakSpacing.md) {
+        VStack(alignment: .leading, spacing: ChalkakSpacing.lg) {
             ChalkakRemoteImage(url: banner.thumbnailURL)
                 .frame(maxWidth: .infinity)
                 .aspectRatio(1672.0 / 941.0, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.card))
-            Text(banner.title)
-                .font(ChalkakFont.subheadline)
-                .foregroundStyle(ChalkakColor.textPrimary)
-            if let subtitle = banner.subtitle, !subtitle.isEmpty {
-                Text(subtitle)
-                    .font(ChalkakFont.caption)
-                    .foregroundStyle(ChalkakColor.textSecondary)
+                .background(ChalkakColor.surfaceElevated)
+                .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.large))
+            VStack(alignment: .leading, spacing: ChalkakSpacing.sm) {
+                Text(banner.title)
+                    .font(ChalkakFont.subheadlineBold)
+                    .foregroundStyle(ChalkakColor.textPrimary)
+                if let subtitle = banner.subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(ChalkakFont.caption)
+                        .foregroundStyle(ChalkakColor.textSecondary)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

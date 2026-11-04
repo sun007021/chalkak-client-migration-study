@@ -25,8 +25,8 @@ struct SignaturePad: View {
                 for stroke in drawn {
                     guard let first = stroke.points.first else { continue }
                     if stroke.points.count == 1 {
-                        let rect = CGRect(x: first.x * scaleX - 3, y: first.y * scaleY - 3, width: 6, height: 6)
-                        context.fill(Path(ellipseIn: rect), with: .color(ChalkakColor.textPrimary))
+                        let rect = CGRect(x: first.x * scaleX - 2, y: first.y * scaleY - 2, width: 4, height: 4)
+                        context.fill(Path(ellipseIn: rect), with: .color(ChalkakColor.textOnImage))
                     } else {
                         var path = Path()
                         path.move(to: CGPoint(x: first.x * scaleX, y: first.y * scaleY))
@@ -34,8 +34,8 @@ struct SignaturePad: View {
                             path.addLine(to: CGPoint(x: point.x * scaleX, y: point.y * scaleY))
                         }
                         context.stroke(
-                            path, with: .color(ChalkakColor.textPrimary),
-                            style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round)
+                            path, with: .color(ChalkakColor.textOnImage),
+                            style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
                         )
                     }
                 }
@@ -63,7 +63,27 @@ struct SignaturePad: View {
             )
         }
         .aspectRatio(SignaturePadMetrics.aspectRatio, contentMode: .fit)
-        .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.card))
-        .overlay(RoundedRectangle(cornerRadius: ChalkakRadius.card).stroke(ChalkakColor.border, lineWidth: 1))
+        // 원본 SignaturePad(screens-a.md 6.1): 어두운 캔버스(라운드 12) + 점선 테두리, 바깥 카드 inputBackground/라운드 16
+        .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(ChalkakColor.textOnImage.opacity(0.28), style: StrokeStyle(lineWidth: 1, dash: [6, 6]))
+                .padding(1)
+                .allowsHitTesting(false)
+        }
+        .overlay {
+            if strokes.isEmpty {
+                Text("사인")
+                    .font(ChalkakFont.handwriting)
+                    .scaleEffect(2.4)
+                    .foregroundStyle(ChalkakColor.textOnImage.opacity(0.56))
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.button))
+        .padding(EdgeInsets(top: ChalkakSpacing.lg, leading: ChalkakSpacing.lg, bottom: 14, trailing: ChalkakSpacing.lg))
+        .background(ChalkakColor.inputBackground, in: RoundedRectangle(cornerRadius: ChalkakRadius.large))
+        .overlay(RoundedRectangle(cornerRadius: ChalkakRadius.large).stroke(ChalkakColor.textPrimary.opacity(0.12), lineWidth: 1))
     }
 }

@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/time/kst_date.dart';
 import '../../../core/time/kst_format.dart';
 import '../../../core/ui/app_network_image.dart';
+import '../../../core/ui/components/chalkak_icon.dart';
+import '../../../core/ui/components/chalkak_skeleton.dart';
+import '../../../core/ui/components/chalkak_states.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/home_models.dart';
 import '../domain/home_state.dart';
 import 'home_test_ids.dart';
 
-/// 이번 주 기록: 제목, 사진이 있는 날 수 "N/7", 일~토 7칸, "보러가기".
+/// 이번 주 기록(screens-a §7.6): 제목 headline bold + "N/7" caption semibold, "보러가기" + chevron,
+/// 일~토 7칸(정사각, calendarCell, 라운드 small, 칸 간격 sm). 사진이 없는 칸은 요일 기호를 칸 안에 그린다.
 class HomeWeekSection extends StatelessWidget {
   const HomeWeekSection({
     super.key,
@@ -27,10 +32,17 @@ class HomeWeekSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final weekly = this.weekly;
+    final spacing = context.tokens.spacing;
     return TestId(
       HomeTestIds.weekSection,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+        // 피드백 카드가 없을 때 위 간격 xxl(40).
+        padding: EdgeInsets.fromLTRB(
+          spacing.screenHorizontal,
+          spacing.xxl,
+          spacing.screenHorizontal,
+          0,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -38,21 +50,20 @@ class HomeWeekSection extends StatelessWidget {
               count: weekly is WeeklyReady ? weekly.recordedCount : null,
               onMorePressed: onMorePressed,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: spacing.lg),
             switch (weekly) {
-              WeeklyLoading() => const SizedBox(
-                height: 72,
-                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-              ),
+              WeeklyLoading() => const _WeekSkeleton(),
               WeeklyReady(:final days) => Row(
                 children: [
-                  for (final day in days)
+                  for (var i = 0; i < days.length; i++) ...[
+                    if (i > 0) SizedBox(width: spacing.sm),
                     Expanded(
                       child: _DayCell(
-                        day: day,
-                        onPressed: () => onDayPressed(day.date),
+                        day: days[i],
+                        onPressed: () => onDayPressed(days[i].date),
                       ),
                     ),
+                  ],
                 ],
               ),
               WeeklyError() => _Error(onRetry: onRetry),
@@ -60,6 +71,32 @@ class HomeWeekSection extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _WeekSkeleton extends StatelessWidget {
+  const _WeekSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final spacing = context.tokens.spacing;
+    return Row(
+      children: [
+        for (var i = 0; i < 7; i++) ...[
+          if (i > 0) SizedBox(width: spacing.sm),
+          Expanded(
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: ChalkakSkeleton(
+                borderRadius: BorderRadius.circular(
+                  context.tokens.radius.small,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -72,20 +109,49 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final tokens = context.tokens;
     return Row(
       children: [
-        Text(Copy.homeWeeklyTitle, style: theme.textTheme.titleMedium),
+        Text(
+          Copy.homeWeeklyTitle,
+          style: tokens.text.headline.copyWith(fontWeight: FontWeight.w700),
+        ),
         if (count != null) ...[
-          const SizedBox(width: 8),
-          Text('$count/7', style: theme.textTheme.bodyMedium),
+          SizedBox(width: tokens.spacing.xs),
+          Text(
+            '$count/7',
+            style: tokens.text.caption.copyWith(
+              color: tokens.colors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
         const Spacer(),
         TestId.button(
           HomeTestIds.weekMoreLink,
-          child: TextButton(
-            onPressed: onMorePressed,
-            child: const Text(Copy.homeWeeklyMore),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onMorePressed,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 44),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    Copy.homeWeeklyMore,
+                    style: tokens.text.caption.copyWith(
+                      color: tokens.colors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  ChalkakIcon(
+                    ChalkakIcon.chevronRight,
+                    size: 12,
+                    color: tokens.colors.textPrimary,
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ],
@@ -101,51 +167,62 @@ class _DayCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final tokens = context.tokens;
     final entry = day.entry;
     final date = day.date;
     return TestId(
       HomeTestIds.weekDay(date.toApiString()),
-      child: InkWell(
-        // 빈 칸은 눌러도 아무 일도 없다(REQ-HOME-023).
+      child: GestureDetector(
+        // 빈 칸은 눌러도 아무 일도 없다(REQ-HOME-023). 눌림 효과는 두지 않는다(UnhighlightedButtonStyle).
+        behavior: HitTestBehavior.opaque,
         onTap: entry == null ? null : onPressed,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-          child: Column(
-            children: [
-              Text(
-                KstFormat.weekdayHeaders[date.weekdayIndex],
-                style: theme.textTheme.labelSmall,
-              ),
-              const SizedBox(height: 4),
-              AspectRatio(
-                aspectRatio: 3 / 4,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: entry == null
-                      ? ColoredBox(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                        )
-                      : TestId(
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(tokens.radius.small),
+            child: ColoredBox(
+              color: tokens.colors.calendarCell,
+              child: entry == null
+                  ? Center(
+                      child: Text(
+                        KstFormat.weekdayHeaders[date.weekdayIndex],
+                        style: tokens.text.caption.copyWith(
+                          color: tokens.colors.textSecondary,
+                        ),
+                      ),
+                    )
+                  : Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        TestId(
                           HomeTestIds.weekPhoto(date.toApiString()),
                           child: AppNetworkImage(url: entry.thumbnailImageUrl),
                         ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text('${date.day}', style: theme.textTheme.labelSmall),
-              // 라벨이 없는 칸과 높이를 맞추려고 자리를 항상 둔다.
-              SizedBox(
-                height: 16,
-                child: entry?.status == CalendarStatus.pending
-                    ? const Text(
-                        Copy.homeWeeklyPending,
-                        style: TextStyle(fontSize: 10),
-                      )
-                    : null,
-              ),
-            ],
+                        if (entry.status == CalendarStatus.pending)
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            child: ColoredBox(
+                              color: tokens.colors.scrim,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 1,
+                                ),
+                                child: Text(
+                                  Copy.homeWeeklyPending,
+                                  textAlign: TextAlign.center,
+                                  style: tokens.text.caption.copyWith(
+                                    color: tokens.colors.textOnImage,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
           ),
         ),
       ),
@@ -165,14 +242,21 @@ class _Error extends StatelessWidget {
         const Expanded(
           child: TestId(
             HomeTestIds.weekError,
-            child: Text(Copy.homeWeeklyError),
+            child: ChalkakStatusText(Copy.homeWeeklyError),
           ),
         ),
         TestId.button(
           HomeTestIds.weekRetryButton,
-          child: TextButton(
-            onPressed: onRetry,
-            child: const Text(Copy.commonRetry),
+          child: Semantics(
+            button: true,
+            label: Copy.commonRetry,
+            excludeSemantics: true,
+            onTap: onRetry,
+            child: ChalkakRetryCircleButton(
+              onPressed: onRetry,
+              size: 32,
+              iconSize: 15,
+            ),
           ),
         ),
       ],

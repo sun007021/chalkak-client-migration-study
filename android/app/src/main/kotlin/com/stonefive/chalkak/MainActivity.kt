@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) forwardPushTap(intent)
         val deps = container.newRootDependencies(onExitApp = ::finish)
         setContent {
-            ChalkakTheme {
+            ChalkakTheme(shimmer = true) {
                 ChalkakRoot(copy = container.copy, deps = deps)
             }
         }

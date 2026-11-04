@@ -323,7 +323,11 @@ describe('DisplayScreen 메이슨리 (D-13 플랫폼 관례)', () => {
       });
     }
     for (const tile of screen.getAllByTestId(/^display\.item-.*-photo$/)) {
-      const aspect = StyleSheet.flatten(tile.props.style).aspectRatio as number;
+      // 비율은 사진 카드(바깥 상자)에 걸린다: 이미지 위쪽 조상 중 aspectRatio가 있는 첫 요소.
+      let node = tile.parent;
+      while (node && StyleSheet.flatten(node.props.style)?.aspectRatio === undefined)
+        node = node.parent;
+      const aspect = StyleSheet.flatten(node?.props.style).aspectRatio as number;
       const id = (tile.props.testID as string).replace(/^display\.item-|-photo$/g, '');
       expect(aspect).toBeCloseTo(ratios.get(id) as number, 5);
     }

@@ -10,6 +10,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import com.stonefive.chalkak.testing.MainRig
 import com.stonefive.chalkak.testing.RecordingUploadGate
 import com.stonefive.chalkak.testing.awaitTag
@@ -76,6 +78,13 @@ class MainHostTest {
 
     private fun scrollTo(tag: String) {
         node("home.scroll").performScrollToNode(hasTestTag(tag))
+        rule.waitForIdle()
+    }
+
+    /** The 82dp ranking cards sit below their header: after the jump to the row, drag the list up so the whole card is on screen. */
+    private fun scrollToRankingItem(tag: String) {
+        scrollTo(tag)
+        node("home.scroll").performTouchInput { swipeUp(startY = bottom * 0.8f, endY = bottom * 0.4f) }
         rule.waitForIdle()
     }
 
@@ -293,7 +302,7 @@ class MainHostTest {
     @Test
     fun `TC-NAV-018 게스트가 랭킹 사진을 누르면 피드 안내 토스트이고 이동도 상세 요청도 없다`() {
         launch(AccessMode.Guest)
-        scrollTo("home.ranking-item-${postId("261")}")
+        scrollToRankingItem("home.ranking-item-${postId("261")}")
         tap("home.ranking-item-${postId("261")}")
         assertToast(copy["nav.guest.feed"])
         node("feed.root").assertDoesNotExist()
@@ -334,7 +343,7 @@ class MainHostTest {
     @Test
     fun `TC-NAV-012 랭킹 사진으로 게시물 상세를 열면 하단바가 사라지고 뒤로 가면 다시 보인다`() {
         launch()
-        scrollTo("home.ranking-item-${postId("261")}")
+        scrollToRankingItem("home.ranking-item-${postId("261")}")
         tap("home.ranking-item-${postId("261")}")
         rule.awaitTag("feed.root")
         node("bottom-bar.root").assertDoesNotExist()
@@ -492,7 +501,7 @@ class MainHostTest {
     @Test
     fun `홈 랭킹 사진을 누르면 홈 항목을 시드로 게시물 상세가 열린다`() {
         launch()
-        scrollTo("home.ranking-item-${postId("261")}")
+        scrollToRankingItem("home.ranking-item-${postId("261")}")
         tap("home.ranking-item-${postId("261")}")
         rule.awaitTag("feed.root")
         val entry = rig.feedEntries.single()

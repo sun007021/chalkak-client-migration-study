@@ -1,4 +1,5 @@
 import SwiftUI
+import ImageIO
 import ChalkakCore
 import ChalkakData
 import ChalkakFeatures
@@ -31,6 +32,9 @@ private struct DisplayScreen: View {
     @State private var isActive = false
     @State private var runTask: Task<Void, Never>?
     @State private var showsDatePicker = false
+    /// 불러오며 측정한 사진별 세로/가로 비율. 측정 전에는 기본 비율(4/3)로 배치한다.
+    @State private var ratioByID: [UUID: CGFloat] = [:]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// 스크롤 위치. 탭을 오가 뷰가 다시 만들어져도 ViewModel이 쥔 마지막 위치에서 시작한다(REQ-DISP-030).
     @State private var scrollPosition: ScrollPosition
 
@@ -80,8 +84,6 @@ private struct DisplayScreen: View {
         }
         .sheet(isPresented: $showsDatePicker) {
             DisplayDatePickerSheet(viewModel: viewModel, isPresented: $showsDatePicker)
-                .presentationDetents([.height(340)])
-                .presentationDragIndicator(.visible)
         }
     }
 
@@ -106,46 +108,43 @@ private struct DisplayScreen: View {
 
     // MARK: 날짜 이동
 
+    /// 날짜 헤더(screens-b.md 2.1): 높이 52, 좌우 25, ‹ 날짜 › 왼쪽 정렬, 셰브런 16 medium 44×44.
     private var dateNavigation: some View {
         HStack(spacing: 0) {
             arrowButton(
                 systemName: "chevron.left", label: DisplayCopy.navPrevious,
                 identifier: "display.prev-date-button", enabled: viewModel.canGoPrevious
             ) { Task { await viewModel.goToPreviousDay() } }
-            Spacer(minLength: 0)
             Button { showsDatePicker = true } label: {
-                HStack(spacing: ChalkakSpacing.xs) {
-                    Text(KST.monthDayLabel(viewModel.pendingDate ?? viewModel.selectedDate))
-                        .font(ChalkakFont.headlineBold)
-                        .foregroundStyle(ChalkakColor.textPrimary)
-                        .accessibilityIdentifier("display.date-label")
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(ChalkakColor.iconPrimary)
-                }
-                .frame(minHeight: 44)
-                .padding(.horizontal, ChalkakSpacing.md)
-                .contentShape(Rectangle())
+                Text(KST.monthDayLabel(viewModel.pendingDate ?? viewModel.selectedDate))
+                    .font(ChalkakFont.headline)
+                    .foregroundStyle(ChalkakColor.textPrimary)
+                    .lineLimit(1)
+                    .frame(minHeight: 44)
+                    .padding(.horizontal, ChalkakSpacing.xs)
+                    .contentShape(Rectangle())
+                    .accessibilityIdentifier("display.date-label")
             }
             .buttonStyle(.plain)
             .disabled(!viewModel.isNavigationEnabled)
             .accessibilityLabel(DisplayCopy.pickerTitle)
             .accessibilityIdentifier("display.date-picker-button")
-            Spacer(minLength: 0)
             arrowButton(
                 systemName: "chevron.right", label: DisplayCopy.navNext,
                 identifier: "display.next-date-button", enabled: viewModel.canGoNext
             ) { Task { await viewModel.goToNextDay() } }
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, ChalkakSpacing.sm)
-        .frame(height: 55)
+        .padding(.horizontal, ChalkakSpacing.screenHorizontal)
+        .padding(.leading, -13)
+        .frame(height: 52)
     }
 
     private func arrowButton(systemName: String, label: String, identifier: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(enabled ? ChalkakColor.iconPrimary : ChalkakColor.iconPrimary.opacity(0.25))
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(enabled ? ChalkakColor.iconSecondary : ChalkakColor.textInactive)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
@@ -162,38 +161,46 @@ private struct DisplayScreen: View {
         switch viewModel.state {
         case .loading:
             ProgressView()
+                .tint(ChalkakColor.actionPrimary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityIdentifier("display.loading")
         case .empty:
             ScrollView {
-                VStack(spacing: ChalkakSpacing.xl) {
+                VStack(spacing: 0) {
                     header
-                    Text(FeedCopy.displayEmpty)
-                        .font(ChalkakFont.subheadline)
-                        .foregroundStyle(ChalkakColor.textSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 200)
-                        .accessibilityElement(children: .contain)
-                        .accessibilityIdentifier("display.empty-state")
+                    VStack(spacing: ChalkakSpacing.sm) {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 34))
+                            .foregroundStyle(ChalkakColor.iconSecondary)
+                            .accessibilityHidden(true)
+                        Text(FeedCopy.displayEmpty)
+                            .font(ChalkakFont.body)
+                            .foregroundStyle(ChalkakColor.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 96)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("display.empty-state")
                 }
-                .padding(.horizontal, ChalkakSpacing.screenHorizontal)
             }
         case .failed(let notice):
-            VStack(spacing: ChalkakSpacing.md) {
+            VStack(spacing: ChalkakSpacing.xl) {
                 Text(notice.message)
-                    .font(ChalkakFont.subheadline)
+                    .font(ChalkakFont.body)
                     .foregroundStyle(ChalkakColor.textSecondary)
                     .multilineTextAlignment(.center)
                 Button { Task { await viewModel.retry() } } label: {
-                    Text(DisplayCopy.retry)
-                        .font(ChalkakFont.footnote)
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(ChalkakColor.onActionPrimary)
-                        .padding(.horizontal, ChalkakSpacing.lg)
-                        .frame(minHeight: 36)
-                        .background(ChalkakColor.actionPrimary, in: Capsule())
+                        .frame(width: 48, height: 48)
+                        .background(ChalkakColor.actionPrimary, in: Circle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(DisplayCopy.retry)
                 .accessibilityIdentifier("display.retry-button")
             }
+            .padding(.horizontal, ChalkakSpacing.screenHorizontal)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("display.error-state")
@@ -202,35 +209,52 @@ private struct DisplayScreen: View {
         }
     }
 
+    /// 주제 헤더: 위 15 / 아래 24, title2 + 설명(subheadline/textInactive, 간격 12), 바닥 0.5 구분선은 화면 끝까지.
     private var header: some View {
-        VStack(alignment: .leading, spacing: ChalkakSpacing.xs) {
+        VStack(alignment: .leading, spacing: 12) {
             Text(viewModel.topic?.title ?? "")
-                .font(ChalkakFont.display)
+                .font(ChalkakFont.title2)
                 .foregroundStyle(ChalkakColor.textPrimary)
                 .accessibilityIdentifier("display.topic-title")
             Text(viewModel.headerDescription)
                 .font(ChalkakFont.subheadline)
-                .foregroundStyle(ChalkakColor.textSecondary)
+                .foregroundStyle(ChalkakColor.textInactive)
                 .accessibilityIdentifier("display.description")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, ChalkakSpacing.screenHorizontal)
+        .padding(.top, 15)
+        .padding(.bottom, 24)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(ChalkakColor.border).frame(height: 0.5)
+        }
     }
 
     private var loadedContent: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: ChalkakSpacing.lg) {
+            LazyVStack(alignment: .leading, spacing: 0) {
                 header
-                if !viewModel.availableSorts.isEmpty { sortTabs }
-                if !viewModel.featured.isEmpty { featuredPager }
+                if !viewModel.featured.isEmpty {
+                    featuredPager
+                        .padding(.top, 15)
+                        .padding(.bottom, ChalkakSpacing.sm)
+                }
+                if !viewModel.availableSorts.isEmpty {
+                    sortTabs
+                        .padding(.horizontal, ChalkakSpacing.screenHorizontal)
+                }
                 grid
+                    .padding(.horizontal, ChalkakSpacing.screenHorizontal)
+                    .padding(.top, viewModel.featured.isEmpty ? 11 : 4)
                 if viewModel.isPaging {
                     ProgressView()
+                        .tint(ChalkakColor.actionPrimary)
                         .frame(maxWidth: .infinity, minHeight: 44)
+                        .padding(.top, ChalkakSpacing.md)
                         .accessibilityIdentifier("display.load-more-indicator")
                 }
             }
-            .padding(.horizontal, ChalkakSpacing.screenHorizontal)
-            .padding(.bottom, ChalkakSpacing.xl)
+            .padding(.bottom, ChalkakSpacing.xxl)
         }
         .scrollPosition($scrollPosition)
         .onScrollGeometryChange(for: Double.self) { Double($0.contentOffset.y) } action: { _, offset in
@@ -250,81 +274,114 @@ private struct DisplayScreen: View {
         .accessibilityIdentifier("display.scroll")
         // 날짜·정렬 변경, 탭 재선택에서만 맨 위로 간다. 같은 날짜·정렬의 재검증은 위치를 건드리지 않는다.
         .onChange(of: viewModel.scrollToTopToken) { _, _ in
-            withAnimation { scrollPosition.scrollTo(edge: .top) }
+            withAnimation(.snappy) { scrollPosition.scrollTo(edge: .top) }
         }
     }
 
-    // MARK: 정렬 탭
+    // MARK: 정렬 선택기
 
     private var sortTabs: some View {
-        HStack(spacing: ChalkakSpacing.sm) {
-            ForEach(viewModel.availableSorts, id: \.self) { sort in
-                let isSelected = sort == viewModel.preferredSort
-                Button { Task { await viewModel.selectSort(sort) } } label: {
-                    Text(DisplayCopy.sortLabel(sort))
-                        .font(ChalkakFont.subheadline)
-                        .foregroundStyle(isSelected ? ChalkakColor.onActionPrimary : ChalkakColor.textPrimary)
-                        .padding(.horizontal, ChalkakSpacing.lg)
-                        .frame(minHeight: 36)
-                        .background(Capsule().fill(isSelected ? ChalkakColor.actionPrimary : ChalkakColor.calendarCell))
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-                .accessibilityIdentifier("display.sort-\(sort.rawValue)-tab")
-            }
+        HStack(spacing: 0) {
+            ChalkakSortSelector(
+                options: viewModel.availableSorts,
+                selectedOption: viewModel.preferredSort,
+                label: { DisplayCopy.sortLabel($0) },
+                onSelect: { sort in Task { await viewModel.selectSort(sort) } },
+                identifier: { "display.sort-\($0.rawValue)-tab" }
+            )
             Spacer(minLength: 0)
         }
     }
 
     // MARK: 아카이브 추천 카드
 
+    /// 대표 사진 캐러셀(screens-b.md 2.3): 카드 3:4, 아래 페이지 표시기(선택 24×7 actionPrimary, 비선택 7×7 textMuted 45%).
     private var featuredPager: some View {
-        TabView(
-            selection: Binding(
-                get: { viewModel.featuredPage },
-                set: { viewModel.setFeaturedPage($0) }
-            )
-        ) {
-            ForEach(Array(viewModel.featured.enumerated()), id: \.element.id) { index, item in
-                PostCell(
-                    item: item, aspect: 5.0 / 6.0,
-                    itemIdentifier: "display.featured-item-\(Self.idString(item.id))",
-                    likeIdentifier: "display.featured-like-button-\(Self.idString(item.id))",
-                    countIdentifier: "display.featured-like-count-\(Self.idString(item.id))",
-                    onOpen: { open(item.id) },
-                    onLike: { viewModel.likeTapped(item.id) }
+        VStack(spacing: ChalkakSpacing.lg) {
+            TabView(
+                selection: Binding(
+                    get: { viewModel.featuredPage },
+                    set: { viewModel.setFeaturedPage($0) }
                 )
-                .padding(.bottom, 28)
-                .tag(index)
+            ) {
+                ForEach(Array(viewModel.featured.enumerated()), id: \.element.id) { index, item in
+                    PostCell(
+                        item: item, aspect: 3.0 / 4.0,
+                        // 같은 게시물이 그리드에도 있으면 그리드 카드가 출발 뷰다(출발 id 중복 방지).
+                        zoomSourceID: viewModel.items.contains(where: { $0.id == item.id }) ? nil : item.id,
+                        itemIdentifier: "display.featured-item-\(Self.idString(item.id))",
+                        likeIdentifier: "display.featured-like-button-\(Self.idString(item.id))",
+                        countIdentifier: "display.featured-like-count-\(Self.idString(item.id))",
+                        onOpen: { open(item.id) },
+                        onLike: { viewModel.likeTapped(item.id) }
+                    )
+                    .padding(.horizontal, 32)
+                    .tag(index)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(height: featuredHeight)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("display.featured-pager")
+            if viewModel.featured.count > 1 {
+                HStack(spacing: ChalkakSpacing.sm) {
+                    ForEach(viewModel.featured.indices, id: \.self) { index in
+                        let isSelected = index == viewModel.featuredPage
+                        Capsule()
+                            .fill(isSelected ? ChalkakColor.actionPrimary : ChalkakColor.textMuted.opacity(0.45))
+                            .frame(width: isSelected ? 24 : 7, height: 7)
+                    }
+                }
+                .accessibilityHidden(true)
             }
         }
-        .tabViewStyle(.page(indexDisplayMode: .always))
-        .frame(height: 440)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("display.featured-pager")
+    }
+
+    /// 화면 폭 − 카드 좌우 32씩에 3:4를 곱한 높이.
+    private var featuredHeight: CGFloat {
+        let width = UIScreen.main.bounds.width - 64
+        return width * 4.0 / 3.0
     }
 
     // MARK: 그리드
 
+    /// 2열 마손리 그리드(screens-b.md 2.2). 항상 더 짧은 열에 다음 사진을 넣는 그리디 패킹이라
+    /// i번째 사진의 열은 앞 사진들의 비율에만 의존한다. 위에서 아래로 불러오는 동안 재배치가 눈에 띄지 않는다.
     private var grid: some View {
-        LazyVGrid(
-            columns: [GridItem(.flexible(), spacing: ChalkakSpacing.md), GridItem(.flexible(), spacing: ChalkakSpacing.md)],
-            spacing: ChalkakSpacing.md
-        ) {
-            ForEach(viewModel.items) { item in
+        let columns = MasonryLayout.distribute(viewModel.items, ratios: ratioByID)
+        return HStack(alignment: .top, spacing: ChalkakSpacing.md) {
+            masonryColumn(columns.left)
+            masonryColumn(columns.right)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("display.grid")
+    }
+
+    private func masonryColumn(_ items: [PostListItem]) -> some View {
+        LazyVStack(spacing: ChalkakSpacing.md) {
+            ForEach(items) { item in
                 PostCell(
-                    item: item, aspect: 5.0 / 6.0,
+                    item: item, aspect: 1 / (ratioByID[item.id] ?? MasonryLayout.defaultRatio),
+                    signatureURL: item.signatureThumbnailImageURL ?? item.signatureOriginalImageURL,
+                    zoomSourceID: item.id,
                     itemIdentifier: "display.item-\(Self.idString(item.id))",
                     likeIdentifier: "display.like-button-\(Self.idString(item.id))",
                     countIdentifier: "display.like-count-\(Self.idString(item.id))",
                     onOpen: { open(item.id) },
                     onLike: { viewModel.likeTapped(item.id) }
                 )
+                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                .task(id: item.id) {
+                    guard ratioByID[item.id] == nil,
+                          let measured = await ImageRatioLoader.ratio(for: item.thumbnailImageURL ?? item.originalImageURL)
+                    else { return }
+                    ratioByID[item.id] = measured
+                }
                 .onAppear { Task { await viewModel.itemAppeared(item.id) } }
             }
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("display.grid")
+        .frame(maxWidth: .infinity, alignment: .top)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: items.map(\.id))
     }
 
     private func open(_ postId: UUID) {
@@ -341,6 +398,9 @@ private struct DisplayScreen: View {
 private struct PostCell: View {
     let item: PostListItem
     let aspect: CGFloat
+    var signatureURL: URL? = nil
+    /// 줌 전환 출발 뷰로 등록할 게시물 id. nil이면 등록하지 않는다.
+    var zoomSourceID: UUID? = nil
     let itemIdentifier: String
     let likeIdentifier: String
     let countIdentifier: String
@@ -352,7 +412,11 @@ private struct PostCell: View {
             .aspectRatio(aspect, contentMode: .fit)
             .overlay {
                 GeometryReader { geo in
-                    ChalkakRemoteImage(url: item.thumbnailImageURL ?? item.originalImageURL)
+                    ChalkakSignedImage(
+                        imageURL: item.thumbnailImageURL ?? item.originalImageURL,
+                        signatureURL: signatureURL,
+                        signatureSize: CGSize(width: 40, height: 30)
+                    )
                         .frame(width: geo.size.width, height: geo.size.height)
                         .clipped()
                         .contentShape(Rectangle())
@@ -361,14 +425,15 @@ private struct PostCell: View {
                         .accessibilityAddTraits(.isButton)
                 }
             }
-            .overlay(alignment: .bottomTrailing) {
+            .overlay(alignment: .bottomLeading) {
                 PostLikeButton(
                     like: item.like, buttonIdentifier: likeIdentifier, countIdentifier: countIdentifier,
                     onImage: true, action: onLike
                 )
-                .padding(ChalkakSpacing.sm)
             }
-            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.card))
+            .background(Color.black)
+            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.photoCard))
+            .feedZoomSource(id: zoomSourceID)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(itemIdentifier)
     }
@@ -393,27 +458,13 @@ private struct DisplayDatePickerSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: ChalkakSpacing.md) {
-            Text(DisplayCopy.pickerTitle)
-                .font(ChalkakFont.headline)
-                .foregroundStyle(ChalkakColor.textPrimary)
-                .padding(.top, ChalkakSpacing.lg)
-            HStack(spacing: 0) {
-                wheel(selection: $year, values: viewModel.pickerYears, label: DisplayCopy.pickerYear, identifier: "display.date-picker-year")
-                wheel(selection: $month, values: viewModel.pickerMonths(year: year), label: DisplayCopy.pickerMonth, identifier: "display.date-picker-month")
-                wheel(selection: $day, values: viewModel.pickerDays(year: year, month: month), label: DisplayCopy.pickerDay, identifier: "display.date-picker-day")
-            }
-            .frame(height: 150)
-            ChalkakDialogButton(title: DisplayCopy.pickerConfirm, identifier: "display.date-picker-confirm-button") {
-                let target = viewModel.resolvedPickerDate(year: year, month: month, day: day)
-                isPresented = false
-                Task { await viewModel.select(date: target) }
-            }
-            .padding(.horizontal, ChalkakSpacing.screenHorizontal)
-            .padding(.bottom, ChalkakSpacing.lg)
+        ChalkakPickerSheet(title: DisplayCopy.pickerTitle, confirmTitle: DisplayCopy.pickerConfirm, onConfirm: confirm) {
+            ChalkakWheelPicker(columns: [
+                column(accessibilityLabel: "연도", values: viewModel.pickerYears, selection: $year, valueLabel: DisplayCopy.pickerYear),
+                column(accessibilityLabel: "월", values: viewModel.pickerMonths(year: year), selection: $month, valueLabel: DisplayCopy.pickerMonth),
+                column(accessibilityLabel: "일", values: viewModel.pickerDays(year: year, month: month), selection: $day, valueLabel: DisplayCopy.pickerDay),
+            ])
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(ChalkakColor.background.ignoresSafeArea())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("display.date-picker-sheet")
         // 휠 사이 값이 서로 어긋나면(없는 날, 범위 밖) 가까운 값으로 맞춘다(REQ-DISP-009).
@@ -421,16 +472,23 @@ private struct DisplayDatePickerSheet: View {
         .onChange(of: month) { _, _ in normalize() }
     }
 
-    private func wheel(selection: Binding<Int>, values: [Int], label: @escaping (Int) -> String, identifier: String) -> some View {
-        Picker("", selection: selection) {
-            ForEach(values, id: \.self) { value in
-                Text(label(value)).tag(value)
+    private func confirm() {
+        let target = viewModel.resolvedPickerDate(year: year, month: month, day: day)
+        isPresented = false
+        Task { await viewModel.select(date: target) }
+    }
+
+    private func column(
+        accessibilityLabel: String, values: [Int], selection: Binding<Int>, valueLabel: (Int) -> String
+    ) -> ChalkakWheelColumn {
+        ChalkakWheelColumn(
+            accessibilityLabel: accessibilityLabel,
+            titles: values.map(valueLabel),
+            selectedIndex: values.firstIndex(of: selection.wrappedValue) ?? 0,
+            onSelect: { index in
+                if values.indices.contains(index) { selection.wrappedValue = values[index] }
             }
-        }
-        .pickerStyle(.wheel)
-        .frame(maxWidth: .infinity)
-        .clipped()
-        .accessibilityIdentifier(identifier)
+        )
     }
 
     private func normalize() {
@@ -438,5 +496,48 @@ private struct DisplayDatePickerSheet: View {
         if resolved.month != month { month = resolved.month }
         if resolved.day != day { day = resolved.day }
         if resolved.year != year { year = resolved.year }
+    }
+}
+
+// MARK: 마손리 배치
+
+/// 2열 그리디 패킹. 열 높이 추정 = (세로/가로 비율, 모르면 4/3) + 간격 보정 0.06(원본 DisplayPhotoGrid).
+enum MasonryLayout {
+    static let defaultRatio: CGFloat = 4.0 / 3.0
+    static let spacingRatio: CGFloat = 0.06
+
+    static func distribute(_ items: [PostListItem], ratios: [UUID: CGFloat]) -> (left: [PostListItem], right: [PostListItem]) {
+        var left: [PostListItem] = []
+        var right: [PostListItem] = []
+        var leftHeight: CGFloat = 0
+        var rightHeight: CGFloat = 0
+        for item in items {
+            let unit = (ratios[item.id] ?? defaultRatio) + spacingRatio
+            if leftHeight <= rightHeight {
+                left.append(item)
+                leftHeight += unit
+            } else {
+                right.append(item)
+                rightHeight += unit
+            }
+        }
+        return (left, right)
+    }
+}
+
+/// 이미지의 EXIF 방향을 반영한 세로/가로 비율(height / width)을 한 번 측정한다(원본 ImageRatioLoader).
+/// 화면에 그리는 요청과 같은 URLSession.shared 캐시를 쓰고, 픽셀 디코딩 없이 헤더 크기만 읽는다.
+enum ImageRatioLoader {
+    static func ratio(for url: URL) async -> CGFloat? {
+        guard let (data, _) = try? await URLSession.shared.data(from: url),
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = (props[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue,
+              let height = (props[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue,
+              width > 0, height > 0
+        else { return nil }
+        let orientation = (props[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        let swapped = (5...8).contains(orientation)
+        return CGFloat(swapped ? width / height : height / width)
     }
 }

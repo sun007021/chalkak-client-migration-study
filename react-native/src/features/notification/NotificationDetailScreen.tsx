@@ -1,19 +1,15 @@
 import { useEffect } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
-import { colors, spacing } from '../../shared/ui/theme';
+import { colors, spacing, typography } from '../../shared/design/tokens';
 import type { NotificationDetailViewModel } from './NotificationDetailViewModel';
+import { BackButton } from '../../shared/ui/BackButton';
+import { ChalkakOutlinedButton } from '../../shared/ui/Button';
+import { RemoteImage } from '../../shared/ui/RemoteImage';
+import { Text } from '../../shared/ui/Text';
 
 /** 알림 상세 화면. testID는 docs/testing/testids.md의 알림 상세 표를 따른다. 마운트 = onShown, 언마운트 = onHidden. */
 export function NotificationDetailScreen({
@@ -33,27 +29,30 @@ export function NotificationDetailScreen({
   return (
     <View testID="notification-detail.root" style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.bar}>
-        <Pressable
-          testID="notification-detail.back-button"
-          accessibilityRole="button"
-          accessibilityLabel={t('common.close')}
-          onPress={() => viewModel.onBackPress()}
-          hitSlop={8}
-          style={styles.back}
+        <View style={styles.barBack}>
+          <BackButton
+            testID="notification-detail.back-button"
+            accessibilityLabel={t('common.close')}
+            onPress={() => viewModel.onBackPress()}
+          />
+        </View>
+        <Text
+          testID="notification-detail.screen-title"
+          style={styles.screenTitle}
+          accessibilityRole="header"
         >
-          <Text style={styles.backText}>{'<'}</Text>
-        </Pressable>
-        <Text testID="notification-detail.screen-title" style={styles.screenTitle}>
           {t('noti.detail.title')}
         </Text>
       </View>
 
       {state.status === 'loading' ? (
-        <ActivityIndicator testID="notification-detail.loading" style={styles.center} />
+        <View style={styles.center}>
+          <ActivityIndicator testID="notification-detail.loading" color={colors.actionPrimary} />
+        </View>
       ) : null}
       {state.status === 'not-found' ? (
         <View style={styles.center}>
-          <Text testID="notification-detail.not-found-state" style={styles.message}>
+          <Text testID="notification-detail.not-found-state" style={styles.notFound}>
             {t('noti.gone')}
           </Text>
         </View>
@@ -61,52 +60,57 @@ export function NotificationDetailScreen({
       {state.status === 'error' ? (
         <View testID="notification-detail.error-state" style={styles.center}>
           <Text style={styles.message}>{state.errorMessage ?? t('noti.detail.error')}</Text>
-          <Pressable
+          <ChalkakOutlinedButton
             testID="notification-detail.retry-button"
-            accessibilityRole="button"
+            label={t('noti.inbox.retry')}
+            fillsWidth={false}
             onPress={() => void viewModel.retry()}
             style={styles.retry}
-          >
-            <Text style={styles.retryText}>{t('noti.inbox.retry')}</Text>
-          </Pressable>
+          />
         </View>
       ) : null}
 
       {detail ? (
         <ScrollView
-          contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing.xl }}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.screenHorizontal,
+            paddingTop: spacing.lg,
+            paddingBottom: insets.bottom + spacing.xl,
+            gap: spacing.xl,
+          }}
         >
-          <Text testID="notification-detail.title" style={styles.title}>
-            {detail.title}
-          </Text>
-          <Text testID="notification-detail.body" style={styles.body}>
-            {detail.body}
-          </Text>
+          <View>
+            <Text testID="notification-detail.title" style={styles.title}>
+              {detail.title}
+            </Text>
+            <Text testID="notification-detail.body" style={styles.body}>
+              {detail.body}
+            </Text>
+          </View>
           {detail.photoUrl ? (
-            <Image
+            <RemoteImage
               testID="notification-detail.photo"
-              source={{ uri: detail.photoUrl }}
-              style={styles.photo}
+              uri={detail.photoUrl}
               resizeMode="contain"
+              accessibilityLabel="반려된 내 사진"
+              style={styles.photo}
             />
           ) : null}
           {detail.rejectionReason ? (
-            <View testID="notification-detail.rejection-section" style={styles.section}>
+            <View testID="notification-detail.rejection-section">
               <Text style={styles.sectionTitle}>{t('noti.detail.reason')}</Text>
-              <Text testID="notification-detail.rejection-reason" style={styles.body}>
+              <Text testID="notification-detail.rejection-reason" style={styles.reason}>
                 {detail.rejectionReason}
               </Text>
             </View>
           ) : null}
           {detail.showBackToInbox ? (
-            <Pressable
+            <ChalkakOutlinedButton
               testID="notification-detail.back-to-inbox-button"
-              accessibilityRole="button"
+              label={t('noti.detail.to-inbox')}
               onPress={() => viewModel.onBackToInboxPress()}
-              style={styles.retry}
-            >
-              <Text style={styles.retryText}>{t('noti.detail.to-inbox')}</Text>
-            </Pressable>
+            />
           ) : null}
         </ScrollView>
       ) : null}
@@ -114,26 +118,19 @@ export function NotificationDetailScreen({
   );
 }
 
+// 원본 근거: docs/design/screens-c.md §3.2 (제목 headline, 본문 subheadline textSecondary, 사진 1:1 surface, 사유 라벨 caption textInactive).
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  bar: { height: 48, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg },
-  back: { paddingRight: spacing.md },
-  backText: { fontSize: 20, color: colors.textPrimary },
-  screenTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  bar: { height: 72, justifyContent: 'center', paddingHorizontal: 20 },
+  barBack: { position: 'absolute', left: 20 },
+  screenTitle: { ...typography.headline, color: colors.textPrimary, textAlign: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  message: { fontSize: 15, color: colors.textPrimary, textAlign: 'center' },
-  title: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  body: { fontSize: 15, color: colors.textPrimary, marginTop: spacing.md, lineHeight: 22 },
-  photo: { width: '100%', aspectRatio: 1, marginTop: spacing.lg, backgroundColor: colors.surface },
-  section: { marginTop: spacing.xl },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.textSecondary },
-  retry: {
-    marginTop: spacing.xl,
-    alignSelf: 'flex-start',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: 8,
-    backgroundColor: colors.surface,
-  },
-  retryText: { fontSize: 14, color: colors.textPrimary },
+  message: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
+  notFound: { ...typography.subheadline, color: colors.textSecondary, textAlign: 'center' },
+  title: { ...typography.headline, color: colors.textPrimary },
+  body: { ...typography.subheadline, color: colors.textSecondary, marginTop: spacing.sm },
+  photo: { width: '100%', aspectRatio: 1, backgroundColor: colors.surface },
+  sectionTitle: { ...typography.caption, color: colors.textInactive },
+  reason: { ...typography.body, color: colors.textPrimary, marginTop: spacing.sm },
+  retry: { marginTop: spacing.lg },
 });

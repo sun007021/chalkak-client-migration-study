@@ -124,6 +124,8 @@ android {
                 it.inputs.dir(sharedDir.resolve("fixtures")).withPropertyName("sharedFixtures")
                 it.inputs.dir(sharedDir.resolve("copy")).withPropertyName("sharedCopy")
                 it.inputs.file(sharedDir.resolve("constants.json")).withPropertyName("sharedConstants")
+                // ChalkakTokensTest compares the theme with the design tokens.
+                it.inputs.file(sharedDir.resolve("design/tokens.json")).withPropertyName("sharedDesignTokens")
             }
         }
     }

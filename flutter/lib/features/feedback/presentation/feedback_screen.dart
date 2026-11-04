@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_button.dart';
+import '../../../core/ui/components/chalkak_nav_button.dart';
+import '../../../core/ui/components/chalkak_text_field.dart';
 import '../../../core/ui/test_id.dart';
 import 'feedback_test_ids.dart';
-
 import 'feedback_view_model.dart';
 
 /// 피드백 화면(REQ-FDBK-002, 003, 006). testids: `feedback.root`, `feedback.close-button`(누르면 [onClose]),
@@ -57,25 +60,63 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   @override
   Widget build(BuildContext context) {
     final viewModel = widget.viewModel;
+    final tokens = context.tokens;
     return TestId(
       FeedbackTestIds.root,
       child: Scaffold(
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          leading: TestId.button(
-            FeedbackTestIds.closeButton,
-            child: IconButton(
-              icon: const Icon(Icons.close),
-              tooltip: Copy.commonClose,
-              onPressed: widget.onClose,
-            ),
-          ),
-          title: const Text(Copy.fdbkTitle),
-        ),
+        backgroundColor: tokens.colors.background,
         body: SafeArea(
           child: ListenableBuilder(
             listenable: viewModel,
-            builder: (context, _) => _body(context, viewModel.state),
+            builder: (context, _) => Column(
+              children: [
+                // 상단 바(FeedbackTopBar): 닫기 + 가운데 제목 headline, 오른쪽 균형 빈칸.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 10, 12, 8),
+                  child: Row(
+                    children: [
+                      TestId.button(
+                        FeedbackTestIds.closeButton,
+                        child: ChalkakNavButton.close(
+                          onPressed: widget.onClose,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          Copy.fdbkTitle,
+                          textAlign: TextAlign.center,
+                          style: tokens.text.headline.copyWith(
+                            color: tokens.colors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: ChalkakNavButton.size),
+                    ],
+                  ),
+                ),
+                Expanded(child: _body(context, viewModel.state)),
+                // 보내기 버튼은 아래에 고정한다(좌우 screenHorizontal, 위 sm, 아래 lg).
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    tokens.spacing.screenHorizontal,
+                    tokens.spacing.sm,
+                    tokens.spacing.screenHorizontal,
+                    tokens.spacing.lg,
+                  ),
+                  child: TestId.button(
+                    FeedbackTestIds.submitButton,
+                    child: ChalkakButton(
+                      label: viewModel.state.sending
+                          ? Copy.fdbkSending
+                          : Copy.fdbkSend,
+                      onPressed: viewModel.state.canSend
+                          ? () => unawaited(viewModel.send())
+                          : null,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -83,89 +124,95 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   }
 
   Widget _body(BuildContext context, FeedbackState state) {
-    final theme = Theme.of(context);
+    final tokens = context.tokens;
     final overLimit = state.count > AppConstants.feedbackMax;
-    final errorStyle = theme.textTheme.bodySmall?.copyWith(
-      color: theme.colorScheme.error,
+    final errorStyle = tokens.text.footnote.copyWith(
+      color: tokens.colors.error,
     );
-    // 키보드가 올라오면 Scaffold가 본문 높이를 줄이므로 스크롤로 입력창과 버튼을 보인다.
+    // 키보드가 올라오면 Scaffold가 본문 높이를 줄이므로 스크롤로 입력창을 보인다.
     return SingleChildScrollView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.fromLTRB(
+        tokens.spacing.screenHorizontal,
+        tokens.spacing.xl,
+        tokens.spacing.screenHorizontal,
+        tokens.spacing.lg,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           TestId(
             FeedbackTestIds.guideText,
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: Copy.fdbkIntroTitle,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  Copy.fdbkIntroTitle,
+                  style: tokens.text.title2.copyWith(
+                    color: tokens.colors.textPrimary,
                   ),
-                  const TextSpan(text: '\n\n'),
-                  TextSpan(
-                    text: Copy.fdbkIntroBody,
-                    style: theme.textTheme.bodyMedium,
+                ),
+                SizedBox(height: tokens.spacing.md),
+                Text(
+                  Copy.fdbkIntroBody,
+                  style: tokens.text.subheadline.copyWith(
+                    color: tokens.colors.textSecondary,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
+          Text(
+            Copy.fdbkFieldLabel,
+            style: tokens.text.subheadline.copyWith(
+              color: tokens.colors.textPrimary,
+            ),
+          ),
+          SizedBox(height: tokens.spacing.sm),
           TestId(
             FeedbackTestIds.input,
-            child: TextField(
+            child: ChalkakTextField(
               controller: _controller,
               readOnly: state.sending,
-              minLines: 6,
-              maxLines: 10,
+              minLines: 8,
+              maxLines: 14,
+              minHeight: 240,
+              style: tokens.text.subheadline,
+              hintText: Copy.fdbkFieldPlaceholder,
+              semanticLabel: Copy.fdbkFieldLabel,
               keyboardType: TextInputType.multiline,
               textInputAction: TextInputAction.newline,
-              decoration: const InputDecoration(
-                labelText: Copy.fdbkFieldLabel,
-                hintText: Copy.fdbkFieldPlaceholder,
-                floatingLabelBehavior: FloatingLabelBehavior.always,
-                alignLabelWithHint: true,
-                border: OutlineInputBorder(),
-              ),
               onChanged: widget.viewModel.onTextChanged,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TestId(
-              FeedbackTestIds.counter,
-              child: Text(
-                '${state.count}/${AppConstants.feedbackMax}',
-                style: overLimit ? errorStyle : theme.textTheme.bodySmall,
+              counter: TestId(
+                FeedbackTestIds.counter,
+                child: Text(
+                  '${state.count} / ${AppConstants.feedbackMax}',
+                  style: overLimit
+                      ? tokens.text.subheadline.copyWith(
+                          color: tokens.colors.error,
+                        )
+                      : null,
+                ),
               ),
             ),
           ),
           if (state.validationMessage case final message?)
-            TestId(
-              FeedbackTestIds.validationMessage,
-              child: Text(message, style: errorStyle),
+            Padding(
+              padding: EdgeInsets.only(top: tokens.spacing.sm),
+              child: TestId(
+                FeedbackTestIds.validationMessage,
+                child: Text(message, style: errorStyle),
+              ),
             ),
           if (state.errorMessage case final message?)
-            TestId(
-              FeedbackTestIds.errorMessage,
-              child: Text(message, style: errorStyle),
+            Padding(
+              padding: EdgeInsets.only(top: tokens.spacing.sm),
+              child: TestId(
+                FeedbackTestIds.errorMessage,
+                child: Text(message, style: errorStyle),
+              ),
             ),
-          const SizedBox(height: 16),
-          TestId.button(
-            FeedbackTestIds.submitButton,
-            child: FilledButton(
-              onPressed: state.canSend
-                  ? () => unawaited(widget.viewModel.send())
-                  : null,
-              child: Text(state.sending ? Copy.fdbkSending : Copy.fdbkSend),
-            ),
-          ),
         ],
       ),
     );

@@ -7,6 +7,10 @@ import { webOnlyCopy } from '../../copy/webOnly';
 import { useScreenView } from '../../core/analytics/useScreenView';
 import { useViewModel } from '../../core/state/useViewModel';
 import { notificationTimeLabel } from '../../core/time/format';
+import { color, font, radius, space } from '../../design/tokens';
+import { IcNotification, IcRotateRight } from '../../core/ui/icons.generated';
+import { Skeleton } from '../../core/ui/Skeleton';
+import { BackButton, TopBar } from '../../core/ui/TopBar';
 import { EmptyState, ErrorState } from '../../core/ui/StateViews';
 import { useScrollRestore } from '../../core/ui/useScrollRestore';
 import { VisibilitySentinel } from '../../core/ui/VisibilitySentinel';
@@ -45,11 +49,9 @@ export function NotificationsScreen(): ReactNode {
   return <InboxView vm={vm} />;
 }
 
-const barStyle: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '12px 16px' };
-const titleStyle: CSSProperties = { margin: 0, fontSize: 18, flex: 1 };
 const listStyle: CSSProperties = { margin: 0, padding: 0, listStyle: 'none' };
-const rowStyle: CSSProperties = { display: 'flex', gap: 12, alignItems: 'flex-start', width: '100%', padding: '12px 16px', border: 0, background: 'none', font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' };
-const thumbStyle: CSSProperties = { flex: 'none', width: 56, height: 56, borderRadius: 8, objectFit: 'cover', background: '#e5e5e5' };
+const rowStyle: CSSProperties = { display: 'flex', gap: space.md, alignItems: 'flex-start', width: '100%', padding: `${space.lg} var(--space-screen-horizontal)`, border: 0, borderBottom: `1px solid ${color.border}`, background: 'none', font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' };
+const thumbStyle: CSSProperties = { flex: 'none', width: 56, height: 56, borderRadius: radius.small, objectFit: 'cover', background: color.calendarCell };
 const textStyle: CSSProperties = { whiteSpace: 'pre-wrap', overflowWrap: 'break-word' };
 
 function InboxView({ vm }: { vm: NotificationInboxViewModel }): ReactNode {
@@ -67,31 +69,41 @@ function InboxView({ vm }: { vm: NotificationInboxViewModel }): ReactNode {
 
   const canRefresh = (body.status === 'ready' || body.status === 'empty') && !state.refreshing;
   return (
-    <div data-testid="notifications.root">
-      <header style={barStyle}>
-        <button type="button" data-testid="notifications.back-button" aria-label={webOnlyCopy['noti.back']} onClick={close}>
-          <span aria-hidden="true">←</span>
-        </button>
-        <h1 style={titleStyle}>{t('noti.inbox.title')}</h1>
-        <button type="button" aria-label={webOnlyCopy['noti.refresh']} disabled={!canRefresh} onClick={() => void vm.refresh()}>
-          <span aria-hidden="true">↻</span>
-        </button>
-      </header>
+    <div data-testid="notifications.root" className="ck-screen">
+      <TopBar
+        title={t('noti.inbox.title')}
+        left={<BackButton testId="notifications.back-button" onClick={close} />}
+        right={
+          <button type="button" className="ck-icon-btn" aria-label={webOnlyCopy['noti.refresh']} disabled={!canRefresh} style={{ opacity: canRefresh ? 1 : 0.4 }} onClick={() => void vm.refresh()}>
+            <IcRotateRight size={22} />
+          </button>
+        }
+      />
       {state.refreshing ? (
-        <div data-testid="notifications.refresh-indicator" role="status" aria-busy="true" style={{ padding: '4px 16px', fontSize: 12, background: '#f2f2f2' }}>
-          {webOnlyCopy['noti.refresh-indicator']}
+        <div data-testid="notifications.refresh-indicator" role="status" aria-busy="true">
+          <Skeleton style={{ height: 3 }} />
+          <span className="visually-hidden">{webOnlyCopy['noti.refresh-indicator']}</span>
         </div>
       ) : null}
       {body.status === 'loading' ? (
-        <div data-testid="notifications.loading" role="status" aria-busy="true" style={{ padding: 24, textAlign: 'center' }}>
-          {t('noti.inbox.loading')}
+        <div data-testid="notifications.loading" role="status" aria-busy="true" style={{ display: 'flex', flexDirection: 'column' }}>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} style={{ display: 'flex', gap: space.md, padding: `${space.lg} var(--space-screen-horizontal)` }}>
+              <Skeleton style={{ flex: 'none', width: 56, height: 56, borderRadius: radius.small }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: space.sm }}>
+                <Skeleton style={{ height: 16, width: '60%', borderRadius: radius.small }} />
+                <Skeleton style={{ height: 14, width: '90%', borderRadius: radius.small }} />
+              </div>
+            </div>
+          ))}
+          <span className="visually-hidden">{t('noti.inbox.loading')}</span>
         </div>
       ) : null}
       {body.status === 'error' ? <ErrorState screenId="notifications" message={body.network ? t('noti.network') : t('noti.inbox.error')} onRetry={() => void vm.retry()} /> : null}
       {body.status === 'empty' ? (
-        <EmptyState screenId="notifications">
-          <p style={{ margin: 0, padding: '24px 16px 0', fontWeight: 600 }}>{t('noti.inbox.empty.title')}</p>
-          <p style={{ margin: 0, padding: '4px 16px' }}>{t('noti.inbox.empty.body')}</p>
+        <EmptyState screenId="notifications" icon={<IcNotification size={34} />}>
+          <p style={{ margin: 0, ...font('body'), color: color.textSecondary }}>{t('noti.inbox.empty.title')}</p>
+          <p style={{ margin: 0, ...font('subheadline'), color: color.textMuted }}>{t('noti.inbox.empty.body')}</p>
         </EmptyState>
       ) : null}
       {body.status === 'ready' ? <InboxList vm={vm} state={state} items={body.items} hasNext={body.hasNext} observe={container.visibilityObserver} /> : null}
@@ -124,9 +136,10 @@ function InboxList({ vm, state, items, hasNext, observe }: { vm: NotificationInb
         ))}
       </ul>
       {state.paging ? (
-        <p data-testid="notifications.load-more-indicator" role="status" aria-busy="true" style={{ textAlign: 'center' }}>
-          {webOnlyCopy['noti.load-more']}
-        </p>
+        <div data-testid="notifications.load-more-indicator" role="status" aria-busy="true" style={{ padding: space.lg }}>
+          <Skeleton style={{ height: 8, width: 96, margin: '0 auto', borderRadius: radius.pill }} />
+          <span className="visually-hidden">{webOnlyCopy['noti.load-more']}</span>
+        </div>
       ) : null}
     </>
   );
@@ -142,18 +155,18 @@ const InboxRow = memo(function InboxRow({ item, onPress }: { item: NotificationI
         <span data-testid={`notifications.item-thumbnail-${id}`} aria-hidden="true" style={thumbStyle} />
       )}
       <span style={{ flex: 1, minWidth: 0, display: 'block' }}>
-        <strong data-testid={`notifications.item-title-${id}`} style={{ display: 'block', ...textStyle }}>
+        <strong data-testid={`notifications.item-title-${id}`} style={{ display: 'block', ...font('subheadline'), fontWeight: 600, ...textStyle }}>
           {item.title}
         </strong>
-        <span data-testid={`notifications.item-body-${id}`} style={{ display: 'block', ...textStyle }}>
+        <span data-testid={`notifications.item-body-${id}`} style={{ display: 'block', marginTop: 2, color: color.textSecondary, ...font('footnote'), ...textStyle }}>
           {item.body}
         </span>
-        <time data-testid={`notifications.item-time-${id}`} dateTime={new Date(item.createdAt).toISOString()} style={{ display: 'block', fontSize: 12, opacity: 0.7 }}>
+        <time data-testid={`notifications.item-time-${id}`} dateTime={new Date(item.createdAt).toISOString()} style={{ display: 'block', marginTop: space.xs, color: color.textMuted, ...font('caption') }}>
           {notificationTimeLabel(item.createdAt)}
         </time>
       </span>
       {item.readAt === null ? (
-        <span data-testid={`notifications.item-unread-${id}`} role="img" aria-label={webOnlyCopy['noti.unread.a11y']} style={{ flex: 'none', width: 8, height: 8, borderRadius: 4, background: '#e53935', marginTop: 6 }} />
+        <span data-testid={`notifications.item-unread-${id}`} role="img" aria-label={webOnlyCopy['noti.unread.a11y']} style={{ flex: 'none', width: 7, height: 7, borderRadius: '50%', background: color.inputCursor, marginTop: 6 }} />
       ) : null}
     </button>
   );
