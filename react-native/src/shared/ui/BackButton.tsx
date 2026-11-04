@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet } from 'react-native';
 
 import { colors } from '../design/tokens';
+import { GlassSurface, glassFill, useUsesGlass } from '../glass/glass';
 import { Icon } from './icons/Icon';
 
 export type BackButtonProps = {
@@ -18,6 +19,14 @@ export function BackButton({
   accessibilityLabel,
   variant = 'back',
 }: BackButtonProps) {
+  const glass = useUsesGlass();
+  const icon = (
+    <Icon
+      name={variant === 'close' ? 'ic_close' : 'ic_arrow_back'}
+      size={24}
+      color={colors.iconPrimary}
+    />
+  );
   return (
     <Pressable
       testID={testID}
@@ -26,15 +35,28 @@ export function BackButton({
       onPress={onPress}
       style={({ pressed }) => [styles.button, { opacity: pressed ? 0.6 : 1 }]}
     >
-      <Icon
-        name={variant === 'close' ? 'ic_close' : 'ic_arrow_back'}
-        size={24}
-        color={colors.iconPrimary}
-      />
+      {glass ? (
+        <GlassSurface
+          testID={testID ? `${testID}.glass` : undefined}
+          fill={glassFill.bar}
+          style={styles.glass}
+        >
+          {icon}
+        </GlassSurface>
+      ) : (
+        icon
+      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  glass: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   button: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
 });

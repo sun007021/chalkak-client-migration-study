@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { KstDate } from '../../core/time/KstDate';
 import { useViewModelState } from '../../core/state/useViewModelState';
+import { useGlassBarInset } from '../../shared/glass/glass';
 import { t } from '../../shared/copy';
 import { colors, spacing } from '../../shared/design/tokens';
 import { HeroCard } from './ui/HeroCard';
@@ -37,6 +38,7 @@ export function HomeScreen({ viewModel, renderAiCard }: HomeScreenProps) {
   const state = useViewModelState(viewModel);
   const feed = useViewModelState(viewModel.bannerFeed);
   const insets = useSafeAreaInsets();
+  const barInset = useGlassBarInset();
   const scrollRef = useRef<ScrollViewInstance>(null);
   const issue = useIssuePrefetch(viewModel);
   const { report: reportVisibleCards } = issue;
@@ -71,7 +73,7 @@ export function HomeScreen({ viewModel, renderAiCard }: HomeScreenProps) {
         onLayout={issue.onScrollLayout}
         onScroll={issue.onScroll}
         scrollEventThrottle={100}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: spacing.xxl + barInset }]}
         refreshControl={
           <RefreshControl
             refreshing={state.refreshing}
