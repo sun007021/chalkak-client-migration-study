@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_button.dart';
 import '../../../core/ui/test_id.dart';
 import '../../edit/domain/rgba_image.dart';
 import '../../edit/presentation/rgba_image_view.dart';
@@ -51,7 +53,6 @@ class _UploadSuccessScreenState extends State<UploadSuccessScreen> {
   @override
   Widget build(BuildContext context) {
     final vm = widget.viewModel;
-    final theme = Theme.of(context);
     final photo = widget.photo;
     return TestId(
       UploadTestIds.successRoot,
@@ -70,7 +71,16 @@ class _UploadSuccessScreenState extends State<UploadSuccessScreen> {
                           if (photo != null && photo.height > 0)
                             Card(
                               clipBehavior: Clip.antiAlias,
-                              elevation: 2,
+                              elevation: 0,
+                              color: context.tokens.colors.surfaceElevated,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  context.tokens.radius.photoCard,
+                                ),
+                                side: BorderSide(
+                                  color: context.tokens.colors.border,
+                                ),
+                              ),
                               child: ConstrainedBox(
                                 constraints: BoxConstraints(
                                   maxHeight:
@@ -81,8 +91,8 @@ class _UploadSuccessScreenState extends State<UploadSuccessScreen> {
                                   child: RgbaImageView(
                                     image: photo,
                                     fit: BoxFit.cover,
-                                    placeholder: const ColoredBox(
-                                      color: Colors.black12,
+                                    placeholder: ColoredBox(
+                                      color: context.tokens.colors.skeletonBase,
                                     ),
                                   ),
                                 ),
@@ -92,7 +102,7 @@ class _UploadSuccessScreenState extends State<UploadSuccessScreen> {
                             Icon(
                               Icons.check_circle_outline,
                               size: 72,
-                              color: theme.colorScheme.primary,
+                              color: context.tokens.colors.accent,
                             ),
                           const SizedBox(height: 24),
                           TestId(
@@ -100,7 +110,9 @@ class _UploadSuccessScreenState extends State<UploadSuccessScreen> {
                             child: Text(
                               vm.message,
                               textAlign: TextAlign.center,
-                              style: theme.textTheme.titleLarge,
+                              style: context.tokens.text.title3.copyWith(
+                                color: context.tokens.colors.textPrimary,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -109,7 +121,9 @@ class _UploadSuccessScreenState extends State<UploadSuccessScreen> {
                             child: Text(
                               vm.statusMessage,
                               textAlign: TextAlign.center,
-                              style: theme.textTheme.bodyMedium,
+                              style: context.tokens.text.callout.copyWith(
+                                color: context.tokens.colors.textNeutral,
+                              ),
                             ),
                           ),
                         ],
@@ -121,9 +135,9 @@ class _UploadSuccessScreenState extends State<UploadSuccessScreen> {
                   width: double.infinity,
                   child: TestId.button(
                     UploadTestIds.successConfirmButton,
-                    child: FilledButton(
+                    child: ChalkakButton(
                       onPressed: vm.onConfirmPressed,
-                      child: const Text(Copy.uploadSuccessConfirm),
+                      label: Copy.uploadSuccessConfirm,
                     ),
                   ),
                 ),

@@ -7,16 +7,17 @@ import 'chalkak_skeleton.dart';
 /// actionPrimary 스피너를 그린다(테마의 ProgressIndicator 색). 스켈레톤을 쓸 수 있는 자리는
 /// [ChalkakSkeleton]을 먼저 쓰고 이 위젯은 보조 표시로만 쓴다.
 class ChalkakSpinner extends StatelessWidget {
-  const ChalkakSpinner({super.key, this.size = 24});
+  const ChalkakSpinner({super.key, this.size = 24, this.color});
 
   final double size;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => SizedBox.square(
     dimension: size,
     child: CircularProgressIndicator(
       strokeWidth: size <= 24 ? 2 : 2.5,
-      color: context.tokens.colors.actionPrimary,
+      color: color ?? context.tokens.colors.actionPrimary,
     ),
   );
 }

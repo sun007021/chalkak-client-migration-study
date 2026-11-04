@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_button.dart';
+import '../../../core/ui/components/chalkak_icon.dart';
+import '../../../core/ui/components/chalkak_states.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/record_state.dart';
 import '../domain/record_view_model.dart';
@@ -36,7 +40,7 @@ class RecordScreen extends StatelessWidget {
         builder: (context, _) {
           final state = viewModel.state;
           return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -87,15 +91,16 @@ class RecordScreen extends StatelessWidget {
         const SizedBox(height: 16),
         TestId.button(
           RecordTestIds.saveImageButton,
-          child: FilledButton.tonalIcon(
+          child: TextButton(
             onPressed: state.isSaving ? null : viewModel.saveCalendarImage,
-            icon: state.isSaving
-                ? const SizedBox.square(
-                    dimension: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.download_outlined),
-            label: const Text(Copy.recordSave),
+            style: TextButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+              foregroundColor: context.tokens.colors.textMuted,
+              textStyle: context.tokens.text.footnote,
+            ),
+            child: state.isSaving
+                ? const ChalkakSpinner(size: 16)
+                : const Text(Copy.recordSave),
           ),
         ),
       ],
@@ -122,19 +127,19 @@ class _MonthHeader extends StatelessWidget {
       children: [
         TestId.button(
           RecordTestIds.prevMonthButton,
-          child: IconButton(
-            icon: const Icon(Icons.chevron_left),
+          child: _ArrowButton(
+            icon: ChalkakIcon.displayArrowLeft,
             onPressed: state.canGoPrevious ? onPrevious : null,
           ),
         ),
         Expanded(
           child: TestId(
             RecordTestIds.monthPickerButton,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: onPickerPressed,
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -142,10 +147,17 @@ class _MonthHeader extends StatelessWidget {
                       RecordTestIds.monthLabel,
                       child: Text(
                         state.monthLabel,
-                        style: Theme.of(context).textTheme.titleMedium,
+                        style: context.tokens.text.title2.copyWith(
+                          color: context.tokens.colors.textPrimary,
+                        ),
                       ),
                     ),
-                    const Icon(Icons.arrow_drop_down),
+                    const SizedBox(width: 4),
+                    ChalkakIcon(
+                      ChalkakIcon.chevronDown,
+                      size: 16,
+                      color: context.tokens.colors.iconSecondary,
+                    ),
                   ],
                 ),
               ),
@@ -154,8 +166,8 @@ class _MonthHeader extends StatelessWidget {
         ),
         TestId.button(
           RecordTestIds.nextMonthButton,
-          child: IconButton(
-            icon: const Icon(Icons.chevron_right),
+          child: _ArrowButton(
+            icon: ChalkakIcon.displayArrowRight,
             onPressed: state.canGoNext ? onNext : null,
           ),
         ),
@@ -173,7 +185,7 @@ class _Loading extends StatelessWidget {
       RecordTestIds.loading,
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: 96),
-        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        child: Center(child: ChalkakSpinner()),
       ),
     );
   }
@@ -195,13 +207,19 @@ class _ErrorView extends StatelessWidget {
     final message = switch (failure) {
       RecordFailure.unauthorized => const TestId(
         RecordTestIds.loginRequiredState,
-        child: Text(Copy.recordErr401, textAlign: TextAlign.center),
+        child: ChalkakStatusText(
+          Copy.recordErr401,
+          textAlign: TextAlign.center,
+        ),
       ),
       RecordFailure.invalidMonth => const TestId(
         RecordTestIds.invalidMonthMessage,
-        child: Text(Copy.recordErr400, textAlign: TextAlign.center),
+        child: ChalkakStatusText(
+          Copy.recordErr400,
+          textAlign: TextAlign.center,
+        ),
       ),
-      RecordFailure.other => const Text(
+      RecordFailure.other => const ChalkakStatusText(
         Copy.recordErrOther,
         textAlign: TextAlign.center,
       ),
@@ -209,7 +227,7 @@ class _ErrorView extends StatelessWidget {
     return TestId(
       RecordTestIds.errorState,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 72),
+        padding: const EdgeInsets.only(top: 24, bottom: 48),
         child: Column(
           children: [
             message,
@@ -217,21 +235,59 @@ class _ErrorView extends StatelessWidget {
             switch (failure) {
               RecordFailure.unauthorized => TestId.button(
                 RecordTestIds.loginButton,
-                child: FilledButton(
+                child: ChalkakButton(
                   onPressed: onLogin,
-                  child: const Text(Copy.recordGuestLogin),
+                  label: Copy.recordGuestLogin,
+                  fillsWidth: false,
                 ),
               ),
               RecordFailure.invalidMonth => const SizedBox.shrink(),
               RecordFailure.other => TestId.button(
                 RecordTestIds.retryButton,
-                child: FilledButton(
+                child: TextButton(
                   onPressed: onRetry,
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    textStyle: context.tokens.text.body,
+                  ),
                   child: const Text(Copy.commonRetry),
                 ),
               ),
             },
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ArrowButton extends StatelessWidget {
+  const _ArrowButton({required this.icon, required this.onPressed});
+
+  final String icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onPressed,
+        child: SizedBox.square(
+          dimension: 48,
+          child: Center(
+            child: Opacity(
+              opacity: enabled ? 1 : 0.35,
+              child: ChalkakIcon(
+                icon,
+                size: 18,
+                color: context.tokens.colors.iconPrimary,
+              ),
+            ),
+          ),
         ),
       ),
     );
