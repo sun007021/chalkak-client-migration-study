@@ -67,6 +67,13 @@ describe('기록 화면 구성 (TC-REC-009, 011, 042)', () => {
     expect(tid('record.day-2026-10-21')).toHaveTextContent('21');
   });
 
+  it('화면 표시용 썸네일은 CORS 모드로 읽지 않는다(CDN에 CORS 헤더가 없어도 보인다, 로컬 E2E 회귀)', async () => {
+    await openRecordApp();
+    await recordLoaded();
+    for (const img of Array.from(tid('record.calendar-grid').querySelectorAll('img'))) expect(img).not.toHaveAttribute('crossorigin');
+    expect(within(tid('record.selected-photo')).getByRole('img')).not.toHaveAttribute('crossorigin');
+  });
+
   it('TC-REC-015 응답 배열이 날짜 순서가 아니어도 날짜 칸에 정확히 배치된다', async () => {
     await openRecordApp({ routes: { [OCT]: 'record/posts-calendar__2026-10-shuffled' } });
     await recordLoaded();

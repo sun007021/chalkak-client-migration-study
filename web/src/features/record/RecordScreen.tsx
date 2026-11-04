@@ -256,8 +256,8 @@ const DayCell = memo(function DayCell({ vm, date, day, month, post, selected, to
       style={{ ...cellStyle, cursor: 'pointer', outlineOffset: -3, ...(selected ? { outline: '3px solid #111' } : {}) }}
       onClick={() => vm.selectDate(date)}
     >
-      {/* crossOrigin: 달력 이미지(canvas)와 같은 캐시 항목을 쓰도록 CORS 모드로 읽는다. */}
-      <img data-testid={`record.day-photo-${date}`} src={post.thumbnailImageUrl} alt="" crossOrigin="anonymous" style={thumbStyle} />
+      {/* 화면 표시는 CORS 모드로 읽지 않는다: 이미지 CDN이 CORS 헤더를 주지 않으면 crossOrigin 이미지는 깨진다(로컬 E2E에서 확인). 달력 이미지 저장(canvas)만 CORS로 따로 읽는다. */}
+      <img data-testid={`record.day-photo-${date}`} src={post.thumbnailImageUrl} alt="" style={thumbStyle} />
       <span aria-hidden="true" style={dayNumberStyle}>
         {day}
       </span>
@@ -276,7 +276,7 @@ function SelectedPhoto({ vm, state, post }: { vm: RecordViewModel; state: Record
   const pending = post.status === 'PENDING';
   return (
     <section data-testid="record.selected-photo" style={{ position: 'relative', padding: '12px 16px' }}>
-      <img src={post.thumbnailImageUrl} alt={webOnlyCopy['record.selected-photo-alt']} crossOrigin="anonymous" style={{ display: 'block', width: '100%', borderRadius: 8, background: '#e5e5e5' }} />
+      <img src={post.thumbnailImageUrl} alt={webOnlyCopy['record.selected-photo-alt']} style={{ display: 'block', width: '100%', borderRadius: 8, background: '#e5e5e5' }} />
       {pending ? (
         <div
           style={{ position: 'absolute', top: 20, left: 24 }}
