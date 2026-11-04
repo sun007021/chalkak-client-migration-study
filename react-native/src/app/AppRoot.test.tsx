@@ -10,7 +10,7 @@ jest.mock('expo-splash-screen', () => ({
   hideAsync: () => mockHideAsync(),
   preventAutoHideAsync: jest.fn(async () => true),
 }));
-jest.mock('./App', async () => {
+jest.mock('./App', () => {
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return { App: () => <View testID="app-root-child" /> };
 });

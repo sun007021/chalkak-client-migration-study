@@ -15,7 +15,7 @@ import { bytesToBase64 } from '../../core/encoding/base64';
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { format, t } from '../../shared/copy';
 import { POST_TITLE_MAX } from '../../shared/constants';
-import { colors, radius, spacing, typography } from '../../shared/design/tokens';
+import { colors, spacing, typography } from '../../shared/design/tokens';
 import { BackButton } from '../../shared/ui/BackButton';
 import { ChalkakButton } from '../../shared/ui/Button';
 import { Dialog, DialogButton } from '../../shared/ui/Dialog';

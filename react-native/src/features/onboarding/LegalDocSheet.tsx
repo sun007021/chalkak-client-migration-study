@@ -1,10 +1,13 @@
 import type { ComponentType } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Modal, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
 import type { TermsDocumentViewModel } from './TermsDocumentViewModel';
+import { colors, spacing, typography } from '../../shared/design/tokens';
+import { BackButton } from '../../shared/ui/BackButton';
+import { ChalkakOutlinedButton } from '../../shared/ui/Button';
 import { Text } from '../../shared/ui/Text';
 
 export type WebViewComponentProps = {
@@ -39,15 +42,12 @@ export function LegalDocSheet({ viewModel, WebView, onClose }: LegalDocSheetProp
           <Text testID="legal-doc.title" style={styles.title}>
             {title}
           </Text>
-          <Pressable
+          <BackButton
             testID="legal-doc.close-button"
-            accessibilityRole="button"
+            variant="close"
+            accessibilityLabel={t('common.close')}
             onPress={onClose}
-            hitSlop={12}
-            style={styles.close}
-          >
-            <Text style={styles.closeText}>✕</Text>
-          </Pressable>
+          />
         </View>
         {status === 'cannot-open' ? (
           <Text testID="legal-doc.open-failed-message" style={styles.message}>
@@ -58,14 +58,12 @@ export function LegalDocSheet({ viewModel, WebView, onClose }: LegalDocSheetProp
             <Text testID="legal-doc.error-state" style={styles.message}>
               {t('onb.terms.doc.error')}
             </Text>
-            <Pressable
+            <ChalkakOutlinedButton
               testID="legal-doc.retry-button"
-              accessibilityRole="button"
+              label={t('onb.terms.doc.retry')}
+              fillsWidth={false}
               onPress={() => viewModel.retry()}
-              style={styles.retry}
-            >
-              <Text style={styles.retryText}>{t('onb.terms.doc.retry')}</Text>
-            </Pressable>
+            />
           </View>
         ) : inAppUrl ? (
           <View testID="legal-doc.web-content" style={styles.web}>
@@ -77,7 +75,11 @@ export function LegalDocSheet({ viewModel, WebView, onClose }: LegalDocSheetProp
               onExternalLink={(target) => void viewModel.openExternal(target)}
             />
             {status === 'loading' ? (
-              <ActivityIndicator testID="legal-doc.loading" style={styles.loading} />
+              <ActivityIndicator
+                testID="legal-doc.loading"
+                color={colors.actionPrimary}
+                style={styles.loading}
+              />
             ) : null}
           </View>
         ) : null}
@@ -87,22 +89,25 @@ export function LegalDocSheet({ viewModel, WebView, onClose }: LegalDocSheetProp
 }
 
 const styles = StyleSheet.create({
-  sheet: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: { height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20 },
-  title: { flex: 1, fontSize: 17, fontWeight: '700', color: '#111111' },
-  close: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  closeText: { fontSize: 18, color: '#111111' },
+  sheet: { flex: 1, backgroundColor: colors.surfaceElevated },
+  header: {
+    height: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: spacing.screenHorizontal,
+    paddingRight: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  title: { ...typography.headline, flex: 1, color: colors.textPrimary },
   web: { flex: 1 },
   loading: { ...StyleSheet.absoluteFill },
-  errorState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  message: { textAlign: 'center', marginTop: 48, fontSize: 15, color: '#444444' },
-  retry: {
-    height: 44,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    backgroundColor: '#111111',
-    alignItems: 'center',
-    justifyContent: 'center',
+  errorState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
+  message: {
+    ...typography.body,
+    textAlign: 'center',
+    marginTop: 48,
+    paddingHorizontal: spacing.screenHorizontal,
+    color: colors.textSecondary,
   },
-  retryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
 });

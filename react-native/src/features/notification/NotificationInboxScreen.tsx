@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
-import { colors, radius, spacing, typography } from '../../shared/design/tokens';
+import { colors, spacing, typography } from '../../shared/design/tokens';
 import type {
   NotificationInboxViewModel,
   NotificationItemView,

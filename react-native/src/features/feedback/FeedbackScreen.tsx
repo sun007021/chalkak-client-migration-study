@@ -1,23 +1,20 @@
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { FEEDBACK_MAX } from '../../shared/constants';
 import { t } from '../../shared/copy';
-import { colors, spacing } from '../../shared/design/tokens';
+import { colors, spacing, typography } from '../../shared/design/tokens';
+import { BackButton } from '../../shared/ui/BackButton';
+import { ChalkakButton } from '../../shared/ui/Button';
+import { Text } from '../../shared/ui/Text';
+import { TextField } from '../../shared/ui/TextField';
 import type { FeedbackViewModel } from './FeedbackViewModel';
-import { Text, TextInput } from '../../shared/ui/Text';
 
 /**
  * 피드백 작성 화면. testID는 testids.md의 feedback.*. 상태는 구독만 하고 screen_view는 보내지 않는다
  * (소유자가 start()로 보낸다). 입력은 1000자에서 막지 않고 보내기 시점에 검증한다(REQ-FDBK-005).
+ * 레이아웃은 docs/design/screens-c.md §5.2 (제목 title2, 설명 subheadline, 입력 높이 240, 하단 고정 보내기 버튼).
  */
 export function FeedbackScreen({ viewModel }: { viewModel: FeedbackViewModel }) {
   const state = useViewModelState(viewModel);
@@ -26,39 +23,42 @@ export function FeedbackScreen({ viewModel }: { viewModel: FeedbackViewModel }) 
     <KeyboardAvoidingView
       testID="feedback.root"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
+      style={[styles.root, { paddingTop: insets.top }]}
     >
       <View style={styles.header}>
-        <Text style={styles.title}>{t('fdbk.title')}</Text>
-        <Pressable
+        <BackButton
           testID="feedback.close-button"
-          accessibilityRole="button"
+          variant="close"
+          accessibilityLabel={t('common.close')}
           onPress={() => viewModel.close()}
-          hitSlop={12}
-        >
-          <Text style={styles.close}>✕</Text>
-        </Pressable>
+        />
       </View>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <Text testID="feedback.guide-text" style={styles.guide}>
           {t('fdbk.intro.title')}
         </Text>
         <Text testID="feedback.guide-body" style={styles.guideBody}>
           {t('fdbk.intro.body')}
         </Text>
-        <Text style={styles.label}>{t('fdbk.field.label')}</Text>
-        <TextInput
-          testID="feedback.input"
-          value={state.text}
-          onChangeText={(text) => viewModel.onTextChange(text)}
-          placeholder={t('fdbk.field.placeholder')}
-          multiline
-          textAlignVertical="top"
-          style={styles.input}
-        />
-        <Text testID="feedback.counter" style={styles.counter}>
-          {`${state.count}/${FEEDBACK_MAX}`}
-        </Text>
+        <View style={styles.field}>
+          <TextField
+            testID="feedback.input"
+            accessibilityLabel={t('fdbk.field.label')}
+            value={state.text}
+            onChangeText={(text) => viewModel.onTextChange(text)}
+            placeholder={t('fdbk.field.placeholder')}
+            multiline
+            editable={!state.sending}
+            textAlignVertical="top"
+            counterText={`${state.count} / ${FEEDBACK_MAX}`}
+            counterTestID="feedback.counter"
+            style={styles.input}
+          />
+        </View>
         {state.validationMessage !== null ? (
           <Text testID="feedback.validation-message" style={styles.error}>
             {state.validationMessage}
@@ -70,53 +70,30 @@ export function FeedbackScreen({ viewModel }: { viewModel: FeedbackViewModel }) 
           </Text>
         ) : null}
       </ScrollView>
-      <Pressable
-        testID="feedback.submit-button"
-        accessibilityRole="button"
-        accessibilityState={{ disabled: !state.canSubmit }}
-        disabled={!state.canSubmit}
-        onPress={() => void viewModel.submit()}
-        style={[styles.submit, !state.canSubmit && styles.submitDisabled]}
-      >
-        <Text style={styles.submitText}>{state.sending ? t('fdbk.sending') : t('fdbk.send')}</Text>
-      </Pressable>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
+        <ChalkakButton
+          testID="feedback.submit-button"
+          label={state.sending ? t('fdbk.sending') : t('fdbk.send')}
+          disabled={!state.canSubmit}
+          onPress={() => void viewModel.submit()}
+        />
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: spacing.lg,
+  header: { alignItems: 'flex-end', paddingHorizontal: spacing.md },
+  content: { paddingHorizontal: spacing.screenHorizontal, paddingTop: spacing.xl },
+  guide: { ...typography.title2, color: colors.textPrimary },
+  guideBody: { ...typography.subheadline, color: colors.textSecondary, marginTop: spacing.md },
+  field: { marginTop: 28 },
+  input: { ...typography.subheadline, minHeight: 240 - 2 * spacing.lg - spacing.xl },
+  error: { ...typography.footnote, color: colors.error, marginTop: spacing.sm },
+  footer: {
+    paddingHorizontal: spacing.screenHorizontal,
+    paddingTop: spacing.sm,
+    backgroundColor: colors.background,
   },
-  title: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  close: { fontSize: 20, color: colors.textPrimary },
-  content: { padding: spacing.lg, gap: spacing.md },
-  guide: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, lineHeight: 28 },
-  guideBody: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
-  label: { fontSize: 14, color: colors.textSecondary },
-  input: {
-    minHeight: 160,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: spacing.md,
-    fontSize: 16,
-    color: colors.textPrimary,
-  },
-  counter: { alignSelf: 'flex-end', fontSize: 13, color: colors.textSecondary },
-  error: { fontSize: 14, color: colors.danger },
-  submit: {
-    margin: spacing.lg,
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitDisabled: { opacity: 0.4 },
-  submitText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 });

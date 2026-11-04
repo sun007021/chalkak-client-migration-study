@@ -101,7 +101,7 @@ describe('CalendarImageCaptureHost', () => {
 
   it('썸네일이 제때 준비되지 않으면 사진이 빠진 PNG를 만들지 않고 실패한다', async () => {
     const renderer = new ViewShotCalendarImageRenderer();
-    await render(<CalendarImageCaptureHost renderer={renderer} imageWaitMs={30} />);
+    await render(<CalendarImageCaptureHost renderer={renderer} imageWaitMs={250} />);
     let error: unknown;
     let pending!: Promise<unknown>;
     await act(async () => {

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   Animated,
   StyleSheet,
@@ -46,7 +46,7 @@ export function FeaturedPager({
   onImageLoad,
 }: Props) {
   const [width, setWidth] = useState(0);
-  const scrollX = useRef(new Animated.Value(0)).current;
+  const [scrollX] = useState(() => new Animated.Value(0));
   const pageWidth = Math.max(width - SIDE_MARGIN * 2, 0);
   const interval = pageWidth + PAGE_GAP;
 

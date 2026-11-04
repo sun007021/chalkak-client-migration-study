@@ -15,7 +15,7 @@ export const SKELETON_MIN_VISIBLE_MS = 250;
 /** 부모가 모서리를 잘라야 한다(clip은 호출부 책임). 크기는 style로 준다. */
 export function Skeleton({ style, testID }: { style?: StyleProp<ViewStyle>; testID?: string }) {
   const [width, setWidth] = useState(0);
-  const progress = useRef(new Animated.Value(0)).current;
+  const [progress] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const loop = Animated.loop(
