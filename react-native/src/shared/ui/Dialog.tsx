@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { colors, radius, typography } from '../design/tokens';
 import { Text } from './Text';
@@ -41,9 +41,11 @@ export function Dialog({
     >
       <View testID={testID} style={styles.scrim}>
         <View style={styles.card} accessibilityViewIsModal>
-          <Text testID={titleTestID} style={styles.title} accessibilityRole="header">
-            {title}
-          </Text>
+          {title ? (
+            <Text testID={titleTestID} style={styles.title} accessibilityRole="header">
+              {title}
+            </Text>
+          ) : null}
           {message ? (
             <Text testID={messageTestID} style={styles.message}>
               {message}
@@ -64,6 +66,9 @@ export type DialogButtonProps = {
   /** cancel: 회색 / primary: 짙은 색 / destructive: 빨강. */
   tone?: 'cancel' | 'primary' | 'destructive';
   disabled?: boolean;
+  /** 진행 중이면 스피너를 보인다(busyTestID가 그 요소의 testID). */
+  busy?: boolean;
+  busyTestID?: string;
 };
 
 export function DialogButton({
@@ -72,6 +77,8 @@ export function DialogButton({
   testID,
   tone = 'primary',
   disabled,
+  busy,
+  busyTestID,
 }: DialogButtonProps) {
   const background =
     tone === 'cancel'
@@ -91,6 +98,9 @@ export function DialogButton({
         { backgroundColor: background, opacity: disabled ? 0.4 : pressed ? 0.85 : 1 },
       ]}
     >
+      {busy ? (
+        <ActivityIndicator testID={busyTestID} size="small" color={colors.onActionPrimary} />
+      ) : null}
       <Text style={styles.buttonLabel}>{label}</Text>
     </Pressable>
   );
@@ -123,6 +133,8 @@ const styles = StyleSheet.create({
   actions: { marginTop: 23, flexDirection: 'row', alignSelf: 'stretch', gap: 10 },
   button: {
     flex: 1,
+    flexDirection: 'row',
+    gap: 6,
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Animated,
-  Image,
   StyleSheet,
   View,
   type GestureResponderEvent,
@@ -10,10 +9,13 @@ import {
 } from 'react-native';
 
 import { colors } from '../../../shared/design/tokens';
+import { RemoteImage } from '../../../shared/ui/RemoteImage';
 import { PinchTracker, type Transform } from '../pinchTracker';
 
 type Props = {
   uri: string;
+  /** 원본이 뜨기 전에 먼저 보이는 썸네일(전시에서 온 시드). */
+  thumbnailUri?: string | null;
   accessibilityLabel: string;
   /** 사진 위(오른쪽 아래)에 얹을 내용. 사인. 확대할 때 사진과 같이 움직인다. */
   children?: ReactNode;
@@ -26,7 +28,7 @@ const RETURN_MS = 200;
  * 손가락 아래 지점이 고정되도록 확대 중심을 맞춘다(계산은 PinchTracker). 한 손가락 터치는 건드리지 않는다.
  * 제스처 라이브러리 없이 View의 터치 이벤트와 Animated(JS 구동)로 구현한다.
  */
-export function ZoomablePhoto({ uri, accessibilityLabel, children }: Props) {
+export function ZoomablePhoto({ uri, thumbnailUri, accessibilityLabel, children }: Props) {
   const [scale] = useState(() => new Animated.Value(1));
   const [translateX] = useState(() => new Animated.Value(0));
   const [translateY] = useState(() => new Animated.Value(0));
@@ -122,7 +124,12 @@ export function ZoomablePhoto({ uri, accessibilityLabel, children }: Props) {
         testID="feed.photo-content"
         style={[styles.fill, { transform: [{ translateX }, { translateY }, { scale }] }]}
       >
-        <Image source={{ uri }} style={styles.fill} resizeMode="contain" />
+        <RemoteImage
+          uri={uri}
+          thumbnailUri={thumbnailUri}
+          resizeMode="contain"
+          style={styles.fill}
+        />
         {children}
       </Animated.View>
     </View>
@@ -130,6 +137,6 @@ export function ZoomablePhoto({ uri, accessibilityLabel, children }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, overflow: 'hidden', backgroundColor: colors.surface },
+  root: { flex: 1, overflow: 'hidden', backgroundColor: colors.background },
   fill: { flex: 1 },
 });

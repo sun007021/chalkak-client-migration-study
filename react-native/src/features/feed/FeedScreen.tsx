@@ -1,12 +1,17 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { formatTopicDateLabel } from '../../core/time/dateFormat';
 import type { KstDate } from '../../core/time/KstDate';
 import { format, t } from '../../shared/copy';
-import { colors, spacing } from '../../shared/design/tokens';
+import { colors, spacing, typography } from '../../shared/design/tokens';
+import { BackButton } from '../../shared/ui/BackButton';
+import { Icon } from '../../shared/ui/icons/Icon';
+import { RemoteImage } from '../../shared/ui/RemoteImage';
+import { RoundIconButton } from '../../shared/ui/RoundIconButton';
+import { Skeleton } from '../../shared/ui/Skeleton';
 import { LikeButton } from '../like/LikeButton';
 import { DeleteDialog, TitleDialog } from './ui/FeedDialogs';
 import { ZoomablePhoto } from './ui/ZoomablePhoto';
@@ -43,25 +48,47 @@ export function FeedScreen({ viewModel, renderAiReview }: FeedScreenProps) {
   return (
     <View testID="feed.root" style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.bar}>
-        <Pressable
+        <BackButton
           testID="feed.back-button"
-          accessibilityRole="button"
           accessibilityLabel={t('common.close')}
           onPress={() => viewModel.onBackPress()}
-          hitSlop={8}
-          style={styles.back}
-        >
-          <Text style={styles.backText}>{'<'}</Text>
-        </Pressable>
-        {content?.topicDate ? (
-          <Text testID="feed.date-label" style={styles.date}>
-            {formatTopicDateLabel(content.topicDate)}
-          </Text>
+        />
+        <View style={styles.barSpacer} />
+        {state.canEditTitle ? (
+          <Pressable
+            testID="feed.edit-title-button"
+            accessibilityRole="button"
+            accessibilityLabel={t('feed.edit.title')}
+            onPress={() => viewModel.openTitleEditor()}
+            style={styles.barButton}
+          >
+            <Icon name="ic_edit" size={24} color={colors.actionPrimary} />
+          </Pressable>
+        ) : null}
+        {state.canDelete ? (
+          <Pressable
+            testID="feed.delete-button"
+            accessibilityRole="button"
+            accessibilityLabel={t('feed.delete.title')}
+            onPress={() => viewModel.requestDelete()}
+            style={styles.barButton}
+          >
+            <Icon name="ic_delete" size={24} color={colors.error} />
+          </Pressable>
         ) : null}
       </View>
 
+      <View style={styles.topic}>
+        {/* 상세를 받기 전에도 높이를 유지한다(사진 위치가 튀지 않게, screens-b.md §4.1). */}
+        <Text testID="feed.date-label" style={styles.topicDate}>
+          {content?.topicDate ? formatTopicDateLabel(content.topicDate) : ' '}
+        </Text>
+      </View>
+
       {state.status === 'loading' ? (
-        <ActivityIndicator testID="feed.loading" style={styles.center} />
+        <View testID="feed.loading" style={styles.loading}>
+          <Skeleton style={styles.loadingPhoto} />
+        </View>
       ) : null}
       {state.status === 'not-found' ? (
         <View style={styles.center}>
@@ -75,72 +102,51 @@ export function FeedScreen({ viewModel, renderAiReview }: FeedScreenProps) {
           <Text testID="feed.error-state" style={styles.message}>
             {state.errorMessage ?? t('feed.error.load')}
           </Text>
-          <Pressable
+          <RoundIconButton
             testID="feed.retry-button"
-            accessibilityRole="button"
+            accessibilityLabel={t('common.retry')}
+            size={48}
+            iconSize={20}
             onPress={() => void viewModel.retry()}
-            style={styles.retry}
-          >
-            <Text style={styles.retryText}>{t('common.retry')}</Text>
-          </Pressable>
+          />
         </View>
       ) : null}
 
       {content ? (
         <View style={styles.body}>
-          <ZoomablePhoto uri={content.originalImageUrl} accessibilityLabel={photoLabel}>
+          <ZoomablePhoto
+            uri={content.originalImageUrl}
+            thumbnailUri={content.thumbnailImageUrl}
+            accessibilityLabel={photoLabel}
+          >
             {signature && failedSignature !== signature ? (
-              <Image
+              <RemoteImage
                 testID="feed.signature-image"
-                source={{ uri: signature }}
-                style={styles.signature}
+                uri={signature}
                 resizeMode="contain"
+                style={styles.signature}
                 // 사인만 못 불러와도 사진은 그대로 둔다.
                 onError={() => setFailedSignature(signature)}
               />
             ) : null}
           </ZoomablePhoto>
-          <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
-            <View style={styles.titleRow}>
-              <Text testID="feed.title" style={styles.title} numberOfLines={1}>
-                {title}
-              </Text>
-              <LikeButton
-                buttonTestID="feed.like-button"
-                countTestID="feed.like-count"
-                isLiked={content.isLiked}
-                likeCount={content.likeCount}
-                disabled={!state.canLike}
-                onPress={() => viewModel.onLikePress()}
-              />
-            </View>
+          <View style={styles.likeRow}>
+            <LikeButton
+              buttonTestID="feed.like-button"
+              countTestID="feed.like-count"
+              isLiked={content.isLiked}
+              likeCount={content.likeCount}
+              disabled={!state.canLike}
+              onPress={() => viewModel.onLikePress()}
+            />
+            <Text testID="feed.title" style={styles.title} numberOfLines={1}>
+              {title}
+            </Text>
+          </View>
+          <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.xl }]}>
             {renderAiReview && state.confirmed && state.isMine && content.topicDate
               ? renderAiReview({ postId: content.postId, topicDate: content.topicDate })
               : null}
-            <View style={styles.actions}>
-              {state.canEditTitle ? (
-                <Pressable
-                  testID="feed.edit-title-button"
-                  accessibilityRole="button"
-                  accessibilityLabel={t('feed.edit.title')}
-                  onPress={() => viewModel.openTitleEditor()}
-                  hitSlop={8}
-                >
-                  <Text style={styles.actionText}>{t('feed.edit.title')}</Text>
-                </Pressable>
-              ) : null}
-              {state.canDelete ? (
-                <Pressable
-                  testID="feed.delete-button"
-                  accessibilityRole="button"
-                  accessibilityLabel={t('feed.delete.title')}
-                  onPress={() => viewModel.requestDelete()}
-                  hitSlop={8}
-                >
-                  <Text style={styles.deleteText}>{t('feed.delete.title')}</Text>
-                </Pressable>
-              ) : null}
-            </View>
           </View>
         </View>
       ) : null}
@@ -169,48 +175,45 @@ export function FeedScreen({ viewModel, renderAiReview }: FeedScreenProps) {
   );
 }
 
+// 원본 피드(screens-b.md §4.1): 상단 바(뒤로 48 + 수정·삭제 아이콘 48), 주제 라벨 subheadline(좌우 25),
+// 사진, 좋아요 행(높이 57, 좌우 14, 하트 24 + 숫자 / 제목 body textSecondary 오른쪽, 아래 0.5px border).
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
   },
-  back: { paddingRight: spacing.sm },
-  backText: { fontSize: 22, color: colors.textPrimary },
-  date: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-  message: { color: colors.textSecondary, fontSize: 15 },
-  retry: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: 20,
-    backgroundColor: colors.accent,
+  barSpacer: { flex: 1 },
+  barButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  topic: {
+    paddingHorizontal: spacing.screenHorizontal,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
   },
-  retryText: { color: '#FFFFFF', fontWeight: '600' },
+  topicDate: { ...typography.subheadline, color: colors.textPrimary },
+  loading: { flex: 1, paddingBottom: spacing.xxl },
+  loadingPhoto: { flex: 1 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.xl },
+  message: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   body: { flex: 1 },
-  signature: { position: 'absolute', right: spacing.md, bottom: spacing.md, width: 96, height: 48 },
-  footer: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.md },
-  titleRow: {
+  signature: { position: 'absolute', right: spacing.sm, bottom: spacing.sm, width: 70, height: 52 },
+  likeRow: {
+    height: 57,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
-  title: { flex: 1, fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  actions: { flexDirection: 'row', gap: spacing.lg },
-  actionText: { fontSize: 14, color: colors.textSecondary },
-  deleteText: { fontSize: 14, color: colors.danger },
+  title: { ...typography.body, flex: 1, textAlign: 'right', color: colors.textSecondary },
+  footer: { paddingHorizontal: spacing.screenHorizontal, paddingTop: spacing.lg, gap: spacing.md },
   overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: colors.scrim,
   },
 });

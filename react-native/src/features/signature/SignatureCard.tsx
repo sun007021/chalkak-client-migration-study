@@ -1,9 +1,13 @@
 import { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
 import type { SignatureCardViewModel } from './SignatureCardViewModel';
+import { colors, radius, spacing, typography } from '../../shared/design/tokens';
+import { ChalkakButton } from '../../shared/ui/Button';
+import { RoundIconButton } from '../../shared/ui/RoundIconButton';
+import { Skeleton } from '../../shared/ui/Skeleton';
 import { Text } from '../../shared/ui/Text';
 
 /**
@@ -39,53 +43,53 @@ export function SignatureCard({ viewModel }: { viewModel: SignatureCardViewModel
               <Text testID="settings.signature-error" style={styles.errorText}>
                 {t('sign.load.error')}
               </Text>
-              <Pressable
+              <RoundIconButton
                 testID="settings.signature-retry-button"
-                accessibilityRole="button"
+                accessibilityLabel={t('common.retry')}
+                size={32}
+                iconSize={15}
                 onPress={() => void viewModel.refresh()}
-              >
-                <Text style={styles.retryText}>{t('common.retry')}</Text>
-              </Pressable>
+              />
             </View>
           ) : null}
           {loading ? (
-            <ActivityIndicator testID="settings.signature-loading" color="#FFFFFF" />
+            <View testID="settings.signature-loading" style={StyleSheet.absoluteFill}>
+              <Skeleton style={StyleSheet.absoluteFill} />
+            </View>
           ) : null}
         </View>
       </View>
-      <Pressable
+      <ChalkakButton
         testID="settings.signature-change-button"
-        accessibilityRole="button"
+        label={t('sign.card.change')}
+        verticalPadding={13}
         onPress={() => viewModel.onChangePress()}
-        style={styles.change}
-      >
-        <Text style={styles.changeText}>{t('sign.card.change')}</Text>
-      </Pressable>
+      />
     </View>
   );
 }
 
+// 사인 PNG는 흰 획이라 actionPrimary 바탕 위에 올린다(원본 사인 패드와 같은 어두운 면).
 const styles = StyleSheet.create({
-  wrapper: { gap: 12 },
-  card: { borderRadius: 16, backgroundColor: '#FFFFFF', padding: 16, gap: 12 },
-  title: { fontSize: 16, fontWeight: '700', color: '#111111' },
+  wrapper: { gap: spacing.md },
+  card: {
+    borderRadius: radius.large,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  title: { ...typography.headline, color: colors.textPrimary },
   imageBox: {
     height: 96,
-    borderRadius: 12,
-    backgroundColor: '#222222',
+    borderRadius: radius.button,
+    overflow: 'hidden',
+    backgroundColor: colors.actionPrimary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   image: { width: '100%', height: '100%' },
-  errorBox: { alignItems: 'center', gap: 8, padding: 8 },
-  errorText: { color: '#FFFFFF', fontSize: 13, textAlign: 'center' },
-  retryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
-  change: {
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#111111',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  changeText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  errorBox: { alignItems: 'center', gap: spacing.sm, padding: spacing.sm },
+  errorText: { ...typography.footnote, color: colors.onActionPrimary, textAlign: 'center' },
 });
