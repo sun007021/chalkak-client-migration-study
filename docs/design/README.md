@@ -13,7 +13,7 @@
 ## 1. 원칙
 
 1. **원본이 기준, 완성도는 원본 이상.** 색·글꼴·간격·라운드·아이콘·상태 화면·애니메이션을 원본 수치대로 맞춘다. 플랫폼 기본 위젯 모양(Material 기본 보라색, 시스템 파란 링크, 회색 기본 버튼, 기본 스피너만 있는 로딩 등)이 그대로 보이면 미완성이다.
-2. **플랫폼 관례 차이는 허용.** 내비게이션 전환(iOS push / Android 예측형 뒤로가기), 시트 손잡이, 스위치·휠 피커, 햅틱, 스크롤 바운스, 시스템 다이얼로그는 플랫폼 것을 쓴다. 단, 색·글꼴·라운드는 토큰을 입힌다. iOS 26 이상에서 원본이 Liquid Glass를 쓰는 곳은 iOS 네이티브만 따른다.
+2. **플랫폼 관례 차이는 허용.** 내비게이션 전환(iOS push / Android 예측형 뒤로가기), 시트 손잡이, 스위치·휠 피커, 햅틱, 스크롤 바운스, 시스템 다이얼로그는 플랫폼 것을 쓴다. 단, 색·글꼴·라운드는 토큰을 입힌다. 단, **원본 iOS가 iOS 26 이상에서 쓰는 Liquid Glass는 플랫폼 관례가 아니라 원본 디자인의 일부**다. 대응 방식은 §5를 따른다.
 3. **기능은 바꾸지 않는다.** testID, 문구(`shared/copy/ko.json`), 상태 전이, 분석 이벤트는 그대로 둔다. UI 수정으로 깨지는 테스트는 기대값이 생김새(색·크기)일 때만 고친다.
 4. **하드코딩 금지.** 화면 코드는 토큰 이름만 쓴다. 토큰에 없는 수치(컴포넌트 높이, 그림자, 애니메이션 시간)는 컴포넌트 안 상수로 두고 screens 문서의 원본 근거를 주석으로 단다.
 5. **라이트 테마만.** 원본은 라이트 고정이다. 다크 모드에서도 라이트 토큰을 쓴다(시스템 다크에 끌려가 배경만 검게 되는 일이 없게).
@@ -100,11 +100,38 @@ iOS 원본이 SF Symbol을 쓰는 곳은 iOS 네이티브는 SF Symbol, 나머�
 
 Material 3 기본 색 체계(`ColorScheme.fromSeed`, 보라 계열)는 쓰지 않는다. Material 컴포넌트를 쓰더라도 `ColorScheme`을 토큰으로 덮는다(primary=actionPrimary, surface=background, surfaceTint 없음, ripple은 textPrimary 8~12%).
 
-## 5. 완료 기준(플랫폼 PR마다)
+## 5. Liquid Glass(iOS 26) 대응
+
+원본 iOS는 `ChalkakPlatformAppearance.usesLiquidGlass`(iOS 26 이상, 디버그 인자 `-use-flat-ios-design`로 끔)로 아래 요소를 유리 재질로 그리고, iOS 18~25와 Android는 평면으로 그린다. 1차 작업(#102)에서 iOS가 CI Xcode 16 때문에 이 분기를 빼 원본과 달라졌다.
+
+### 5.1 원본 사용처
+
+| 요소 | 원본 근거 | 유리일 때 | 평면일 때 |
+| --- | --- | --- | --- |
+| 하단 바 | `DesignSystem/Components/BottomBar/ChalkakBottomBar.swift:59-151`, `ContentView.swift:466-480` | 떠 있는 캡슐. 배경 `background` 30% + `glassEffect(.regular.tint(background 20%).interactive())`, 좌우 여백 lg+xs(compact 때 xxl+xs), 아래 sm, 바 뒤 배경 투명. 선택 렌즈(`.clear.interactive()`), 드래그 scrub, 스크롤 compact 전환(0.75s smooth) | 화면 폭 바, 배경 `surfaceElevated` |
+| 원형 내비 버튼(뒤로·닫기·액션) | `ChalkakNavigationButton.swift:56-83` | `.buttonStyle(.glass)`, 툴바 공유 배경 automatic | 평면 아이콘, 공유 배경 숨김 |
+| 피드 상단 액션 아이콘 | `Feed/Components/FeedTopBar.swift:74` | 유리 버튼 안 아이콘 크기(`liquidGlassActionIconSize`) | `Metrics.actionIconSize` |
+| 시트(피커·AI 리뷰 시작/결과·사인 안내·기록 사진) | `ChalkakPickerSheet.swift:27`, `AIReviewStartSheet.swift:39`, `FeedAIReviewSheet.swift:17,54,102`, `FeedSignatureHintSheet.swift:42`, `Home/HomeScreen.swift:219` | 시스템 시트 기본 유리 배경(배경·코너 지정 안 함, 콘텐츠 배경 clear) | `presentationBackground(surfaceElevated)` + 코너 `sheet`(28) |
+| AI 리뷰 시트 버튼 | `FeedAIReviewSheet.swift:170` | `glassEffect(.regular.interactive(), in: Capsule())` | 평면 버튼 |
+| 사진 편집 컨트롤 바탕 | `PhotoEdit/Components/PhotoEditControlBackground.swift:12-32` | `glassEffect(.regular.interactive(), in: shape)` | `editorControl` 단색 |
+
+### 5.2 플랫폼별 규칙
+
+| 플랫폼 | 규칙 |
+| --- | --- |
+| iOS 네이티브 | 원본과 같이 iOS 26 이상은 SwiftUI 유리 API, 그 미만은 평면. CI는 iOS 26 SDK(Xcode 26)로 빌드한다. |
+| Flutter·React Native, **iOS에서 실행** | OS 버전이 26 이상이면 유리를 근사한다: 블러(σ≈20, `BackdropFilter` / `expo-blur` `BlurView` intensity≈60, tint light) 위에 `background` 30% 채움 + 흰색 35% 0.5px 테두리. 적용 대상은 5.1의 하단 바(떠 있는 캡슐, 같은 여백), 원형 내비 버튼(44, 같은 재질), 시트 배경(블러 + `surfaceElevated` 70%). 선택 렌즈는 캡슐 안 흰색 45% 캡슐로 대신하고, scrub·compact 전환은 있으면 좋지만 필수는 아니다. 26 미만은 평면. |
+| Android 네이티브, Flutter·RN의 Android | 원본 Android와 같이 평면(유리 없음). |
+| Web | 평면을 기본으로 한다(원본 Android·iOS 25 이하와 같음). 하단 바만 `backdrop-filter: blur(20px)` + `background` 85%로 콘텐츠 위에 떠 있게 해도 된다. 지원하지 않는 브라우저는 불투명 `surfaceElevated`. |
+
+모든 플랫폼에서 "투명도 줄이기"(iOS Reduce Transparency, Android 고대비, `prefers-reduced-transparency`)가 켜지면 평면으로 그린다.
+
+## 6. 완료 기준(플랫폼 PR마다)
 
 - [ ] 토큰·글꼴·아이콘이 `shared/design`과 같다(대조 테스트 통과).
 - [ ] screens 문서의 화면마다 레이아웃 수치·컴포넌트·상태(로딩 스켈레톤/빈/오류/게스트)를 맞췄거나, 다른 점을 `gaps/<platform>.md`에 이유와 함께 적었다.
 - [ ] 화면 바탕이 `#F7F6F3`, 본문이 Pretendard, 주 버튼이 `#2B2724` 캡슐/라운드 12다.
 - [ ] 로딩은 원본처럼 스켈레톤(쉬머)이고, 기본 스피너만 덩그러니 있는 화면이 없다.
+- [ ] §5 Liquid Glass 규칙(해당 플랫폼)을 따랐다.
 - [ ] 터치 영역 44pt/48dp 이상, 텍스트 대비 WCAG AA.
 - [ ] 기존 테스트·린트·타입 검사·CI가 통과하고 testID·문구는 그대로다.
