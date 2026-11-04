@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/ui/components/chalkak_dialog.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/ai_review_session.dart';
 import '../domain/ai_review_state.dart';
@@ -331,12 +332,12 @@ class AiReviewCriteriaDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return TestId(
       AiReviewTestIds.resultSheetCriteriaDialog,
-      child: AlertDialog(
-        title: const Text(Copy.aiResultCriteriaDialogTitle),
+      child: ChalkakDialog(
+        title: Copy.aiResultCriteriaDialogTitle,
         actions: [
-          TextButton(
+          ChalkakDialogButton(
+            label: Copy.commonConfirm,
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text(Copy.commonConfirm),
           ),
         ],
       ),

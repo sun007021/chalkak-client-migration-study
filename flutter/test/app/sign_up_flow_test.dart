@@ -1,10 +1,10 @@
 import 'package:chalkak/app/app_routes.dart';
 import 'package:chalkak/core/copy/ko.g.dart';
+import 'package:chalkak/core/ui/components/chalkak_dialog.dart';
 import 'package:chalkak/core/ui/test_ids.dart';
 import 'package:chalkak/features/notification/data/push_platform.dart';
 import 'package:chalkak/features/onboarding/presentation/onboarding_test_ids.dart';
 import 'package:chalkak/features/signature/presentation/signature_test_ids.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_harness.dart';
@@ -186,7 +186,7 @@ void main() {
       expect(byId(SignatureTestIds.previewRoot), findsNothing);
       expect(byId(SignatureTestIds.previewErrorDialog), findsNothing);
       expect(byId(TestIds.loginErrorDialog), findsOneWidget);
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(ChalkakDialog), findsOneWidget);
       expect(
         find.descendant(
           of: byId(TestIds.loginErrorDialog),

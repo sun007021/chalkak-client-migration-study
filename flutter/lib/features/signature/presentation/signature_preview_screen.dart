@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_dialog.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/signature_mode.dart';
 import 'signature_preview_view_model.dart';
@@ -240,17 +242,23 @@ class _ErrorDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return TestId(
       SignatureTestIds.previewErrorDialog,
-      child: AlertDialog(
+      child: ChalkakDialog(
         content: TestId(
           SignatureTestIds.previewErrorMessage,
-          child: Text(message),
+          child: Text(
+            message,
+            textAlign: TextAlign.center,
+            style: context.tokens.text.callout.copyWith(
+              color: context.tokens.colors.textNeutral,
+            ),
+          ),
         ),
         actions: [
           TestId.button(
             SignatureTestIds.previewErrorDialogConfirmButton,
-            child: TextButton(
+            child: ChalkakDialogButton(
+              label: Copy.commonConfirm,
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text(Copy.commonConfirm),
             ),
           ),
         ],
