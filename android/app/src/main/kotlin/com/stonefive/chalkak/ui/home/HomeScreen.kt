@@ -306,11 +306,11 @@ private fun HeroBlock(state: HomeUiState, callbacks: HomeCallbacks, image: Remot
                         text = copy["home.hero.pending-badge"],
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = ChalkakTheme.colors.onToast,
+                        color = ChalkakTheme.colors.textOnImage,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(12.dp)
-                            .background(ChalkakTheme.colors.toastBackground, CircleShape)
+                            .background(ChalkakTheme.colors.scrim, CircleShape)
                             .padding(horizontal = 12.dp, vertical = 4.dp)
                             .testTag("home.hero-pending-badge"),
                     )
@@ -502,7 +502,7 @@ private fun WeekCell(day: WeekDay, onClick: (LocalDate) -> Unit, image: RemoteIm
                 text = day.date.dayOfMonth.toString(),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = if (entry != null) ChalkakTheme.colors.onToast else ChalkakTheme.colors.textInactive,
+                color = if (entry != null) ChalkakTheme.colors.textOnImage else ChalkakTheme.colors.textInactive,
             )
         }
         if (entry?.status == ModerationStatus.PENDING) {
