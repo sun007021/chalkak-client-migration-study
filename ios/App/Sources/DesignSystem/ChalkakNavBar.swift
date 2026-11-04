@@ -66,6 +66,12 @@ struct ChalkakNavigationButtonStyle: ViewModifier {
 
 /// 쌓임 화면 위쪽 바: 뒤로 버튼과 가운데 제목. 높이 55(홈 상단 바와 같다), 아래 구분선은 border.
 struct ChalkakNavBar: View {
+    /// 글라스 원은 테두리가 보이므로 원본 FeedTopBar처럼 화면 끝에서 lg(16) 띄운다.
+    /// 평면 아이콘은 48 터치 영역 안에 작게 그려지므로 xs만 둔다.
+    static var horizontalPadding: CGFloat {
+        ChalkakPlatformAppearance.usesLiquidGlass ? ChalkakSpacing.lg : ChalkakSpacing.xs
+    }
+
     let title: String
     let backIdentifier: String
     let titleIdentifier: String?
@@ -83,7 +89,7 @@ struct ChalkakNavBar: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(.horizontal, ChalkakSpacing.xs)
+        .padding(.horizontal, Self.horizontalPadding)
         .frame(height: 55)
     }
 }
