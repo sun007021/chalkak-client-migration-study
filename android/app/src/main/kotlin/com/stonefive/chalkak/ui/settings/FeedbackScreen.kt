@@ -1,5 +1,8 @@
 package com.stonefive.chalkak.ui.settings
 
+import com.stonefive.chalkak.ui.components.ChalkakTextField
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -18,7 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
+import com.stonefive.chalkak.ui.components.ChalkakTopBar
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -71,70 +74,52 @@ fun FeedbackScreen(
             .imePadding()
             .testTag("feedback.root"),
     ) {
-        Row(Modifier.fillMaxWidth().padding(start = 8.dp, top = 4.dp, end = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconAction(R.drawable.ic_close, onClose, Modifier.testTag("feedback.close-button"))
-            Text(
-                text = copy["fdbk.title"],
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.textPrimary,
-                modifier = Modifier.padding(start = 4.dp),
-            )
-        }
-        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
+        // screens-c 1.3: the shared top bar (back at the start, centered headline).
+        ChalkakTopBar(
+            title = copy["fdbk.title"],
+            onBack = onClose,
+            backModifier = Modifier.testTag("feedback.close-button").semantics { contentDescription = copy["common.close"] },
+        )
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = ChalkakTheme.spacing.screenHorizontal)) {
             Spacer(Modifier.height(16.dp))
             Text(
                 text = copy["fdbk.intro.title"],
-                style = MaterialTheme.typography.headlineMedium,
+                style = ChalkakTheme.typography.title2,
                 color = colors.textPrimary,
                 modifier = Modifier.testTag("feedback.guide-text"),
             )
             Text(
                 text = copy["fdbk.intro.body"],
-                style = MaterialTheme.typography.bodySmall,
+                style = ChalkakTheme.typography.subheadline,
                 color = colors.textNeutral,
                 modifier = Modifier.padding(top = 12.dp).testTag("feedback.guide-body"),
             )
             Spacer(Modifier.height(24.dp))
-            BasicTextField(
+            ChalkakTextField(
                 value = state.input,
                 onValueChange = onInputChange,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.textPrimary),
-                cursorBrush = SolidColor(colors.inputCursor),
+                placeholder = copy["fdbk.field.placeholder"],
+                minLines = 8,
                 modifier = Modifier.fillMaxWidth().testTag("feedback.input"),
-                decorationBox = { inner ->
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 200.dp)
-                            .background(colors.inputBackground, RoundedCornerShape(16.dp))
-                            .border(1.dp, colors.border, RoundedCornerShape(16.dp))
-                            .padding(16.dp),
-                    ) {
-                        if (state.input.isEmpty()) {
-                            Text(copy["fdbk.field.placeholder"], style = MaterialTheme.typography.bodyLarge, color = colors.textInactive)
-                        }
-                        inner()
-                    }
-                },
             )
             Spacer(Modifier.height(16.dp))
         }
         Text(
             text = "${state.count}/${AppConstants.FEEDBACK_MAX}",
-            style = MaterialTheme.typography.labelMedium,
+            style = ChalkakTheme.typography.footnote,
             color = colors.textInactive,
             textAlign = TextAlign.End,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp).testTag("feedback.counter"),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = ChalkakTheme.spacing.screenHorizontal, vertical = 8.dp).testTag("feedback.counter"),
         )
         state.error?.let { error ->
             val invalid = error.copyKey == SettingsCopyKeys.FEEDBACK_ERROR_INVALID
             Text(
                 text = error.serverMessage ?: error.copyKey?.let { copy[it] } ?: copy[SettingsCopyKeys.FEEDBACK_ERROR_GENERIC],
-                style = MaterialTheme.typography.labelMedium,
+                style = ChalkakTheme.typography.footnote,
                 color = colors.destructive,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
+                    .padding(horizontal = ChalkakTheme.spacing.screenHorizontal)
                     .padding(bottom = 12.dp)
                     .testTag(if (invalid) "feedback.validation-message" else "feedback.error-message"),
             )
@@ -143,7 +128,7 @@ fun FeedbackScreen(
             text = copy[if (state.sending) "fdbk.sending" else "fdbk.send"],
             onClick = onSend,
             enabled = state.sendEnabled,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 18.dp).testTag("feedback.submit-button"),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = ChalkakTheme.spacing.screenHorizontal).padding(bottom = 18.dp).testTag("feedback.submit-button"),
         )
     }
 }

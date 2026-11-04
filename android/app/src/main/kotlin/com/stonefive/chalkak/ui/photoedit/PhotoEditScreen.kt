@@ -24,7 +24,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
+import com.stonefive.chalkak.R
+import com.stonefive.chalkak.ui.theme.ChalkakTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
@@ -97,10 +100,32 @@ interface PhotoEditActions {
     fun onErrorConfirm(id: Long) = Unit
 }
 
-private val EditBackground = Color(0xFF141312)
-private val EditContent = Color.White
-private val EditMuted = Color.White.copy(alpha = 0.56f)
-private val EditSelected = Color.White.copy(alpha = 0.18f)
+// screens-b 6 / tokens `photoEdit*`: the editor palette comes from the theme instead of local literals.
+private val EditBackground: Color @Composable get() = ChalkakTheme.colors.photoEditBackground
+private val EditContent: Color @Composable get() = ChalkakTheme.colors.photoEditContent
+private val EditMuted: Color @Composable get() = ChalkakTheme.colors.photoEditContentMuted
+private val EditSelected: Color @Composable get() = ChalkakTheme.colors.photoEditContent.copy(alpha = 0.18f)
+
+/** Adjustment icons (screens-b 6.2 table). */
+private fun AdjustItem.iconRes(): Int = when (this) {
+    AdjustItem.AUTO -> R.drawable.ic_adjust_auto
+    AdjustItem.EXPOSURE -> R.drawable.ic_adjust_exposure
+    AdjustItem.CONTRAST -> R.drawable.ic_adjust_contrast
+    AdjustItem.HIGHLIGHTS -> R.drawable.ic_adjust_highlights
+    AdjustItem.SHADOWS -> R.drawable.ic_adjust_shadows
+    AdjustItem.BLACK_POINT -> R.drawable.ic_adjust_black_point
+    AdjustItem.SATURATION -> R.drawable.ic_adjust_saturation
+    AdjustItem.WARMTH -> R.drawable.ic_adjust_warmth
+}
+
+@Composable
+private fun AdjustLabel(item: AdjustItem, text: String, color: Color, modifier: Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Icon(painterResource(item.iconRes()), contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(ChalkakTheme.spacing.xs))
+        Text(text, color = color, style = ChalkakTheme.typography.caption, maxLines = 1)
+    }
+}
 private const val ADJUST_SCALE = 100.0
 private val RowHeight = 34.dp
 
@@ -144,7 +169,7 @@ private fun TopBar(state: PhotoEditUiState, actions: PhotoEditActions) {
     val copy = LocalCopy.current
     Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = actions::onCancel, modifier = Modifier.testTag("photo-edit.cancel-button")) {
-            Text(copy["edit.top.cancel"], color = EditContent, style = MaterialTheme.typography.titleSmall)
+            Text(copy["edit.top.cancel"], color = EditContent, style = ChalkakTheme.typography.body)
         }
         Spacer(Modifier.weight(1f))
         TextButton(
@@ -152,7 +177,7 @@ private fun TopBar(state: PhotoEditUiState, actions: PhotoEditActions) {
             enabled = state.ready && !state.busy,
             modifier = Modifier.testTag("photo-edit.done-button"),
         ) {
-            Text(copy["edit.top.done"], color = if (state.ready && !state.busy) EditContent else EditMuted, style = MaterialTheme.typography.titleSmall)
+            Text(copy["edit.top.done"], color = if (state.ready && !state.busy) EditContent else EditMuted, style = ChalkakTheme.typography.body)
         }
     }
 }
@@ -206,10 +231,10 @@ private fun CropTools(state: PhotoEditUiState, actions: PhotoEditActions) {
     }
     Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = actions::onRotate, modifier = Modifier.testTag("photo-edit.rotate-button")) {
-            Text(copy["edit.crop.rotate"], color = EditContent, style = MaterialTheme.typography.bodySmall)
+            Text(copy["edit.crop.rotate"], color = EditContent, style = ChalkakTheme.typography.footnote)
         }
         TextButton(onClick = actions::onCropReset, modifier = Modifier.testTag("photo-edit.reset-button")) {
-            Text(copy["edit.crop.reset"], color = EditContent, style = MaterialTheme.typography.bodySmall)
+            Text(copy["edit.crop.reset"], color = EditContent, style = ChalkakTheme.typography.footnote)
         }
     }
 }
@@ -220,12 +245,7 @@ private fun AdjustTools(state: PhotoEditUiState, actions: PhotoEditActions) {
     val layers = state.adjustments
     CompactControls {
         Row(Modifier.fillMaxWidth().height(RowHeight), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = copy[AdjustItem.AUTO.copyKey],
-                color = EditContent,
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.width(LabelWidth).testTag("photo-edit.adjust-item-auto"),
-            )
+            AdjustLabel(AdjustItem.AUTO, copy[AdjustItem.AUTO.copyKey], EditContent, Modifier.width(LabelWidth).testTag("photo-edit.adjust-item-auto"))
             Switch(
                 checked = layers.autoStrength > 0.0,
                 onCheckedChange = { on -> actions.onAutoStrengthChanged(if (on) 1.0 else 0.0) },
@@ -239,17 +259,17 @@ private fun AdjustTools(state: PhotoEditUiState, actions: PhotoEditActions) {
                 modifier = Modifier.weight(1f).testTag("photo-edit.adjust-auto-strength-slider"),
             )
             TextButton(onClick = actions::onAdjustReset, modifier = Modifier.testTag("photo-edit.reset-button")) {
-                Text(copy["edit.adjust.reset"], color = EditContent, style = MaterialTheme.typography.bodySmall)
+                Text(copy["edit.adjust.reset"], color = EditContent, style = ChalkakTheme.typography.footnote)
             }
         }
         AdjustItem.entries.filter { it != AdjustItem.AUTO }.forEach { item ->
             val name = item.copyKey.tagPart("edit.adjust.")
             Row(Modifier.fillMaxWidth().height(RowHeight), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = copy[item.copyKey],
-                    color = if (state.adjustItem == item) EditContent else EditMuted,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier
+                AdjustLabel(
+                    item,
+                    copy[item.copyKey],
+                    if (state.adjustItem == item) EditContent else EditMuted,
+                    Modifier
                         .width(LabelWidth)
                         .testTag("photo-edit.adjust-item-$name")
                         .selectable(selected = state.adjustItem == item, role = Role.Tab, onClick = { actions.onAdjustItemSelected(item) }),
@@ -265,7 +285,7 @@ private fun AdjustTools(state: PhotoEditUiState, actions: PhotoEditActions) {
     }
 }
 
-private val LabelWidth = 76.dp
+private val LabelWidth = 96.dp
 
 @Composable
 private fun CompactControls(content: @Composable () -> Unit) {
@@ -323,7 +343,7 @@ private fun ToolChip(
             .padding(horizontal = horizontalPadding, vertical = verticalPadding),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = if (selected) EditContent else EditMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        Text(label, color = if (selected) EditContent else EditMuted, style = ChalkakTheme.typography.caption, maxLines = 1)
     }
 }
 
@@ -344,7 +364,7 @@ private fun TabBar(selected: EditTab, actions: PhotoEditActions) {
                     .padding(horizontal = 20.dp, vertical = 10.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(copy[key], color = if (selected == tab) EditContent else EditMuted, style = MaterialTheme.typography.titleSmall)
+                Text(copy[key], color = if (selected == tab) EditContent else EditMuted, style = ChalkakTheme.typography.subheadline)
             }
         }
     }

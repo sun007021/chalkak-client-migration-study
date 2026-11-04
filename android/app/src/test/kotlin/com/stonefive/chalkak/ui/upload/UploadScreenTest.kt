@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -167,7 +168,7 @@ class UploadScreenTest {
     @Test
     fun `TC-UPL-089 세로 사진은 원본 비율 3 대 4로 표시된다`() {
         show(withPhoto(), previewOf(ImageSize(3000, 4000)))
-        val bounds = rule.onNodeWithTag("upload.photo-preview").assertIsDisplayed().getBoundsInRoot()
+        val bounds = rule.onNodeWithTag("upload.photo-preview").assertIsDisplayed().getUnclippedBoundsInRoot()
         assertTrue(kotlin.math.abs(bounds.width.value / bounds.height.value - 3f / 4f) < 0.02f, "ratio ${bounds.width} x ${bounds.height}")
     }
 

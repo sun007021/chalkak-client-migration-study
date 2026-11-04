@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -69,7 +68,7 @@ fun ChalkakRoot(copy: Copy, modifier: Modifier = Modifier) {
         ) {
             Text(
                 text = copy["app.name"],
-                style = MaterialTheme.typography.headlineMedium,
+                style = ChalkakTheme.typography.title2,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.testTag("splash.logo"),
             )
@@ -118,7 +117,7 @@ class RootDependencies(
 fun MainPlaceholder(modifier: Modifier = Modifier) {
     val copy = LocalCopy.current
     Box(modifier = modifier.fillMaxSize().testTag("home.root"), contentAlignment = Alignment.Center) {
-        Text(text = copy["app.name"], style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(text = copy["app.name"], style = ChalkakTheme.typography.title2, fontWeight = FontWeight.Bold)
     }
 }
 
