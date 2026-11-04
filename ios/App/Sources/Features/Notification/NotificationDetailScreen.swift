@@ -41,30 +41,22 @@ struct NotificationDetailScreen: View {
     private var content: some View {
         switch viewModel.phase {
         case .loading:
-            ProgressView().accessibilityIdentifier("notification-detail.loading")
+            ProgressView().tint(ChalkakColor.actionPrimary).accessibilityIdentifier("notification-detail.loading")
         case .gone:
             Text(NotificationCopy.gone)
-                .font(ChalkakFont.callout)
+                .font(ChalkakFont.subheadline)
                 .foregroundStyle(ChalkakColor.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, ChalkakSpacing.screenHorizontal)
                 .accessibilityIdentifier("notification-detail.not-found-state")
         case .error(let message):
-            VStack(spacing: ChalkakSpacing.md) {
+            VStack(spacing: ChalkakSpacing.lg) {
                 Text(message)
-                    .font(ChalkakFont.callout)
+                    .font(ChalkakFont.body)
                     .foregroundStyle(ChalkakColor.textSecondary)
                     .multilineTextAlignment(.center)
-                Button { Task { await viewModel.retry() } } label: {
-                    Text(NotificationCopy.retry)
-                        .font(ChalkakFont.callout)
-                        .foregroundStyle(ChalkakColor.onActionPrimary)
-                        .padding(.horizontal, ChalkakSpacing.xl)
-                        .frame(minHeight: 44)
-                        .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("notification-detail.retry-button")
+                ChalkakOutlinedButton(title: NotificationCopy.retry, action: { Task { await viewModel.retry() } })
+                    .accessibilityIdentifier("notification-detail.retry-button")
             }
             .padding(.horizontal, ChalkakSpacing.screenHorizontal)
             .accessibilityElement(children: .contain)
@@ -76,30 +68,32 @@ struct NotificationDetailScreen: View {
 
     private func detailContent(_ detail: NotificationDetail) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: ChalkakSpacing.lg) {
-                Text(detail.title)
-                    .font(ChalkakFont.headlineBold)
-                    .foregroundStyle(ChalkakColor.textPrimary)
-                    .accessibilityIdentifier("notification-detail.title")
-                Text(detail.body)
-                    .font(ChalkakFont.callout)
-                    .foregroundStyle(ChalkakColor.textPrimary)
-                    .accessibilityIdentifier("notification-detail.body")
+            VStack(alignment: .leading, spacing: ChalkakSpacing.xl) {
+                VStack(alignment: .leading, spacing: ChalkakSpacing.sm) {
+                    Text(detail.title)
+                        .font(ChalkakFont.headline)
+                        .foregroundStyle(ChalkakColor.textPrimary)
+                        .accessibilityIdentifier("notification-detail.title")
+                    Text(detail.body)
+                        .font(ChalkakFont.subheadline)
+                        .foregroundStyle(ChalkakColor.textSecondary)
+                        .accessibilityIdentifier("notification-detail.body")
+                }
                 if let imageURL = detail.originalImageURL {
                     ChalkakRemoteImage(url: imageURL, contentMode: .fit)
                         .frame(maxWidth: .infinity)
                         .aspectRatio(1, contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.large))
+                        .background(ChalkakColor.surface)
                         .accessibilityIdentifier("notification-detail.photo")
                 }
                 if let reason = detail.rejectionReason, !reason.isEmpty {
                     VStack(alignment: .leading, spacing: ChalkakSpacing.sm) {
                         Text(NotificationCopy.detailReason)
-                            .font(ChalkakFont.headline)
-                            .foregroundStyle(ChalkakColor.textPrimary)
+                            .font(ChalkakFont.caption)
+                            .foregroundStyle(ChalkakColor.textInactive)
                         Text(reason)
-                            .font(ChalkakFont.callout)
-                            .foregroundStyle(ChalkakColor.textSecondary)
+                            .font(ChalkakFont.body)
+                            .foregroundStyle(ChalkakColor.textPrimary)
                             .accessibilityIdentifier("notification-detail.rejection-reason")
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -107,15 +101,8 @@ struct NotificationDetailScreen: View {
                     .accessibilityIdentifier("notification-detail.rejection-section")
                 }
                 if detail.type == .postRejected {
-                    Button { viewModel.backToInbox() } label: {
-                        Text(NotificationCopy.detailToInbox)
-                            .font(ChalkakFont.callout)
-                            .foregroundStyle(ChalkakColor.onActionPrimary)
-                            .frame(maxWidth: .infinity, minHeight: 56)
-                            .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("notification-detail.back-to-inbox-button")
+                    ChalkakButton(title: NotificationCopy.detailToInbox, action: { viewModel.backToInbox() }, fillsWidth: true)
+                        .accessibilityIdentifier("notification-detail.back-to-inbox-button")
                 }
             }
             .padding(.horizontal, ChalkakSpacing.screenHorizontal)
