@@ -3,6 +3,10 @@ package com.stonefive.chalkak.ui.terms
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import com.stonefive.chalkak.ui.components.ChalkakCheckbox
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -69,25 +73,26 @@ fun TermsScreen(
 ) {
     val copy = LocalCopy.current
     val colors = ChalkakTheme.colors
+    val spacing = ChalkakTheme.spacing
     Column(modifier = modifier.fillMaxSize().background(colors.inputBackground).testTag("terms.root")) {
         BackAction(onClick = onBackClick, modifier = Modifier.statusBarsPadding().padding(start = 8.dp, top = 4.dp).testTag("terms.back-button"))
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal)) {
             Spacer(Modifier.height(30.dp))
             Text(
                 text = copy["onb.terms.title"],
                 color = colors.textPrimary,
-                style = MaterialTheme.typography.headlineLarge,
+                style = ChalkakTheme.typography.title1,
                 modifier = Modifier.testTag("terms.title"),
             )
-            Spacer(Modifier.height(48.dp))
-            ConsentRow(
+            Spacer(Modifier.height(57.dp))
+            AllConsentRow(
                 label = copy["onb.terms.agree-all"],
                 checked = state.agreeAll,
                 onToggle = onAgreeAllClick,
                 checkboxTag = "terms.agree-all-checkbox",
             )
-            HorizontalDivider(color = colors.border)
-            ConsentRow(
+            Spacer(Modifier.height(3.dp))
+            RequiredConsentRow(
                 label = copy["onb.terms.service"],
                 checked = state.agreeService,
                 onToggle = onServiceClick,
@@ -96,8 +101,8 @@ fun TermsScreen(
                 onView = onServiceViewClick,
                 viewTag = "terms.service-view-button",
             )
-            HorizontalDivider(color = colors.border)
-            ConsentRow(
+            HorizontalDivider(thickness = 1.dp, color = colors.border)
+            RequiredConsentRow(
                 label = copy["onb.terms.privacy"],
                 checked = state.agreePrivacy,
                 onToggle = onPrivacyClick,
@@ -106,7 +111,7 @@ fun TermsScreen(
                 onView = onPrivacyViewClick,
                 viewTag = "terms.privacy-view-button",
             )
-            HorizontalDivider(color = colors.border)
+            HorizontalDivider(thickness = 1.dp, color = colors.border)
         }
         Spacer(Modifier.weight(1f))
         ChalkakButton(
@@ -115,7 +120,7 @@ fun TermsScreen(
             enabled = state.nextEnabled,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = spacing.screenHorizontal)
                 .navigationBarsPadding()
                 .padding(bottom = 20.dp)
                 .testTag("terms.next-button"),
@@ -123,40 +128,64 @@ fun TermsScreen(
     }
 }
 
+/** "전체 동의" card (screens-a 5.1): checkbox 22 + body, padding 16 / 19, 1dp #E3E1DD outline, `shapes.large`. */
 @Composable
-private fun ConsentRow(
+private fun AllConsentRow(label: String, checked: Boolean, onToggle: () -> Unit, checkboxTag: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(ChalkakTheme.shapes.large)
+            .background(ChalkakTheme.colors.inputBackground)
+            .border(1.dp, TermsCardBorder, ChalkakTheme.shapes.large)
+            .toggleable(value = checked, interactionSource = null, indication = null, role = Role.Checkbox, onValueChange = { onToggle() })
+            .padding(horizontal = 16.dp, vertical = 19.dp)
+            .testTag(checkboxTag),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        ChalkakCheckbox(checked)
+        Text(text = label, color = ChalkakTheme.colors.textPrimary, style = ChalkakTheme.typography.body)
+    }
+}
+
+/** Required-consent row: checkbox + 85% title (start 4, 16 vertical, 14 apart) and a muted "보기" link at the end. */
+@Composable
+private fun RequiredConsentRow(
     label: String,
     checked: Boolean,
     onToggle: () -> Unit,
     checkboxTag: String,
-    viewText: String? = null,
-    onView: (() -> Unit)? = null,
-    viewTag: String? = null,
+    viewText: String,
+    onView: () -> Unit,
+    viewTag: String,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .weight(1f)
-                .toggleable(value = checked, role = Role.Checkbox, onValueChange = { onToggle() })
-                .padding(vertical = 16.dp)
+                .toggleable(value = checked, interactionSource = null, indication = null, role = Role.Checkbox, onValueChange = { onToggle() })
+                .padding(start = 4.dp, top = 16.dp, bottom = 16.dp)
                 .testTag(checkboxTag),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Image(
-                painter = painterResource(if (checked) R.drawable.ic_checkbox_selected else R.drawable.ic_checkbox_unselected),
-                contentDescription = null,
-                modifier = Modifier.size(22.dp),
-            )
-            Text(text = label, color = ChalkakTheme.colors.textPrimary, style = MaterialTheme.typography.bodyLarge)
+            ChalkakCheckbox(checked)
+            Text(text = label, color = ChalkakTheme.colors.textPrimary.copy(alpha = 0.85f), style = ChalkakTheme.typography.body)
         }
-        if (viewText != null && onView != null && viewTag != null) {
-            TextButton(onClick = onView, modifier = Modifier.testTag(viewTag)) {
-                Text(text = viewText, color = ChalkakTheme.colors.textInactive, style = MaterialTheme.typography.bodySmall)
-            }
-        }
+        Text(
+            text = viewText,
+            color = ChalkakTheme.colors.textMuted,
+            style = ChalkakTheme.typography.callout,
+            modifier = Modifier
+                .clickable(role = Role.Button, onClick = onView)
+                .padding(start = 12.dp, top = 16.dp, end = 4.dp, bottom = 16.dp)
+                .testTag(viewTag),
+        )
     }
 }
+
+/** Outline of the "전체 동의" card (`OnboardingTermsScreen.swift`, #E3E1DD). */
+private val TermsCardBorder = androidx.compose.ui.graphics.Color(0xFFE3E1DD)
 
 private class DocumentSheet(val kind: TermsKind, val url: String)
 
@@ -222,14 +251,15 @@ fun TermsRoute(
             onBackClick = holder::onBack,
         )
         openFailed?.let { (_, copyKey) ->
-            Box(Modifier.fillMaxSize().navigationBarsPadding().padding(bottom = 96.dp), contentAlignment = Alignment.BottomCenter) {
+            Box(Modifier.fillMaxSize().navigationBarsPadding().padding(horizontal = ChalkakTheme.spacing.screenHorizontal).padding(bottom = 32.dp), contentAlignment = Alignment.BottomCenter) {
                 Text(
                     text = copy[copyKey],
-                    color = ChalkakTheme.colors.onToast,
-                    style = MaterialTheme.typography.bodySmall,
+                    color = ChalkakTheme.colors.onActionPrimary,
+                    style = ChalkakTheme.typography.subheadline,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     modifier = Modifier
-                        .background(ChalkakTheme.colors.toastBackground, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .background(ChalkakTheme.colors.actionPrimary, ChalkakTheme.shapes.pill)
+                        .padding(horizontal = ChalkakTheme.spacing.lg, vertical = ChalkakTheme.spacing.md)
                         .testTag("legal-doc.open-failed-message"),
                 )
             }

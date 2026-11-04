@@ -1,11 +1,11 @@
 package com.stonefive.chalkak.ui.main
 
+import com.stonefive.chalkak.ui.theme.ChalkakTheme
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -106,7 +106,7 @@ class ScrollToTopSignal {
 @Composable
 fun TabPlaceholder(tab: Tab, modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize().testTag("${tab.analyticsName}.root"), contentAlignment = Alignment.Center) {
-        Text(text = LocalCopy.current[tab.labelCopyKey], style = MaterialTheme.typography.titleMedium)
+        Text(text = LocalCopy.current[tab.labelCopyKey], style = ChalkakTheme.typography.headline)
     }
 }
 

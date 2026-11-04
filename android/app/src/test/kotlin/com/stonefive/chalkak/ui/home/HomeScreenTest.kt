@@ -3,6 +3,7 @@ package com.stonefive.chalkak.ui.home
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -193,7 +194,7 @@ class HomeScreenTest {
         show(state)
         assertOnlyHero("home.hero-error", "home.hero-retry-button")
         tag("home.hero-error").assertTextEquals(copy["home.hero.error"])
-        tag("home.hero-retry-button").assertTextEquals(copy["home.hero.retry"])
+        tag("home.hero-retry-button").assertContentDescriptionEquals(copy["home.hero.retry"])
         tag("home.hero-retry-button").performClick()
         assertEquals(listOf("hero-retry"), calls)
     }

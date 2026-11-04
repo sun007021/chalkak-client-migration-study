@@ -24,7 +24,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -53,6 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.ImeAction
 import com.stonefive.chalkak.R
+import com.stonefive.chalkak.ui.components.ChalkakTopBar
 import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.platform.PhotoPreview
 import com.stonefive.chalkak.platform.UploadPlatform
@@ -97,7 +97,7 @@ class UploadResult(val info: SuccessInfo, val photo: PickedPhoto?, val edit: Pho
 
 private const val PlaceholderRatio = 1.216f
 private val SubmitAreaHeight = 104.dp
-private val SideMargin = 22.dp
+private val SideMargin = 25.dp
 private val CardDate: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy. MM. dd")
 
 /**
@@ -125,20 +125,12 @@ fun UploadScreen(
     val colors = ChalkakTheme.colors
     Box(modifier.fillMaxSize().background(colors.background).testTag("upload.root")) {
         Column(Modifier.fillMaxSize()) {
-            Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconAction(R.drawable.ic_close, actions::onClose, Modifier.testTag("upload.close-button"))
-                Text(
-                    text = copy["upload.title"],
-                    style = MaterialTheme.typography.titleLarge,
-                    color = colors.textPrimary,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.size(48.dp))
-            }
+            ChalkakTopBar(
+                title = copy["upload.title"],
+                onBack = actions::onClose,
+                backIcon = R.drawable.ic_close,
+                backModifier = Modifier.testTag("upload.close-button"),
+            )
             Column(Modifier.weight(1f).fillMaxWidth().imePadding().verticalScroll(rememberScrollState())) {
                 PhotoArea(state, preview, actions, photoContent)
                 Spacer(Modifier.height(20.dp))
@@ -188,7 +180,7 @@ private fun PhotoArea(state: PhotoUploadUiState, preview: PhotoPreview?, actions
                 if (topic is TopicState.Loaded) {
                     Text(
                         text = copy.format("upload.heading", "주제" to topic.title),
-                        style = MaterialTheme.typography.titleSmall,
+                        style = ChalkakTheme.typography.callout,
                         color = colors.textNeutral,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.testTag("upload.topic-title"),
@@ -197,7 +189,7 @@ private fun PhotoArea(state: PhotoUploadUiState, preview: PhotoPreview?, actions
                 }
                 Text(
                     text = copy["upload.subheading"],
-                    style = MaterialTheme.typography.labelMedium,
+                    style = ChalkakTheme.typography.footnote,
                     color = colors.textInactive,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.testTag("upload.guide-text"),
@@ -230,7 +222,7 @@ private fun RoundIconButton(iconRes: Int, description: String, onClick: () -> Un
         modifier = modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.size(42.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.66f)), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(42.dp).clip(CircleShape).background(ChalkakTheme.colors.surface.copy(alpha = 0.66f)), contentAlignment = Alignment.Center) {
             Icon(painter = painterResource(iconRes), contentDescription = description, tint = Color.Unspecified, modifier = Modifier.size(22.dp))
         }
     }
@@ -244,16 +236,16 @@ private fun TitleInput(state: PhotoUploadUiState, actions: UploadActions) {
         value = state.title,
         onValueChange = actions::onTitleChange,
         enabled = !state.submitting && !state.completed,
-        textStyle = MaterialTheme.typography.bodyMedium.copy(color = colors.textPrimary),
+        textStyle = ChalkakTheme.typography.callout.copy(color = colors.textPrimary),
         cursorBrush = SolidColor(colors.inputCursor),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         modifier = Modifier.fillMaxWidth().testTag("upload.title-input"),
         decorationBox = { inner ->
             Box(
-                Modifier.fillMaxWidth().background(colors.inputBackground, RoundedCornerShape(14.dp)).padding(horizontal = 16.dp, vertical = 14.dp),
+                Modifier.fillMaxWidth().background(colors.inputBackground, ChalkakTheme.shapes.input).padding(horizontal = 16.dp, vertical = 14.dp),
             ) {
                 if (state.title.isEmpty()) {
-                    Text(copy["upload.caption.placeholder"], style = MaterialTheme.typography.bodyMedium, color = colors.textInactive)
+                    Text(copy["upload.caption.placeholder"], style = ChalkakTheme.typography.callout, color = colors.textInactive)
                 }
                 inner()
             }
@@ -261,7 +253,7 @@ private fun TitleInput(state: PhotoUploadUiState, actions: UploadActions) {
     )
     Text(
         text = "${PostTitle.length(state.title)}/${AppConstants.POST_TITLE_MAX}",
-        style = MaterialTheme.typography.labelMedium,
+        style = ChalkakTheme.typography.footnote,
         color = colors.textInactive,
         textAlign = TextAlign.End,
         modifier = Modifier.fillMaxWidth().padding(top = 6.dp).testTag("upload.title-counter"),
@@ -273,9 +265,9 @@ private fun TopicFailure(state: PhotoUploadUiState, actions: UploadActions) {
     val failed = state.topic as? TopicState.Failed ?: return
     val copy = LocalCopy.current
     Column(Modifier.fillMaxWidth().padding(top = 8.dp).testTag("upload.error-state")) {
-        Text(copy[failed.copyKey], style = MaterialTheme.typography.bodySmall, color = ChalkakTheme.colors.destructive)
+        Text(copy[failed.copyKey], style = ChalkakTheme.typography.subheadline, color = ChalkakTheme.colors.destructive)
         TextButton(onClick = actions::onTopicRetry, modifier = Modifier.testTag("upload.retry-button")) {
-            Text(copy["common.retry"], style = MaterialTheme.typography.bodyMedium, color = ChalkakTheme.colors.actionPrimary)
+            Text(copy["common.retry"], style = ChalkakTheme.typography.callout, color = ChalkakTheme.colors.actionPrimary)
         }
     }
 }
@@ -291,7 +283,7 @@ private fun Feedback(state: PhotoUploadUiState) {
     val text = error.text(copy::get)
     Text(
         text = text,
-        style = MaterialTheme.typography.bodySmall,
+        style = ChalkakTheme.typography.subheadline,
         color = ChalkakTheme.colors.destructive,
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("upload.error-message"),
     )
@@ -421,7 +413,7 @@ fun UploadSuccessScreen(
     Column(modifier.fillMaxSize().background(colors.background).testTag("upload-success.root")) {
         Column(Modifier.weight(1f).fillMaxWidth().statusBarsPadding().verticalScroll(rememberScrollState())) {
             Spacer(Modifier.height(60.dp))
-            Column(Modifier.padding(horizontal = SideMargin).fillMaxWidth().background(colors.inputBackground, RoundedCornerShape(12.dp)).padding(16.dp)) {
+            Column(Modifier.padding(horizontal = SideMargin).fillMaxWidth().background(colors.inputBackground, ChalkakTheme.shapes.photoCard).padding(16.dp)) {
                 val ratio = preview?.let { PhotoEditTransform.outputSize(it.size, edit.quarterTurns, edit.crop).ratio() } ?: 1f
                 Box(Modifier.fillMaxWidth().aspectRatio(ratio).background(colors.border)) {
                     when {
@@ -432,7 +424,7 @@ fun UploadSuccessScreen(
                 }
                 Text(
                     text = info.topicDate.format(CardDate),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = ChalkakTheme.typography.footnote,
                     color = colors.textInactive,
                     modifier = Modifier.padding(top = 20.dp),
                 )
@@ -440,13 +432,13 @@ fun UploadSuccessScreen(
             Spacer(Modifier.height(34.dp))
             Text(
                 text = UploadSuccessText.title(info.topicTitle),
-                style = MaterialTheme.typography.headlineSmall,
+                style = ChalkakTheme.typography.title3,
                 color = colors.textPrimary,
                 modifier = Modifier.padding(horizontal = SideMargin).testTag("upload-success.message"),
             )
             Text(
                 text = copy[UploadSuccessText.statusCopyKey(info.status)],
-                style = MaterialTheme.typography.bodySmall,
+                style = ChalkakTheme.typography.subheadline,
                 color = colors.textNeutral,
                 modifier = Modifier.padding(start = SideMargin, top = 10.dp, end = SideMargin, bottom = 40.dp).testTag("upload-success.status-message"),
             )

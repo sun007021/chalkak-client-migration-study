@@ -40,15 +40,20 @@ class ToastLayerTest {
     @Test
     fun `same text with a new id is redrawn and each id expires after the toast duration`() {
         setContent()
+        // The entrance animation (slide + fade) would advance the virtual clock inside waitForIdle, so step time by hand.
+        rule.mainClock.autoAdvance = false
         toast = ToastUi(1, "같은 문구")
         rule.waitForIdle()
+        rule.mainClock.advanceTimeByFrame()
         rule.mainClock.advanceTimeBy(2_000)
         check(expired.isEmpty())
         toast = ToastUi(2, "같은 문구")
         rule.waitForIdle()
+        rule.mainClock.advanceTimeByFrame()
         rule.mainClock.advanceTimeBy(2_000)
         check(expired.isEmpty()) { "the first window must not expire the newer toast: $expired" }
-        rule.mainClock.advanceTimeBy(AppConstants.TOAST_DURATION_MS - 2_000 + 100)
+        rule.mainClock.advanceTimeBy(AppConstants.TOAST_DURATION_MS - 2_000 + 300)
+        rule.mainClock.advanceTimeByFrame()
         check(expired == listOf(2L)) { "expired=$expired" }
     }
 }

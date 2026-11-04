@@ -1,6 +1,10 @@
 package com.stonefive.chalkak.ui.notification
 
 import androidx.compose.foundation.background
+import com.stonefive.chalkak.ui.components.ChalkakTopBar
+import com.stonefive.chalkak.R
+import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -74,8 +78,7 @@ class NotificationCallbacks(
     val onRetry: () -> Unit,
 )
 
-private val ScreenPadding = 16.dp
-private val ThumbnailSize = 48.dp
+private val ThumbnailSize = 44.dp
 
 /**
  * Stateless inbox (testids.md "알림", TC-NOTI-*). Everything comes from [state]; taps and scroll positions go out through [callbacks].
@@ -93,50 +96,48 @@ fun NotificationScreen(
     val copy = LocalCopy.current
     val colors = ChalkakTheme.colors
     Column(modifier.fillMaxSize().background(colors.background).testTag("notifications.root")) {
-        TopBar {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                BackAction(callbacks.onBack, Modifier.testTag("notifications.back-button").semantics { contentDescription = copy["common.close"] })
-                Text(
-                    text = copy[NotiCopyKeys.INBOX_TITLE],
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.textPrimary,
-                    modifier = Modifier.padding(start = 4.dp),
-                )
-            }
-        }
+        ChalkakTopBar(
+            title = copy[NotiCopyKeys.INBOX_TITLE],
+            onBack = callbacks.onBack,
+            backModifier = Modifier.testTag("notifications.back-button").semantics { contentDescription = copy["common.close"] },
+        )
         when (state.phase) {
             InboxPhase.Loading -> Centered {
                 Loading()
                 Text(
                     text = copy[NotiCopyKeys.INBOX_LOADING],
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.textNeutral,
-                    modifier = Modifier.padding(top = 12.dp).testTag("notifications.loading"),
+                    style = ChalkakTheme.typography.subheadline,
+                    color = colors.textSecondary,
+                    modifier = Modifier.padding(top = ChalkakTheme.spacing.lg).testTag("notifications.loading"),
                 )
             }
-            InboxPhase.Empty -> Centered(Modifier.testTag("notifications.empty-state")) {
-                Text(copy[NotiCopyKeys.INBOX_EMPTY_TITLE], style = MaterialTheme.typography.titleMedium, color = colors.textPrimary, textAlign = TextAlign.Center)
+            InboxPhase.Empty -> Column(
+                Modifier.fillMaxSize().padding(top = 144.dp, start = ChalkakTheme.spacing.screenHorizontal, end = ChalkakTheme.spacing.screenHorizontal).testTag("notifications.empty-state"),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.sm),
+            ) {
+                Icon(painterResource(R.drawable.ic_bell), contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(34.dp))
+                Text(copy[NotiCopyKeys.INBOX_EMPTY_TITLE], style = ChalkakTheme.typography.body, color = colors.textSecondary, textAlign = TextAlign.Center)
                 Text(
                     copy[NotiCopyKeys.INBOX_EMPTY_BODY],
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.textNeutral,
+                    style = ChalkakTheme.typography.subheadline,
+                    color = colors.textMuted,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 8.dp),
                 )
             }
             InboxPhase.Error -> Centered(Modifier.testTag("notifications.error-state")) {
                 Text(
                     copy[state.errorCopyKey ?: NotiCopyKeys.INBOX_ERROR],
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = colors.textPrimary,
+                    style = ChalkakTheme.typography.body,
+                    color = colors.textSecondary,
                     textAlign = TextAlign.Center,
                 )
                 Text(
                     text = copy[NotiCopyKeys.INBOX_RETRY],
-                    style = MaterialTheme.typography.titleSmall,
-                    color = colors.textPrimary,
+                    style = ChalkakTheme.typography.body,
+                    color = colors.actionPrimary,
                     modifier = Modifier
-                        .padding(top = 12.dp)
+                        .padding(top = ChalkakTheme.spacing.md)
                         .testTag("notifications.retry-button")
                         .tapTarget(callbacks.onRetry)
                         .heightIn(min = 48.dp)
@@ -174,7 +175,7 @@ private fun InboxList(state: InboxUiState, callbacks: NotificationCallbacks, ima
         ) {
             itemsIndexed(state.rows, key = { _, row -> row.id }) { index, row ->
                 InboxItem(row, callbacks.onRowClick, image)
-                if (index < state.rows.lastIndex) HorizontalDivider(Modifier.padding(horizontal = ScreenPadding), color = ChalkakTheme.colors.border)
+                if (index < state.rows.lastIndex) HorizontalDivider(Modifier.padding(horizontal = ChalkakTheme.spacing.screenHorizontal), thickness = 1.dp, color = ChalkakTheme.colors.border)
             }
             if (state.loadingMore) {
                 item(key = "load-more") {
@@ -199,6 +200,7 @@ private fun ReportLastVisibleRow(listState: LazyListState, rowCount: Int, report
     }
 }
 
+/** Row (screens-c 3.1.2): unread dot column (12 wide, 8 dot in `inputCursor`), text column, 44dp thumbnail; 24dp above and below. */
 @Composable
 private fun InboxItem(row: InboxRow, onClick: (String) -> Unit, image: RemoteImage) {
     val colors = ChalkakTheme.colors
@@ -207,48 +209,49 @@ private fun InboxItem(row: InboxRow, onClick: (String) -> Unit, image: RemoteIma
             .fillMaxWidth()
             .testTag("notifications.item-${row.id}")
             .tapTarget { onClick(row.id) }
-            .heightIn(min = 48.dp)
-            .padding(horizontal = ScreenPadding, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = ChalkakTheme.spacing.screenHorizontal, vertical = ChalkakTheme.spacing.xl),
+        verticalAlignment = Alignment.Top,
     ) {
-        image(
-            row.thumbnailImageUrl,
-            Modifier.size(ThumbnailSize).clip(RoundedCornerShape(10.dp)).testTag("notifications.item-thumbnail-${row.id}"),
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        Box(Modifier.width(ChalkakTheme.spacing.md).padding(top = ChalkakTheme.spacing.xs)) {
+            if (row.unread) {
+                Box(
+                    Modifier
+                        .size(ChalkakTheme.spacing.sm)
+                        .background(colors.inputCursor, CircleShape)
+                        .testTag("notifications.item-unread-${row.id}"),
+                )
+            }
+        }
+        Column(Modifier.weight(1f).padding(start = ChalkakTheme.spacing.md), verticalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.sm)) {
             Text(
                 text = row.title,
-                style = MaterialTheme.typography.titleSmall,
+                style = ChalkakTheme.typography.subheadline,
                 color = colors.textPrimary,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.testTag("notifications.item-title-${row.id}"),
             )
-            Text(
-                text = row.body,
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.textNeutral,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.testTag("notifications.item-body-${row.id}"),
-            )
+            if (row.body.isNotBlank()) {
+                Text(
+                    text = row.body,
+                    style = ChalkakTheme.typography.caption,
+                    color = colors.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("notifications.item-body-${row.id}"),
+                )
+            }
             Text(
                 text = row.timeText,
-                style = MaterialTheme.typography.bodySmall,
+                style = ChalkakTheme.typography.caption,
                 color = colors.textInactive,
                 modifier = Modifier.testTag("notifications.item-time-${row.id}"),
             )
         }
-        if (row.unread) {
-            Box(
-                Modifier
-                    .padding(start = 8.dp)
-                    .size(8.dp)
-                    .background(colors.destructive, CircleShape)
-                    .testTag("notifications.item-unread-${row.id}"),
-            )
-        }
+        image(
+            row.thumbnailImageUrl,
+            Modifier.padding(start = ChalkakTheme.spacing.lg).size(ThumbnailSize).clip(RoundedCornerShape(6.dp)).testTag("notifications.item-thumbnail-${row.id}"),
+        )
     }
 }
 

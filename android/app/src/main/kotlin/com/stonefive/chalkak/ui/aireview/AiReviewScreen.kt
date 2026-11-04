@@ -39,6 +39,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.stonefive.chalkak.R
+import androidx.compose.foundation.layout.width
+import com.stonefive.chalkak.ui.components.DialogButtonStyle
+import com.stonefive.chalkak.ui.components.ChalkakDialogButton
+import com.stonefive.chalkak.ui.theme.ChalkakRadius
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
 import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.ui.components.ChalkakButton
 import com.stonefive.chalkak.ui.components.ChalkakOutlinedButton
@@ -138,17 +145,27 @@ private fun PillArea(state: AiReviewUiState, callbacks: AiReviewCallbacks) {
                     .padding(horizontal = 20.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    copy[key],
-                    style = MaterialTheme.typography.titleSmall,
-                    color = if (enabled) colors.textPrimary else colors.textInactive,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // screens-b 7.1: aperture badge before the pill label.
+                    Icon(
+                        painterResource(R.drawable.ic_aperture),
+                        contentDescription = null,
+                        tint = if (enabled) colors.textPrimary else colors.textInactive,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(ChalkakTheme.spacing.xs))
+                    Text(
+                        copy[key],
+                        style = ChalkakTheme.typography.subheadline,
+                        color = if (enabled) colors.textPrimary else colors.textInactive,
+                    )
+                }
             }
         }
         state.noticeCopyKey?.let {
             Text(
                 copy[it],
-                style = MaterialTheme.typography.bodySmall,
+                style = ChalkakTheme.typography.footnote,
                 color = colors.textNeutral,
                 modifier = Modifier.padding(top = 8.dp).testTag("feed.ai-message"),
             )
@@ -162,7 +179,7 @@ private fun Scrim(onDismiss: () -> Unit, contentAlignment: Alignment, content: @
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color(0x66000000))
+            .background(ChalkakTheme.colors.scrim)
             // pointerInput, not clickable: clickable merges the whole sheet into one semantics node and hides the testids.
             .pointerInput(onDismiss) { detectTapGestures { onDismiss() } },
         contentAlignment = contentAlignment,
@@ -175,11 +192,21 @@ private fun SheetCard(tag: String, modifier: Modifier = Modifier, content: @Comp
         modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .background(ChalkakTheme.colors.inputBackground, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            .background(ChalkakTheme.colors.surfaceElevated, RoundedCornerShape(topStart = ChalkakRadius.sheet, topEnd = ChalkakRadius.sheet))
             .pointerInput(Unit) { detectTapGestures { } }
-            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .padding(horizontal = ChalkakTheme.spacing.screenHorizontal, vertical = 12.dp)
             .testTag(tag),
-    ) { content() }
+    ) {
+        // screens-b 1.3: 32 x 4 grabber on the sheet's top edge.
+        Box(
+            Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(bottom = 8.dp)
+                .size(width = 32.dp, height = 4.dp)
+                .background(ChalkakTheme.colors.border, CircleShape),
+        )
+        content()
+    }
 }
 
 @Composable
@@ -193,7 +220,7 @@ private fun CloseButton(tag: String, onClick: () -> Unit) {
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Image(painterResource(R.drawable.ic_close), contentDescription = null, modifier = Modifier.size(24.dp))
+        Image(painterResource(R.drawable.ic_close), contentDescription = null, colorFilter = ColorFilter.tint(ChalkakTheme.colors.iconPrimary), modifier = Modifier.size(24.dp))
     }
 }
 
@@ -214,14 +241,14 @@ private fun StartSheet(sheet: AiSheet.Start, enabled: Boolean, callbacks: AiRevi
     val colors = ChalkakTheme.colors
     SheetCard("ai-start-sheet.root") {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(copy[sheet.titleCopyKey], style = MaterialTheme.typography.titleLarge, color = colors.textPrimary, modifier = Modifier.weight(1f))
+            Text(copy[sheet.titleCopyKey], style = ChalkakTheme.typography.title3, color = colors.textPrimary, modifier = Modifier.weight(1f))
             CloseButton("ai-start-sheet.close-button", callbacks.onSheetDismiss)
         }
         Column(
             Modifier.padding(top = 8.dp, bottom = 20.dp).testTag("ai-start-sheet.description").semantics(mergeDescendants = true) {},
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            sheet.lineCopyKeys.forEach { Text(copy[it], style = MaterialTheme.typography.bodyMedium, color = colors.textNeutral) }
+            sheet.lineCopyKeys.forEach { Text(copy[it], style = ChalkakTheme.typography.callout, color = colors.textNeutral) }
         }
         ChalkakButton(
             copy[sheet.confirmCopyKey],
@@ -240,7 +267,7 @@ private fun ResultSheet(content: AiResultUi, callbacks: AiReviewCallbacks) {
         Row(verticalAlignment = Alignment.Top) {
             Text(
                 content.summary,
-                style = MaterialTheme.typography.titleMedium,
+                style = ChalkakTheme.typography.headline,
                 color = colors.textPrimary,
                 modifier = Modifier.weight(1f).padding(top = 12.dp).testTag("ai-result-sheet.feedback-summary"),
             )
@@ -250,14 +277,14 @@ private fun ResultSheet(content: AiResultUi, callbacks: AiReviewCallbacks) {
             Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     content.scoreText,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = ChalkakTheme.typography.title1,
                     color = colors.textPrimary,
                     modifier = Modifier
                         .testTag("ai-result-sheet.overall-score")
                         .semantics { contentDescription = copy.format(content.scoreA11yCopyKey, "X" to content.scoreText) },
                 )
                 // No ko.json key for the bare "/ 10" denominator; the score's own description already says "10점 만점", so hide it from TalkBack.
-                Text("/ 10", style = MaterialTheme.typography.bodyMedium, color = colors.textNeutral, modifier = Modifier.padding(start = 6.dp).clearAndSetSemantics {})
+                Text("/ 10", style = ChalkakTheme.typography.callout, color = colors.textNeutral, modifier = Modifier.padding(start = 6.dp).clearAndSetSemantics {})
                 Spacer(Modifier.weight(1f))
                 Box(
                     Modifier
@@ -267,13 +294,13 @@ private fun ResultSheet(content: AiResultUi, callbacks: AiReviewCallbacks) {
                         .clickable(role = Role.Button, onClick = callbacks.onCriteriaHelpClick),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("?", style = MaterialTheme.typography.titleMedium, color = colors.textNeutral)
+                    Text("?", style = ChalkakTheme.typography.headline, color = colors.textNeutral)
                 }
             }
             if (content.showPerspectiveBadge) {
                 Text(
                     copy["ai.result.distinctive"],
-                    style = MaterialTheme.typography.labelLarge,
+                    style = ChalkakTheme.typography.subheadline,
                     color = colors.textPrimary,
                     modifier = Modifier
                         .padding(top = 8.dp)
@@ -290,8 +317,8 @@ private fun ResultSheet(content: AiResultUi, callbacks: AiReviewCallbacks) {
                         .testTag("ai-result-sheet.criteria-item-${row.key}")
                         .semantics(mergeDescendants = true) {},
                 ) {
-                    Text(row.label, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary, modifier = Modifier.weight(1f))
-                    Text(row.scoreText, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
+                    Text(row.label, style = ChalkakTheme.typography.callout, color = colors.textPrimary, modifier = Modifier.weight(1f))
+                    Text(row.scoreText, style = ChalkakTheme.typography.callout, color = colors.textPrimary)
                 }
             }
             content.sections.forEach { section ->
@@ -302,8 +329,8 @@ private fun ResultSheet(content: AiResultUi, callbacks: AiReviewCallbacks) {
                         .testTag("ai-result-sheet.feedback-${section.titleCopyKey.substringAfterLast('.')}")
                         .semantics(mergeDescendants = true) {},
                 ) {
-                    Text(copy[section.titleCopyKey], style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)
-                    Text(section.body, style = MaterialTheme.typography.bodyMedium, color = colors.textNeutral, modifier = Modifier.padding(top = 4.dp))
+                    Text(copy[section.titleCopyKey], style = ChalkakTheme.typography.subheadline, color = colors.textPrimary)
+                    Text(section.body, style = ChalkakTheme.typography.callout, color = colors.textNeutral, modifier = Modifier.padding(top = 4.dp))
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -316,11 +343,11 @@ private fun FailedSheet(sheet: AiSheet.Failed, callbacks: AiReviewCallbacks) {
     val copy = LocalCopy.current
     val colors = ChalkakTheme.colors
     SheetCard("ai-failed-sheet.root") {
-        Text(copy[sheet.titleCopyKey], style = MaterialTheme.typography.titleLarge, color = colors.textPrimary)
+        Text(copy[sheet.titleCopyKey], style = ChalkakTheme.typography.title3, color = colors.textPrimary)
         sheet.reasonCopyKey?.let {
             Text(
                 copy[it],
-                style = MaterialTheme.typography.bodyMedium,
+                style = ChalkakTheme.typography.callout,
                 color = colors.textNeutral,
                 modifier = Modifier.padding(top = 8.dp).testTag("ai-failed-sheet.message"),
             )
@@ -345,25 +372,26 @@ private fun CriteriaDialog(callbacks: AiReviewCallbacks) {
     Scrim(callbacks.onCriteriaHelpDismiss, Alignment.Center) {
         Column(
             Modifier
-                .padding(horizontal = 36.dp)
-                .fillMaxWidth()
-                .background(colors.inputBackground, RoundedCornerShape(20.dp))
+                .fillMaxWidth(0.81f)
+                .background(colors.surfaceElevated, ChalkakTheme.shapes.large)
                 .pointerInput(Unit) { detectTapGestures { } }
-                .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 12.dp)
+                .padding(start = 40.dp, top = 24.dp, end = 40.dp, bottom = 26.dp)
                 .testTag("ai-result-sheet.criteria-dialog"),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
                 copy["ai.result.criteria-dialog-title"],
-                style = MaterialTheme.typography.titleLarge,
+                style = ChalkakTheme.typography.title3,
                 color = colors.textPrimary,
-                textAlign = TextAlign.Start,
+                textAlign = TextAlign.Center,
             )
-            TextButton(
+            Spacer(Modifier.height(20.dp))
+            ChalkakDialogButton(
+                text = copy["common.confirm"],
                 onClick = callbacks.onCriteriaHelpDismiss,
-                modifier = Modifier.align(Alignment.End).padding(top = 12.dp).testTag("ai-result-sheet.criteria-close-button"),
-            ) {
-                Text(copy["common.confirm"], color = colors.textPrimary, style = MaterialTheme.typography.titleSmall)
-            }
+                style = DialogButtonStyle.Primary,
+                modifier = Modifier.fillMaxWidth().testTag("ai-result-sheet.criteria-close-button"),
+            )
         }
     }
 }

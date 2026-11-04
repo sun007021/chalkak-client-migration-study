@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,7 +24,7 @@ import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.ui.components.BackAction
 import com.stonefive.chalkak.ui.components.ChalkakOutlinedButton
 import com.stonefive.chalkak.ui.components.Loading
-import com.stonefive.chalkak.ui.components.TopBar
+import com.stonefive.chalkak.ui.components.ChalkakTopBar
 import com.stonefive.chalkak.ui.theme.ChalkakTheme
 import kr.chalkak.core.data.home.Banner
 import kr.chalkak.feature.home.ExternalLinkOpener
@@ -52,23 +51,18 @@ fun IssueWebScreen(
     val copy = LocalCopy.current
     BackHandler(onBack = onBack)
     Column(modifier = modifier.fillMaxSize().testTag("issue.root")) {
-        TopBar {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                BackAction(onClick = onBack, modifier = Modifier.testTag("issue.back-button"))
-                Text(
-                    text = copy["home.banner.title"],
-                    style = MaterialTheme.typography.titleLarge,
-                    color = ChalkakTheme.colors.textPrimary,
-                    modifier = Modifier.padding(start = 8.dp).testTag("issue.title"),
-                )
-            }
-        }
+        ChalkakTopBar(
+            title = copy["home.banner.title"],
+            onBack = onBack,
+            backModifier = Modifier.testTag("issue.back-button"),
+            titleModifier = Modifier.testTag("issue.title"),
+        )
         if (linkMessage != null) {
             Text(
                 text = linkMessage,
-                style = MaterialTheme.typography.bodySmall,
+                style = ChalkakTheme.typography.subheadline,
                 color = ChalkakTheme.colors.destructive,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("issue.link-open-failed-message"),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = ChalkakTheme.spacing.screenHorizontal, vertical = 8.dp).testTag("issue.link-open-failed-message"),
             )
         }
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -84,7 +78,7 @@ fun IssueWebScreen(
                 ) {
                     Text(
                         text = copy["banner.web.load-error"],
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = ChalkakTheme.typography.callout,
                         color = ChalkakTheme.colors.textNeutral,
                         modifier = Modifier.testTag("issue.error-state"),
                     )

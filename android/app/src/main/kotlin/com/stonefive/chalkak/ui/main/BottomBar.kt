@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -51,10 +50,10 @@ fun BottomBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(ChalkakTheme.colors.inputBackground)
+            .background(ChalkakTheme.colors.surfaceElevated)
             .navigationBarsPadding()
             .selectableGroup()
-            .padding(top = 10.dp, bottom = 8.dp)
+            .padding(top = 15.dp, bottom = 10.dp)
             .testTag("bottom-bar.root"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -88,12 +87,11 @@ private fun RowScope.TabItem(tab: Tab, selectedTab: Tab?, onTabClick: (Tab) -> U
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(painter = painterResource(iconOf(tab, isSelected)), contentDescription = null, tint = color, modifier = Modifier.size(23.dp))
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(7.dp))
         Text(
             text = copy[tab.labelCopyKey],
             color = color,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            style = ChalkakTheme.typography.footnote.copy(fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal),
         )
     }
 }
