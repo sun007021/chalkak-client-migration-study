@@ -2,7 +2,6 @@ import { useCallback, useEffect } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -12,11 +11,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
-import { colors, spacing } from '../../shared/design/tokens';
+import { colors, radius, spacing, typography } from '../../shared/design/tokens';
 import type {
   NotificationInboxViewModel,
   NotificationItemView,
 } from './NotificationInboxViewModel';
+import { BackButton } from '../../shared/ui/BackButton';
+import { Icon } from '../../shared/ui/icons/Icon';
+import { RemoteImage } from '../../shared/ui/RemoteImage';
+import { RoundIconButton } from '../../shared/ui/RoundIconButton';
 import { Text } from '../../shared/ui/Text';
 
 type Props = { viewModel: NotificationInboxViewModel; onBack?: () => void };
@@ -53,37 +56,39 @@ export function NotificationInboxScreen({ viewModel, onBack }: Props) {
   return (
     <View testID="notifications.root" style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.bar}>
-        <Pressable
-          testID="notifications.back-button"
-          accessibilityRole="button"
-          accessibilityLabel={t('common.close')}
-          onPress={onBack}
-          hitSlop={8}
-          style={styles.back}
-        >
-          <Text style={styles.backText}>{'<'}</Text>
-        </Pressable>
-        <Text style={styles.title}>{t('noti.inbox.title')}</Text>
+        <View style={styles.barBack}>
+          <BackButton
+            testID="notifications.back-button"
+            accessibilityLabel={t('common.close')}
+            onPress={() => onBack?.()}
+          />
+        </View>
+        <Text style={styles.title} accessibilityRole="header">
+          {t('noti.inbox.title')}
+        </Text>
       </View>
 
       {state.status === 'loading' ? (
         <View style={styles.center}>
-          <ActivityIndicator testID="notifications.loading" />
-          <Text style={styles.message}>{t('noti.inbox.loading')}</Text>
+          <ActivityIndicator
+            testID="notifications.loading"
+            color={colors.actionPrimary}
+            style={styles.spinner}
+          />
+          <Text style={styles.loadingText}>{t('noti.inbox.loading')}</Text>
         </View>
       ) : null}
 
       {state.status === 'error' ? (
-        <View testID="notifications.error-state" style={styles.center}>
+        <View testID="notifications.error-state" style={[styles.center, styles.errorBox]}>
           <Text style={styles.message}>{state.errorMessage ?? t('noti.inbox.error')}</Text>
-          <Pressable
+          <RoundIconButton
             testID="notifications.retry-button"
-            accessibilityRole="button"
+            accessibilityLabel={t('noti.inbox.retry')}
+            size={48}
+            iconSize={20}
             onPress={() => void viewModel.retry()}
-            style={styles.retry}
-          >
-            <Text style={styles.retryText}>{t('noti.inbox.retry')}</Text>
-          </Pressable>
+          />
         </View>
       ) : null}
 
@@ -96,25 +101,35 @@ export function NotificationInboxScreen({ viewModel, onBack }: Props) {
           onViewableItemsChanged={onViewable}
           refreshControl={
             <RefreshControl
+              tintColor={colors.actionPrimary}
+              colors={[colors.actionPrimary]}
               refreshing={state.refreshing}
               onRefresh={() => void viewModel.refresh()}
             />
           }
           contentContainerStyle={state.status === 'empty' ? styles.emptyContent : undefined}
           ListEmptyComponent={
-            <View testID="notifications.empty-state" style={styles.center}>
-              <Text style={styles.message}>{t('noti.inbox.empty.title')}</Text>
+            <View testID="notifications.empty-state" style={styles.empty}>
+              <Icon name="ic_notification" size={34} color={colors.iconSecondary} />
+              <Text style={styles.emptyTitle}>{t('noti.inbox.empty.title')}</Text>
               <Text style={styles.sub}>{t('noti.inbox.empty.body')}</Text>
             </View>
           }
           ListHeaderComponent={
             state.refreshing ? (
-              <ActivityIndicator testID="notifications.refresh-indicator" />
+              <ActivityIndicator
+                testID="notifications.refresh-indicator"
+                color={colors.actionPrimary}
+              />
             ) : undefined
           }
           ListFooterComponent={
             state.loadingMore ? (
-              <ActivityIndicator testID="notifications.load-more-indicator" style={styles.more} />
+              <ActivityIndicator
+                testID="notifications.load-more-indicator"
+                color={colors.actionPrimary}
+                style={styles.more}
+              />
             ) : undefined
           }
         />
@@ -128,27 +143,20 @@ function Row({ item, onPress }: { item: NotificationItemView; onPress: () => voi
     <Pressable
       testID={`notifications.item-${item.id}`}
       accessibilityRole="button"
+      accessibilityValue={{ text: item.unread ? '읽지 않음' : '읽음' }}
       onPress={onPress}
       style={styles.row}
     >
-      {item.thumbnailUrl ? (
-        <Image
-          testID={`notifications.item-thumbnail-${item.id}`}
-          source={{ uri: item.thumbnailUrl }}
-          style={styles.thumb}
-        />
-      ) : (
-        // 썸네일이 없으면 대체 이미지 자리.
-        <View
-          testID={`notifications.item-thumbnail-${item.id}`}
-          style={[styles.thumb, styles.thumbEmpty]}
-        />
-      )}
+      <View style={styles.dotColumn}>
+        {item.unread ? (
+          <View testID={`notifications.item-unread-${item.id}`} style={styles.dot} />
+        ) : null}
+      </View>
       <View style={styles.texts}>
         <Text
           testID={`notifications.item-title-${item.id}`}
           style={styles.itemTitle}
-          numberOfLines={1}
+          numberOfLines={2}
         >
           {item.title}
         </Text>
@@ -163,51 +171,58 @@ function Row({ item, onPress }: { item: NotificationItemView; onPress: () => voi
           {item.timeLabel}
         </Text>
       </View>
-      {item.unread ? (
-        <View testID={`notifications.item-unread-${item.id}`} style={styles.dot} />
-      ) : null}
+      <RemoteImage
+        testID={`notifications.item-thumbnail-${item.id}`}
+        uri={item.thumbnailUrl}
+        style={styles.thumb}
+      />
     </Pressable>
   );
 }
 
+// 원본 근거: docs/design/screens-c.md §3.1 (상단 바 72, 행 위아래 24, 점 8 inputCursor, 썸네일 44/6, 구분선 border).
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  bar: { height: 48, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg },
-  back: { paddingRight: spacing.md },
-  backText: { fontSize: 20, color: colors.textPrimary },
-  title: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  emptyContent: { flexGrow: 1 },
-  message: { fontSize: 15, color: colors.textPrimary, textAlign: 'center', marginTop: spacing.sm },
-  sub: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs },
-  retry: {
-    marginTop: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: 8,
-    backgroundColor: colors.surface,
+  bar: {
+    height: 72,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
   },
-  retryText: { fontSize: 14, color: colors.textPrimary },
-  more: { padding: spacing.lg },
+  barBack: { position: 'absolute', left: 20 },
+  title: { ...typography.headline, color: colors.textPrimary, textAlign: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  spinner: { marginBottom: spacing.lg },
+  loadingText: { ...typography.subheadline, color: colors.textSecondary },
+  errorBox: { gap: spacing.xl },
+  emptyContent: { flexGrow: 1 },
+  empty: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingTop: 144,
+    paddingHorizontal: spacing.screenHorizontal,
+  },
+  emptyTitle: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
+  message: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
+  sub: { ...typography.subheadline, color: colors.textMuted, textAlign: 'center' },
+  more: { paddingVertical: spacing.xl },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    alignItems: 'flex-start',
+    paddingVertical: spacing.xl,
+    marginHorizontal: spacing.screenHorizontal,
+    borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  thumb: { width: 48, height: 48, borderRadius: 8, marginRight: spacing.md },
-  thumbEmpty: { backgroundColor: colors.surface },
-  texts: { flex: 1 },
-  itemTitle: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  itemBody: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  time: { fontSize: 12, color: colors.textSecondary, marginTop: 4 },
+  dotColumn: { width: spacing.md, paddingTop: spacing.xs },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.accent,
-    marginLeft: spacing.sm,
+    width: spacing.sm,
+    height: spacing.sm,
+    borderRadius: spacing.xs,
+    backgroundColor: colors.inputCursor,
   },
+  texts: { flex: 1, marginLeft: spacing.md, gap: spacing.sm },
+  itemTitle: { ...typography.subheadline, color: colors.textPrimary },
+  itemBody: { ...typography.caption, color: colors.textSecondary },
+  time: { ...typography.caption, color: colors.textInactive },
+  thumb: { width: 44, height: 44, marginLeft: spacing.lg, borderRadius: 6, overflow: 'hidden' },
 });
