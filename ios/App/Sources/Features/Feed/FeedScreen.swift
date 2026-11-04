@@ -197,19 +197,9 @@ private struct FeedContentView: View {
     }
 
     private func iconButton(_ asset: String, label: String, color: Color, identifier: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(asset)
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 24, height: 24)
-                .foregroundStyle(color)
-                .frame(width: 48, height: 48)
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-        .accessibilityIdentifier(identifier)
+        FeedTopBarActionButton(asset: asset, color: color, action: action)
+            .accessibilityLabel(label)
+            .accessibilityIdentifier(identifier)
     }
 
     // MARK: 다이얼로그
@@ -471,5 +461,42 @@ private struct FeedSignatureImage: View {
                 Color.clear.aspectRatio(2, contentMode: .fit)
             }
         }
+    }
+}
+
+/// 피드 상단 수정·삭제 아이콘 버튼(48 원). Liquid Glass에서는 유리 버튼 안 아이콘을 네이티브 뒤로가기와 같은 17pt로 맞춘다(원본 FeedTopBar).
+private struct FeedTopBarActionButton: View {
+    @ScaledMetric(relativeTo: .body) private var glassIconSize: CGFloat = 17
+    let asset: String
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        if #available(iOS 26.0, *), ChalkakPlatformAppearance.usesLiquidGlass {
+            Button(action: action) { icon(size: glassIconSize) }
+                .foregroundStyle(color)
+                .tint(color)
+                .controlSize(.large)
+                .modifier(ChalkakNavigationButtonStyle())
+                .buttonBorderShape(.circle)
+                .frame(width: ChalkakNavigationButton.diameter, height: ChalkakNavigationButton.diameter)
+                .contentShape(Circle())
+        } else {
+            Button(action: action) {
+                icon(size: 24)
+                    .frame(width: 48, height: 48)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func icon(size: CGFloat) -> some View {
+        Image(asset)
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .foregroundStyle(color)
     }
 }

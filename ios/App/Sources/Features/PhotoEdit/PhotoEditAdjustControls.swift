@@ -32,10 +32,12 @@ struct PhotoEditAdjustControls: View {
 
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: ChalkakSpacing.md) {
-                        ForEach(AdjustmentItem.ordered, id: \.self) { item in
-                            itemButton(item)
-                                .id(item)
+                    PhotoEditControlGroup {
+                        HStack(spacing: ChalkakSpacing.md) {
+                            ForEach(AdjustmentItem.ordered, id: \.self) { item in
+                                itemButton(item)
+                                    .id(item)
+                            }
                         }
                     }
                     .padding(.horizontal, ChalkakSpacing.lg)
@@ -80,7 +82,7 @@ struct PhotoEditAdjustControls: View {
             }
             .foregroundStyle(item == .auto && itemValue > 0 ? ChalkakColor.editorAccent : ChalkakColor.editorContent)
             .frame(width: RulerMetrics.itemSize, height: RulerMetrics.itemSize)
-            .background(ChalkakColor.editorControl, in: Circle())
+            .photoEditControlBackground(in: Circle())
             .overlay {
                 Circle()
                     .inset(by: RulerMetrics.ringWidth / 2)

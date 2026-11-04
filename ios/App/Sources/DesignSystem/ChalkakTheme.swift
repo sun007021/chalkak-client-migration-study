@@ -113,3 +113,18 @@ extension Color {
         )
     }
 }
+
+/// iOS 26 이상에서 Liquid Glass를 쓸지 정한다(원본 ChalkakPlatformAppearance).
+/// 배포 대상은 iOS 18이므로 iOS 26 API는 호출하는 곳마다 `if #available(iOS 26.0, *)`로 함께 감싼다.
+enum ChalkakPlatformAppearance {
+    static var usesLiquidGlass: Bool {
+        #if DEBUG
+        // 기존 시뮬레이터에서 iOS 26 미만 모양을 미리 본다(실행 인자 `-use-flat-ios-design`).
+        if ProcessInfo.processInfo.arguments.contains("-use-flat-ios-design") {
+            return false
+        }
+        #endif
+        if #available(iOS 26.0, *) { return true }
+        return false
+    }
+}

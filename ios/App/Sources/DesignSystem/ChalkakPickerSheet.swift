@@ -1,8 +1,30 @@
 import SwiftUI
 import UIKit
 
+/// 시트 표면. Liquid Glass(iOS 26)에서는 시스템 유리 시트가 보이도록 배경·모서리를 지정하지 않고 내용 배경을 투명으로 둔다.
+/// 그 미만은 `surfaceElevated` 배경 + 모서리 `sheet`(28)(원본 ChalkakPickerSheet·AIReviewStartSheet 등).
+enum ChalkakSheetSurface {
+    static var contentBackground: Color {
+        ChalkakPlatformAppearance.usesLiquidGlass ? .clear : ChalkakColor.surfaceElevated
+    }
+}
+
+extension View {
+    /// 시트 내용에 붙이는 표시 방식. 평면일 때만 배경과 모서리를 지정한다.
+    @ViewBuilder
+    func chalkakSheetPresentationStyle() -> some View {
+        if ChalkakPlatformAppearance.usesLiquidGlass {
+            self
+        } else {
+            self
+                .presentationCornerRadius(ChalkakRadius.sheet)
+                .presentationBackground(ChalkakColor.surfaceElevated)
+        }
+    }
+}
+
 /// 가운데 제목, 오른쪽 "완료", 그 아래 휠로 이루어진 시트 내용(원본 ChalkakPickerSheet, screens-b.md).
-/// 높이 340, 손잡이 표시, 라운드 sheet(28), 배경 surfaceElevated.
+/// 높이 340, 손잡이 표시. 평면이면 라운드 sheet(28)·배경 surfaceElevated, Liquid Glass면 시스템 유리 시트.
 struct ChalkakPickerSheet<Wheels: View>: View {
     let title: String
     var confirmTitle = "완료"
@@ -17,11 +39,10 @@ struct ChalkakPickerSheet<Wheels: View>: View {
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .padding(.top, 20)
-        .background(ChalkakColor.surfaceElevated)
+        .background(ChalkakSheetSurface.contentBackground)
         .presentationDetents([.height(340)])
         .presentationDragIndicator(.visible)
-        .presentationCornerRadius(ChalkakRadius.sheet)
-        .presentationBackground(ChalkakColor.surfaceElevated)
+        .chalkakSheetPresentationStyle()
     }
 
     private var header: some View {

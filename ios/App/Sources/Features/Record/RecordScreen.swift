@@ -81,8 +81,7 @@ private struct RecordScreen: View {
             RecordMonthPickerSheet(viewModel: viewModel, isPresented: $showsMonthPicker)
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
-                .presentationCornerRadius(ChalkakRadius.sheet)
-                .presentationBackground(ChalkakColor.surfaceElevated)
+                .chalkakSheetPresentationStyle()
         }
     }
 
@@ -401,7 +400,7 @@ private struct RecordMonthPickerSheet: View {
                 }
             }
         }
-        .background(ChalkakColor.surfaceElevated.ignoresSafeArea())
+        .background(ChalkakSheetSurface.contentBackground.ignoresSafeArea())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("record.month-picker-sheet")
     }
