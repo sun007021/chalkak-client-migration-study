@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertContentDescriptionEquals
+
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -274,7 +275,8 @@ class HomeScreenTest {
     fun `TC-HOME-019 오늘 인기 사진은 최대 5장이다`() {
         val state = loadedHomeState()
         show(state)
-        listOf("202", "203", "204", "205", "206").forEach { tag("home.popular-item-${postId(it)}").assertIsDisplayed() }
+        // The ranking row is a 82dp horizontal scroller: the fifth card may sit past the viewport edge, so only its presence is checked.
+        listOf("202", "203", "204", "205", "206").forEach { tag("home.popular-item-${postId(it)}").assertExists() }
         assertAbsent("home.popular-item-${postId("207")}", "home.popular-item-${postId("208")}")
     }
 

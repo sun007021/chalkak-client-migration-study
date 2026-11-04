@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -558,6 +560,7 @@ private fun Modifier.tapTarget(onClick: () -> Unit): Modifier {
 // ---- rankings --------------------------------------------------------------------------------------------------------------
 
 private const val RANKING_SLOTS = 5
+private val RANKING_CARD_SIZE = 82.dp
 
 @Composable
 private fun RankingBlock(kind: RankingKind, section: Section<List<HomePost>>, callbacks: HomeCallbacks, image: RemoteImage) {
@@ -571,12 +574,15 @@ private fun RankingBlock(kind: RankingKind, section: Section<List<HomePost>>, ca
             is Section.Ready -> if (section.value.isEmpty()) {
                 SectionMessage(copy["home.ranking.empty"], "$prefix-empty")
             } else {
-                Row(Modifier.fillMaxWidth().padding(horizontal = ScreenPadding), horizontalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.md)) {
-                    // Five equal slots: a short list leaves the right slots empty, so every photo is on screen at once.
+                // screens-a 7.7: 82dp cards in a horizontal list that scrolls edge to edge (content padding, not outer padding).
+                // At most 5 cards, so a plain scrolling Row keeps every card in the tree (no lazy composition).
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = ScreenPadding),
+                    horizontalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.lg),
+                ) {
                     section.value.take(RANKING_SLOTS).forEach { post ->
-                        RankingCard(post, prefix, callbacks, image, Modifier.weight(1f))
+                        RankingCard(post, prefix, callbacks, image, Modifier.width(RANKING_CARD_SIZE))
                     }
-                    repeat(RANKING_SLOTS - section.value.take(RANKING_SLOTS).size) { Spacer(Modifier.weight(1f)) }
                 }
             }
             is Section.Error -> SectionMessage(
