@@ -21,7 +21,18 @@
 | 피커/바텀 시트 | screens-b §1.2, §1.3 | 단순 모달 | **맞춤.** `BottomSheet`(상단 28, 손잡이 32x4, 슬라이드), `WheelPicker`(44, 5줄) |
 | 빈 상태 / 이미지 | screens-b §1.5, §2.4 | 문구만 / 기본 이미지 | **맞춤.** `EmptyState`, `RemoteImage`(스켈레톤, 실패 시 플레이스홀더) |
 | 정렬 선택기 / 뒤로 버튼 / 원형 재시도 | screens-b §1.1, screens-c §1.3 | 문자 | **맞춤.** `SortSelector`, `BackButton`(48), `RoundIconButton` |
-| 하단 바 | screens-a §3 | 문자 라벨 | **맞춤.** `ic_bottom_*` 선택/비선택 아이콘, 가운데 40 작성 버튼. iOS Liquid Glass 바와 스크롤 접힘/컴팩트 바는 플랫폼 기능이라 **관례 유지**(Flat 바 수치: 아이콘 23, footnote 라벨) |
+| 하단 바 | screens-a §3 | 문자 라벨 | **맞춤.** `ic_bottom_*` 선택/비선택 아이콘, 가운데 40 작성 버튼. Flat 바 수치: 아이콘 23, footnote 라벨. 스크롤 접힘/컴팩트 바와 drag scrub은 **보류**(필수 아님, §5.2). Liquid Glass는 아래 §5 행 |
+
+## Liquid Glass (README §5)
+
+| 요소 | 원본 기준 | 수정 전 | 처리 |
+|---|---|---|---|
+| 유리 판단 | §5.2, `usesLiquidGlass` | 없음 | **맞춤.** `shared/glass/glass.tsx`의 `useUsesGlass`: iOS이고 주 버전 26 이상이고 "투명도 줄이기" 꺼짐일 때만 true(변경 이벤트 구독). `GlassOverride`로 테스트·디버그에서 고정. Android·iOS 26 미만은 평면 |
+| 재질 | §5.2 | 없음 | **맞춤(근사).** `expo-blur` `BlurView`(intensity 60, tint light) + 채움 + 흰색 35% 0.5px 테두리(`GlassSurface`). `expo-glass-effect`(UIGlassEffect)는 SDK 58 번들 버전이 있으나 쓰지 않음: Xcode 26 빌드가 필요하고 spec이 정한 채움·테두리 수치를 맞출 수 없으며 Android/구버전 분기와 테스트 mock이 번거로워 BlurView로 통일. 이후 CI가 Xcode 26이 되면 교체 후보 |
+| 하단 바 | §5.1 첫 행 | 화면 폭 바 | **맞춤.** 유리면 떠 있는 캡슐(좌우 lg+xs, 아래 sm+안전 영역, 바 뒤 투명, background 30%), 선택 탭 뒤 흰색 45% 캡슐 렌즈. 평면이면 기존 바. testID 동일(`bottom-bar.lens`만 유리일 때 추가). **보류:** scrub·스크롤 compact 전환 |
+| 원형 내비 버튼 | §5.1 둘째 행 | 평면 아이콘 | **맞춤.** `BackButton`이 유리면 44 원형 유리 위에 아이콘 |
+| 바텀시트 | §5.1 시트 행 | `surfaceElevated` 불투명 | **맞춤.** 유리면 시트 전체에 블러 + `surfaceElevated` 70%(코너 28 유지) |
+| 피드 상단 액션 아이콘 크기, AI 리뷰 시트 버튼, 사진 편집 컨트롤 바탕 | §5.1 | 평면 | **보류.** 이번 범위는 하단 바·내비 버튼·시트 배경. 후속 |
 
 ## 화면
 

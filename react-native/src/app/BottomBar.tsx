@@ -5,13 +5,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../core/state/useViewModelState';
 import { t } from '../shared/copy';
-import { colors, pretendardFor, typography } from '../shared/design/tokens';
+import { colors, pretendardFor, spacing, typography } from '../shared/design/tokens';
 import { Icon } from '../shared/ui/icons/Icon';
 import type { IconName } from '../shared/ui/icons/iconData';
 import { useAppContainer } from './AppContainerContext';
 import { BottomTabPolicy } from './BottomTabPolicy';
 import type { TabRouteName } from './navigation/routes';
 import { Text } from '../shared/ui/Text';
+import { GlassSurface, glassFill, useUsesGlass } from '../shared/glass/glass';
 
 type TabSpec = { testID: string; label: string; icon: IconName; iconSelected: IconName };
 
@@ -60,6 +61,7 @@ export function BottomBar({ state, navigation }: BottomTabBarProps) {
     [mode, analytics, toast],
   );
   const insets = useSafeAreaInsets();
+  const glass = useUsesGlass();
   const focusedName = state.routes[state.index]?.name;
 
   const onTabPress = (name: TabRouteName, routeKey: string) => {
@@ -88,14 +90,15 @@ export function BottomBar({ state, navigation }: BottomTabBarProps) {
         onPress={() => onTabPress(name, route.key)}
         style={styles.tab}
       >
+        {glass && selected ? <View testID="bottom-bar.lens" style={styles.lens} /> : null}
         <Icon name={selected ? spec.iconSelected : spec.icon} size={ICON_SIZE} color={color} />
         <Text style={[styles.label, { color }, selected && styles.selected]}>{spec.label}</Text>
       </Pressable>
     );
   };
 
-  return (
-    <View testID="bottom-bar.root" style={[styles.root, { paddingBottom: insets.bottom + 12 }]}>
+  const items = (
+    <>
       {tab('Home')}
       {tab('Display')}
       <View style={styles.slot}>
@@ -111,11 +114,41 @@ export function BottomBar({ state, navigation }: BottomTabBarProps) {
       </View>
       {tab('Record')}
       {tab('Settings')}
+    </>
+  );
+
+  if (!glass) {
+    return (
+      <View testID="bottom-bar.root" style={[styles.root, { paddingBottom: insets.bottom + 12 }]}>
+        {items}
+      </View>
+    );
+  }
+  // 떠 있는 캡슐(README §5.2): 좌우 lg+xs, 아래 sm(+안전 영역), 바 뒤는 투명.
+  return (
+    <View
+      pointerEvents="box-none"
+      style={[styles.floatWrap, { paddingBottom: insets.bottom + spacing.sm }]}
+    >
+      <GlassSurface testID="bottom-bar.root" fill={glassFill.bar} style={styles.capsule}>
+        {items}
+      </GlassSurface>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  floatWrap: { paddingHorizontal: spacing.lg + spacing.xs, backgroundColor: 'transparent' },
+  capsule: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 8 },
+  lens: {
+    position: 'absolute',
+    top: 2,
+    bottom: 2,
+    left: 6,
+    right: 6,
+    borderRadius: 999,
+    backgroundColor: glassFill.lens,
+  },
   root: {
     flexDirection: 'row',
     alignItems: 'center',

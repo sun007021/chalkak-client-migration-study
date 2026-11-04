@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, radius } from '../design/tokens';
+import { GlassSurface, glassFill, useUsesGlass } from '../glass/glass';
 
 // 원본 근거: docs/design/README.md §4 (시트: 원본과 같은 라운드 시트), screens-b.md §1.2.
 // 위 모서리 28, surfaceElevated, 손잡이 32x4(screens-a.md §7.5 Android AiReviewSheetDragHandle).
@@ -38,6 +39,7 @@ export function BottomSheet({
   showHandle = true,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
+  const glass = useUsesGlass();
   const { height: windowHeight } = useWindowDimensions();
   const [progress] = useState(() => new Animated.Value(0));
 
@@ -76,9 +78,17 @@ export function BottomSheet({
             height !== undefined
               ? { height: height + insets.bottom }
               : { maxHeight: windowHeight * 0.9 },
+            glass && styles.sheetGlass,
             { paddingBottom: insets.bottom, transform: [{ translateY }] },
           ]}
         >
+          {glass ? (
+            <GlassSurface
+              testID={testID ? `${testID}.glass` : undefined}
+              fill={glassFill.sheet}
+              style={StyleSheet.absoluteFill}
+            />
+          ) : null}
           {showHandle ? <View style={styles.handle} /> : null}
           {children}
         </Animated.View>
@@ -96,6 +106,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
     overflow: 'hidden',
   },
+  sheetGlass: { backgroundColor: 'transparent' },
   handle: {
     alignSelf: 'center',
     marginTop: 10,
