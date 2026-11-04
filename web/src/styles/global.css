@@ -520,3 +520,10 @@ button.ck-row:active { background: rgba(43, 39, 36, 0.04); }
   color: var(--color-text-primary);
   font: var(--font-callout-weight) var(--font-callout-size) / var(--font-callout-line-height) var(--font-callout-family);
 }
+
+/* role="switch" 행 안의 스위치 모양(screens-c §1.4: 켜짐 색은 actionPrimary) */
+.ck-switch-vis { position: relative; flex: none; width: 51px; height: 31px; border-radius: var(--radius-pill); background: var(--color-calendar-cell-border); transition: background-color 0.2s ease; }
+.ck-switch-vis::after { content: ''; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18); transition: transform 0.2s ease; }
+[aria-checked='true'] > .ck-switch-vis { background: var(--color-action-primary); }
+[aria-checked='true'] > .ck-switch-vis::after { transform: translateX(20px); }
+.ck-row:disabled > .ck-switch-vis { opacity: 0.5; }
