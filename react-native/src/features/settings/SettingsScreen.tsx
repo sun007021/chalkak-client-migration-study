@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import type { PushSettingKey } from '../../data/settings/NotificationSettingsRepository';
+import { useGlassBarInset } from '../../shared/glass/glass';
 import { t } from '../../shared/copy';
 import { colors, radius, spacing, typography } from '../../shared/design/tokens';
 import { Dialog, DialogButton } from '../../shared/ui/Dialog';
@@ -60,8 +61,12 @@ function GuestBody({ viewModel }: { viewModel: SettingsViewModel }) {
 
 function MemberBody({ viewModel }: { viewModel: SettingsViewModel }) {
   const { version } = useViewModelState(viewModel);
+  const barInset = useGlassBarInset();
   return (
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      contentContainerStyle={[styles.content, { paddingBottom: spacing.xxl + barInset }]}
+      showsVerticalScrollIndicator={false}
+    >
       <Section title={t('settings.section.app')}>
         <SignatureCard viewModel={viewModel.signatureCard} />
       </Section>

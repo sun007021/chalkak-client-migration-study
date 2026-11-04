@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { formatMonthDay } from '../../core/time/dateFormat';
 import type { PostSort, PostSummary } from '../../data/post/PostModels';
+import { useGlassBarInset } from '../../shared/glass/glass';
 import { t } from '../../shared/copy';
 import { colors, radius, spacing, typography } from '../../shared/design/tokens';
 import { EmptyState } from '../../shared/ui/EmptyState';
@@ -53,6 +54,7 @@ const GRID_IDS = {
 export function DisplayScreen({ viewModel }: { viewModel: DisplayViewModel }) {
   const state = useViewModelState(viewModel);
   const insets = useSafeAreaInsets();
+  const barInset = useGlassBarInset();
   const scrollRef = useRef<ScrollViewInstance>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [collapse, setCollapse] = useState(0);
@@ -197,7 +199,7 @@ export function DisplayScreen({ viewModel }: { viewModel: DisplayViewModel }) {
           onLayout={visible.onViewportLayout}
           onScroll={onScroll}
           scrollEventThrottle={50}
-          contentContainerStyle={styles.gridContent}
+          contentContainerStyle={[styles.gridContent, { paddingBottom: spacing.xxl + barInset }]}
         >
           {state.refreshing ? (
             <ActivityIndicator

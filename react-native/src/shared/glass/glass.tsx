@@ -9,7 +9,9 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { colors } from '../design/tokens';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { colors, spacing } from '../design/tokens';
 
 // 원본 근거: docs/design/README.md §5.2 (RN, iOS에서 실행). 원본 ChalkakPlatformAppearance.usesLiquidGlass.
 // iOS 26 이상 + 투명도 줄이기 꺼짐일 때만 유리를 근사하고, 그 외(Android, iOS 26 미만)는 평면이다.
@@ -99,3 +101,16 @@ const styles = StyleSheet.create({
   clip: { overflow: 'hidden' },
   rim: { borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.35)', backgroundColor: 'transparent' },
 });
+
+/** 유리 하단 바 캡슐의 높이(탭 48 + 위아래 8). BottomBar의 캡슐과 같은 값이다. */
+export const GLASS_BAR_HEIGHT = 64;
+
+/**
+ * 탭 화면 스크롤 콘텐츠 아래에 줄 inset. 유리 하단 바는 콘텐츠 위에 떠 있으므로(절대 배치)
+ * 바 높이 + 아래 여백 + 안전 영역만큼 비워 마지막 항목이 가려지지 않게 한다. 평면이면 0.
+ */
+export function useGlassBarInset(): number {
+  const glass = useUsesGlass();
+  const insets = useSafeAreaInsets();
+  return glass ? GLASS_BAR_HEIGHT + spacing.sm + insets.bottom : 0;
+}

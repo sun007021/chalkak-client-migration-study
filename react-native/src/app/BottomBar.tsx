@@ -12,7 +12,7 @@ import { useAppContainer } from './AppContainerContext';
 import { BottomTabPolicy } from './BottomTabPolicy';
 import type { TabRouteName } from './navigation/routes';
 import { Text } from '../shared/ui/Text';
-import { GlassSurface, glassFill, useUsesGlass } from '../shared/glass/glass';
+import { GLASS_BAR_HEIGHT, GlassSurface, glassFill, useUsesGlass } from '../shared/glass/glass';
 
 type TabSpec = { testID: string; label: string; icon: IconName; iconSelected: IconName };
 
@@ -138,8 +138,21 @@ export function BottomBar({ state, navigation }: BottomTabBarProps) {
 }
 
 const styles = StyleSheet.create({
-  floatWrap: { paddingHorizontal: spacing.lg + spacing.xs, backgroundColor: 'transparent' },
-  capsule: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingVertical: 8 },
+  floatWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: spacing.lg + spacing.xs,
+    backgroundColor: 'transparent',
+  },
+  capsule: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    paddingVertical: 8,
+    minHeight: GLASS_BAR_HEIGHT,
+  },
   lens: {
     position: 'absolute',
     top: 2,

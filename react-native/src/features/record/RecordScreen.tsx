@@ -7,6 +7,7 @@ import { formatMonthDay } from '../../core/time/dateFormat';
 import type { KstDate } from '../../core/time/KstDate';
 import type { YearMonth } from '../../core/time/YearMonth';
 import type { RecordPhoto } from '../../data/record/RecordModels';
+import { useGlassBarInset } from '../../shared/glass/glass';
 import { t } from '../../shared/copy';
 import { colors, radius, spacing, typography } from '../../shared/design/tokens';
 import { buildCalendarGrid, formatRecordMonthLabel } from './calendarGrid';
@@ -29,6 +30,7 @@ const CELL_GAP = 6; // screens-c.md §2.3 칸 간격
 export function RecordScreen({ viewModel }: { viewModel: RecordViewModel }) {
   const state = useViewModelState(viewModel);
   const insets = useSafeAreaInsets();
+  const barInset = useGlassBarInset();
   const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
@@ -39,7 +41,9 @@ export function RecordScreen({ viewModel }: { viewModel: RecordViewModel }) {
   return (
     <View testID="record.root" style={[styles.root, { paddingTop: insets.top }]}>
       <MonthHeader state={state} viewModel={viewModel} onPickerPress={() => setPickerOpen(true)} />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: spacing.xl + barInset }]}
+      >
         {state.status === 'loading' ? <CalendarSkeleton /> : null}
         {state.status === 'error' ? <ErrorState state={state} viewModel={viewModel} /> : null}
         {state.status === 'content' ? <ContentState state={state} viewModel={viewModel} /> : null}

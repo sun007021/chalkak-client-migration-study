@@ -29,7 +29,7 @@
 |---|---|---|---|
 | 유리 판단 | §5.2, `usesLiquidGlass` | 없음 | **맞춤.** `shared/glass/glass.tsx`의 `useUsesGlass`: iOS이고 주 버전 26 이상이고 "투명도 줄이기" 꺼짐일 때만 true(변경 이벤트 구독). `GlassOverride`로 테스트·디버그에서 고정. Android·iOS 26 미만은 평면 |
 | 재질 | §5.2 | 없음 | **맞춤(근사).** `expo-blur` `BlurView`(intensity 60, tint light) + 채움 + 흰색 35% 0.5px 테두리(`GlassSurface`). `expo-glass-effect`(UIGlassEffect)는 SDK 58 번들 버전이 있으나 쓰지 않음: Xcode 26 빌드가 필요하고 spec이 정한 채움·테두리 수치를 맞출 수 없으며 Android/구버전 분기와 테스트 mock이 번거로워 BlurView로 통일. 이후 CI가 Xcode 26이 되면 교체 후보 |
-| 하단 바 | §5.1 첫 행 | 화면 폭 바 | **맞춤.** 유리면 떠 있는 캡슐(좌우 lg+xs, 아래 sm+안전 영역, 바 뒤 투명, background 30%), 선택 탭 뒤 흰색 45% 캡슐 렌즈. 평면이면 기존 바. testID 동일(`bottom-bar.lens`만 유리일 때 추가). **보류:** scrub·스크롤 compact 전환 |
+| 하단 바 | §5.1 첫 행 | 화면 폭 바 | **맞춤.** 유리면 떠 있는 캡슐(좌우 lg+xs, 아래 sm+안전 영역, 바 뒤 투명, background 30%), 선택 탭 뒤 흰색 45% 캡슐 렌즈. 평면이면 기존 바. testID 동일(`bottom-bar.lens`만 유리일 때 추가). 홈·전시·기록·설정 스크롤 하단에 `useGlassBarInset`(바 64+sm+안전 영역)을 더해 마지막 항목이 가려지지 않음. **보류:** scrub·스크롤 compact 전환 |
 | 원형 내비 버튼 | §5.1 둘째 행 | 평면 아이콘 | **맞춤.** `BackButton`이 유리면 44 원형 유리 위에 아이콘 |
 | 바텀시트 | §5.1 시트 행 | `surfaceElevated` 불투명 | **맞춤.** 유리면 시트 전체에 블러 + `surfaceElevated` 70%(코너 28 유지) |
 | 피드 상단 액션 아이콘 크기, AI 리뷰 시트 버튼, 사진 편집 컨트롤 바탕 | §5.1 | 평면 | **보류.** 이번 범위는 하단 바·내비 버튼·시트 배경. 후속 |
