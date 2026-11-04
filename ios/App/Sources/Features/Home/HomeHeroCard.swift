@@ -10,7 +10,8 @@ struct HomeHeroCard: View {
         content
             .frame(maxWidth: .infinity)
             .aspectRatio(5.0 / 6.0, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.large))
+            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.photoCard))
+            .overlay(RoundedRectangle(cornerRadius: ChalkakRadius.photoCard).strokeBorder(ChalkakColor.border, lineWidth: 1))
     }
 
     @ViewBuilder
@@ -24,23 +25,15 @@ struct HomeHeroCard: View {
             status(viewModel.heroText, identifier: "home.hero-processing") { EmptyView() }
         case .error:
             status(viewModel.heroText, identifier: "home.hero-error") {
-                Button { Task { await viewModel.retry(.hero) } } label: {
-                    Text(HomeCopy.retry)
-                        .font(ChalkakFont.footnote)
-                        .foregroundStyle(ChalkakColor.onActionPrimary)
-                        .padding(.horizontal, ChalkakSpacing.lg)
-                        .frame(minHeight: 36)
-                        .background(ChalkakColor.actionPrimary, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("home.hero-retry-button")
+                ChalkakRetryCircleButton(diameter: 40, iconSize: 18) { Task { await viewModel.retry(.hero) } }
+                    .accessibilityIdentifier("home.hero-retry-button")
             }
         case .empty:
             ZStack {
                 Button { Task { await viewModel.heroTapped() } } label: {
                     VStack(spacing: ChalkakSpacing.xl) {
                         Text(viewModel.heroText)
-                            .font(ChalkakFont.subheadline)
+                            .font(ChalkakFont.subheadlineSemibold)
                             .foregroundStyle(ChalkakColor.textPrimary)
                             .multilineTextAlignment(.center)
                         Image(systemName: "plus")
@@ -50,7 +43,7 @@ struct HomeHeroCard: View {
                             .background(ChalkakColor.actionPrimary, in: Circle())
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(ChalkakColor.surfaceElevated)
+                    .background(ChalkakColor.surface)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -63,7 +56,7 @@ struct HomeHeroCard: View {
                 ChalkakRemoteImage(url: thumbnailURL)
                 if isPending {
                     Text(HomeCopy.heroPendingBadge)
-                        .font(ChalkakFont.caption)
+                        .font(ChalkakFont.captionSemibold)
                         .foregroundStyle(ChalkakColor.textOnImage)
                         .padding(.horizontal, ChalkakSpacing.md)
                         .padding(.vertical, ChalkakSpacing.xs)
@@ -73,6 +66,7 @@ struct HomeHeroCard: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(ChalkakColor.surfaceElevated)
             .clipped()
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("home.hero-photo")
@@ -88,7 +82,7 @@ struct HomeHeroCard: View {
             action()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(ChalkakColor.surfaceElevated)
+        .background(ChalkakColor.surface)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(identifier)
     }

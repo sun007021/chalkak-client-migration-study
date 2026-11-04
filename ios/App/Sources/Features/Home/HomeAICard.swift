@@ -42,6 +42,8 @@ private struct HomeAICard: View {
                     .accessibilityIdentifier("home.ai-message")
             }
         }
+        .padding(.horizontal, ChalkakSpacing.screenHorizontal)
+        .padding(.top, ChalkakSpacing.lg)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("home.ai-card")
         .task(id: isRunning) {
@@ -80,33 +82,50 @@ private struct HomeAICard: View {
         }
     }
 
+    /// 원본 HomeFeedbackCard 헤더(screens-a.md 7.5): 카드 surfaceElevated/xlarge/border + 옅은 그림자, 최소 높이 64,
+    /// 제목 callout semibold, 오른쪽에 진행 중이면 오디오 웨이브 원, 완료면 "자세히 보기"+chevron.down, 재요청은 텍스트.
     private func row(_ card: AIReviewViewModel.Card) -> some View {
         HStack(spacing: ChalkakSpacing.md) {
             Text(card.message)
-                .font(ChalkakFont.subheadline)
+                .font(ChalkakFont.calloutSemibold)
                 .foregroundStyle(ChalkakColor.textPrimary)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if let title = card.actionTitle, let action = card.action {
                 Button { Task { await viewModel.performCardAction() } } label: {
-                    Text(title)
-                        .font(ChalkakFont.footnote)
-                        .foregroundStyle(ChalkakColor.onActionPrimary)
-                        .padding(.horizontal, ChalkakSpacing.md)
-                        .frame(minHeight: 32)
-                        .background(ChalkakColor.actionPrimary, in: Capsule())
+                    HStack(spacing: ChalkakSpacing.xs) {
+                        Text(title)
+                            .font(ChalkakFont.footnote)
+                            .foregroundStyle(ChalkakColor.textSecondary)
+                        if action == .showResult {
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(ChalkakColor.iconSecondary)
+                        }
+                    }
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ChalkakPressOpacityButtonStyle())
                 .accessibilityIdentifier(action == .retry ? "home.ai-retry-button" : "home.ai-detail-button")
             } else if card.action == .start {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(ChalkakColor.iconPrimary)
+                    .foregroundStyle(ChalkakColor.iconSecondary)
+            } else if card.action == nil, viewModel.phase != .failed {
+                ChalkakAudioWaveIcon(isAnimating: true)
+                    .foregroundStyle(ChalkakColor.onActionPrimary)
+                    .frame(width: 32, height: 32)
+                    .background(ChalkakColor.actionPrimary, in: Circle())
+                    .accessibilityHidden(true)
             }
         }
-        .padding(ChalkakSpacing.lg)
-        .frame(maxWidth: .infinity, minHeight: 56)
-        .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.large))
+        .padding(.leading, ChalkakSpacing.lg)
+        .padding(.trailing, ChalkakSpacing.sm)
+        .frame(maxWidth: .infinity, minHeight: 64)
+        .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.xlarge))
+        .overlay(RoundedRectangle(cornerRadius: ChalkakRadius.xlarge).stroke(ChalkakColor.border, lineWidth: 1))
+        .shadow(color: ChalkakColor.actionPrimary.opacity(0.08), radius: 12, x: 0, y: 5)
         .contentShape(Rectangle())
     }
 }
