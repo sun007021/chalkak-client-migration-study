@@ -1,3 +1,5 @@
+import { Button } from "../../core/ui/Button";
+import { color, font, radius, space } from "../../design/tokens";
 import { useEffect, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { Navigate, useNavigate } from "react-router";
@@ -31,16 +33,17 @@ const rootStyle: CSSProperties = {
   boxSizing: "border-box",
   display: "flex",
   flexDirection: "column",
-  gap: 16,
-  padding: 16,
+  gap: space.lg,
+  padding: `${space.xl} ${space.lg}`,
+  background: color.background,
 };
 const cardStyle: CSSProperties = {
   width: "100%",
   maxHeight: "55dvh",
   objectFit: "contain",
   display: "block",
-  borderRadius: 12,
-  background: "#f2f2f2",
+  borderRadius: radius.large,
+  background: color.surface,
 };
 
 function UploadSuccessView({ result }: { result: UploadResult }): ReactNode {
@@ -69,23 +72,18 @@ function UploadSuccessView({ result }: { result: UploadResult }): ReactNode {
   return (
     <div data-testid="upload-success.root" style={rootStyle}>
       {photoUrl && <img src={photoUrl} alt={webOnlyCopy["upload.success.photo-alt"]} style={cardStyle} />}
-      <p data-testid="upload-success.message">
+      <p data-testid="upload-success.message" style={{ margin: 0, textAlign: "center", color: color.textPrimary, whiteSpace: "pre-line", ...font("title3") }}>
         {t("upload.success.title", {
           주제: result.topicTitle,
           "을/를": objectParticle(result.topicTitle),
         })}
       </p>
       {statusKey && (
-        <p data-testid="upload-success.status-message">{t(statusKey)}</p>
+        <p data-testid="upload-success.status-message" style={{ margin: 0, textAlign: "center", color: color.textSecondary, whiteSpace: "pre-line", ...font("callout") }}>{t(statusKey)}</p>
       )}
-      <button
-        type="button"
-        data-testid="upload-success.confirm-button"
-        style={{ minHeight: 48, marginTop: "auto" }}
-        onClick={confirm}
-      >
+      <Button fill data-testid="upload-success.confirm-button" style={{ marginTop: "auto" }} onClick={confirm}>
         {t("upload.success.confirm")}
-      </button>
+      </Button>
     </div>
   );
 }

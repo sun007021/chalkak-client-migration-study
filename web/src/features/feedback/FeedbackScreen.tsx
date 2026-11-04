@@ -27,7 +27,7 @@ export function FeedbackScreen(): ReactNode {
 }
 
 const page: CSSProperties = { minHeight: '100dvh', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', background: color.background };
-const body: CSSProperties = { display: 'flex', flexDirection: 'column', gap: space.md, padding: `${space.md}px ${space.lg}px ${space.xl}px` };
+const body: CSSProperties = { display: 'flex', flexDirection: 'column', gap: space.md, padding: `${space.md} ${space.lg} ${space.xl}` };
 const note: CSSProperties = { margin: 0, color: color.error, ...font('caption') };
 
 function FeedbackView({ vm }: { vm: FeedbackViewModel }): ReactNode {

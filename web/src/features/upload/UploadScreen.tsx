@@ -9,7 +9,11 @@ import { webOnlyCopy } from "../../copy/webOnly";
 import { useScreenView } from "../../core/analytics/useScreenView";
 import { useOwnedViewModel } from "../../core/state/useOwnedViewModel";
 import { useViewModel } from "../../core/state/useViewModel";
+import { Button } from "../../core/ui/Button";
+import { IcPhotoCamera, IcPhotoLibrary } from "../../core/ui/icons.generated";
 import { ErrorState } from "../../core/ui/StateViews";
+import { CloseButton, TopBar } from "../../core/ui/TopBar";
+import { color, font, radius, space } from "../../design/tokens";
 import { planUploadClose, readUploadRouteState } from "./uploadNavigation";
 import type { UploadViewModel } from "./UploadViewModel";
 
@@ -46,13 +50,9 @@ const rootStyle: CSSProperties = {
   boxSizing: "border-box",
   display: "flex",
   flexDirection: "column",
-  gap: 16,
-  padding: 16,
-};
-const headerStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
+  gap: space.md,
+  padding: `0 ${space.lg} ${space.xl}`,
+  background: color.background,
 };
 const previewStyle: CSSProperties = {
   width: "100%",
@@ -60,9 +60,9 @@ const previewStyle: CSSProperties = {
   display: "block",
   padding: 0,
   border: "none",
-  borderRadius: 12,
+  borderRadius: radius.large,
   overflow: "hidden",
-  background: "#f2f2f2",
+  background: color.surface,
 };
 const pickersStyle: CSSProperties = { display: "flex", gap: 8 };
 const pickerStyle: CSSProperties = {
@@ -71,9 +71,13 @@ const pickerStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  border: "1px dashed currentColor",
-  borderRadius: 12,
+  gap: 8,
+  border: `1px dashed ${color.border}`,
+  borderRadius: radius.large,
+  background: color.surface,
+  color: color.textSecondary,
   cursor: "pointer",
+  ...font("callout"),
 };
 const hiddenInputStyle: CSSProperties = {
   position: "absolute",
@@ -85,9 +89,12 @@ const hiddenInputStyle: CSSProperties = {
 };
 const editorOverlayStyle: CSSProperties = {
   position: "fixed",
-  inset: 0,
+  top: 0,
+  bottom: 0,
+  left: "var(--column-inset)",
+  right: "var(--column-inset)",
   zIndex: 30,
-  background: "Canvas",
+  background: color.background,
   overflow: "auto",
 };
 
@@ -143,28 +150,19 @@ function UploadView({ vm }: { vm: UploadViewModel }): ReactNode {
   const { topic, photo, editor } = state;
   return (
     <div data-testid="upload.root" style={rootStyle}>
-      <div style={headerStyle}>
-        <button
-          type="button"
-          data-testid="upload.close-button"
-          aria-label={t("common.close")}
-          style={{ minWidth: 44, minHeight: 44 }}
-          onClick={close}
-        >
-          ✕
-        </button>
-        <h1 style={{ margin: 0, fontSize: 18 }}>{t("upload.title")}</h1>
+      <div style={{ margin: `0 calc(-1 * ${space.lg})` }}>
+        <TopBar title={t("upload.title")} left={<CloseButton testId="upload.close-button" onClick={close} />} />
       </div>
 
       {topic.status === "ready" && (
         <div>
           <h2
             data-testid="upload.topic-title"
-            style={{ margin: 0, fontSize: 20 }}
+            style={{ margin: 0, color: color.textPrimary, ...font("title2") }}
           >
             {t("upload.heading", { 주제: topic.title })}
           </h2>
-          <p data-testid="upload.guide-text" style={{ margin: "4px 0 0" }}>
+          <p data-testid="upload.guide-text" style={{ margin: "4px 0 0", color: color.textSecondary, ...font("callout") }}>
             {t("upload.subheading")}
           </p>
         </div>
@@ -186,7 +184,7 @@ function UploadView({ vm }: { vm: UploadViewModel }): ReactNode {
         />
       )}
       <div style={{ ...pickersStyle, ...(photo ? { minHeight: 0 } : {}) }}>
-        <PickerLabel testId="upload.album-button" icon="🖼">
+        <PickerLabel testId="upload.album-button" icon={<IcPhotoLibrary size={28} />}>
           <input
             type="file"
             accept="image/*"
@@ -197,7 +195,7 @@ function UploadView({ vm }: { vm: UploadViewModel }): ReactNode {
           />
         </PickerLabel>
         {container.cameraCapture.supported() && (
-          <PickerLabel testId="upload.camera-button" icon="📷">
+          <PickerLabel testId="upload.camera-button" icon={<IcPhotoCamera size={28} />}>
             <input
               type="file"
               accept="image/*"
@@ -211,7 +209,7 @@ function UploadView({ vm }: { vm: UploadViewModel }): ReactNode {
         )}
       </div>
 
-      <div>
+      <div className="ck-field">
         <textarea
           data-testid="upload.title-input"
           rows={2}
@@ -221,13 +219,16 @@ function UploadView({ vm }: { vm: UploadViewModel }): ReactNode {
           style={{
             width: "100%",
             boxSizing: "border-box",
-            padding: 12,
-            borderRadius: 8,
-            font: "inherit",
+            border: "none",
+            outline: "none",
+            background: "transparent",
+            resize: "none",
+            color: color.textPrimary,
+            ...font("body"),
           }}
           onChange={(event) => vm.setTitle(event.target.value)}
         />
-        <div data-testid="upload.title-counter" style={{ textAlign: "right" }}>
+        <div data-testid="upload.title-counter" style={{ textAlign: "right", color: color.textMuted, ...font("caption") }}>
           {state.titleCount}/{POST_TITLE_MAX}
         </div>
       </div>
@@ -242,21 +243,15 @@ function UploadView({ vm }: { vm: UploadViewModel }): ReactNode {
           tabIndex={-1}
           data-testid="upload.error-message"
           role="alert"
-          style={{ margin: 0 }}
+          style={{ margin: 0, color: color.error, ...font("caption") }}
         >
           {state.errorMessage}
         </p>
       )}
 
-      <button
-        type="button"
-        data-testid="upload.submit-button"
-        disabled={!state.canSubmit}
-        style={{ minHeight: 48, marginTop: "auto" }}
-        onClick={submit}
-      >
+      <Button fill data-testid="upload.submit-button" disabled={!state.canSubmit} style={{ marginTop: "auto" }} onClick={submit}>
         {state.submitting ? t("upload.submitting") : t("upload.submit")}
-      </button>
+      </Button>
 
       {Editor && editor && (
         <div style={editorOverlayStyle}>
@@ -279,7 +274,7 @@ function PickerLabel({
   children,
 }: {
   testId: string;
-  icon: string;
+  icon: ReactNode;
   children: ReactNode;
 }): ReactNode {
   const [focused, setFocused] = useState(false);
@@ -288,13 +283,13 @@ function PickerLabel({
       data-testid={testId}
       style={
         focused
-          ? { ...pickerStyle, outline: "3px solid #1a73e8", outlineOffset: 2 }
+          ? { ...pickerStyle, outline: `3px solid ${color.actionPrimary}`, outlineOffset: 2 }
           : pickerStyle
       }
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
     >
-      <span aria-hidden="true">{icon}</span>
+      <span aria-hidden="true" style={{ display: "inline-flex" }}>{icon}</span>
       {children}
     </label>
   );
@@ -347,7 +342,7 @@ function Indicator({ testId }: { testId: string }): ReactNode {
       data-testid={testId}
       role="status"
       aria-busy="true"
-      style={{ display: "flex", justifyContent: "center" }}
+      style={{ display: "flex", justifyContent: "center", color: color.actionPrimary }}
     >
       <svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true">
         <circle

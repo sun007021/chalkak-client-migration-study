@@ -8,7 +8,10 @@ import { webOnlyCopy } from '../../copy/webOnly';
 import { useScreenView } from '../../core/analytics/useScreenView';
 import { useViewModel } from '../../core/state/useViewModel';
 import { formatDateString } from '../../core/time/kst';
+import { Button } from '../../core/ui/Button';
+import { IcChevronRight } from '../../core/ui/icons.generated';
 import { LoadingIndicator } from '../../core/ui/StateViews';
+import { color, font, radius, space } from '../../design/tokens';
 import { useDialogFocus } from '../../core/ui/useDialogFocus';
 import { useRovingTabIndex } from '../../core/ui/useRovingTabIndex';
 import { useShellContext } from '../shell/MainShell';
@@ -59,16 +62,17 @@ export function RecordScreen(): ReactNode {
 
 const rowStyle: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 };
 const plainButton: CSSProperties = { border: 0, padding: 0, background: 'none', font: 'inherit', color: 'inherit', cursor: 'pointer' };
-const weekdayRowStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', fontSize: 12, color: '#666', padding: '4px 0' };
+const weekdayRowStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', color: color.textMuted, padding: '4px 0 8px', ...font('caption') };
 const gridStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 };
-const cellStyle: CSSProperties = { position: 'relative', aspectRatio: '1 / 1', minWidth: 0, borderRadius: 6, overflow: 'hidden', background: '#f2f2f2', fontSize: 12, textAlign: 'left' };
-const dayNumberStyle: CSSProperties = { position: 'absolute', top: 2, left: 4, padding: '0 3px', borderRadius: 4, background: 'rgba(255,255,255,0.8)', color: '#111', lineHeight: 1.3 };
+const cellStyle: CSSProperties = { position: 'relative', aspectRatio: '1 / 1', minWidth: 0, borderRadius: 8, overflow: 'hidden', background: color.surface, textAlign: 'left', ...font('caption') };
+const dayNumberStyle: CSSProperties = { position: 'absolute', top: 2, left: 4, padding: '0 4px', borderRadius: 6, background: 'rgba(255,255,255,0.8)', color: color.textPrimary, lineHeight: 1.3 };
 const thumbStyle: CSSProperties = { display: 'block', width: '100%', height: '100%', objectFit: 'cover' };
+const navBtn: CSSProperties = { ...plainButton, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', color: color.textPrimary };
 
 function RecordView({ vm, state, onLogin }: { vm: RecordViewModel; state: RecordState; onLogin: () => void }): ReactNode {
   const { body } = state;
   return (
-    <div data-testid="record.root" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}>
+    <div data-testid="record.root" style={{ background: color.background, minHeight: '100dvh', paddingBottom: 'calc(var(--bottom-bar-height, 80px) + 16px)' }}>
       <MonthHeader vm={vm} state={state} />
       {body.status === 'loading' ? <LoadingIndicator screenId="record" /> : null}
       {body.status === 'error' ? <ErrorView kind={body.kind} onRetry={() => void vm.retry()} onLogin={onLogin} /> : null}
@@ -76,15 +80,15 @@ function RecordView({ vm, state, onLogin }: { vm: RecordViewModel; state: Record
         <>
           <Calendar vm={vm} state={state} posts={body.posts} />
           {body.posts.length === 0 ? (
-            <div data-testid="record.empty-state" style={{ padding: 16, textAlign: 'center' }}>
+            <div data-testid="record.empty-state" style={{ padding: space.lg, textAlign: 'center', color: color.textSecondary, ...font('callout') }}>
               {webOnlyCopy['record.empty']}
             </div>
           ) : null}
           {state.selectedPost ? <SelectedPhoto vm={vm} state={state} post={state.selectedPost} /> : null}
-          <div style={{ padding: '8px 16px' }}>
-            <button type="button" data-testid="record.save-image-button" disabled={state.saving} onClick={() => void vm.saveImage()}>
+          <div style={{ padding: `${space.sm} ${space.lg}` }}>
+            <Button variant="outlined" fill data-testid="record.save-image-button" disabled={state.saving} onClick={() => void vm.saveImage()}>
               {t('record.save')}
-            </button>
+            </Button>
           </div>
         </>
       ) : null}
@@ -96,17 +100,18 @@ function MonthHeader({ vm, state }: { vm: RecordViewModel; state: RecordState })
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerButton = useRef<HTMLButtonElement | null>(null);
   return (
-    <header style={{ padding: '12px 16px' }}>
+    <header style={{ padding: `${space.md} ${space.lg}`, position: 'relative' }}>
       <div style={rowStyle}>
-        <button type="button" data-testid="record.prev-month-button" aria-label={webOnlyCopy['record.nav.previous']} disabled={!state.canGoPrevious} onClick={() => void vm.selectPreviousMonth()}>
-          <span aria-hidden="true">‹</span>
+        <button type="button" data-testid="record.prev-month-button" aria-label={webOnlyCopy['record.nav.previous']} disabled={!state.canGoPrevious} className="ck-press" style={{ ...navBtn, opacity: state.canGoPrevious ? 1 : 0.3 }} onClick={() => void vm.selectPreviousMonth()}>
+          <IcChevronRight size={20} style={{ transform: "scaleX(-1)" }} />
         </button>
         <button
           ref={pickerButton}
           type="button"
           data-testid="record.month-picker-button"
           aria-haspopup="dialog"
-          style={plainButton}
+          className="ck-press"
+          style={{ ...plainButton, color: color.textPrimary, ...font('headline') }}
           onClick={() => {
             // 사파리 등은 버튼을 눌러도 포커스가 옮겨 오지 않고 jsdom의 fireEvent.click도 마찬가지다.
             // 이 줄이 없으면 시트를 닫을 때 포커스가 body로 돌아가므로 명시적으로 옮긴다(제거하지 말 것).
@@ -116,8 +121,8 @@ function MonthHeader({ vm, state }: { vm: RecordViewModel; state: RecordState })
         >
           <span data-testid="record.month-label" aria-live="polite">{monthLabel(state.month)}</span>
         </button>
-        <button type="button" data-testid="record.next-month-button" aria-label={webOnlyCopy['record.nav.next']} disabled={!state.canGoNext} onClick={() => void vm.selectNextMonth()}>
-          <span aria-hidden="true">›</span>
+        <button type="button" data-testid="record.next-month-button" aria-label={webOnlyCopy['record.nav.next']} disabled={!state.canGoNext} className="ck-press" style={{ ...navBtn, opacity: state.canGoNext ? 1 : 0.3 }} onClick={() => void vm.selectNextMonth()}>
+          <IcChevronRight size={20} />
         </button>
       </div>
       {pickerOpen ? (
@@ -146,8 +151,8 @@ function MonthPickerSheet({ months, current, onSelect, onClose }: { months: Year
   }, []);
   const onListKeyDown = useRovingTabIndex('option');
   return (
-    <div ref={ref} data-testid="record.month-picker-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} style={{ padding: 12, background: '#fff', border: '1px solid #e5e5e5', borderRadius: 8 }}>
-      <h2 id={titleId} style={{ margin: '0 0 8px', fontSize: 16 }}>
+    <div ref={ref} data-testid="record.month-picker-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} style={{ position: 'absolute', zIndex: 20, left: space.lg, right: space.lg, top: '100%', padding: space.lg, background: color.surfaceElevated, borderRadius: radius.large, boxShadow: '0 8px 28px rgba(0,0,0,0.18)' }}>
+      <h2 id={titleId} style={{ margin: '0 0 8px', color: color.textPrimary, ...font('headline') }}>
         {t('record.picker.title')}
       </h2>
       <div role="listbox" aria-labelledby={titleId} onKeyDown={onListKeyDown} style={{ display: 'flex', flexDirection: 'column', maxHeight: '50vh', overflowY: 'auto' }}>
@@ -162,7 +167,7 @@ function MonthPickerSheet({ months, current, onSelect, onClose }: { months: Year
               tabIndex={selected ? 0 : -1}
               data-testid={`record.month-picker-item-${monthKey(ym)}`}
               aria-selected={selected}
-              style={{ ...plainButton, padding: '8px 4px', textAlign: 'left', fontWeight: selected ? 700 : 400 }}
+              style={{ ...plainButton, padding: '10px 4px', textAlign: 'left', color: selected ? color.textPrimary : color.textSecondary, ...font('callout'), fontWeight: selected ? 700 : 400 }}
               onClick={() => onSelect(ym)}
             >
               {monthLabel(ym)}
@@ -170,10 +175,10 @@ function MonthPickerSheet({ months, current, onSelect, onClose }: { months: Year
           );
         })}
       </div>
-      <div style={{ marginTop: 8 }}>
-        <button type="button" data-testid="record.month-picker-close-button" onClick={onClose}>
+      <div style={{ marginTop: space.md }}>
+        <Button variant="outlined" fill compact data-testid="record.month-picker-close-button" onClick={onClose}>
           {t('common.close')}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -205,7 +210,7 @@ function Calendar({ vm, state, posts }: { vm: RecordViewModel; state: RecordStat
     gridRef.current?.querySelector<HTMLElement>(`[data-date="${next}"]`)?.focus();
   };
   return (
-    <section style={{ padding: '0 16px' }}>
+    <section style={{ padding: `0 ${space.lg}` }}>
       <div data-testid="record.weekday-header" style={weekdayRowStyle}>
         {Array.from(t('record.weekday')).map((weekday, index) => (
           <span key={index}>{weekday}</span>
@@ -234,11 +239,11 @@ interface DayCellProps {
 }
 
 const DayCell = memo(function DayCell({ vm, date, day, month, post, selected, today }: DayCellProps): ReactNode {
-  const marker = today ? <span data-testid="record.today-marker" aria-hidden="true" style={{ position: 'absolute', right: 4, bottom: 4, width: 8, height: 8, borderRadius: '50%', background: '#e5484d' }} /> : null;
+  const marker = today ? <span data-testid="record.today-marker" aria-hidden="true" style={{ position: 'absolute', right: 4, bottom: 4, width: 8, height: 8, borderRadius: '50%', background: color.error }} /> : null;
   if (!post) {
     return (
       <div role="gridcell" data-testid={`record.day-${date}`} aria-current={today ? 'date' : undefined} style={cellStyle}>
-        <span style={{ ...dayNumberStyle, background: 'none', color: '#666' }}>{day}</span>
+        <span style={{ ...dayNumberStyle, background: 'none', color: color.textMuted }}>{day}</span>
         {marker}
       </div>
     );
@@ -253,7 +258,7 @@ const DayCell = memo(function DayCell({ vm, date, day, month, post, selected, to
       aria-selected={selected}
       aria-current={today ? 'date' : undefined}
       aria-label={label}
-      style={{ ...cellStyle, cursor: 'pointer', outlineOffset: -3, ...(selected ? { outline: '3px solid #111' } : {}) }}
+      style={{ ...cellStyle, cursor: 'pointer', outlineOffset: -3, ...(selected ? { outline: `3px solid ${color.actionPrimary}` } : {}) }}
       onClick={() => vm.selectDate(date)}
     >
       {/* 화면 표시는 CORS 모드로 읽지 않는다: 이미지 CDN이 CORS 헤더를 주지 않으면 crossOrigin 이미지는 깨진다(로컬 E2E에서 확인). 달력 이미지 저장(canvas)만 CORS로 따로 읽는다. */}
@@ -262,7 +267,7 @@ const DayCell = memo(function DayCell({ vm, date, day, month, post, selected, to
         {day}
       </span>
       {post.status === 'PENDING' ? (
-        <span data-testid={`record.day-pending-${date}`} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 2, fontSize: 10, textAlign: 'center', background: 'rgba(0,0,0,0.6)', color: '#fff' }}>
+        <span data-testid={`record.day-pending-${date}`} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 2, textAlign: 'center', background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 10 }}>
           {t('record.pending.badge')}
         </span>
       ) : null}
@@ -275,8 +280,8 @@ function SelectedPhoto({ vm, state, post }: { vm: RecordViewModel; state: Record
   const tooltipId = useId();
   const pending = post.status === 'PENDING';
   return (
-    <section data-testid="record.selected-photo" style={{ position: 'relative', padding: '12px 16px' }}>
-      <img src={post.thumbnailImageUrl} alt={webOnlyCopy['record.selected-photo-alt']} style={{ display: 'block', width: '100%', borderRadius: 8, background: '#e5e5e5' }} />
+    <section data-testid="record.selected-photo" style={{ position: 'relative', padding: `${space.md} ${space.lg}` }}>
+      <img src={post.thumbnailImageUrl} alt={webOnlyCopy['record.selected-photo-alt']} style={{ display: 'block', width: '100%', borderRadius: radius.small, background: color.surface }} />
       {pending ? (
         <div
           style={{ position: 'absolute', top: 20, left: 24 }}
@@ -293,25 +298,25 @@ function SelectedPhoto({ vm, state, post }: { vm: RecordViewModel; state: Record
             aria-label={`${t('record.pending.badge')}, ${state.pendingHintOpen ? t('record.pending.hint-close') : t('record.pending.hint-open')}`}
             aria-expanded={state.pendingHintOpen}
             aria-describedby={state.pendingHintOpen ? tooltipId : undefined}
-            style={{ ...plainButton, padding: '4px 8px', borderRadius: 12, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: 12 }}
+            style={{ ...plainButton, padding: '4px 8px', borderRadius: 12, background: 'rgba(0,0,0,0.7)', color: '#fff', ...font('caption') }}
             onClick={() => vm.togglePendingHint()}
           >
             {t('record.pending.badge')}
           </button>
           {state.pendingHintOpen ? (
-            <p id={tooltipId} data-testid="record.pending-tooltip" style={{ margin: '4px 0 0', padding: 8, borderRadius: 8, background: '#fff', border: '1px solid #e5e5e5', fontSize: 12, whiteSpace: 'pre-line' }}>
+            <p id={tooltipId} data-testid="record.pending-tooltip" style={{ margin: '4px 0 0', padding: 8, borderRadius: radius.small, background: color.surfaceElevated, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', color: color.textPrimary, ...font('caption'), whiteSpace: 'pre-line' }}>
               {t('record.pending.tooltip')}
             </p>
           ) : null}
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-          <button type="button" data-testid="record.view-feed-button" onClick={() => vm.openFeed()}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <Button fill compact data-testid="record.view-feed-button" onClick={() => vm.openFeed()}>
             {t('record.action.feed')}
-          </button>
-          <button type="button" data-testid="record.view-display-button" onClick={() => vm.openDisplay()}>
+          </Button>
+          <Button variant="outlined" fill compact data-testid="record.view-display-button" onClick={() => vm.openDisplay()}>
             {t('record.action.display')}
-          </button>
+          </Button>
         </div>
       )}
     </section>
@@ -319,29 +324,30 @@ function SelectedPhoto({ vm, state, post }: { vm: RecordViewModel; state: Record
 }
 
 function ErrorView({ kind, onRetry, onLogin }: { kind: RecordErrorKind; onRetry: () => void; onLogin: () => void }): ReactNode {
+  const box: CSSProperties = { padding: space.xl, textAlign: 'center', color: color.textSecondary, ...font('callout') };
   if (kind === 'unauthorized') {
     return (
-      <div role="alert" data-testid="record.login-required-state" style={{ padding: 16, textAlign: 'center' }}>
-        <p>{t('record.err.401')}</p>
-        <button type="button" data-testid="record.login-button" onClick={onLogin}>
+      <div role="alert" data-testid="record.login-required-state" style={box}>
+        <p style={{ marginTop: 0 }}>{t('record.err.401')}</p>
+        <Button data-testid="record.login-button" onClick={onLogin}>
           {t('record.guest.login')}
-        </button>
+        </Button>
       </div>
     );
   }
   if (kind === 'invalid-month') {
     return (
-      <p role="alert" data-testid="record.invalid-month-message" style={{ padding: 16, textAlign: 'center' }}>
+      <p role="alert" data-testid="record.invalid-month-message" style={box}>
         {t('record.err.400')}
       </p>
     );
   }
   return (
-    <div role="alert" data-testid="record.error-state" style={{ padding: 16, textAlign: 'center' }}>
-      <p data-testid="record.error-message">{kind === 'network' ? t('common.error.network') : t('record.err.other')}</p>
-      <button type="button" data-testid="record.retry-button" onClick={onRetry}>
+    <div role="alert" data-testid="record.error-state" style={box}>
+      <p data-testid="record.error-message" style={{ marginTop: 0 }}>{kind === 'network' ? t('common.error.network') : t('record.err.other')}</p>
+      <Button variant="outlined" data-testid="record.retry-button" onClick={onRetry}>
         {t('common.retry')}
-      </button>
+      </Button>
     </div>
   );
 }
