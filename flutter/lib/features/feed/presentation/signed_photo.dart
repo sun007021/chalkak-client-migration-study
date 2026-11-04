@@ -26,8 +26,9 @@ class SignedPhoto extends StatefulWidget {
   final ImageProvider? photoProvider;
 
   /// 사진 가장자리에서 사인까지의 간격.
-  static const double signatureInset = 12;
-  static const double signatureWidth = 96;
+  // 원본: 우하단 spacing.sm(8) 안쪽, 70x52 (FeedPhoto.swift:502).
+  static const double signatureInset = 8;
+  static const double signatureWidth = 70;
 
   @override
   State<SignedPhoto> createState() => _SignedPhotoState();

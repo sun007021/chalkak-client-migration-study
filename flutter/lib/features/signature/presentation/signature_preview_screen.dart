@@ -3,6 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_button.dart';
+import '../../../core/ui/components/chalkak_dialog.dart';
+import '../../../core/ui/components/chalkak_states.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/signature_mode.dart';
 import 'signature_preview_view_model.dart';
@@ -115,7 +119,9 @@ class _SignaturePreviewScreenState extends State<SignaturePreviewScreen> {
             child: Scaffold(
               body: SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: context.tokens.spacing.screenHorizontal,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -124,7 +130,9 @@ class _SignaturePreviewScreenState extends State<SignaturePreviewScreen> {
                         SignatureTestIds.previewTitle,
                         child: Text(
                           Copy.onbSignPreviewTitle,
-                          style: Theme.of(context).textTheme.headlineSmall,
+                          style: context.tokens.text.title1.copyWith(
+                            color: context.tokens.colors.textPrimary,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -135,10 +143,12 @@ class _SignaturePreviewScreenState extends State<SignaturePreviewScreen> {
                             child: TestId(
                               SignatureTestIds.previewImage,
                               child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(
+                                  context.tokens.radius.button,
+                                ),
                                 // 사인은 투명 배경에 흰 획이라 어두운 바탕이 있어야 보인다.
                                 child: ColoredBox(
-                                  color: const Color(0xFF2B2B30),
+                                  color: context.tokens.colors.actionPrimary,
                                   child: Image.memory(
                                     state.png,
                                     fit: BoxFit.contain,
@@ -152,11 +162,14 @@ class _SignaturePreviewScreenState extends State<SignaturePreviewScreen> {
                       ),
                       if (change) ...[
                         const SizedBox(height: 12),
-                        const TestId(
+                        TestId(
                           SignatureTestIds.previewChangeNotice,
                           child: Text(
                             Copy.signChangeNotice,
                             textAlign: TextAlign.center,
+                            style: context.tokens.text.footnote.copyWith(
+                              color: context.tokens.colors.textSecondary,
+                            ),
                           ),
                         ),
                       ],
@@ -166,12 +179,7 @@ class _SignaturePreviewScreenState extends State<SignaturePreviewScreen> {
                           child: state.isSubmitting
                               ? const TestId(
                                   SignatureTestIds.previewLoading,
-                                  child: SizedBox.square(
-                                    dimension: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                    ),
-                                  ),
+                                  child: ChalkakSpinner(),
                                 )
                               : inlineError == null
                               ? null
@@ -180,45 +188,36 @@ class _SignaturePreviewScreenState extends State<SignaturePreviewScreen> {
                                   child: Text(
                                     inlineError.text,
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .error,
-                                    ),
+                                    style: context.tokens.text.footnote
+                                        .copyWith(
+                                          color: context.tokens.colors.error,
+                                        ),
                                   ),
                                 ),
                         ),
                       ),
                       TestId.button(
                         SignatureTestIds.previewRedrawButton,
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(52),
-                          ),
+                        child: ChalkakOutlinedButton(
                           onPressed: state.isSubmitting
                               ? null
                               : _vm.onRedrawPressed,
-                          child: const Text(Copy.onbSignPreviewRedraw),
+                          label: Copy.onbSignPreviewRedraw,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
                       TestId.button(
                         SignatureTestIds.previewConfirmButton,
-                        child: FilledButton(
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(52),
-                          ),
+                        child: ChalkakButton(
                           onPressed: state.isSubmitting
                               ? null
                               : _vm.onConfirmPressed,
-                          child: Text(
-                            change
-                                ? Copy.signChangeConfirm
-                                : Copy.onbSignPreviewStart,
-                          ),
+                          label: change
+                              ? Copy.signChangeConfirm
+                              : Copy.onbSignPreviewStart,
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 18),
                     ],
                   ),
                 ),
@@ -240,17 +239,23 @@ class _ErrorDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return TestId(
       SignatureTestIds.previewErrorDialog,
-      child: AlertDialog(
+      child: ChalkakDialog(
         content: TestId(
           SignatureTestIds.previewErrorMessage,
-          child: Text(message),
+          child: Text(
+            message,
+            textAlign: TextAlign.center,
+            style: context.tokens.text.callout.copyWith(
+              color: context.tokens.colors.textNeutral,
+            ),
+          ),
         ),
         actions: [
           TestId.button(
             SignatureTestIds.previewErrorDialogConfirmButton,
-            child: TextButton(
+            child: ChalkakDialogButton(
+              label: Copy.commonConfirm,
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text(Copy.commonConfirm),
             ),
           ),
         ],

@@ -18,6 +18,8 @@ dependencies:
   # 업로드: 편집한 사진을 손실 WebP로 압축한다(네이티브 인코더).
   flutter_image_compress: ^2.5.1
   flutter_secure_storage: ^11.2.0
+  # 아이콘: shared/design/icons의 SVG를 그린다(docs/design/README.md §3).
+  flutter_svg: ^2.3.2
   gal: ^2.3.3
   go_router: ^18.1.1
   # 업로드: 시스템 사진 선택기와 카메라로 한 장 가져온다.
@@ -40,3 +42,22 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icons/
+    - assets/images/
+  # shared/design/fonts와 같은 파일(대조 테스트가 이름·내용을 확인한다).
+  fonts:
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/Pretendard-Regular.otf
+          weight: 400
+        - asset: assets/fonts/Pretendard-SemiBold.otf
+          weight: 600
+        - asset: assets/fonts/Pretendard-Bold.otf
+          weight: 700
+    - family: Continuous
+      fonts:
+        - asset: assets/fonts/Continuous-Regular.otf
+    - family: GriunXHangeulBanguri
+      fonts:
+        - asset: assets/fonts/GriunXHangeulBanguri-Regular.ttf

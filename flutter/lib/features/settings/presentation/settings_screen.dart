@@ -3,6 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_card.dart';
+import '../../../core/ui/components/chalkak_dialog.dart';
+import '../../../core/ui/components/chalkak_icon.dart';
 import '../../../core/ui/test_id.dart';
 import '../../onboarding/domain/legal_document.dart';
 import '../../onboarding/presentation/legal_document_sheet.dart';
@@ -180,75 +184,174 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _guestBody(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: TestId.button(
-        SettingsTestIds.loginButton,
-        child: FilledButton(
-          onPressed: () => unawaited(widget.viewModel.onLoginPressed()),
-          child: const Text(Copy.settingsGuestLogin),
-        ),
-      ),
-    ),
-  );
+  /// 레이아웃(screens-c §4.1): 좌우 screenHorizontal, 위 48, 아래 xxl, 세로 스크롤(스크롤바 없음).
+  EdgeInsets _pagePadding(BuildContext context) {
+    final spacing = context.tokens.spacing;
+    return EdgeInsets.fromLTRB(
+      spacing.screenHorizontal,
+      48,
+      spacing.screenHorizontal,
+      spacing.xxl,
+    );
+  }
 
-  Widget _memberBody(SettingsState state) {
-    final viewModel = widget.viewModel;
-    return Stack(
-      children: [
-        ListView(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          children: [
-            const _SectionTitle(Copy.settingsSectionApp),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SettingsSignatureCard(
-                viewModel: viewModel.signature,
-                onChange: viewModel.onChangeSignaturePressed,
-              ),
-            ),
-            const _SectionTitle(Copy.settingsSectionPush),
-            _PushSection(viewModel: viewModel.push),
-            const _SectionTitle(Copy.settingsSectionAccount),
-            _Row(
-              id: SettingsTestIds.logoutRow,
-              label: Copy.settingsRowLogout,
-              onTap: viewModel.onLogoutRowPressed,
-            ),
-            _Row(
-              id: SettingsTestIds.withdrawRow,
-              label: Copy.settingsRowWithdraw,
-              onTap: viewModel.onWithdrawRowPressed,
-            ),
-            const _SectionTitle(Copy.settingsSectionFeedback),
-            _Row(
-              id: SettingsTestIds.feedbackRow,
-              label: Copy.settingsRowFeedback,
-              onTap: viewModel.onFeedbackPressed,
-            ),
-            const _SectionTitle(Copy.settingsSectionInfo),
-            _Row(
-              id: SettingsTestIds.privacyRow,
-              label: Copy.settingsRowPrivacy,
-              onTap: viewModel.onPrivacyPressed,
-            ),
-            _Row(
-              id: SettingsTestIds.termsRow,
-              label: Copy.settingsRowTerms,
-              onTap: viewModel.onTermsPressed,
-            ),
-            TestId(
-              SettingsTestIds.versionRow,
-              child: ListTile(
-                title: const Text(Copy.settingsRowVersion),
-                trailing: TestId(
-                  SettingsTestIds.versionValue,
-                  child: Text(state.appVersion),
+  Widget _guestBody(BuildContext context) {
+    final tokens = context.tokens;
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+      child: ListView(
+        padding: _pagePadding(context),
+        children: [
+          const ChalkakSectionLabel(Copy.settingsSectionAccount),
+          SizedBox(height: tokens.spacing.lg),
+          // 게스트 로그인 버튼(screens-c §4.6): 행 전체가 actionPrimary, 라운드 large.
+          TestId.button(
+            SettingsTestIds.loginButton,
+            child: Semantics(
+              button: true,
+              label: Copy.settingsGuestLogin,
+              excludeSemantics: true,
+              onTap: () => unawaited(widget.viewModel.onLoginPressed()),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => unawaited(widget.viewModel.onLoginPressed()),
+                child: ChalkakCard(
+                  color: tokens.colors.actionPrimary,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            Copy.settingsGuestLogin,
+                            style: tokens.text.callout.copyWith(
+                              color: tokens.colors.onActionPrimary,
+                            ),
+                          ),
+                        ),
+                        ChalkakIcon(
+                          ChalkakIcon.chevronRight,
+                          size: 13,
+                          color: tokens.colors.onActionPrimary,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _memberBody(SettingsState state) {
+    final viewModel = widget.viewModel;
+    final tokens = context.tokens;
+    final lg = SizedBox(height: tokens.spacing.lg);
+    const section = SizedBox(height: 36);
+    final bigSection = SizedBox(height: tokens.spacing.xxl);
+    return Stack(
+      children: [
+        ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+          child: ListView(
+            padding: _pagePadding(context),
+            children: [
+              const ChalkakSectionLabel(Copy.settingsSectionApp),
+              lg,
+              SettingsSignatureCard(
+                viewModel: viewModel.signature,
+                onChange: viewModel.onChangeSignaturePressed,
+              ),
+              section,
+              const ChalkakSectionLabel(Copy.settingsSectionPush),
+              lg,
+              _PushSection(viewModel: viewModel.push),
+              section,
+              const ChalkakSectionLabel(Copy.settingsSectionAccount),
+              lg,
+              Opacity(
+                // 진행 중에는 카드 전체를 흐리게 한다(iOS 0.55).
+                opacity: state.accountBusy ? 0.55 : 1,
+                child: ChalkakCard(
+                  child: Column(
+                    children: [
+                      _Row(
+                        id: SettingsTestIds.logoutRow,
+                        label: Copy.settingsRowLogout,
+                        onTap: viewModel.onLogoutRowPressed,
+                        trailing: const ChalkakIcon(
+                          ChalkakIcon.logOut,
+                          size: 12,
+                        ),
+                      ),
+                      const ChalkakCardDivider(),
+                      _Row(
+                        id: SettingsTestIds.withdrawRow,
+                        label: Copy.settingsRowWithdraw,
+                        labelColor: tokens.colors.destructive,
+                        onTap: viewModel.onWithdrawRowPressed,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              bigSection,
+              const ChalkakSectionLabel(Copy.settingsSectionFeedback),
+              lg,
+              ChalkakCard(
+                child: _Row(
+                  id: SettingsTestIds.feedbackRow,
+                  label: Copy.settingsRowFeedback,
+                  onTap: viewModel.onFeedbackPressed,
+                  chevron: true,
+                ),
+              ),
+              bigSection,
+              const ChalkakSectionLabel(Copy.settingsSectionInfo),
+              lg,
+              ChalkakCard(
+                child: Column(
+                  children: [
+                    _Row(
+                      id: SettingsTestIds.privacyRow,
+                      label: Copy.settingsRowPrivacy,
+                      onTap: viewModel.onPrivacyPressed,
+                      chevron: true,
+                    ),
+                    const ChalkakCardDivider(),
+                    _Row(
+                      id: SettingsTestIds.termsRow,
+                      label: Copy.settingsRowTerms,
+                      onTap: viewModel.onTermsPressed,
+                      chevron: true,
+                    ),
+                    const ChalkakCardDivider(),
+                    TestId(
+                      SettingsTestIds.versionRow,
+                      child: ChalkakListRow(
+                        title: Copy.settingsRowVersion,
+                        trailing: TestId(
+                          SettingsTestIds.versionValue,
+                          child: Text(
+                            state.appVersion,
+                            style: tokens.text.callout.copyWith(
+                              color: tokens.colors.textMuted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         if (state.dialog case final dialog?)
           _DialogOpener(
@@ -261,36 +364,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.title);
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-    child: Text(
-      title,
-      style: Theme.of(context).textTheme.titleSmall
-          ?.copyWith(color: Theme.of(context).colorScheme.primary),
-    ),
-  );
-}
-
 class _Row extends StatelessWidget {
-  const _Row({required this.id, required this.label, required this.onTap});
+  const _Row({
+    required this.id,
+    required this.label,
+    required this.onTap,
+    this.labelColor,
+    this.trailing,
+    this.chevron = false,
+  });
 
   final String id;
   final String label;
   final VoidCallback onTap;
+  final Color? labelColor;
+  final Widget? trailing;
+  final bool chevron;
 
   @override
   Widget build(BuildContext context) => TestId.button(
     id,
-    child: ListTile(
-      title: Text(label),
-      trailing: const Icon(Icons.chevron_right),
+    child: Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
       onTap: onTap,
+      child: ChalkakListRow(
+        title: label,
+        titleColor: labelColor,
+        trailing: trailing,
+        chevron: chevron,
+        onTap: onTap,
+      ),
     ),
   );
 }
@@ -310,48 +415,56 @@ class _PushSection extends StatelessWidget {
         builder: (context, _) {
           final state = viewModel.state;
           final ready = state.status == PushSettingsStatus.ready;
-          return Column(
-            children: [
-              if (state.status == PushSettingsStatus.loading ||
-                  state.status == PushSettingsStatus.idle)
-                const TestId(
-                  SettingsTestIds.pushLoading,
-                  child: LinearProgressIndicator(),
+          return ChalkakCard(
+            child: Column(
+              children: [
+                if (state.status == PushSettingsStatus.loading ||
+                    state.status == PushSettingsStatus.idle)
+                  const TestId(
+                    SettingsTestIds.pushLoading,
+                    child: LinearProgressIndicator(minHeight: 2),
+                  ),
+                _toggle(
+                  context,
+                  state,
+                  ready: ready,
+                  id: SettingsTestIds.pushTopicToggle,
+                  label: Copy.settingsPushTopic,
+                  setting: PushSetting.topic,
                 ),
-              if (state.status == PushSettingsStatus.loadFailed)
-                _loadError(context),
-              _toggle(
-                state,
-                ready: ready,
-                id: SettingsTestIds.pushTopicToggle,
-                label: Copy.settingsPushTopic,
-                setting: PushSetting.topic,
-              ),
-              _toggle(
-                state,
-                ready: ready,
-                id: SettingsTestIds.pushModerationToggle,
-                label: Copy.settingsPushModeration,
-                setting: PushSetting.moderation,
-              ),
-              _toggle(
-                state,
-                ready: ready,
-                id: SettingsTestIds.pushAiToggle,
-                label: Copy.settingsPushAiReview,
-                setting: PushSetting.aiReview,
-              ),
-            ],
+                const ChalkakCardDivider(),
+                _toggle(
+                  context,
+                  state,
+                  ready: ready,
+                  id: SettingsTestIds.pushModerationToggle,
+                  label: Copy.settingsPushModeration,
+                  setting: PushSetting.moderation,
+                ),
+                const ChalkakCardDivider(),
+                _toggle(
+                  context,
+                  state,
+                  ready: ready,
+                  id: SettingsTestIds.pushAiToggle,
+                  label: Copy.settingsPushAiReview,
+                  setting: PushSetting.aiReview,
+                ),
+                if (state.status == PushSettingsStatus.loadFailed)
+                  _loadError(context),
+              ],
+            ),
           );
         },
       ),
     );
   }
 
+  /// 카드 맨 아래 오류 줄(screens-c §4.3): caption error 문구 + 밑줄 "다시 시도"(textSecondary, 최소 44).
   Widget _loadError(BuildContext context) {
-    final theme = Theme.of(context);
+    final tokens = context.tokens;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
           Expanded(
@@ -359,17 +472,36 @@ class _PushSection extends StatelessWidget {
               SettingsTestIds.pushError,
               child: Text(
                 Copy.settingsPushLoadError,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.error,
-                ),
+                style: tokens.text.caption.copyWith(color: tokens.colors.error),
               ),
             ),
           ),
           TestId.button(
             SettingsTestIds.pushRetryButton,
-            child: TextButton(
-              onPressed: () => unawaited(viewModel.retry()),
-              child: const Text(Copy.commonRetry),
+            child: Semantics(
+              button: true,
+              label: Copy.commonRetry,
+              excludeSemantics: true,
+              onTap: () => unawaited(viewModel.retry()),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => unawaited(viewModel.retry()),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: 44,
+                    minWidth: 44,
+                  ),
+                  child: Center(
+                    child: Text(
+                      Copy.commonRetry,
+                      style: tokens.text.caption.copyWith(
+                        color: tokens.colors.textSecondary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -380,6 +512,7 @@ class _PushSection extends StatelessWidget {
   /// 값이 없으면(불러오는 중, 조회 실패) 지어낸 값 대신 꺼진 비활성 스위치를 보인다.
   /// 저장 중인 항목도 다른 항목의 입력은 막지 않고, 같은 항목의 두 번째 입력은 ViewModel이 무시한다.
   Widget _toggle(
+    BuildContext context,
     PushSettingsState state, {
     required bool ready,
     required String id,
@@ -388,20 +521,28 @@ class _PushSection extends StatelessWidget {
   }) {
     final value = state.values?.valueOf(setting) ?? false;
     void toggle() => unawaited(viewModel.toggle(setting, !value));
+    final colors = context.tokens.colors;
     // 스위치는 시각 요소로만 두고, 행 하나가 checked·enabled를 노출한다(testids.md §2).
+    // 행 전체가 눌린다(Android). 켜짐 색은 actionPrimary(iOS).
     return MergeSemantics(
       key: Key(id),
       child: Semantics(
         identifier: id,
         checked: value,
         enabled: ready,
-        child: ListTile(
-          enabled: ready,
-          title: Text(label),
+        onTap: ready ? toggle : null,
+        child: ChalkakListRow(
+          title: label,
+          titleColor: ready ? null : colors.textMuted,
+          verticalPadding: 10.5,
           onTap: ready ? toggle : null,
           trailing: ExcludeSemantics(
             child: IgnorePointer(
-              child: Switch(value: value, onChanged: ready ? (_) {} : null),
+              child: Switch.adaptive(
+                value: value,
+                activeTrackColor: colors.actionPrimary,
+                onChanged: ready ? (_) {} : null,
+              ),
             ),
           ),
         ),
@@ -465,53 +606,51 @@ class _ConfirmDialog extends StatelessWidget {
           });
         }
         final isWithdraw = kind == SettingsDialog.withdraw;
-        final colors = Theme.of(context).colorScheme;
         return PopScope(
           canPop: !state.accountBusy,
           child: TestId(
             isWithdraw
                 ? SettingsTestIds.withdrawDialog
                 : SettingsTestIds.logoutDialog,
-            child: AlertDialog(
-              content: Text(
-                isWithdraw
-                    ? Copy.authWithdrawConfirmMessage
-                    : Copy.authLogoutConfirmMessage,
-              ),
+            child: ChalkakDialog(
+              title: isWithdraw
+                  ? Copy.authWithdrawConfirmOk
+                  : Copy.authLogoutConfirmOk,
+              message: isWithdraw
+                  ? Copy.authWithdrawConfirmMessage
+                  : Copy.authLogoutConfirmMessage,
               actions: [
                 TestId.button(
                   isWithdraw
                       ? SettingsTestIds.withdrawCancelButton
                       : SettingsTestIds.logoutCancelButton,
-                  child: TextButton(
+                  child: ChalkakDialogButton(
+                    kind: ChalkakDialogButtonKind.cancel,
+                    label: Copy.authConfirmCancel,
                     onPressed: state.accountBusy
                         ? null
                         : viewModel.onDialogCancelled,
-                    child: const Text(Copy.authConfirmCancel),
                   ),
                 ),
                 TestId.button(
                   isWithdraw
                       ? SettingsTestIds.withdrawConfirmButton
                       : SettingsTestIds.logoutConfirmButton,
-                  child: isWithdraw
-                      ? FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: colors.error,
-                            foregroundColor: colors.onError,
+                  child: ChalkakDialogButton(
+                    kind: isWithdraw
+                        ? ChalkakDialogButtonKind.destructive
+                        : ChalkakDialogButtonKind.primary,
+                    label: isWithdraw
+                        ? Copy.authWithdrawConfirmOk
+                        : Copy.authLogoutConfirmOk,
+                    onPressed: state.accountBusy
+                        ? null
+                        : () => unawaited(
+                            isWithdraw
+                                ? viewModel.onWithdrawConfirmed()
+                                : viewModel.onLogoutConfirmed(),
                           ),
-                          onPressed: state.accountBusy
-                              ? null
-                              : () =>
-                                    unawaited(viewModel.onWithdrawConfirmed()),
-                          child: const Text(Copy.authWithdrawConfirmOk),
-                        )
-                      : TextButton(
-                          onPressed: state.accountBusy
-                              ? null
-                              : () => unawaited(viewModel.onLogoutConfirmed()),
-                          child: const Text(Copy.authLogoutConfirmOk),
-                        ),
+                  ),
                 ),
               ],
             ),

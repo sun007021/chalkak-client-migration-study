@@ -3,8 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/time/kst_date.dart';
 import '../../../core/time/kst_format.dart';
+import '../../../core/ui/components/chalkak_icon.dart';
+import '../../../core/ui/components/chalkak_logo.dart';
+import '../../../core/ui/components/chalkak_skeleton.dart';
+import '../../../core/ui/components/chalkak_states.dart';
 import '../../../core/ui/test_id.dart';
 import '../../banner/domain/banner_list_controller.dart';
 import '../domain/home_state.dart';
@@ -117,6 +122,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: TestId(
                   HomeTestIds.scroll,
                   child: RefreshIndicator(
+                    color: context.tokens.colors.actionPrimary,
+                    backgroundColor: context.tokens.colors.surfaceElevated,
                     onRefresh: () async => _onPull(),
                     child: _content(context, state),
                   ),
@@ -141,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
         SliverList.list(
           children: [
             _TopicHeader(topic: state.topic, onRetry: viewModel.retryTopic),
-            const SizedBox(height: 16),
+            SizedBox(height: context.tokens.spacing.xl),
             HomeHeroCard(
               hero: state.hero,
               onPressed: viewModel.onHeroPressed,
@@ -149,7 +156,12 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             if (aiCardPostId != null)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                padding: EdgeInsets.fromLTRB(
+                  context.tokens.spacing.screenHorizontal,
+                  context.tokens.spacing.lg,
+                  context.tokens.spacing.screenHorizontal,
+                  0,
+                ),
                 child: widget.aiCardBuilder(
                   context,
                   aiCardPostId,
@@ -204,14 +216,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         SliverToBoxAdapter(
           child: SizedBox(
-            height: 48,
+            height: context.tokens.spacing.xxl + context.tokens.spacing.sm,
             child: banners.isLoadingMore
-                ? const Center(
-                    child: SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
+                ? const Center(child: ChalkakSpinner(size: 20))
                 : null,
           ),
         ),
@@ -220,59 +227,93 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+/// 홈 상단 바(screens-a §7.2): 높이 55, 로고 + 알림 버튼(ic_notification 24, 터치 44), 아래 divider.
+/// 미읽음 점은 지름 7 inputCursor 색이다.
 class _TopBar extends StatelessWidget {
   const _TopBar({required this.hasUnread, required this.onNotificationPressed});
 
   final bool hasUnread;
   final VoidCallback onNotificationPressed;
 
+  static const _height = 55.0;
+  static const _dotSize = 7.0;
+
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 8, 0),
-        child: Row(
-          children: [
-            Text(Copy.appName, style: Theme.of(context).textTheme.titleLarge),
-            const Spacer(),
-            TestId.button(
-              HomeTestIds.notificationButton,
-              child: IconButton(
-                icon: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    const Icon(Icons.notifications_none),
-                    if (hasUnread)
-                      const Positioned(
-                        top: 0,
-                        right: 0,
-                        child: TestId(
-                          HomeTestIds.notificationUnreadDot,
-                          child: SizedBox.square(
-                            dimension: 8,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
+    final tokens = context.tokens;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: tokens.colors.background,
+        border: Border(bottom: BorderSide(color: tokens.colors.border)),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: _height,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: tokens.spacing.screenHorizontal,
+              right: tokens.spacing.screenHorizontal - 10,
+            ),
+            child: Row(
+              children: [
+                const ChalkakLogo(),
+                const Spacer(),
+                TestId.button(
+                  HomeTestIds.notificationButton,
+                  child: Semantics(
+                    button: true,
+                    label: Copy.notiInboxTitle,
+                    excludeSemantics: true,
+                    onTap: onNotificationPressed,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onNotificationPressed,
+                      child: SizedBox.square(
+                        dimension: 44,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          clipBehavior: Clip.none,
+                          children: [
+                            ChalkakIcon(
+                              ChalkakIcon.notification,
+                              size: 24,
+                              color: tokens.colors.iconPrimary,
                             ),
-                          ),
+                            if (hasUnread)
+                              Positioned(
+                                top: 44 / 2 - 12 - 2,
+                                right: 44 / 2 - 12 - 2,
+                                child: TestId(
+                                  HomeTestIds.notificationUnreadDot,
+                                  child: SizedBox.square(
+                                    dimension: _dotSize,
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: tokens.colors.inputCursor,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                  ],
+                    ),
+                  ),
                 ),
-                tooltip: Copy.notiInboxTitle,
-                onPressed: onNotificationPressed,
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
+/// 오늘의 주제 헤더(screens-a §7.3): 위 xl+sm, "M월 d일 · 오늘의 주제" subheadline,
+/// 주제명 title2, 둘 사이 sm. 로딩·오류·빈 상태는 같은 자리에 한 줄 문구로 보인다.
 class _TopicHeader extends StatelessWidget {
   const _TopicHeader({required this.topic, required this.onRetry});
 
@@ -281,25 +322,51 @@ class _TopicHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final tokens = context.tokens;
+    final status = tokens.text.subheadline.copyWith(
+      color: tokens.colors.textSecondary,
+    );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: EdgeInsets.fromLTRB(
+        tokens.spacing.screenHorizontal,
+        tokens.spacing.xl + tokens.spacing.sm,
+        tokens.spacing.screenHorizontal,
+        0,
+      ),
       child: switch (topic) {
-        TopicLoading() => const TestId(
+        TopicLoading() => TestId(
           HomeTestIds.loading,
-          child: Text(Copy.homeTopicLoading),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(Copy.homeTopicLoading, style: status),
+              SizedBox(height: tokens.spacing.sm),
+              ChalkakSkeleton(
+                width: 180,
+                height: 28,
+                borderRadius: BorderRadius.circular(tokens.radius.small),
+              ),
+            ],
+          ),
         ),
-        TopicNotReady() => const Text(Copy.homeTopicNotReady),
+        TopicNotReady() => Text(Copy.homeTopicNotReady, style: status),
         TopicError() => TestId(
           HomeTestIds.errorState,
           child: Row(
             children: [
-              const Expanded(child: Text(Copy.homeTopicError)),
+              Expanded(child: Text(Copy.homeTopicError, style: status)),
               TestId.button(
                 HomeTestIds.retryButton,
-                child: TextButton(
-                  onPressed: onRetry,
-                  child: const Text(Copy.commonRetry),
+                child: Semantics(
+                  button: true,
+                  label: Copy.commonRetry,
+                  excludeSemantics: true,
+                  onTap: onRetry,
+                  child: ChalkakRetryCircleButton(
+                    onPressed: onRetry,
+                    size: 32,
+                    iconSize: 15,
+                  ),
                 ),
               ),
             ],
@@ -312,13 +379,20 @@ class _TopicHeader extends StatelessWidget {
               HomeTestIds.topicDate,
               child: Text(
                 KstFormat.todayTopicLabel(topic.topicDate),
-                style: theme.textTheme.labelLarge,
+                style: tokens.text.subheadline.copyWith(
+                  color: tokens.colors.textPrimary,
+                ),
               ),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: tokens.spacing.sm),
             TestId(
               HomeTestIds.topicTitle,
-              child: Text(topic.title, style: theme.textTheme.headlineSmall),
+              child: Text(
+                topic.title,
+                style: tokens.text.title2.copyWith(
+                  color: tokens.colors.textPrimary,
+                ),
+              ),
             ),
           ],
         ),

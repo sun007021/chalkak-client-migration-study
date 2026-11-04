@@ -3,8 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/text/code_points.dart';
 import '../../../core/ui/app_network_image.dart';
+import '../../../core/ui/components/chalkak_dialog.dart';
+import '../../../core/ui/components/chalkak_icon.dart';
+import '../../../core/ui/components/chalkak_nav_button.dart';
+import '../../../core/ui/components/chalkak_skeleton.dart';
+import '../../../core/ui/components/chalkak_text_field.dart';
 import '../../../core/ui/test_id.dart';
 import '../../like/domain/toast_message.dart';
 import '../../like/presentation/like_button.dart';
@@ -96,7 +102,7 @@ class _FeedScreenState extends State<FeedScreen> {
       context: context,
       barrierDismissible: barrierDismissible,
       barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      barrierColor: Colors.black54,
+      barrierColor: context.tokens.colors.scrim,
       transitionDuration: const Duration(milliseconds: 80),
       pageBuilder: (context, _, _) => builder(context),
       transitionBuilder: (context, animation, _, child) =>
@@ -129,23 +135,55 @@ class _FeedScreenState extends State<FeedScreen> {
     return TestId(
       FeedTestIds.root,
       child: Material(
-        color: Theme.of(context).scaffoldBackgroundColor,
+        color: context.tokens.colors.background,
         child: SafeArea(
           child: ListenableBuilder(
             listenable: viewModel,
             builder: (context, _) {
               final state = viewModel.state;
+              // 상세 응답이 확정되기 전에는 수정·삭제를 누를 수 없다(REQ-FEED-009, TC-FEED-012).
+              final actionable = state.isConfirmed && !state.isDeleting;
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TestId.button(
-                      FeedTestIds.backButton,
-                      child: IconButton(
-                        icon: const Icon(Icons.arrow_back),
-                        onPressed: widget.onClose,
-                      ),
+                  // 상단 바(FeedTopBar): 좌우 lg, 위아래 md. 왼쪽 뒤로, 오른쪽 수정(ic_edit)·삭제(ic_delete).
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: context.tokens.spacing.lg - 4,
+                      vertical: context.tokens.spacing.md - 4,
+                    ),
+                    child: Row(
+                      children: [
+                        TestId.button(
+                          FeedTestIds.backButton,
+                          child: ChalkakNavButton.back(
+                            onPressed: widget.onClose,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (state.status == FeedStatus.content &&
+                            state.canEditTitle)
+                          TestId.button(
+                            FeedTestIds.editTitleButton,
+                            child: _TopIconButton(
+                              icon: ChalkakIcon.edit,
+                              color: context.tokens.colors.actionPrimary,
+                              label: Copy.feedEditTitle,
+                              onPressed: actionable ? _editTitle : null,
+                            ),
+                          ),
+                        if (state.status == FeedStatus.content &&
+                            state.canDelete)
+                          TestId.button(
+                            FeedTestIds.deleteButton,
+                            child: _TopIconButton(
+                              icon: ChalkakIcon.delete,
+                              color: context.tokens.colors.error,
+                              label: Copy.feedDeleteTitle,
+                              onPressed: actionable ? _confirmDelete : null,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   Expanded(child: _body(state)),
@@ -172,8 +210,6 @@ class _FeedScreenState extends State<FeedScreen> {
       state: state,
       aiSlot: widget.aiSlot,
       onLike: widget.viewModel.onLikeTapped,
-      onEdit: _editTitle,
-      onDelete: _confirmDelete,
     ),
   };
 }
@@ -189,12 +225,47 @@ class _Loading extends StatelessWidget {
     final url = imageUrl;
     return TestId(
       FeedTestIds.loading,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (url != null) AppNetworkImage(url: url, fit: BoxFit.contain),
-          const Center(child: CircularProgressIndicator()),
-        ],
+      child: url != null
+          ? AppNetworkImage(url: url, fit: BoxFit.contain)
+          : const ChalkakSkeleton(),
+    );
+  }
+}
+
+/// 상단 바 아이콘 버튼: 48 터치, 아이콘 24. 비활성이면 흐리게 한다.
+class _TopIconButton extends StatelessWidget {
+  const _TopIconButton({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String icon;
+  final Color color;
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      enabled: onPressed != null,
+      label: label,
+      excludeSemantics: true,
+      onTap: onPressed,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onPressed,
+        child: SizedBox.square(
+          dimension: 48,
+          child: Center(
+            child: Opacity(
+              opacity: onPressed == null ? 0.4 : 1,
+              child: ChalkakIcon(icon, size: 24, color: color),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -208,19 +279,31 @@ class _ErrorBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return TestId(
       FeedTestIds.errorState,
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(text),
-            const SizedBox(height: 12),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: tokens.text.body.copyWith(
+                color: tokens.colors.textSecondary,
+              ),
+            ),
+            SizedBox(height: tokens.spacing.xl),
             TestId.button(
               FeedTestIds.retryButton,
-              child: FilledButton(
+              child: TextButton(
                 onPressed: onRetry,
-                child: const Text(Copy.commonRetry),
+                child: Text(
+                  Copy.commonRetry,
+                  style: tokens.text.body.copyWith(
+                    color: tokens.colors.actionPrimary,
+                  ),
+                ),
               ),
             ),
           ],
@@ -235,29 +318,43 @@ class _Content extends StatelessWidget {
     required this.state,
     required this.aiSlot,
     required this.onLike,
-    required this.onEdit,
-    required this.onDelete,
   });
 
   final FeedState state;
   final Widget? aiSlot;
   final VoidCallback onLike;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final content = state.content!;
-    final textTheme = Theme.of(context).textTheme;
+    final tokens = context.tokens;
     final dateLabel = state.dateLabel;
     final signatureUrl = content.signatureImageUrl;
-    // 상세 응답이 확정되기 전에는 수정·삭제를 누를 수 없다(REQ-FEED-009, TC-FEED-012).
-    final actionable = state.isConfirmed && !state.isDeleting;
     return Stack(
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // 주제 날짜 라벨(FeedTopic): 좌우 screenHorizontal, 위 lg, subheadline textPrimary.
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                tokens.spacing.screenHorizontal,
+                tokens.spacing.lg,
+                tokens.spacing.screenHorizontal,
+                tokens.spacing.md,
+              ),
+              child: dateLabel == null
+                  ? Text(' ', style: tokens.text.subheadline)
+                  : TestId(
+                      FeedTestIds.dateLabel,
+                      child: Text(
+                        dateLabel,
+                        style: tokens.text.subheadline.copyWith(
+                          color: tokens.colors.textPrimary,
+                        ),
+                      ),
+                    ),
+            ),
             Expanded(
               child: TestId(
                 FeedTestIds.photo,
@@ -270,50 +367,18 @@ class _Content extends StatelessWidget {
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (dateLabel != null)
-                    TestId(
-                      FeedTestIds.dateLabel,
-                      child: Text(dateLabel, style: textTheme.bodySmall),
-                    ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TestId(
-                          FeedTestIds.title,
-                          child: Text(
-                            state.displayTitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: textTheme.titleLarge,
-                          ),
-                        ),
-                      ),
-                      if (state.canEditTitle)
-                        TestId.button(
-                          FeedTestIds.editTitleButton,
-                          child: IconButton(
-                            tooltip: Copy.feedEditTitle,
-                            icon: const Icon(Icons.edit_outlined),
-                            onPressed: actionable ? onEdit : null,
-                          ),
-                        ),
-                      if (state.canDelete)
-                        TestId.button(
-                          FeedTestIds.deleteButton,
-                          child: IconButton(
-                            tooltip: Copy.feedDeleteTitle,
-                            icon: const Icon(Icons.delete_outline),
-                            onPressed: actionable ? onDelete : null,
-                          ),
-                        ),
-                    ],
-                  ),
-                  Row(
+            // 좋아요 행(FeedLikeRow): 높이 57, 좌우 14, 왼쪽 하트 24 + 수, 오른쪽 제목(textSecondary), 바닥 border.
+            DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: tokens.colors.border, width: 0.5),
+                ),
+              ),
+              child: SizedBox(
+                height: 57,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Row(
                     children: [
                       LikeButton(
                         buttonId: FeedTestIds.likeButton,
@@ -323,21 +388,41 @@ class _Content extends StatelessWidget {
                         enabled: state.likeEnabled,
                         onPressed: onLike,
                       ),
-                      if (aiSlot != null) ...[const Spacer(), aiSlot!],
+                      if (aiSlot != null) ...[
+                        SizedBox(width: tokens.spacing.md),
+                        aiSlot!,
+                      ],
+                      SizedBox(width: tokens.spacing.md),
+                      Expanded(
+                        child: TestId(
+                          FeedTestIds.title,
+                          child: Text(
+                            state.displayTitle,
+                            maxLines: 1,
+                            textAlign: TextAlign.end,
+                            overflow: TextOverflow.ellipsis,
+                            style: tokens.text.body.copyWith(
+                              color: tokens.colors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                ],
+                ),
               ),
             ),
           ],
         ),
         if (state.isDeleting)
-          const Positioned.fill(
+          Positioned.fill(
             child: TestId(
               FeedTestIds.deleting,
               child: ColoredBox(
-                color: Colors.black26,
-                child: Center(child: CircularProgressIndicator()),
+                color: tokens.colors.scrim,
+                child: const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
               ),
             ),
           ),
@@ -384,30 +469,30 @@ class _TitleDialogState extends State<_TitleDialog> {
         final error = state.titleError;
         return TestId(
           FeedTestIds.titleDialog,
-          child: AlertDialog(
-            title: const Text(Copy.feedEditTitle),
+          child: ChalkakDialog(
+            title: Copy.feedEditTitle,
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const SizedBox(height: 8),
                 TestId(
                   FeedTestIds.titleInput,
-                  child: TextField(
+                  child: ChalkakTextField(
                     controller: _controller,
                     enabled: !saving,
                     autofocus: true,
+                    style: context.tokens.text.subheadline,
                     inputFormatters: [PostTitleInputFormatter()],
-                    decoration: const InputDecoration(
-                      hintText: Copy.feedEditPlaceholder,
-                    ),
+                    hintText: Copy.feedEditPlaceholder,
                   ),
                 ),
                 if (error != null) ...[
                   const SizedBox(height: 8),
                   Text(
                     error,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+                    style: context.tokens.text.footnote.copyWith(
+                      color: context.tokens.colors.error,
                     ),
                   ),
                 ],
@@ -424,16 +509,17 @@ class _TitleDialogState extends State<_TitleDialog> {
             actions: [
               TestId.button(
                 FeedTestIds.titleCancelButton,
-                child: TextButton(
+                child: ChalkakDialogButton(
+                  kind: ChalkakDialogButtonKind.cancel,
+                  label: Copy.feedEditCancel,
                   onPressed: saving ? null : () => Navigator.of(context).pop(),
-                  child: const Text(Copy.feedEditCancel),
                 ),
               ),
               TestId.button(
                 FeedTestIds.titleSaveButton,
-                child: TextButton(
+                child: ChalkakDialogButton(
+                  label: saving ? Copy.feedEditSaving : Copy.feedEditSave,
                   onPressed: saving ? null : _save,
-                  child: Text(saving ? Copy.feedEditSaving : Copy.feedEditSave),
                 ),
               ),
             ],
@@ -451,22 +537,24 @@ class _DeleteDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return TestId(
       FeedTestIds.deleteDialog,
-      child: AlertDialog(
-        title: const Text(Copy.feedDeleteTitle),
-        content: const Text(Copy.feedDeleteBody),
+      child: ChalkakDialog(
+        title: Copy.feedDeleteTitle,
+        message: Copy.feedDeleteBody,
         actions: [
           TestId.button(
             FeedTestIds.deleteCancelButton,
-            child: TextButton(
+            child: ChalkakDialogButton(
+              kind: ChalkakDialogButtonKind.cancel,
+              label: Copy.feedDeleteCancel,
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text(Copy.feedDeleteCancel),
             ),
           ),
           TestId.button(
             FeedTestIds.deleteConfirmButton,
-            child: TextButton(
+            child: ChalkakDialogButton(
+              kind: ChalkakDialogButtonKind.destructive,
+              label: Copy.feedDeleteConfirm,
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text(Copy.feedDeleteConfirm),
             ),
           ),
         ],
