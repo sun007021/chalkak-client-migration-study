@@ -51,14 +51,17 @@ struct PostLikeButton: View {
         .shadow(color: .black.opacity(0.25), radius: 2, x: 0, y: 1)
     }
 
+    /// 상세 좋아요 행(screens-b.md 4.1): 하트 template 24(좋아요 actionPrimary / 아니면 textSecondary), 숫자 body/textSecondary, 간격 9, 최소 44.
     private var inlineBody: some View {
-        HStack(spacing: ChalkakSpacing.xs) {
+        HStack(spacing: 9) {
             Button(action: action) {
                 Image(like.isLiked ? "ic_heart_filled" : "ic_heart")
+                    .renderingMode(.template)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 20, height: 20)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 24, height: 24)
+                    .foregroundStyle(like.isLiked ? ChalkakColor.actionPrimary : ChalkakColor.textSecondary)
+                    .frame(width: 32, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -66,8 +69,8 @@ struct PostLikeButton: View {
             .accessibilityAddTraits(like.isLiked ? [.isSelected] : [])
             .accessibilityIdentifier(buttonIdentifier)
             Text("\(like.likeCount)")
-                .font(ChalkakFont.caption)
-                .foregroundStyle(ChalkakColor.textPrimary)
+                .font(ChalkakFont.body)
+                .foregroundStyle(ChalkakColor.textSecondary)
                 .accessibilityIdentifier(countIdentifier)
         }
     }
