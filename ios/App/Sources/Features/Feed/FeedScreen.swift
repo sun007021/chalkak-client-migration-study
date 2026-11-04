@@ -193,7 +193,7 @@ private struct FeedContentView: View {
                 iconButton("ic_delete", label: FeedDialogCopy.deleteTitle, color: ChalkakColor.error, identifier: "feed.delete-button") { viewModel.deleteTapped() }
             }
         }
-        .padding(.trailing, ChalkakSpacing.md)
+        .padding(.trailing, ChalkakPlatformAppearance.usesLiquidGlass ? ChalkakSpacing.lg : ChalkakSpacing.md)
     }
 
     private func iconButton(_ asset: String, label: String, color: Color, identifier: String, action: @escaping () -> Void) -> some View {
