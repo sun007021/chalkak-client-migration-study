@@ -4,6 +4,13 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import com.stonefive.chalkak.ui.components.ChalkakSkeleton
+import com.stonefive.chalkak.ui.components.ChalkakSheet
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -81,6 +88,9 @@ data class RecordCallbacks(
 private const val ERR_400_KEY = "record.err.400"
 private val DayHeight = 52.dp
 
+/** Calendar cell corner (`radius.small`, 7). */
+private val CellShape get() = RoundedCornerShape(7.dp)
+
 /** Side gutter; 11dp makes the seven day columns whole-pixel wide on a 400dp screen (no rounding drift between columns). */
 private val GridGutter = 11.dp
 
@@ -105,9 +115,7 @@ fun RecordScreen(
         Column(Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = GridGutter)) {
             MonthHeader(state, copy, callbacks, onPickerClick = { pickerOpen = true })
             when (state.phase) {
-                RecordPhase.Loading -> Box(Modifier.fillMaxWidth().padding(top = 96.dp), contentAlignment = Alignment.Center) {
-                    Loading(Modifier.testTag("record.loading"))
-                }
+                RecordPhase.Loading -> CalendarSkeleton(Modifier.testTag("record.loading"))
                 RecordPhase.Error -> ErrorContent(state.error, copy, callbacks)
                 RecordPhase.Content -> Content(state, copy, callbacks, image, today)
             }
@@ -130,7 +138,7 @@ private fun MonthHeader(state: RecordUiState, copy: Copy, callbacks: RecordCallb
         Arrow(R.drawable.ic_chevron_left, state.canGoPrevious, callbacks.onPreviousMonth, Modifier.testTag("record.prev-month-button"))
         Text(
             text = monthLabel(copy, state.month),
-            style = MaterialTheme.typography.titleMedium,
+            style = ChalkakTheme.typography.headline,
             color = colors.textPrimary,
             modifier = Modifier.padding(horizontal = 8.dp).testTag("record.month-label"),
         )
@@ -142,7 +150,7 @@ private fun MonthHeader(state: RecordUiState, copy: Copy, callbacks: RecordCallb
                 .testTag("record.month-picker-button"),
             contentAlignment = Alignment.Center,
         ) {
-            Text("▾", color = colors.textPrimary, style = MaterialTheme.typography.titleMedium)
+            Icon(painterResource(R.drawable.ic_chevron_down), contentDescription = null, tint = colors.iconPrimary, modifier = Modifier.size(16.dp))
         }
         Arrow(R.drawable.ic_chevron_right, state.canGoNext, callbacks.onNextMonth, Modifier.testTag("record.next-month-button"))
     }
@@ -151,7 +159,7 @@ private fun MonthHeader(state: RecordUiState, copy: Copy, callbacks: RecordCallb
 @Composable
 private fun Arrow(iconRes: Int, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {
     Box(
-        modifier.size(48.dp).alpha(if (enabled) 1f else 0.3f).clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+        modifier.size(48.dp).alpha(if (enabled) 1f else 0.35f).clip(CircleShape).clickable(enabled = enabled, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Image(painterResource(iconRes), contentDescription = null, modifier = Modifier.size(24.dp))
@@ -167,8 +175,8 @@ private fun Content(state: RecordUiState, copy: Copy, callbacks: RecordCallbacks
                 c.toString(),
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.textInactive,
+                style = ChalkakTheme.typography.caption,
+                color = colors.textSecondary,
             )
         }
     }
@@ -183,7 +191,7 @@ private fun Content(state: RecordUiState, copy: Copy, callbacks: RecordCallbacks
         }
     }
     state.panel?.let { Panel(it, copy, callbacks, image) }
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(ChalkakTheme.spacing.xl))
     ChalkakButton(
         text = copy["record.save"],
         onClick = callbacks.onSaveImage,
@@ -210,12 +218,13 @@ private fun DayCell(cell: RecordCell, selected: Boolean, isToday: Boolean, callb
         tagged.selectable(selected = false, enabled = false, onClick = {})
     }
     Box(interactive, contentAlignment = Alignment.Center) {
-        val shape = RoundedCornerShape(8.dp)
+        val shape = CellShape
         Box(
             Modifier
                 .fillMaxSize()
                 .clip(shape)
-                .then(if (selected) Modifier.border(BorderStroke(2.dp, colors.actionPrimary), shape) else Modifier),
+                .background(colors.calendarCell)
+                .border(BorderStroke(if (selected) 2.dp else 1.dp, if (selected) colors.calendarSelection else colors.calendarCellBorder), shape),
         ) {
             if (post != null) {
                 image(post.thumbnailImageUrl, Modifier.fillMaxSize().testTag("record.day-photo-$date"))
@@ -225,7 +234,7 @@ private fun DayCell(cell: RecordCell, selected: Boolean, isToday: Boolean, callb
                             .align(Alignment.BottomEnd)
                             .padding(3.dp)
                             .size(8.dp)
-                            .background(colors.inputCursor, CircleShape)
+                            .background(colors.accent, CircleShape)
                             .testTag("record.day-pending-$date"),
                     )
                 }
@@ -233,8 +242,10 @@ private fun DayCell(cell: RecordCell, selected: Boolean, isToday: Boolean, callb
             Text(
                 date.dayOfMonth.toString(),
                 modifier = Modifier.align(Alignment.TopStart).padding(start = 4.dp, top = 2.dp),
-                style = MaterialTheme.typography.labelSmall,
-                color = if (post != null) Color.White else colors.textPrimary,
+                style = ChalkakTheme.typography.caption.copy(
+                    shadow = if (post != null) Shadow(Color.Black.copy(alpha = 0.45f), Offset(0f, 1f), 4f) else null,
+                ),
+                color = if (post != null) colors.textOnImage else colors.textPrimary,
             )
             if (isToday) {
                 Box(
@@ -242,9 +253,22 @@ private fun DayCell(cell: RecordCell, selected: Boolean, isToday: Boolean, callb
                         .align(Alignment.TopEnd)
                         .padding(4.dp)
                         .size(6.dp)
-                        .background(colors.destructive, CircleShape)
+                        .background(colors.accent, CircleShape)
                         .testTag("record.today-marker"),
                 )
+            }
+        }
+    }
+}
+
+/** Loading stand-in: the weekday header and five weeks of shimmering cells. */
+@Composable
+private fun CalendarSkeleton(modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth()) {
+        Spacer(Modifier.height(28.dp))
+        repeat(5) {
+            Row(Modifier.fillMaxWidth()) {
+                repeat(7) { ChalkakSkeleton(Modifier.weight(1f).height(DayHeight).padding(2.dp).clip(CellShape)) }
             }
         }
     }
@@ -253,8 +277,8 @@ private fun DayCell(cell: RecordCell, selected: Boolean, isToday: Boolean, callb
 @Composable
 private fun Panel(panel: RecordPanel, copy: Copy, callbacks: RecordCallbacks, image: RemoteImage) {
     val colors = ChalkakTheme.colors
-    Column(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(16.dp)).testTag("record.selected-photo")) {
+    Column(Modifier.fillMaxWidth().padding(top = ChalkakTheme.spacing.xl), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(ChalkakTheme.shapes.photoCard).background(colors.calendarCell).testTag("record.selected-photo")) {
             image(panel.post.thumbnailImageUrl, Modifier.fillMaxSize())
         }
         if (panel.pendingBadge) {
@@ -268,16 +292,16 @@ private fun Panel(panel: RecordPanel, copy: Copy, callbacks: RecordCallbacks, im
                     .testTag("record.pending-badge"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(copy["record.pending.badge"], style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)
+                Text(copy["record.pending.badge"], style = ChalkakTheme.typography.callout, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
             }
             if (panel.hintOpen) {
                 Text(
                     copy["record.pending.tooltip"],
-                    style = MaterialTheme.typography.bodySmall,
+                    style = ChalkakTheme.typography.footnote,
                     color = colors.onActionPrimary,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
-                        .background(colors.actionPrimary, RoundedCornerShape(12.dp))
+                        .background(colors.actionPrimary, ChalkakTheme.shapes.button)
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                         .testTag("record.pending-tooltip"),
                 )
@@ -304,20 +328,32 @@ private fun Panel(panel: RecordPanel, copy: Copy, callbacks: RecordCallbacks, im
 private fun ErrorContent(error: RecordError?, copy: Copy, callbacks: RecordCallbacks) {
     val colors = ChalkakTheme.colors
     val title = error?.titleCopyKey?.let { copy[it] } ?: copy["record.err.other"]
+    val message = ChalkakTheme.typography.body
     Column(Modifier.fillMaxWidth().padding(top = 96.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         when {
             error?.titleCopyKey == ERR_400_KEY ->
-                Text(title, color = colors.textPrimary, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("record.invalid-month-message"))
+                Text(title, color = colors.textSecondary, style = message, textAlign = TextAlign.Center, modifier = Modifier.testTag("record.invalid-month-message"))
             error?.action == RecordErrorAction.Login -> Column(
                 Modifier.testTag("record.login-required-state"),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(title, color = colors.textPrimary, style = MaterialTheme.typography.bodyLarge)
-                ChalkakButton(copy["record.guest.login"], callbacks.onLoginTapped, Modifier.padding(top = 16.dp).testTag("record.login-button"))
+                Text(title, color = colors.textSecondary, style = message, textAlign = TextAlign.Center)
+                ChalkakButton(copy["record.guest.login"], callbacks.onLoginTapped, Modifier.padding(top = ChalkakTheme.spacing.xl).testTag("record.login-button"))
             }
             else -> Column(Modifier.testTag("record.error-state"), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(title, color = colors.textPrimary, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("record.error-message"))
-                ChalkakButton(copy["common.retry"], callbacks.onRetry, Modifier.padding(top = 16.dp).testTag("record.retry-button"))
+                Text(title, color = colors.textSecondary, style = message, textAlign = TextAlign.Center, modifier = Modifier.testTag("record.error-message"))
+                Text(
+                    copy["common.retry"],
+                    style = message,
+                    color = colors.actionPrimary,
+                    modifier = Modifier
+                        .padding(top = ChalkakTheme.spacing.sm)
+                        .heightIn(min = 44.dp)
+                        .clickable(role = Role.Button, onClick = callbacks.onRetry)
+                        .wrapContentHeight(Alignment.CenterVertically)
+                        .padding(horizontal = ChalkakTheme.spacing.sm)
+                        .testTag("record.retry-button"),
+                )
             }
         }
     }
@@ -327,49 +363,35 @@ private fun ErrorContent(error: RecordError?, copy: Copy, callbacks: RecordCallb
 @Composable
 private fun MonthPickerSheet(state: RecordUiState, copy: Copy, onPick: (YearMonth) -> Unit, onClose: () -> Unit) {
     val colors = ChalkakTheme.colors
-    BackHandler(onBack = onClose)
-    Box(
-        Modifier.fillMaxSize().background(Color(0x66000000)).pointerInput(Unit) { detectTapGestures { onClose() } },
-        contentAlignment = Alignment.BottomCenter,
-    ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(max = 480.dp)
-                .background(colors.inputBackground, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                .pointerInput(Unit) { detectTapGestures { } }
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-                .testTag("record.month-picker-sheet"),
-        ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    copy["record.picker.title"],
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.textPrimary,
-                    modifier = Modifier.weight(1f),
-                )
-                IconAction(R.drawable.ic_close, onClose, Modifier.testTag("record.month-picker-close-button"))
-            }
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                state.availableMonths.forEach { month ->
-                    val selected = month == state.month
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (selected) colors.background else Color.Transparent)
-                            .selectable(selected = selected, role = Role.RadioButton, onClick = { onPick(month) })
-                            .padding(horizontal = 12.dp)
-                            .testTag("record.month-picker-item-${monthKey(month)}"),
-                        contentAlignment = Alignment.CenterStart,
-                    ) {
-                        Text(
-                            monthLabel(copy, month),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (selected) colors.textPrimary else colors.textInactive,
-                        )
-                    }
+    ChalkakSheet(onDismiss = onClose, tag = "record.month-picker-sheet") {
+        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                copy["record.picker.title"],
+                style = ChalkakTheme.typography.title3,
+                color = colors.textPrimary,
+                modifier = Modifier.weight(1f),
+            )
+            IconAction(R.drawable.ic_close, onClose, Modifier.testTag("record.month-picker-close-button"))
+        }
+        Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
+            state.availableMonths.forEach { month ->
+                val selected = month == state.month
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .clip(ChalkakTheme.shapes.button)
+                        .background(if (selected) colors.background else Color.Transparent)
+                        .selectable(selected = selected, role = Role.RadioButton, onClick = { onPick(month) })
+                        .padding(horizontal = 12.dp)
+                        .testTag("record.month-picker-item-${monthKey(month)}"),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    Text(
+                        monthLabel(copy, month),
+                        style = ChalkakTheme.typography.body,
+                        color = if (selected) colors.textPrimary else colors.textInactive,
+                    )
                 }
             }
         }
