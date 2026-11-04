@@ -6,6 +6,7 @@ import '../../../core/copy/ko.g.dart';
 import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/ui/components/chalkak_nav_button.dart';
 import '../../../core/ui/components/chalkak_states.dart';
+import '../../../core/ui/glass/chalkak_glass.dart';
 import '../../../core/ui/test_id.dart';
 import 'legal_document_view_model.dart';
 import 'onboarding_test_ids.dart';
@@ -41,7 +42,7 @@ class LegalDocumentSheet extends StatefulWidget {
     required LegalDocumentViewModel viewModel,
     required LegalWebViewBuilder webViewBuilder,
   }) {
-    return showModalBottomSheet<void>(
+    return showChalkakBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

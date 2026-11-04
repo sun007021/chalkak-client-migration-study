@@ -6,6 +6,7 @@ import '../../../core/analytics/analytics_constants.dart';
 import '../../../core/copy/ko.g.dart';
 import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/ui/components/chalkak_icon.dart';
+import '../../../core/ui/glass/chalkak_glass.dart';
 import '../../../core/ui/test_id.dart';
 import '../../../core/ui/toast/toast_controller.dart';
 import '../../../core/ui/toast/toast_host.dart';
@@ -285,6 +286,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       bottomOffset: _toastAboveBottomBar,
       child: Scaffold(
         backgroundColor: context.tokens.colors.background,
+        // 유리 하단 바는 떠 있어서 본문이 바 뒤까지 이어진다.
+        extendBody: ChalkakGlassScope.of(context),
         body: Stack(
           children: [
             IndexedStack(
@@ -383,7 +386,7 @@ class _TabPlaceholder extends StatelessWidget {
 /// 하단 바(screens-a §3.3 Flat / §3.6 Android). 배경 surfaceElevated, 위 15 / 아래 10 여백,
 /// 아이템 최소 48x48, 아이콘 23 + 간격 7 + 라벨 footnote(선택 시 bold). 색은 선택 actionPrimary,
 /// 비선택 bottomBar이고 눌러도 ripple이 없다. 가운데 작성 버튼은 `ic_bottom_write`(40 원).
-/// iOS 26 Liquid Glass 렌즈는 네이티브만의 연출이라 따르지 않는다(README §1.2).
+/// iOS 26 이상 iOS에서는 떠 있는 유리 캡슐로 그린다(README §5.2, [ChalkakGlassScope]).
 class _BottomBar extends StatelessWidget {
   const _BottomBar({
     required this.selected,
@@ -406,6 +409,35 @@ class _BottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.tokens.colors;
+    final glass = ChalkakGlassScope.of(context);
+    final items = _items(context, glass);
+    if (glass) {
+      // 떠 있는 캡슐: 좌우 lg+xs, 아래 sm, 바 뒤는 투명(ChalkakBottomBar.swift:59-151).
+      final spacing = context.tokens.spacing;
+      return TestId(
+        NavigationTestIds.bottomBarRoot,
+        child: SafeArea(
+          top: false,
+          minimum: EdgeInsets.only(bottom: spacing.sm),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              spacing.lg + spacing.xs,
+              0,
+              spacing.lg + spacing.xs,
+              spacing.sm,
+            ),
+            child: GlassSurface(
+              key: const Key('bottom-bar-glass'),
+              shape: const StadiumBorder(),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: SizedBox(height: _itemMinSize, child: items),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return TestId(
       NavigationTestIds.bottomBarRoot,
       child: DecoratedBox(
@@ -422,76 +454,82 @@ class _BottomBar extends StatelessWidget {
               bottom: _bottomPadding,
             ),
             // 높이를 고정해 Scaffold가 주는 무제한 높이에서 Center가 화면 끝까지 늘어나지 않게 한다.
-            child: SizedBox(
-              height: _itemMinSize,
-              child: Row(
-                children: [
-                  _tab(
-                    context,
-                    BottomDestination.home,
-                    NavigationTestIds.tabHome,
-                    'home',
-                    Copy.navTabHome,
-                  ),
-                  _tab(
-                    context,
-                    BottomDestination.display,
-                    NavigationTestIds.tabDisplay,
-                    'display',
-                    Copy.navTabDisplay,
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: Semantics(
-                        key: const Key(NavigationTestIds.uploadButton),
-                        identifier: NavigationTestIds.uploadButton,
-                        container: true,
-                        button: true,
-                        label: Copy.navTabUploadA11y,
-                        onTap: onUpload,
-                        excludeSemantics: true,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: onUpload,
-                          child: const SizedBox(
-                            width: _itemMinSize,
-                            height: _itemMinSize,
-                            child: Center(
-                              child: ChalkakIcon(
-                                ChalkakIcon.bottomWrite,
-                                size: _writeSize,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  _tab(
-                    context,
-                    BottomDestination.record,
-                    NavigationTestIds.tabRecord,
-                    'record',
-                    Copy.navTabRecord,
-                  ),
-                  _tab(
-                    context,
-                    BottomDestination.settings,
-                    NavigationTestIds.tabSettings,
-                    'setting',
-                    Copy.navTabSettings,
-                  ),
-                ],
-              ),
-            ),
+            child: SizedBox(height: _itemMinSize, child: items),
           ),
         ),
       ),
     );
   }
 
+  Widget _items(BuildContext context, bool glass) {
+    return Row(
+      children: [
+        _tab(
+          context,
+          glass,
+          BottomDestination.home,
+          NavigationTestIds.tabHome,
+          'home',
+          Copy.navTabHome,
+        ),
+        _tab(
+          context,
+          glass,
+          BottomDestination.display,
+          NavigationTestIds.tabDisplay,
+          'display',
+          Copy.navTabDisplay,
+        ),
+        Expanded(
+          child: Center(
+            child: Semantics(
+              key: const Key(NavigationTestIds.uploadButton),
+              identifier: NavigationTestIds.uploadButton,
+              container: true,
+              button: true,
+              label: Copy.navTabUploadA11y,
+              onTap: onUpload,
+              excludeSemantics: true,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onUpload,
+                child: const SizedBox(
+                  width: _itemMinSize,
+                  height: _itemMinSize,
+                  child: Center(
+                    child: ChalkakIcon(
+                      ChalkakIcon.bottomWrite,
+                      size: _writeSize,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        _tab(
+          context,
+          glass,
+          BottomDestination.record,
+          NavigationTestIds.tabRecord,
+          'record',
+          Copy.navTabRecord,
+        ),
+        _tab(
+          context,
+          glass,
+          BottomDestination.settings,
+          NavigationTestIds.tabSettings,
+          'setting',
+          Copy.navTabSettings,
+        ),
+      ],
+    );
+  }
+
   Widget _tab(
     BuildContext context,
+    bool glass,
     BottomDestination destination,
     String id,
     String iconName,
@@ -514,38 +552,54 @@ class _BottomBar extends StatelessWidget {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => onTab(destination),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                minWidth: _itemMinSize,
-                minHeight: _itemMinSize,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ChalkakIcon(
-                    isSelected
-                        ? 'ic_bottom_${iconName}_selected'
-                        : 'ic_bottom_$iconName',
-                    size: _iconSize,
-                    color: color,
-                  ),
-                  const SizedBox(height: _iconLabelGap),
-                  Text(
-                    label,
-                    style: tokens.text.footnote.copyWith(
+            child: _lens(
+              show: glass && isSelected,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minWidth: _itemMinSize,
+                  minHeight: _itemMinSize,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ChalkakIcon(
+                      isSelected
+                          ? 'ic_bottom_${iconName}_selected'
+                          : 'ic_bottom_$iconName',
+                      size: _iconSize,
                       color: color,
-                      fontWeight: isSelected
-                          ? FontWeight.w700
-                          : FontWeight.w400,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: _iconLabelGap),
+                    Text(
+                      label,
+                      style: tokens.text.footnote.copyWith(
+                        color: color,
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  /// 유리 바에서 선택 항목을 흰색 45% 캡슐로 감싼다(선택 렌즈 근사).
+  Widget _lens({required bool show, required Widget child}) {
+    if (!show) return child;
+    return DecoratedBox(
+      key: const Key('bottom-bar-lens'),
+      decoration: ShapeDecoration(
+        color: Colors.white.withValues(alpha: ChalkakGlassSpec.lensAlpha),
+        shape: const StadiumBorder(),
+      ),
+      child: child,
     );
   }
 }

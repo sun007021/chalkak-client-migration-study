@@ -42,3 +42,13 @@ jest.mock('expo-notifications', () => {
     scheduleNotificationAsync: jest.fn(async () => 'id'),
   };
 });
+
+// expo-blur는 네이티브 뷰가 필요하다. 테스트에서는 testID로 찾을 수 있는 빈 View로 바꾼다.
+jest.mock('expo-blur', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    BlurView: (props: Record<string, unknown>) =>
+      React.createElement(View, { ...props, testID: 'mock-blur-view' }),
+  };
+});

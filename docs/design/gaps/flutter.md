@@ -47,9 +47,19 @@
 | 배너 웹 | screens-a §4.5 | 기본 AppBar | 맞춤(뒤로 버튼, 스피너). 앱바 구성은 Material 관례로 유지 |
 | 화면 전환 | screens-c §6 | 기본 | 관례 유지. iOS Cupertino, Android Material 전환 사용 |
 
+## Liquid Glass (README §5)
+
+| 요소 | 원본 기준 | 수정 전 | 처리 |
+|---|---|---|---|
+| 유리 여부 판단 | §5.2 Flutter 행 | 없음(항상 평면) | 맞춤. `resolveUsesGlass`/`ChalkakGlassScope`(`core/ui/glass/chalkak_glass.dart`): iOS이고 주 버전 26 이상이고 투명도 줄이기 꺼짐이면 유리, 테스트에서는 scope로 주입. Flutter는 투명도 줄이기를 직접 알려 주지 않아 `MediaQuery.highContrast`를 대용 신호로 쓴다(관례 유지, 정확한 연동은 플랫폼 채널이 필요해 보류) |
+| 하단 바 | §5.1 ChalkakBottomBar.swift:59-151 | 화면 폭 평면 바 | 맞춤. 유리일 때 떠 있는 캡슐(블러 σ20 + background 30% + 흰색 35% 0.5px 테두리, 좌우 lg+xs, 아래 sm, 바 뒤 투명, `extendBody`), 선택 항목은 흰색 45% 캡슐 렌즈. Android·iOS 26 미만은 평면 유지 |
+| 원형 내비 버튼 | §5.1 ChalkakNavigationButton.swift:56-83 | 아이콘만 | 맞춤. 유리일 때 44 원에 같은 재질(터치 영역 48 유지). 평면은 그대로 |
+| 시트 배경 | §5.1 시트 행 | 기본 Material 시트 | 맞춤. `showChalkakBottomSheet`가 유리일 때 블러 + surfaceElevated 70%, 코너 28로 그림(전시 날짜·기록 월·AI 리뷰·법률 문서 시트). 평면은 기본 시트 |
+| 피드 상단 액션 아이콘 크기, AI 리뷰 시트 버튼, 사진 편집 컨트롤 | §5.1 | 평면 | 보류. §5.2가 하단 바·원형 내비 버튼·시트만 대상으로 정함 |
+
 ## 남은 차이
 
 - 기록 화면의 기둥·책자 묶음, 연간 달력, 선택 주 떠오름은 보류(기능 범위).
 - 사인 패드 점선 테두리·캡션, 알림 상세 정사각 사진 틀, 사진 편집 도구 아이콘 전용 에셋은 보류.
-- 하단 바 접힘 연동(iOS `chalkakBottomBarScrollBehavior`)과 Liquid Glass 효과는 플랫폼 고유라 이식하지 않음.
+- 하단 바 접힘 연동(iOS `chalkakBottomBarScrollBehavior`), 선택 렌즈 드래그 scrub, compact 전환은 보류(README §5.2에서 필수 아님).
 - CI: 저장소에 Flutter 워크플로가 없어(`android.yml`, `ios.yml`, `react-native.yml`만 있음) 만들지 않았다. 로컬 검증은 `flutter/tool/check.sh`.
