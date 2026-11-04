@@ -35,6 +35,8 @@ struct MainView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var entries: [StackEntry] = []
     @State private var nextEntryID = 0
+    /// 전시 사진 → 피드 줌 전환의 출발·도착 연결.
+    @Namespace private var feedZoomNamespace
 
     var body: some View {
         let shell = session.shell
@@ -64,6 +66,7 @@ struct MainView: View {
                     .toolbar(.hidden, for: .navigationBar)
             }
         }
+        .environment(\.feedZoomNamespace, feedZoomNamespace)
         .overlay { SettingsAccountDialogs(account: session.settings.account) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("main.root")
@@ -127,6 +130,7 @@ struct MainView: View {
             IssueWebScreen(container: container, url: url, onBack: { shell.pop() })
         case .feed(let entry):
             FeedScreen(container: container, session: session, entry: entry)
+                .feedZoomDestination(postID: entry.feedPostID, enabled: shell.selectedTab == .display)
         case .notifications:
             NotificationInboxScreen(container: container, session: session)
         case .notificationDetail(let notificationId):

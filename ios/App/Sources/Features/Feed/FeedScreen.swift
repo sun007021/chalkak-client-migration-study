@@ -3,7 +3,7 @@ import ChalkakCore
 import ChalkakData
 import ChalkakFeatures
 
-private extension PostDetailEntry {
+extension PostDetailEntry {
     /// 진입 경로와 무관한 게시물 id(Kit의 `postId`는 모듈 내부용).
     var feedPostID: UUID {
         switch self {
@@ -27,6 +27,7 @@ struct FeedScreen: View {
                 FeedContentView(container: container, session: session, viewModel: viewModel)
             }
         }
+        .edgeSwipeBackEnabled()
         .onAppear {
             if viewModel == nil { viewModel = container.makePostDetailViewModel(entry: entry) }
         }
@@ -412,6 +413,7 @@ private struct FeedZoomablePhoto: View {
     let isLoading: Bool
     @State private var scale: CGFloat = 1
     @State private var anchor: UnitPoint = .center
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Color.clear
@@ -447,7 +449,8 @@ private struct FeedZoomablePhoto: View {
                         scale = min(max(value.magnification, 1), Self.maxScale)
                     }
                     .onEnded { _ in
-                        withAnimation(.easeOut(duration: 0.3)) { scale = 1 }
+                        // 동작 줄이기가 켜져 있으면 애니메이션 없이 원래 크기로 돌아온다.
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.3)) { scale = 1 }
                     }
             )
             .accessibilityElement(children: .contain)

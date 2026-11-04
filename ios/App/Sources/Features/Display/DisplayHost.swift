@@ -307,6 +307,8 @@ private struct DisplayScreen: View {
                 ForEach(Array(viewModel.featured.enumerated()), id: \.element.id) { index, item in
                     PostCell(
                         item: item, aspect: 3.0 / 4.0,
+                        // 같은 게시물이 그리드에도 있으면 그리드 카드가 출발 뷰다(출발 id 중복 방지).
+                        zoomSourceID: viewModel.items.contains(where: { $0.id == item.id }) ? nil : item.id,
                         itemIdentifier: "display.featured-item-\(Self.idString(item.id))",
                         likeIdentifier: "display.featured-like-button-\(Self.idString(item.id))",
                         countIdentifier: "display.featured-like-count-\(Self.idString(item.id))",
@@ -361,6 +363,7 @@ private struct DisplayScreen: View {
                 PostCell(
                     item: item, aspect: 1 / (ratioByID[item.id] ?? MasonryLayout.defaultRatio),
                     signatureURL: item.signatureThumbnailImageURL ?? item.signatureOriginalImageURL,
+                    zoomSourceID: item.id,
                     itemIdentifier: "display.item-\(Self.idString(item.id))",
                     likeIdentifier: "display.like-button-\(Self.idString(item.id))",
                     countIdentifier: "display.like-count-\(Self.idString(item.id))",
@@ -396,6 +399,8 @@ private struct PostCell: View {
     let item: PostListItem
     let aspect: CGFloat
     var signatureURL: URL? = nil
+    /// 줌 전환 출발 뷰로 등록할 게시물 id. nil이면 등록하지 않는다.
+    var zoomSourceID: UUID? = nil
     let itemIdentifier: String
     let likeIdentifier: String
     let countIdentifier: String
@@ -428,6 +433,7 @@ private struct PostCell: View {
             }
             .background(Color.black)
             .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.photoCard))
+            .feedZoomSource(id: zoomSourceID)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(itemIdentifier)
     }
