@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,11 +16,12 @@ import type { KstDate } from '../../core/time/KstDate';
 import type { YearMonth } from '../../core/time/YearMonth';
 import type { RecordPhoto } from '../../data/record/RecordModels';
 import { t } from '../../shared/copy';
-import { colors, spacing } from '../../shared/ui/theme';
+import { colors, spacing } from '../../shared/design/tokens';
 import { buildCalendarGrid, formatRecordMonthLabel } from './calendarGrid';
 import { RECORD_COPY } from './recordCopy';
 import type { RecordState } from './RecordState';
 import type { RecordViewModel } from './RecordViewModel';
+import { Text } from '../../shared/ui/Text';
 
 /**
  * 기록 탭 화면. 상태를 그리기만 하고 분기는 ViewModel이 한다. testID는 docs/testing/testids.md의 record 표를 따른다.

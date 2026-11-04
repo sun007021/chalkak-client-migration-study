@@ -1,16 +1,17 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { formatTopicDateLabel } from '../../core/time/dateFormat';
 import type { KstDate } from '../../core/time/KstDate';
 import { format, t } from '../../shared/copy';
-import { colors, spacing } from '../../shared/ui/theme';
+import { colors, spacing } from '../../shared/design/tokens';
 import { LikeButton } from '../like/LikeButton';
 import { DeleteDialog, TitleDialog } from './ui/FeedDialogs';
 import { ZoomablePhoto } from './ui/ZoomablePhoto';
 import type { FeedViewModel } from './FeedViewModel';
+import { Text } from '../../shared/ui/Text';
 
 /**
  * 게시물 상세 화면. testID는 docs/testing/testids.md의 feed 표를 따른다.

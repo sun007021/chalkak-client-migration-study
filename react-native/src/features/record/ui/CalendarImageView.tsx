@@ -1,9 +1,10 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 
 import { t } from '../../../shared/copy';
-import { colors } from '../../../shared/ui/theme';
+import { colors } from '../../../shared/design/tokens';
 import { buildCalendarGrid, formatRecordMonthLabel } from '../calendarGrid';
 import type { CalendarImageInput } from '../CalendarImage';
+import { Text } from '../../../shared/ui/Text';
 
 /** 저장용 달력 이미지의 레이아웃(dp). 기기 화면 크기와 무관하게 같은 모양으로 그린다. */
 export const CALENDAR_IMAGE = { width: 360, cell: 48, padding: 12 } as const;

@@ -1,11 +1,12 @@
 import { useEffect, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
-import { colors, spacing } from '../../shared/ui/theme';
+import { colors, spacing } from '../../shared/design/tokens';
 import type { UploadSuccessViewModel } from './UploadSuccessViewModel';
+import { Text } from '../../shared/ui/Text';
 
 type Props = { viewModel: UploadSuccessViewModel };
 

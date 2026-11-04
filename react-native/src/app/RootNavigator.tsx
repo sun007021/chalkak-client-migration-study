@@ -6,6 +6,7 @@ import {
 import { useEffect, useMemo } from 'react';
 import { BackHandler } from 'react-native';
 
+import { colors } from '../shared/design/tokens';
 import { KstDate } from '../core/time/KstDate';
 import { FeedbackScreen } from '../features/feedback/FeedbackScreen';
 import type { FeedTarget } from '../features/feed/FeedTarget';
@@ -26,7 +27,9 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 /** 탭 루트 위에 쌓이는 화면들. 쌓인 화면에서는 하단 바가 보이지 않는다(REQ-NAV-023). */
 export function RootNavigator() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
+    >
       <Stack.Screen name="Tabs" component={MainTabs} />
       <Stack.Screen
         name="PostDetail"

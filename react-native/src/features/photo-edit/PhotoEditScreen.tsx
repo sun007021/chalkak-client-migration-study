@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   type LayoutChangeEvent,
 } from 'react-native';
@@ -15,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { bytesToBase64 } from '../../core/encoding/base64';
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t, type CopyKey } from '../../shared/copy';
-import { colors, spacing } from '../../shared/ui/theme';
+import { colors, spacing } from '../../shared/design/tokens';
 import { encodePng } from '../../core/image/png';
 import { localCopy } from '../upload/localCopy';
 import { ASPECT_KEYS, fitScale, type AspectKey } from './CropGeometry';
@@ -26,6 +25,7 @@ import { PHOTO_FILTERS } from './PhotoFilters';
 import { rotatedSize } from './PhotoEditTransform';
 import { CropFrame } from './ui/CropFrame';
 import { RulerSlider } from './ui/RulerSlider';
+import { Text } from '../../shared/ui/Text';
 
 type Props = { viewModel: PhotoEditViewModel };
 

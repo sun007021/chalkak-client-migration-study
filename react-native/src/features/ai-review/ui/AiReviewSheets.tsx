@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { t } from '../../../shared/copy';
-import { colors, spacing } from '../../../shared/ui/theme';
+import { colors, spacing } from '../../../shared/design/tokens';
 import type {
   AiFailedSheet,
   AiResultSheet,
@@ -10,6 +10,7 @@ import type {
   AiStartSheet,
 } from '../AiReviewViewModelState';
 import type { AiReviewViewModel } from '../AiReviewViewModel';
+import { Text } from '../../../shared/ui/Text';
 
 const SECTION_TEST_IDS = {
   strength: 'ai-result-sheet.feedback-strength',

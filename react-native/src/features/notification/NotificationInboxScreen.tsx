@@ -6,18 +6,18 @@ import {
   Pressable,
   RefreshControl,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
-import { colors, spacing } from '../../shared/ui/theme';
+import { colors, spacing } from '../../shared/design/tokens';
 import type {
   NotificationInboxViewModel,
   NotificationItemView,
 } from './NotificationInboxViewModel';
+import { Text } from '../../shared/ui/Text';
 
 type Props = { viewModel: NotificationInboxViewModel; onBack?: () => void };
 

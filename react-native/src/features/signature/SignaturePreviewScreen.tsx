@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { bytesToBase64 } from '../../core/encoding/base64';
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
 import type { SignaturePreviewViewModel } from './SignaturePreviewViewModel';
+import { Text } from '../../shared/ui/Text';
 
 /** 미리보기는 흰 획이 보이도록 어두운 배경 위에 얹는다(REQ-SIGN-010). 밝기는 휘도 0.3 미만. */
 export const SIGNATURE_PREVIEW_BACKDROP_COLOR = '#222222';

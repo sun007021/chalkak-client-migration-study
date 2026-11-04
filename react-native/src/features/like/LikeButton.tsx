@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { colors, spacing } from '../../shared/ui/theme';
+import { colors, spacing } from '../../shared/design/tokens';
 import { likeAccessibilityLabel } from './likeLabel';
+import { Text } from '../../shared/ui/Text';
 
 type Props = {
   buttonTestID: string;

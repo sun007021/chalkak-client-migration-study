@@ -1,10 +1,11 @@
 import type { ComponentType } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
 import type { TermsDocumentViewModel } from './TermsDocumentViewModel';
+import { Text } from '../../shared/ui/Text';
 
 export type WebViewComponentProps = {
   url: string;

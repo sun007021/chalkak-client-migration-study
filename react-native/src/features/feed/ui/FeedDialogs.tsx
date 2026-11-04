@@ -1,16 +1,9 @@
-import {
-  ActivityIndicator,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { t } from '../../../shared/copy';
-import { colors, spacing } from '../../../shared/ui/theme';
+import { colors, spacing } from '../../../shared/design/tokens';
 import type { TitleDialogState } from '../FeedState';
+import { Text, TextInput } from '../../../shared/ui/Text';
 
 function DialogFrame({ testID, children }: { testID: string; children: React.ReactNode }) {
   return (

@@ -1,5 +1,5 @@
 import { memo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
@@ -10,6 +10,7 @@ import type { SignatureDrawViewModel } from './SignatureDrawViewModel';
 import { SignaturePadGesture } from './SignaturePadGesture';
 import { strokeToSvgPath } from './SignatureStrokePath';
 import type { Stroke } from './Stroke';
+import { Text } from '../../shared/ui/Text';
 
 export type SignatureDrawScreenProps = {
   viewModel: SignatureDrawViewModel;

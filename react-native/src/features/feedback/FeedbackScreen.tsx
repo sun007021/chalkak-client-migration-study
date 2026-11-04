@@ -4,8 +4,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,8 +11,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { FEEDBACK_MAX } from '../../shared/constants';
 import { t } from '../../shared/copy';
-import { colors, spacing } from '../../shared/ui/theme';
+import { colors, spacing } from '../../shared/design/tokens';
 import type { FeedbackViewModel } from './FeedbackViewModel';
+import { Text, TextInput } from '../../shared/ui/Text';
 
 /**
  * 피드백 작성 화면. testID는 testids.md의 feedback.*. 상태는 구독만 하고 screen_view는 보내지 않는다

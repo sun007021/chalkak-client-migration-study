@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useViewModelState } from '../core/state/useViewModelState';
 import type { UploadEntryGateViewModel } from '../features/upload/UploadEntryGateViewModel';
 import { localCopy } from '../features/upload/localCopy';
-import { colors } from '../shared/ui/theme';
+import { colors } from '../shared/design/tokens';
 import { useAppContainer } from './AppContainerContext';
 
 /** 업로드 진입 확인(GET /posts/today) 중에만 화면 위에 표시를 그린다. 확인이 끝날 때까지 아래 화면의 터치를 막는다(연타 방지). */

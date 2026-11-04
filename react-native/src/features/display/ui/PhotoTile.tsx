@@ -1,9 +1,10 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import type { PostSummary } from '../../../data/post/PostModels';
 import { format, t } from '../../../shared/copy';
-import { colors, spacing } from '../../../shared/ui/theme';
+import { colors, spacing } from '../../../shared/design/tokens';
 import { LikeButton } from '../../like/LikeButton';
+import { Text } from '../../../shared/ui/Text';
 
 type Props = {
   post: PostSummary;

@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 
 import type { PostSummary } from '../../../data/post/PostModels';
-import { colors, spacing } from '../../../shared/ui/theme';
+import { colors, spacing } from '../../../shared/design/tokens';
 import { PhotoTile } from './PhotoTile';
 
 type Props = {

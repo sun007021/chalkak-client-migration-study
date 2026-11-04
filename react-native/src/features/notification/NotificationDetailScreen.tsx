@@ -1,19 +1,12 @@
 import { useEffect } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
-import { colors, spacing } from '../../shared/ui/theme';
+import { colors, spacing } from '../../shared/design/tokens';
 import type { NotificationDetailViewModel } from './NotificationDetailViewModel';
+import { Text } from '../../shared/ui/Text';
 
 /** 알림 상세 화면. testID는 docs/testing/testids.md의 알림 상세 표를 따른다. 마운트 = onShown, 언마운트 = onHidden. */
 export function NotificationDetailScreen({

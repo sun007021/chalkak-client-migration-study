@@ -4,7 +4,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -17,13 +16,14 @@ import { useViewModelState } from '../../core/state/useViewModelState';
 import { formatMonthDay } from '../../core/time/dateFormat';
 import type { PostSort, PostSummary } from '../../data/post/PostModels';
 import { t } from '../../shared/copy';
-import { colors, spacing } from '../../shared/ui/theme';
+import { colors, spacing } from '../../shared/design/tokens';
 import { collapseProgress } from './displayDateRange';
 import { type MasonryAssignment, sameAssignment, splitMasonry } from './masonry';
 import { DatePickerSheet } from './ui/DatePickerSheet';
 import { FeaturedPager } from './ui/FeaturedPager';
 import { PhotoTile } from './ui/PhotoTile';
 import type { DisplayViewModel } from './DisplayViewModel';
+import { Text } from '../../shared/ui/Text';
 
 /** 헤더(주제·설명)가 다 접히는 스크롤 거리와 접히기 전 높이. */
 const COLLAPSE_DISTANCE = 96;

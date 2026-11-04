@@ -1,14 +1,15 @@
 import { useEffect, type ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import type { PushSettingKey } from '../../data/settings/NotificationSettingsRepository';
 import { t } from '../../shared/copy';
-import { colors, spacing } from '../../shared/ui/theme';
+import { colors, spacing } from '../../shared/design/tokens';
 import { LegalDocSheet, type LegalDocWebView } from '../onboarding/LegalDocSheet';
 import { SignatureCard } from '../signature/SignatureCard';
 import type { SettingsViewModel } from './SettingsViewModel';
+import { Text } from '../../shared/ui/Text';
 
 type Props = { viewModel: SettingsViewModel; WebView: LegalDocWebView };
 

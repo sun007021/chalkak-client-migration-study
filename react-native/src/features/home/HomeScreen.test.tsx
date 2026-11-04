@@ -153,7 +153,10 @@ describe('HomeScreen 히어로 7상태 (D-06)', () => {
     h.router.set('GET /posts/today', 'home/posts-today__500-server-error');
     await renderHome(h, false);
     expect(await screen.findByTestId('home.hero-error')).toHaveTextContent(t('home.hero.error'));
-    expect(screen.getByTestId('home.hero-retry-button')).toHaveTextContent(t('home.hero.retry'));
+    // 원본 디자인: 재시도는 둥근 아이콘 버튼이라 문구는 접근성 라벨에 있다.
+    expect(screen.getByTestId('home.hero-retry-button').props.accessibilityLabel).toBe(
+      t('home.hero.retry'),
+    );
 
     h.router.set('GET /posts/today', 'home/posts-today__posted-approved');
     await fireEvent.press(screen.getByTestId('home.hero-retry-button'));
@@ -215,8 +218,9 @@ describe('HomeScreen 이번 주 기록', () => {
     const dates = ['25', '26', '27', '28', '29', '30', '31'];
     dates.forEach((day, i) => {
       const cell = screen.getByTestId(`home.week-day-2026-10-${day}`);
-      expect(within(cell).getByText(WEEKDAY_HEADERS[i])).toBeOnTheScreen();
-      expect(within(cell).getByText(day)).toBeOnTheScreen();
+      // 원본 디자인: 요일 기호는 사진이 없는 칸 안에 보이고, 날짜는 접근성 라벨로 읽힌다.
+      expect(cell.props.accessibilityLabel).toBe(`${WEEKDAY_HEADERS[i]} ${day}`);
+      if (i >= 3) expect(within(cell).getByText(WEEKDAY_HEADERS[i])).toBeOnTheScreen();
     });
     for (const day of ['25', '26', '27']) {
       expect(screen.getByTestId(`home.week-photo-2026-10-${day}`)).toBeOnTheScreen();
@@ -246,7 +250,9 @@ describe('HomeScreen 이번 주 기록', () => {
     await renderHome(h);
     await fireEvent.press(screen.getByTestId('home.week-day-2026-10-26'));
     await fireEvent.press(screen.getByTestId('home.week-day-2026-10-29'));
-    await fireEvent.press(screen.getByText(t('home.weekly.more')));
+    await fireEvent.press(
+      within(screen.getByTestId('home.week-section')).getByText(t('home.weekly.more')),
+    );
     expect(h.navigator.calls).toEqual([
       { type: 'record', selectedDate: '2026-10-26' },
       { type: 'record', selectedDate: null },

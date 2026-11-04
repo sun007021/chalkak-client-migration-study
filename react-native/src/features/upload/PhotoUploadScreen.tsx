@@ -7,8 +7,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,12 +15,13 @@ import { bytesToBase64 } from '../../core/encoding/base64';
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { format, t } from '../../shared/copy';
 import { POST_TITLE_MAX } from '../../shared/constants';
-import { colors, spacing } from '../../shared/ui/theme';
+import { colors, spacing } from '../../shared/design/tokens';
 import { rotatedSize } from '../photo-edit/PhotoEditTransform';
 import { PhotoEditScreen } from '../photo-edit/PhotoEditScreen';
 import { encodePng } from '../../core/image/png';
 import { localCopy, titleCounterText } from './localCopy';
 import type { PhotoUploadViewModel, SelectedPhoto } from './PhotoUploadViewModel';
+import { Text, TextInput } from '../../shared/ui/Text';
 
 type Props = { viewModel: PhotoUploadViewModel };
 

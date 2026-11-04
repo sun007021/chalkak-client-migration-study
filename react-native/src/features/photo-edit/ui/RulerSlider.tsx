@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react';
-import { StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
+import { StyleSheet, View, type GestureResponderEvent } from 'react-native';
 
-import { colors } from '../../../shared/ui/theme';
+import { colors } from '../../../shared/design/tokens';
 import {
   RULER_DP_PER_UNIT,
   RULER_TICKS_PER_UNIT,
@@ -9,6 +9,7 @@ import {
   isMajorTick,
   tickValue,
 } from '../RulerScale';
+import { Text } from '../../../shared/ui/Text';
 
 /** 멈칫하는 범위(값 단위). 눈금 한 칸(0.02) 안이면 기준값으로 붙는다. */
 const DETENT_RANGE = 0.02;

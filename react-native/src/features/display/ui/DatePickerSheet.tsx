@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import type { KstDate } from '../../../core/time/KstDate';
 import { format, t } from '../../../shared/copy';
-import { colors, spacing } from '../../../shared/ui/theme';
+import { colors, spacing } from '../../../shared/design/tokens';
 import {
   availableDays,
   availableMonths,
@@ -11,6 +11,7 @@ import {
   resolvePickedDate,
   type DateRange,
 } from '../displayDateRange';
+import { Text } from '../../../shared/ui/Text';
 
 type Props = {
   range: DateRange;

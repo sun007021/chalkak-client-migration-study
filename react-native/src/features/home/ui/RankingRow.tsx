@@ -1,18 +1,16 @@
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { format, t } from '../../../shared/copy';
-import { colors, spacing } from '../../../shared/ui/theme';
+import { colors, radius, spacing, typography } from '../../../shared/design/tokens';
+import { Icon } from '../../../shared/ui/icons/Icon';
+import { RemoteImage } from '../../../shared/ui/RemoteImage';
+import { RoundIconButton } from '../../../shared/ui/RoundIconButton';
+import { Skeleton } from '../../../shared/ui/Skeleton';
 import type { PostSummary } from '../../../data/post/PostModels';
 import type { RankingKey, RankingSection } from '../HomeState';
+import { Text } from '../../../shared/ui/Text';
+import { SectionHeader } from './SectionHeader';
 
 type Ids = {
   section: string;
@@ -77,33 +75,39 @@ export function RankingRow({
   const ids = IDS[rankingKey];
   return (
     <View testID={ids.section} style={styles.root}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
-        <Pressable
-          testID={ids.moreLink}
-          accessibilityRole="button"
-          accessibilityLabel={title}
-          onPress={onMorePress}
-          hitSlop={8}
-        >
-          <Text style={styles.more}>{'>'}</Text>
-        </Pressable>
-      </View>
-      {section.status === 'loading' ? <ActivityIndicator style={styles.loading} /> : null}
+      <SectionHeader
+        title={title}
+        moreLabel={t('home.weekly.more')}
+        moreTestID={ids.moreLink}
+        onMorePress={onMorePress}
+      />
+      {section.status === 'loading' ? (
+        <View style={styles.list}>
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} style={styles.photo} />
+          ))}
+        </View>
+      ) : null}
       {section.status === 'error' ? (
         <View style={styles.message}>
           <Text testID={ids.error} style={styles.messageText}>
             {format(t('home.ranking.error'), { '섹션 제목': title })}
           </Text>
-          <Pressable testID={ids.retry} accessibilityRole="button" onPress={onRetry}>
-            <Text style={styles.retryText}>{t('common.retry')}</Text>
-          </Pressable>
+          <RoundIconButton
+            testID={ids.retry}
+            accessibilityLabel={t('common.retry')}
+            size={32}
+            iconSize={15}
+            onPress={onRetry}
+          />
         </View>
       ) : null}
       {section.status === 'ready' && section.posts.length === 0 ? (
-        <Text testID={ids.empty} style={styles.messageText}>
-          {t('home.ranking.empty')}
-        </Text>
+        <View style={styles.message}>
+          <Text testID={ids.empty} style={styles.messageText}>
+            {t('home.ranking.empty')}
+          </Text>
+        </View>
       ) : null}
       {section.status === 'ready' && section.posts.length > 0 ? (
         <ScrollView
@@ -159,11 +163,10 @@ function RankingItem({
           </Text>
         </View>
       ) : (
-        <Image
+        <RemoteImage
           testID={ids.image(post.id)}
-          source={{ uri }}
+          uri={uri}
           style={styles.photo}
-          resizeMode="cover"
           onError={() => setFailedUri(uri)}
         />
       )}
@@ -175,9 +178,11 @@ function RankingItem({
         hitSlop={6}
         style={styles.like}
       >
-        <Text style={[styles.likeIcon, post.isLiked && styles.liked]}>
-          {post.isLiked ? '♥' : '♡'}
-        </Text>
+        <Icon
+          name={post.isLiked ? 'ic_heart_filled' : 'ic_heart'}
+          size={14}
+          color={colors.textOnImage}
+        />
         <Text testID={ids.likeCount(post.id)} style={styles.likeCount}>
           {String(post.likeCount)}
         </Text>
@@ -186,27 +191,43 @@ function RankingItem({
   );
 }
 
+// 원본 HomeRankingRow(screens-a.md §7.7): 카드 82x82, 간격 16, 라운드 small(7), calendarCell, 화면 끝까지 스크롤(contentPadding 25).
+const CARD = 82;
+
 const styles = StyleSheet.create({
-  root: { paddingVertical: spacing.lg, gap: spacing.md },
-  header: {
-    paddingHorizontal: spacing.lg,
+  root: { gap: spacing.lg },
+  message: {
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingHorizontal: spacing.screenHorizontal,
   },
-  title: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  more: { fontSize: 18, color: colors.textSecondary },
-  loading: { padding: spacing.lg },
-  message: { paddingHorizontal: spacing.lg, gap: spacing.xs },
-  messageText: { paddingHorizontal: spacing.lg, color: colors.textSecondary },
-  retryText: { color: colors.accent, fontWeight: '600' },
-  list: { paddingHorizontal: spacing.lg, gap: spacing.sm },
-  item: { width: 132, gap: spacing.xs },
-  photo: { width: 132, height: 132, borderRadius: 12, backgroundColor: colors.surface },
-  photoFallback: { alignItems: 'center', justifyContent: 'center', padding: spacing.sm },
-  fallbackText: { fontSize: 12, textAlign: 'center', color: colors.textSecondary },
-  like: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  likeIcon: { fontSize: 16, color: colors.textSecondary },
-  liked: { color: colors.accent },
-  likeCount: { fontSize: 13, color: colors.textSecondary },
+  messageText: { ...typography.footnote, color: colors.textSecondary },
+  list: { paddingHorizontal: spacing.screenHorizontal, gap: spacing.lg },
+  item: { width: CARD, height: CARD },
+  photo: {
+    width: CARD,
+    height: CARD,
+    borderRadius: radius.small,
+    backgroundColor: colors.calendarCell,
+    overflow: 'hidden',
+  },
+  photoFallback: { alignItems: 'center', justifyContent: 'center', padding: spacing.xs },
+  fallbackText: { ...typography.caption, textAlign: 'center', color: colors.textSecondary },
+  like: {
+    position: 'absolute',
+    left: 6,
+    bottom: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  likeCount: {
+    ...typography.caption,
+    color: colors.textOnImage,
+    textShadowColor: 'rgba(0,0,0,0.25)',
+    textShadowRadius: 2,
+    textShadowOffset: { width: 0, height: 1 },
+  },
 });

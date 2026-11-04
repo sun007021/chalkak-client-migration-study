@@ -9,7 +9,7 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 
-import { colors } from '../../../shared/ui/theme';
+import { colors } from '../../../shared/design/tokens';
 import { PinchTracker, type Transform } from '../pinchTracker';
 
 type Props = {

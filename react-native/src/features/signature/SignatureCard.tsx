@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
 import type { SignatureCardViewModel } from './SignatureCardViewModel';
+import { Text } from '../../shared/ui/Text';
 
 /**
  * 설정 탭의 사인 카드(설정 화면이 배치한다). testID는 settings.signature-*.
