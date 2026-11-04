@@ -22,7 +22,7 @@ import { ExpoNotificationResponseSource } from '../core/push/expo/ExpoNotificati
 import { ExpoPushMessageSource } from '../core/push/expo/ExpoPushMessageSource';
 import { ExpoPushNotificationPresenter } from '../core/push/expo/ExpoPushNotificationPresenter';
 import { ExpoPushPermissionGateway } from '../core/push/expo/ExpoPushPermissionGateway';
-import { ExpoPushTokenProvider } from '../core/push/expo/ExpoPushTokenProvider';
+import { createPushTokenProvider } from '../core/push/createPushTokenProvider';
 import type { NotificationResponseSource } from '../core/push/NotificationResponseSource';
 import type { PushMessageSource } from '../core/push/PushMessageSource';
 import type { PushNotificationPresenter } from '../core/push/PushNotificationPresenter';
@@ -124,6 +124,8 @@ import { LoginViewModel } from '../features/auth/LoginViewModel';
 import { LoginViewModelOwner } from '../features/auth/LoginViewModelOwner';
 import { AuthGate } from '../features/boot/AuthGate';
 import { BootViewModel } from '../features/boot/BootViewModel';
+import type { AppExiter } from '../features/boot/AppExiter';
+import { BackHandlerAppExiter } from '../features/boot/BackHandlerAppExiter';
 import { ForceUpdateGate } from '../features/boot/ForceUpdateGate';
 import type { HomePreloader } from '../features/boot/HomePreloader';
 import { ItunesUpdateChecker } from '../features/boot/ItunesUpdateChecker';
@@ -139,6 +141,7 @@ import { ConsoleNetworkLogger } from '../core/http/ConsoleNetworkLogger';
 import { FetchTransport } from '../core/http/FetchTransport';
 import { HttpRefreshEndpoint } from '../core/http/HttpRefreshEndpoint';
 import { SystemSleeper } from '../core/http/SystemSleeper';
+import { MidnightScheduler } from '../core/time/MidnightScheduler';
 import { TokenRefresher } from '../core/http/TokenRefresher';
 import { ExpoSecureKeyValueStorage } from '../core/session/ExpoSecureKeyValueStorage';
 import { SecureSessionStore } from '../core/session/SecureSessionStore';
@@ -163,6 +166,7 @@ export interface Dependencies {
   readonly homePreloader: HomePreloader;
   readonly updateChecker: UpdateChecker;
   readonly storeOpener: StoreOpener;
+  readonly appExiter: AppExiter;
   readonly visibility: AppVisibility;
   readonly linkOpener: ExternalLinkOpener;
   readonly sleeper: Sleeper;
@@ -217,7 +221,13 @@ function isUserDataCache(value: object): value is UserDataCache {
   return typeof (value as Partial<UserDataCache>).clearAll === 'function';
 }
 
-const DEFAULT_APP_INFO: AppInfo = { platform: 'ios', bundleId: '', version: '', appStoreId: null };
+const DEFAULT_APP_INFO: AppInfo = {
+  platform: 'ios',
+  bundleId: '',
+  version: '',
+  appStoreId: null,
+  iosFcmEnabled: false,
+};
 
 /** 의존성 조립 지점. 테스트에서는 fake를 `overrides`로 넣는다. 전역(Constants 등)은 읽지 않는다. */
 export class AppContainer {
@@ -352,7 +362,11 @@ export class AppContainer {
       authFlow: this.bootViewModel,
     });
     this.pushFeature = this.createPushFeature();
-    this.updateDialogViewModel = new UpdateDialogViewModel(dependencies.storeOpener);
+    this.updateDialogViewModel = new UpdateDialogViewModel(
+      dependencies.storeOpener,
+      dependencies.appInfo.platform,
+      dependencies.appExiter,
+    );
     this.loginOwner = new LoginViewModelOwner(this.bootViewModel, () =>
       this.createLoginViewModel(),
     );
@@ -697,6 +711,7 @@ export class AppContainer {
     return new HomeViewModel({
       mode,
       clock,
+      midnight: new MidnightScheduler({ clock, sleeper: this.sleeper }),
       topics: this.topicRepository,
       posts: this.postRepository,
       notifications: new NotificationRepository({ api }),
@@ -841,9 +856,9 @@ export class AppContainer {
         logger,
       });
     const o = overrides.push ?? {};
-    const pushTokens = overrides.pushTokens ?? new ExpoPushTokenProvider();
     const featureFlags = overrides.featureFlags ?? readFeatureFlags(undefined);
     const appInfo = overrides.appInfo ?? DEFAULT_APP_INFO;
+    const pushTokens = overrides.pushTokens ?? createPushTokenProvider(appInfo);
     const visibility = overrides.visibility ?? new ReactNativeAppVisibility();
     const pushRegistrar =
       overrides.pushRegistrar ??
@@ -885,7 +900,8 @@ export class AppContainer {
         },
         homePreloader: overrides.homePreloader ?? new NoopHomePreloader(),
         updateChecker: overrides.updateChecker ?? createUpdateChecker(appInfo, transport),
-        storeOpener: overrides.storeOpener ?? new LinkingStoreOpener(storeUrlFor(appInfo)),
+        storeOpener: overrides.storeOpener ?? new LinkingStoreOpener(storeUrlsFor(appInfo)),
+        appExiter: overrides.appExiter ?? new BackHandlerAppExiter(),
         userDataCaches: overrides.userDataCaches ?? [],
         visibility,
         linkOpener: overrides.linkOpener ?? new LinkingExternalLinkOpener(),
@@ -929,9 +945,14 @@ function createUpdateChecker(appInfo: AppInfo, transport: FetchTransport): Updat
   });
 }
 
-function storeUrlFor(appInfo: AppInfo): string | null {
+/** 스토어 앱 상세 URL을 시도 순서대로 돌려준다. Android는 Play 앱(`market://`), 실패하면 Play 웹 URL. */
+function storeUrlsFor(appInfo: AppInfo): string[] {
   if (appInfo.platform === 'android') {
-    return appInfo.bundleId ? `market://details?id=${appInfo.bundleId}` : null;
+    if (!appInfo.bundleId) return [];
+    return [
+      `market://details?id=${appInfo.bundleId}`,
+      `https://play.google.com/store/apps/details?id=${appInfo.bundleId}`,
+    ];
   }
-  return appInfo.appStoreId ? `itms-apps://itunes.apple.com/app/id${appInfo.appStoreId}` : null;
+  return appInfo.appStoreId ? [`itms-apps://itunes.apple.com/app/id${appInfo.appStoreId}`] : [];
 }

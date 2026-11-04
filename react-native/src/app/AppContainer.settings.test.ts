@@ -35,7 +35,13 @@ async function create(mode: 'member' | 'guest' = 'member') {
       api: net.api,
       toast,
       push: { permission },
-      appInfo: { platform: 'ios', bundleId: 'b', version: '3.4.5', appStoreId: null },
+      appInfo: {
+        platform: 'ios',
+        bundleId: 'b',
+        version: '3.4.5',
+        appStoreId: null,
+        iosFcmEnabled: false,
+      },
       analyticsBackend,
     },
   );

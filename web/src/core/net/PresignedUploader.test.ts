@@ -85,3 +85,35 @@ describe('PresignedUploader', () => {
     expect(ff.calls).toHaveLength(0);
   });
 });
+
+describe('PresignedUploader 업로드 URL 허용 범위 (리뷰 8)', () => {
+  const loopback = 'http://localhost:4010/__upload/abc?X-Amz-Expires=300';
+
+  it('리뷰 8 배포 빌드(allowLoopbackHttp: false)는 loopback http 업로드 URL을 요청 없이 ConfigError로 거절한다', async () => {
+    const clock = new FakeClock(NOW);
+    const ff = new FakeFetch();
+    const uploader = new PresignedUploader({ fetch: ff.fetch, clock, allowLoopbackHttp: false });
+    await expect(uploader.put({ url: loopback, body: new Blob(['x']), contentType: 'image/webp' })).rejects.toMatchObject({ name: 'ConfigError' });
+    expect(ff.calls).toHaveLength(0);
+  });
+
+  it('리뷰 8 배포 빌드도 https 업로드 URL은 보낸다', async () => {
+    const clock = new FakeClock(NOW);
+    const ff = new FakeFetch();
+    ff.route('PUT /bucket/photo.webp', () => emptyResponse(200));
+    const uploader = new PresignedUploader({ fetch: ff.fetch, clock, allowLoopbackHttp: false });
+    const result = track(uploader.put({ url: URL_WITH_QUERY, body: new Blob(['x']), contentType: 'image/webp' }));
+    await clock.advance(0);
+    expect(result.state).toBe('fulfilled');
+  });
+
+  it('리뷰 8 개발 빌드 기본값은 loopback http를 허용한다', async () => {
+    const clock = new FakeClock(NOW);
+    const ff = new FakeFetch();
+    ff.route('PUT /__upload/abc', () => emptyResponse(200));
+    const uploader = new PresignedUploader({ fetch: ff.fetch, clock });
+    const result = track(uploader.put({ url: loopback, body: new Blob(['x']), contentType: 'image/webp' }));
+    await clock.advance(0);
+    expect(result.state).toBe('fulfilled');
+  });
+});

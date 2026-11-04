@@ -15,8 +15,13 @@ abstract interface class UpdateChecker {
   Future<UpdateStatus> check();
 }
 
-/// "업데이트" 버튼의 동작. iOS는 스토어 열기, Android는 Play 즉시 업데이트 시작.
-/// 실패·취소는 예외로 알려도 되고, 게이트는 어느 쪽이든 강제 상태를 유지한다.
+/// "업데이트" 버튼의 동작. 두 플랫폼 모두 스토어 페이지를 직접 연다.
+/// 열었으면 true, 어디도 열지 못했으면 false(예외도 false로 취급한다).
 abstract interface class UpdateLauncher {
-  Future<void> launch();
+  Future<bool> launch();
+}
+
+/// "취소" 버튼(Android)과 스토어를 열 수 없을 때의 앱 종료. 플랫폼 호출을 감싼다.
+abstract interface class AppExit {
+  Future<void> exit();
 }

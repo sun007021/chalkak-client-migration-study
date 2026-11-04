@@ -5,6 +5,10 @@ import { useContainer } from '../../app/AppContext';
 import { ROUTES, SETTINGS_BELOW_STATE, isSettingsBelow } from '../../app/paths';
 import { SIGNATURE_PNG_SIZE } from '../../constants';
 import { t } from '../../copy/ko';
+import { color, font, radius } from '../../design/tokens';
+import { Button } from '../../core/ui/Button';
+import { IcRotateRight } from '../../core/ui/icons.generated';
+import { BackButton } from '../../core/ui/TopBar';
 import { useSignupGate } from '../onboarding/useSignupGate';
 import { useScreenView } from '../../core/analytics/useScreenView';
 import { useOwnedViewModel } from '../../core/state/useOwnedViewModel';
@@ -26,17 +30,16 @@ export function SignatureDrawScreen({ mode }: { mode: SignatureMode }): ReactNod
   const container = useContainer();
   const gate = useSignupGate(mode === 'onboarding');
   const allowed = gate.kind === 'ok';
-  const create = useCallback(() => {
-    if (!allowed) return null;
-    container.signatureDraft.clear(); // 빈 패드로 시작하므로 이전 PNG도 남기지 않는다.
-    return container.createSignatureDrawViewModel(mode);
-  }, [container, mode, allowed]);
-  const vm = useOwnedViewModel(create);
+  const create = useCallback(() => (allowed ? container.createSignatureDrawViewModel(mode) : null), [container, mode, allowed]);
+  // 빈 패드로 시작하므로 이전 PNG도 남기지 않는다(생성이 아니라 마운트 효과에서).
+  const clearDraft = useCallback(() => container.signatureDraft.clear(), [container]);
+  const vm = useOwnedViewModel(create, clearDraft);
   if (gate.kind === 'redirect') return <Navigate to={gate.to} replace />;
   return vm ? <SignatureDrawView vm={vm} mode={mode} /> : null;
 }
 
-const canvasStyle: CSSProperties = { width: '100%', aspectRatio: '2 / 1', display: 'block', background: '#2b2b2b', borderRadius: 12, touchAction: 'none' };
+// 원본 SignaturePad(screens-a §6.1): 캔버스는 actionPrimary 바탕 라운드 12. 바깥 카드는 inputBackground 라운드 16 + textPrimary 12% 테두리.
+const canvasStyle: CSSProperties = { width: '100%', aspectRatio: '2 / 1', display: 'block', background: color.actionPrimary, borderRadius: radius.button, touchAction: 'none' };
 
 /** 패드의 획을 화면 캔버스에 그린다(논리 크기 1024×512, 흰 획). getContext가 없으면(테스트 환경) 그리지 않는다. */
 function paintStrokes(canvas: HTMLCanvasElement, pad: SignaturePad, strokes: SignaturePad['state']['strokes']): void {
@@ -102,51 +105,79 @@ function SignatureDrawView({ vm, mode }: { vm: SignatureDrawViewModel; mode: Sig
     if (plan.kind === 'back') navigate(-plan.steps);
     else navigate(plan.to, { replace: true });
   };
+  const controlStyle = (disabled: boolean): CSSProperties => ({
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: mode === 'change' ? 6 : 4,
+    minHeight: 44,
+    padding: '10px 16px',
+    border: `1px solid ${color.border}`,
+    borderRadius: radius.pill,
+    background: 'none',
+    color: disabled ? color.textMuted : color.textPrimary,
+    ...font('footnote'),
+  });
   return (
-    <div data-testid="signature.root" data-mode={mode} style={{ minHeight: '100dvh', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16, padding: 16 }}>
-      <button type="button" data-testid="signature.back-button" style={{ alignSelf: 'flex-start', minHeight: 44 }} onClick={back}>
-        ←
-      </button>
-      <h1 data-testid="signature.title" style={{ whiteSpace: 'pre-line' }}>
+    <div
+      data-testid="signature.root"
+      data-mode={mode}
+      className="ck-screen"
+      style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', padding: 'calc(var(--safe-top) + var(--space-sm)) var(--space-screen-horizontal) calc(18px + var(--safe-bottom))', background: color.background }}
+    >
+      <div style={{ marginLeft: -12 }}>
+        <BackButton testId="signature.back-button" onClick={back} />
+      </div>
+      <h1 data-testid="signature.title" style={{ marginTop: 'var(--space-lg)', whiteSpace: 'pre-line', ...font('title1') }}>
         {t('onb.sign.title')}
       </h1>
-      <p data-testid="signature.guide-text" style={{ whiteSpace: 'pre-line' }}>
+      <p data-testid="signature.guide-text" style={{ marginTop: 30, whiteSpace: 'pre-line', color: color.textSecondary, ...font('subheadline') }}>
         {t('onb.sign.guide')}
       </p>
-      <div style={{ position: 'relative' }}>
-        <canvas
-          ref={canvasRef}
-          data-testid="signature.canvas"
-          width={pad.size.width}
-          height={pad.size.height}
-          style={canvasStyle}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={endStroke}
-          onPointerCancel={endStroke}
-        />
-        {!padState.hasSignature && (
-          <span data-testid="signature.canvas-hint" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb', pointerEvents: 'none' }}>
-            {t('onb.sign.pad-hint')}
-          </span>
-        )}
+      <div style={{ marginTop: 32, padding: '16px 16px 14px', background: color.inputBackground, borderRadius: radius.large, border: '1px solid rgba(43, 39, 36, 0.12)' }}>
+        <div style={{ position: 'relative' }}>
+          <canvas
+            ref={canvasRef}
+            data-testid="signature.canvas"
+            width={pad.size.width}
+            height={pad.size.height}
+            style={canvasStyle}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={endStroke}
+            onPointerCancel={endStroke}
+          />
+          {/* 점선 안쪽 테두리: textOnImage 28%, 1px, dash 6/6, inset 1, 라운드 10 */}
+          <div aria-hidden="true" style={{ position: 'absolute', inset: 1, border: '1px dashed rgba(255, 255, 255, 0.28)', borderRadius: 10, pointerEvents: 'none' }} />
+          {!padState.hasSignature && (
+            <span aria-hidden="true" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255, 255, 255, 0.56)', pointerEvents: 'none', ...font('handwriting'), fontSize: '2.9rem', lineHeight: 1 }}>
+              사인
+            </span>
+          )}
+        </div>
+        <p style={{ marginTop: 12, textAlign: 'center', color: color.textMuted, ...font('footnote') }}>
+          {!padState.hasSignature && <span data-testid="signature.canvas-hint">{t('onb.sign.pad-hint')}</span>}
+          {padState.hasSignature && <span aria-hidden="true">&nbsp;</span>}
+        </p>
       </div>
       {state.error && (
-        <p key={state.error.id} data-testid="signature.error-message" role="alert">
+        <p key={state.error.id} data-testid="signature.error-message" role="alert" style={{ marginTop: 'var(--space-md)', textAlign: 'center', color: color.error, ...font('footnote') }}>
           {state.error.message}
         </p>
       )}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button type="button" data-testid="signature.undo-button" disabled={!padState.canUndo} style={{ minHeight: 44 }} onClick={() => pad.undo()}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 24 }}>
+        <button type="button" data-testid="signature.undo-button" disabled={!padState.canUndo} style={controlStyle(!padState.canUndo)} onClick={() => pad.undo()}>
+          <IcRotateRight size={15} style={{ transform: 'scaleX(-1)' }} />
           {t('onb.sign.undo')}
         </button>
-        <button type="button" data-testid="signature.clear-button" disabled={!padState.hasSignature} style={{ minHeight: 44 }} onClick={() => pad.clear()}>
+        <button type="button" data-testid="signature.clear-button" disabled={!padState.hasSignature} style={controlStyle(!padState.hasSignature)} onClick={() => pad.clear()}>
           {t('onb.sign.clear')}
         </button>
       </div>
-      <button type="button" data-testid="signature.submit-button" disabled={!padState.hasSignature || state.busy} style={{ marginTop: 'auto', minHeight: 48 }} onClick={submit}>
-        {t('onb.sign.confirm')}
-      </button>
+      <div style={{ marginTop: 'auto', paddingTop: 'var(--space-xl)' }}>
+        <Button fill data-testid="signature.submit-button" disabled={!padState.hasSignature || state.busy} onClick={submit}>
+          {t('onb.sign.confirm')}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -86,3 +86,6 @@ function resolveValue(value: RouteValue, req: RecordedRequest, index: number): R
 
 /** 필요한 곳에서 json 응답을 짧게 만든다. */
 export const json = jsonResponse;
+
+/** 라우트 값을 응답으로 푼다(다른 응답 함수가 감싸 쓸 때). */
+export const resolveRoute = resolveValue;

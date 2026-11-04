@@ -16,63 +16,48 @@ struct TermsStepView: View {
     }
 
     var body: some View {
+        // 원본 OnboardingTermsScreen(screens-a.md 5.1): 바탕 inputBackground, 타이틀 title1, 간격 50 → 57 → 전체 동의 카드 → 3 → 필수 행 → 다음
         VStack(alignment: .leading, spacing: 0) {
-            Button { viewModel.backTapped() } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(ChalkakColor.iconPrimary)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("terms.back-button")
+            ChalkakNavigationButton(kind: .back) { viewModel.backTapped() }
+                .accessibilityIdentifier("terms.back-button")
+                .padding(.leading, -ChalkakSpacing.sm)
 
             Text(OnboardingCopy.termsTitle)
-                .font(ChalkakFont.display)
+                .font(ChalkakFont.title1)
                 .foregroundStyle(ChalkakColor.textPrimary)
-                .padding(.top, ChalkakSpacing.xl)
+                .padding(.top, 2)
                 .accessibilityIdentifier("terms.title")
 
-            VStack(alignment: .leading, spacing: ChalkakSpacing.lg) {
-                checkRow(
-                    title: OnboardingCopy.termsAgreeAll, isOn: viewModel.agreedToAll,
-                    checkIdentifier: "terms.agree-all-checkbox", viewIdentifier: nil,
-                    toggle: { viewModel.toggleAll() }, view: nil
-                )
-                Divider()
-                checkRow(
+            allConsentRow
+                .padding(.top, 57)
+
+            VStack(spacing: 0) {
+                requiredRow(
                     title: OnboardingCopy.termsService, isOn: viewModel.agreedToService,
                     checkIdentifier: "terms.service-checkbox", viewIdentifier: "terms.service-view-button",
                     toggle: { viewModel.toggleService() },
                     view: { Task { await viewModel.viewDocument(.service) } }
                 )
-                checkRow(
+                termsDivider
+                requiredRow(
                     title: OnboardingCopy.termsPrivacy, isOn: viewModel.agreedToPrivacy,
                     checkIdentifier: "terms.privacy-checkbox", viewIdentifier: "terms.privacy-view-button",
                     toggle: { viewModel.togglePrivacy() },
                     view: { Task { await viewModel.viewDocument(.privacy) } }
                 )
+                termsDivider
             }
-            .padding(.top, 48)
+            .padding(.top, 3)
 
             Spacer(minLength: 0)
 
-            Button { viewModel.nextTapped() } label: {
-                Text(OnboardingCopy.termsNext)
-                    .font(ChalkakFont.callout)
-                    .foregroundStyle(ChalkakColor.onActionPrimary)
-                    .frame(maxWidth: .infinity, minHeight: 56)
-                    .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
-                    .opacity(viewModel.canProceed ? 1 : 0.3)
-            }
-            .buttonStyle(.plain)
-            .disabled(!viewModel.canProceed)
-            .accessibilityIdentifier("terms.next-button")
+            ChalkakButton(title: OnboardingCopy.termsNext, action: { viewModel.nextTapped() }, isEnabled: viewModel.canProceed, fillsWidth: true)
+                .accessibilityIdentifier("terms.next-button")
         }
         .padding(.horizontal, ChalkakSpacing.screenHorizontal)
-        .padding(.bottom, ChalkakSpacing.xl)
+        .padding(.bottom, 20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(ChalkakColor.background.ignoresSafeArea())
+        .background(ChalkakColor.inputBackground.ignoresSafeArea())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("terms.root")
         .onAppear { viewModel.onAppear() }
@@ -101,23 +86,48 @@ struct TermsStepView: View {
         )
     }
 
-    private func checkRow(
-        title: String, isOn: Bool, checkIdentifier: String, viewIdentifier: String?,
-        toggle: @escaping () -> Void, view: (() -> Void)?
+    private var termsDivider: some View {
+        Rectangle().fill(ChalkakColor.border).frame(height: 1)
+    }
+
+    /// 전체 동의 카드: 체크박스 22 + body, 패딩 16/19, 배경 inputBackground, 테두리 #E3E1DD, 라운드 large.
+    private var allConsentRow: some View {
+        Button { viewModel.toggleAll() } label: {
+            HStack(spacing: ChalkakSpacing.lg) {
+                ChalkakCheckbox(isChecked: viewModel.agreedToAll)
+                Text(OnboardingCopy.termsAgreeAll)
+                    .font(ChalkakFont.body)
+                    .foregroundStyle(ChalkakColor.textPrimary)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, ChalkakSpacing.lg)
+            .padding(.vertical, 19)
+            .background(ChalkakColor.inputBackground, in: RoundedRectangle(cornerRadius: ChalkakRadius.large))
+            .overlay(RoundedRectangle(cornerRadius: ChalkakRadius.large).stroke(Color(hex: 0xE3E1DD), lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: ChalkakRadius.large))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(viewModel.agreedToAll ? [.isSelected] : [])
+        .accessibilityValue(viewModel.agreedToAll ? "checked" : "unchecked")
+        .accessibilityIdentifier("terms.agree-all-checkbox")
+    }
+
+    /// 필수 행: 체크박스 + body(textPrimary 85%), 간격 14, 오른쪽 "보기" callout/textMuted.
+    private func requiredRow(
+        title: String, isOn: Bool, checkIdentifier: String, viewIdentifier: String,
+        toggle: @escaping () -> Void, view: @escaping () -> Void
     ) -> some View {
-        HStack(spacing: ChalkakSpacing.md) {
+        HStack(spacing: 0) {
             Button(action: toggle) {
-                HStack(spacing: ChalkakSpacing.md) {
-                    Image(isOn ? "ic_checkbox_selected" : "ic_checkbox_unselected")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 24, height: 24)
+                HStack(spacing: 14) {
+                    ChalkakCheckbox(isChecked: isOn)
                     Text(title)
-                        .font(ChalkakFont.callout)
-                        .foregroundStyle(ChalkakColor.textPrimary)
+                        .font(ChalkakFont.body)
+                        .foregroundStyle(ChalkakColor.textPrimary.opacity(0.85))
                     Spacer(minLength: 0)
                 }
-                .frame(minHeight: 44)
+                .padding(.leading, ChalkakSpacing.xs)
+                .padding(.vertical, ChalkakSpacing.lg)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -125,18 +135,17 @@ struct TermsStepView: View {
             .accessibilityValue(isOn ? "checked" : "unchecked")
             .accessibilityIdentifier(checkIdentifier)
 
-            if let view, let viewIdentifier {
-                Button(action: view) {
-                    Text(OnboardingCopy.termsView)
-                        .font(ChalkakFont.subheadline)
-                        .foregroundStyle(ChalkakColor.textSecondary)
-                        .underline()
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier(viewIdentifier)
+            Button(action: view) {
+                Text(OnboardingCopy.termsView)
+                    .font(ChalkakFont.callout)
+                    .foregroundStyle(ChalkakColor.textMuted)
+                    .padding(.leading, ChalkakSpacing.md)
+                    .padding(.trailing, ChalkakSpacing.xs)
+                    .padding(.vertical, ChalkakSpacing.lg)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(viewIdentifier)
         }
     }
 }

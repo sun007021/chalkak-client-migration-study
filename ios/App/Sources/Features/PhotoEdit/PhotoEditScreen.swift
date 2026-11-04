@@ -54,7 +54,9 @@ struct PhotoEditScreen: View {
             tools
             tabBar
         }
-        .background(ChalkakColor.background.ignoresSafeArea())
+        // 원본 편집기(screens-b.md 6.5): 어두운 편집기 색(editor*)과 다크 컨트롤
+        .background(ChalkakColor.editorBackground.ignoresSafeArea())
+        .preferredColorScheme(.dark)
         .overlay { errorDialog }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("photo-edit.root")
@@ -81,12 +83,12 @@ struct PhotoEditScreen: View {
         HStack {
             Button(EditCopy.cancel) { viewModel.cancel() }
                 .font(ChalkakFont.body)
-                .foregroundStyle(ChalkakColor.textPrimary)
+                .foregroundStyle(ChalkakColor.editorContent)
                 .frame(minWidth: 44, minHeight: 44)
                 .accessibilityIdentifier("photo-edit.cancel-button")
             Spacer()
             if isFinishing {
-                ProgressView().accessibilityIdentifier("photo-edit.rendering-indicator")
+                ProgressView().tint(ChalkakColor.editorContent).accessibilityIdentifier("photo-edit.rendering-indicator")
             }
             Spacer()
             Button(EditCopy.done) {
@@ -98,13 +100,14 @@ struct PhotoEditScreen: View {
                 }
             }
             .font(ChalkakFont.headline)
-            .foregroundStyle(ChalkakColor.accent)
+            .foregroundStyle(isReady && !isFinishing ? ChalkakColor.editorContent : ChalkakColor.editorContentMuted)
             .frame(minWidth: 44, minHeight: 44)
             .disabled(!isReady)
             .accessibilityIdentifier("photo-edit.done-button")
         }
         .padding(.horizontal, ChalkakSpacing.lg)
-        .frame(height: 52)
+        .padding(.top, ChalkakSpacing.sm)
+        .frame(height: 56)
     }
 
     private var tabBar: some View {
@@ -113,7 +116,7 @@ struct PhotoEditScreen: View {
             tabButton(.adjust, title: EditCopy.tabAdjust, identifier: "photo-edit.tab-adjust")
             tabButton(.filter, title: EditCopy.tabFilter, identifier: "photo-edit.tab-filter")
         }
-        .background(ChalkakColor.surfaceElevated.ignoresSafeArea(edges: .bottom))
+        .background(ChalkakColor.editorBackground.ignoresSafeArea(edges: .bottom))
     }
 
     private func tabButton(_ tab: PhotoEditTab, title: String, identifier: String) -> some View {
@@ -121,7 +124,7 @@ struct PhotoEditScreen: View {
         return Button { Task { await viewModel.selectTab(tab) } } label: {
             Text(title)
                 .font(isSelected ? ChalkakFont.headline : ChalkakFont.body)
-                .foregroundStyle(isSelected ? ChalkakColor.textPrimary : ChalkakColor.bottomBarInactive)
+                .foregroundStyle(isSelected ? ChalkakColor.editorContent : ChalkakColor.editorContentMuted)
                 .frame(maxWidth: .infinity, minHeight: 48)
         }
         .buttonStyle(.plain)
@@ -147,7 +150,7 @@ struct PhotoEditScreen: View {
                     }
                     .frame(width: shown.width, height: shown.height)
                 } else {
-                    ProgressView()
+                    ProgressView().tint(ChalkakColor.editorContent)
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
@@ -173,9 +176,9 @@ struct PhotoEditScreen: View {
             case .filter: filterTools
             }
         }
-        .frame(height: 150)
+        .frame(height: viewModel.tab == .adjust ? 200 : 150)
         .frame(maxWidth: .infinity)
-        .background(ChalkakColor.surfaceElevated)
+        .background(ChalkakColor.editorBackground)
     }
 
     private var cropTools: some View {
@@ -199,57 +202,56 @@ struct PhotoEditScreen: View {
         .padding(.vertical, ChalkakSpacing.md)
     }
 
+    /// 조정 탭: 위쪽 줄(자동 토글, 초기화) + 항목 링 + 눈금자(screens-b.md 6.2).
     private var adjustTools: some View {
         VStack(spacing: ChalkakSpacing.sm) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: ChalkakSpacing.sm) {
-                    ForEach(AdjustmentItem.ordered, id: \.self) { item in
-                        chip(
-                            title: EditCopy.label(for: item), isSelected: viewModel.adjustmentItem == item,
-                            identifier: item == .auto ? "photo-edit.adjust-item-auto" : "photo-edit.adjust-item-" + Self.slug(for: item)
-                        ) { Task { await viewModel.selectAdjustmentItem(item) } }
-                    }
+            HStack {
+                if viewModel.adjustmentItem == .auto {
+                    Toggle(EditCopy.label(for: AdjustmentItem.auto), isOn: Binding(
+                        get: { viewModel.adjustments.autoStrength > 0 },
+                        // "자동"이 선택된 상태에서 다시 누르면 켜짐/꺼짐이 번갈아 바뀐다(REQ-EDIT-021).
+                        set: { _ in Task { await viewModel.selectAdjustmentItem(.auto) } }
+                    ))
+                    .labelsHidden()
+                    .tint(ChalkakColor.editorAccent)
+                    .scaleEffect(0.85, anchor: .leading)
+                    .accessibilityIdentifier("photo-edit.adjust-auto-toggle")
                 }
-                .padding(.horizontal, ChalkakSpacing.lg)
+                Spacer()
+                textButton(EditCopy.adjustReset, systemName: "arrow.counterclockwise", identifier: "photo-edit.reset-button") { viewModel.resetAdjustments() }
             }
-            adjustSlider
-                .padding(.horizontal, ChalkakSpacing.lg)
-            textButton(EditCopy.adjustReset, systemName: "arrow.counterclockwise", identifier: "photo-edit.reset-button") { viewModel.resetAdjustments() }
+            .frame(height: 32)
+            .padding(.horizontal, ChalkakSpacing.lg)
+            PhotoEditAdjustControls(
+                selectedItem: viewModel.adjustmentItem,
+                value: { item in
+                    switch item {
+                    case .auto: viewModel.adjustments.autoStrength
+                    case .value(let kind): viewModel.adjustments.value(of: kind)
+                    }
+                },
+                automaticValue: { item in
+                    guard case .value(let kind) = item, viewModel.adjustments.autoStrength > 0 else { return nil }
+                    let share = viewModel.adjustments.autoShare(of: kind)
+                    return share == 0 ? nil : share
+                },
+                onSelect: { item in Task { await viewModel.selectAdjustmentItem(item) } },
+                onValueChange: { newValue in
+                    // 눈금자가 이미 정수 값으로 맞춰 보내고, 기준값(자동 보정 몫)은 반올림하지 않은 채로 온다.
+                    switch viewModel.adjustmentItem {
+                    case .auto: viewModel.setAutoStrength(newValue)
+                    case .value(let kind): viewModel.setAdjustment(kind, to: newValue)
+                    }
+                },
+                rulerIdentifier: { item in
+                    item == .auto ? "photo-edit.adjust-auto-strength-slider" : "photo-edit.adjust-" + Self.slug(for: item) + "-slider"
+                },
+                itemIdentifier: { item in
+                    item == .auto ? "photo-edit.adjust-item-auto" : "photo-edit.adjust-item-" + Self.slug(for: item)
+                }
+            )
         }
-        .padding(.vertical, ChalkakSpacing.md)
-    }
-
-    @ViewBuilder
-    private var adjustSlider: some View {
-        switch viewModel.adjustmentItem {
-        case .auto:
-            HStack(spacing: ChalkakSpacing.md) {
-                Toggle(EditCopy.label(for: AdjustmentItem.auto), isOn: Binding(
-                    get: { viewModel.adjustments.autoStrength > 0 },
-                    // "자동"이 선택된 상태에서 다시 누르면 켜짐/꺼짐이 번갈아 바뀐다(REQ-EDIT-021).
-                    set: { _ in Task { await viewModel.selectAdjustmentItem(.auto) } }
-                ))
-                .labelsHidden()
-                .accessibilityIdentifier("photo-edit.adjust-auto-toggle")
-                Slider(value: Binding(
-                    get: { viewModel.adjustments.autoStrength },
-                    set: { viewModel.setAutoStrength(($0 * 100).rounded() / 100) }
-                ), in: 0...1)
-                .accessibilityIdentifier("photo-edit.adjust-auto-strength-slider")
-            }
-        case .value(let kind):
-            HStack(spacing: ChalkakSpacing.md) {
-                Slider(value: Binding(
-                    get: { viewModel.adjustments.value(of: kind) },
-                    set: { viewModel.setAdjustment(kind, to: ($0 * 100).rounded() / 100) }
-                ), in: AdjustmentLayers.range)
-                .accessibilityIdentifier("photo-edit.adjust-" + Self.slug(for: .value(kind)) + "-slider")
-                Text("\(Int((viewModel.adjustments.value(of: kind) * 100).rounded()))")
-                    .font(ChalkakFont.footnote)
-                    .foregroundStyle(ChalkakColor.textSecondary)
-                    .frame(width: 44, alignment: .trailing)
-            }
-        }
+        .padding(.vertical, ChalkakSpacing.sm)
     }
 
     private var filterTools: some View {
@@ -284,10 +286,10 @@ struct PhotoEditScreen: View {
         Button(action: action) {
             Text(title)
                 .font(ChalkakFont.subheadline)
-                .foregroundStyle(isSelected ? ChalkakColor.onActionPrimary : ChalkakColor.textPrimary)
+                .foregroundStyle(isSelected ? ChalkakColor.editorBackground : ChalkakColor.editorContent)
                 .padding(.horizontal, ChalkakSpacing.md)
                 .frame(minHeight: 36)
-                .background(isSelected ? ChalkakColor.actionPrimary : ChalkakColor.calendarCell, in: Capsule())
+                .background(isSelected ? ChalkakColor.editorContent : ChalkakColor.editorContent.opacity(0.12), in: Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -298,7 +300,7 @@ struct PhotoEditScreen: View {
         Button(action: action) {
             Label(title, systemImage: systemName)
                 .font(ChalkakFont.subheadline)
-                .foregroundStyle(ChalkakColor.textPrimary)
+                .foregroundStyle(ChalkakColor.editorContent)
                 .frame(minHeight: 36)
         }
         .buttonStyle(.plain)
@@ -350,7 +352,7 @@ private struct FilterThumbnail: View {
         Button { viewModel.selectFilter(filter) } label: {
             VStack(spacing: ChalkakSpacing.xs) {
                 ZStack {
-                    ChalkakColor.calendarCell
+                    ChalkakColor.editorContentMuted.opacity(0.3)
                     if let image {
                         Image(uiImage: image).resizable().scaledToFill()
                     }
@@ -359,11 +361,11 @@ private struct FilterThumbnail: View {
                 .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.small))
                 .overlay(
                     RoundedRectangle(cornerRadius: ChalkakRadius.small)
-                        .stroke(isSelected ? ChalkakColor.accent : Color.clear, lineWidth: 2)
+                        .stroke(isSelected ? ChalkakColor.editorContent : Color.clear, lineWidth: 2)
                 )
                 Text(EditCopy.label(for: filter))
                     .font(ChalkakFont.caption)
-                    .foregroundStyle(isSelected ? ChalkakColor.textPrimary : ChalkakColor.textSecondary)
+                    .foregroundStyle(isSelected ? ChalkakColor.editorContent : ChalkakColor.editorContentMuted)
             }
         }
         .buttonStyle(.plain)
@@ -398,11 +400,11 @@ private struct CropOverlay: View {
                 path.addRect(CGRect(origin: .zero, size: displaySize))
                 path.addRect(rect)
             }
-            .fill(Color.black.opacity(0.5), style: FillStyle(eoFill: true))
+            .fill(ChalkakColor.editorScrim, style: FillStyle(eoFill: true))
             .allowsHitTesting(false)
 
             Rectangle()
-                .stroke(Color.white, lineWidth: 1.5)
+                .stroke(ChalkakColor.editorContent, lineWidth: 1.5)
                 .frame(width: rect.width, height: rect.height)
                 .offset(x: rect.minX, y: rect.minY)
                 .allowsHitTesting(false)
@@ -428,7 +430,7 @@ private struct CropOverlay: View {
             ForEach(CropHandle.allCases, id: \.self) { handle in
                 let point = position(of: handle, in: rect)
                 Circle()
-                    .fill(Color.white)
+                    .fill(ChalkakColor.editorContent)
                     .frame(width: 14, height: 14)
                     .frame(width: handleSize, height: handleSize)
                     .contentShape(Rectangle())
@@ -465,6 +467,6 @@ private struct CropOverlay: View {
                 path.addLine(to: CGPoint(x: rect.maxX, y: y))
             }
         }
-        .stroke(Color.white.opacity(0.6), lineWidth: 0.5)
+        .stroke(ChalkakColor.editorContentMuted, lineWidth: 0.5)
     }
 }

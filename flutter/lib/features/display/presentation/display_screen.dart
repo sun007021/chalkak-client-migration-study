@@ -3,8 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/text/code_points.dart';
 import '../../../core/ui/app_network_image.dart';
+import '../../../core/ui/components/chalkak_icon.dart';
+import '../../../core/ui/components/chalkak_skeleton.dart';
+import '../../../core/ui/components/chalkak_states.dart';
 import '../../../core/ui/selectable_test_id.dart';
 import '../../../core/ui/test_id.dart';
 import '../../feed/domain/feed_target.dart';
@@ -105,6 +109,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
     unawaited(
       showModalBottomSheet<void>(
         context: context,
+        isScrollControlled: true,
         builder: (sheetContext) => DatePickerSheet(
           initial: state.selectedDate,
           today: state.today,
@@ -123,7 +128,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
     return TestId(
       DisplayTestIds.root,
       child: Material(
-        color: Theme.of(context).scaffoldBackgroundColor,
+        color: context.tokens.colors.background,
         child: SafeArea(
           bottom: false,
           child: ListenableBuilder(
@@ -133,17 +138,12 @@ class _DisplayScreenState extends State<DisplayScreen> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _Header(
+                  _DateHeader(
                     state: state,
                     onPrevious: viewModel.goPrevious,
                     onNext: viewModel.goNext,
                     onPickDate: _openDatePicker,
                   ),
-                  if (state.showSortTabs)
-                    _SortTabs(
-                      selected: state.sort,
-                      onSelected: viewModel.selectSort,
-                    ),
                   Expanded(child: _body(state)),
                 ],
               );
@@ -157,11 +157,28 @@ class _DisplayScreenState extends State<DisplayScreen> {
   Widget _body(DisplayState state) => switch (state.status) {
     DisplayStatus.loading => const TestId(
       DisplayTestIds.loading,
-      child: Center(child: CircularProgressIndicator()),
+      child: _GridSkeleton(),
     ),
-    DisplayStatus.empty => const TestId(
+    DisplayStatus.empty => TestId(
       DisplayTestIds.emptyState,
-      child: Center(child: Text(Copy.displayEmpty)),
+      child: Padding(
+        padding: const EdgeInsets.only(top: 96),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ChalkakIcon(
+                ChalkakIcon.photoLibrary,
+                size: 34,
+                color: context.tokens.colors.iconSecondary,
+              ),
+              SizedBox(height: context.tokens.spacing.sm),
+              const ChalkakEmptyState(title: Copy.displayEmpty),
+            ],
+          ),
+        ),
+      ),
     ),
     DisplayStatus.error => _ErrorBody(
       text: state.errorText ?? Copy.displayError,
@@ -170,6 +187,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
     DisplayStatus.content => _Content(
       state: state,
       controller: _scroll,
+      onSortSelected: widget.viewModel.selectSort,
       onItemShown: widget.viewModel.onVisibleIndexChanged,
       onPostTapped: widget.viewModel.onPostTapped,
       onLikeTapped: widget.viewModel.onLikeTapped,
@@ -178,8 +196,10 @@ class _DisplayScreenState extends State<DisplayScreen> {
   };
 }
 
-class _Header extends StatelessWidget {
-  const _Header({
+/// 날짜 이동 줄(screens-b §2.1 DisplayDateHeader): 높이 52, 좌우 screenHorizontal,
+/// ‹ 날짜(headline) ▾ › 순서. ‹ › 는 `ic_display_arrow_*` 24, 활성 iconSecondary / 비활성 textInactive.
+class _DateHeader extends StatelessWidget {
+  const _DateHeader({
     required this.state,
     required this.onPrevious,
     required this.onNext,
@@ -193,72 +213,162 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final topic = state.topic;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              TestId.button(
-                DisplayTestIds.prevDateButton,
-                child: IconButton(
-                  tooltip: Copy.displayNavPrevious,
-                  icon: const Icon(Icons.chevron_left),
-                  onPressed: state.canGoPrevious ? onPrevious : null,
+    final tokens = context.tokens;
+    Widget arrow(String id, String icon, String label, VoidCallback? onTap) {
+      final enabled = onTap != null;
+      return TestId.button(
+        id,
+        child: Semantics(
+          button: true,
+          enabled: enabled,
+          label: label,
+          excludeSemantics: true,
+          onTap: onTap,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: SizedBox.square(
+              dimension: 44,
+              child: Center(
+                child: ChalkakIcon(
+                  icon,
+                  size: 24,
+                  color: enabled
+                      ? tokens.colors.iconSecondary
+                      : tokens.colors.textInactive,
                 ),
               ),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 52,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: tokens.spacing.screenHorizontal - 13,
+        ),
+        child: Row(
+          children: [
+            arrow(
+              DisplayTestIds.prevDateButton,
+              ChalkakIcon.displayArrowLeft,
+              Copy.displayNavPrevious,
+              state.canGoPrevious ? onPrevious : null,
+            ),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onPickDate,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Center(
+                  child: TestId(
+                    DisplayTestIds.dateLabel,
+                    child: Text(
+                      state.dateLabel,
+                      maxLines: 1,
+                      style: tokens.text.headline.copyWith(
+                        color: tokens.colors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            TestId.button(
+              DisplayTestIds.datePickerButton,
+              child: Semantics(
+                button: true,
+                label: Copy.displayPickerTitle,
+                excludeSemantics: true,
                 onTap: onPickDate,
-                child: TestId(
-                  DisplayTestIds.dateLabel,
-                  child: Text(state.dateLabel, style: textTheme.titleLarge),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onPickDate,
+                  child: SizedBox.square(
+                    dimension: 36,
+                    child: Center(
+                      child: ChalkakIcon(
+                        ChalkakIcon.chevronDown,
+                        size: 16,
+                        color: tokens.colors.photoActionText,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              TestId.button(
-                DisplayTestIds.datePickerButton,
-                child: IconButton(
-                  tooltip: Copy.displayPickerTitle,
-                  icon: const Icon(Icons.arrow_drop_down),
-                  onPressed: onPickDate,
-                ),
-              ),
-              TestId.button(
-                DisplayTestIds.nextDateButton,
-                child: IconButton(
-                  tooltip: Copy.displayNavNext,
-                  icon: const Icon(Icons.chevron_right),
-                  onPressed: state.canGoNext ? onNext : null,
-                ),
-              ),
-            ],
-          ),
-          if (topic != null)
-            TestId(
-              DisplayTestIds.topicTitle,
-              child: Text(
-                topic.title,
-                style: textTheme.titleMedium,
-                textAlign: TextAlign.center,
               ),
             ),
-          TestId(
-            DisplayTestIds.description,
-            child: Text(
-              state.description,
-              style: textTheme.bodySmall,
-              textAlign: TextAlign.center,
+            arrow(
+              DisplayTestIds.nextDateButton,
+              ChalkakIcon.displayArrowRight,
+              Copy.displayNavNext,
+              state.canGoNext ? onNext : null,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
+/// 주제 머리글(screens-b §2.1 DisplayTopic): 위 15, 아래 24, 좌우 screenHorizontal, 바닥 border 선.
+/// 주제 title2, 설명 subheadline textInactive(사이 12). 스크롤 영역 안에서 콘텐츠와 함께 움직인다.
+class _TopicHeader extends StatelessWidget {
+  const _TopicHeader({required this.state});
+
+  final DisplayState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final topic = state.topic;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: tokens.colors.border, width: 0.5),
+        ),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          tokens.spacing.screenHorizontal,
+          15,
+          tokens.spacing.screenHorizontal,
+          tokens.spacing.xl,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (topic != null)
+              TestId(
+                DisplayTestIds.topicTitle,
+                child: Text(
+                  topic.title,
+                  style: tokens.text.title2.copyWith(
+                    color: tokens.colors.textPrimary,
+                  ),
+                ),
+              ),
+            SizedBox(height: tokens.spacing.md),
+            TestId(
+              DisplayTestIds.description,
+              child: Text(
+                state.description,
+                style: tokens.text.subheadline.copyWith(
+                  color: tokens.colors.textInactive,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 정렬 선택기(ChalkakSortSelector): 항목 간격 lg, subheadline, 선택은 textPrimary + 바닥 1px 밑줄,
+/// 비선택은 textInactive. 터치 높이 44, 눌림 효과·애니메이션 없음.
 class _SortTabs extends StatelessWidget {
   const _SortTabs({required this.selected, required this.onSelected});
 
@@ -267,6 +377,7 @@ class _SortTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     final tabs = <(DisplaySort, String, String)>[
       (
         DisplaySort.recent,
@@ -285,28 +396,107 @@ class _SortTabs extends StatelessWidget {
       ),
     ];
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: tokens.spacing.screenHorizontal,
+      ),
       child: Row(
         children: [
-          for (final (sort, id, label) in tabs)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: SelectableTestId(
-                id,
-                selected: sort == selected,
-                child: ChoiceChip(
-                  label: Text(label),
-                  selected: sort == selected,
-                  onSelected: (_) => onSelected(sort),
-                ),
-              ),
+          for (var i = 0; i < tabs.length; i++) ...[
+            if (i > 0) SizedBox(width: tokens.spacing.lg),
+            _SortTab(
+              id: tabs[i].$2,
+              label: tabs[i].$3,
+              selected: tabs[i].$1 == selected,
+              onTap: () => onSelected(tabs[i].$1),
             ),
+          ],
         ],
       ),
     );
   }
 }
 
+class _SortTab extends StatelessWidget {
+  const _SortTab({
+    required this.id,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String id;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return SelectableTestId(
+      id,
+      selected: selected,
+      child: Semantics(
+        button: true,
+        onTap: onTap,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Center(
+              child: Container(
+                padding: EdgeInsets.only(bottom: tokens.spacing.xs),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: selected
+                          ? tokens.colors.textPrimary
+                          : Colors.transparent,
+                    ),
+                  ),
+                ),
+                child: Text(
+                  label,
+                  style: tokens.text.subheadline.copyWith(
+                    color: selected
+                        ? tokens.colors.textPrimary
+                        : tokens.colors.textInactive,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 첫 진입 로딩: 카드 비율(3:4) 스켈레톤 2열.
+class _GridSkeleton extends StatelessWidget {
+  const _GridSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return GridView.count(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.all(tokens.spacing.screenHorizontal),
+      crossAxisCount: 2,
+      mainAxisSpacing: tokens.spacing.md,
+      crossAxisSpacing: tokens.spacing.md,
+      childAspectRatio: 3 / 4,
+      children: [
+        for (var i = 0; i < 6; i++)
+          ChalkakSkeleton(
+            borderRadius: BorderRadius.circular(tokens.radius.photoCard),
+          ),
+      ],
+    );
+  }
+}
+
+/// 오류: 가운데 메시지(body textSecondary) + xl + 48 원형 새로고침 버튼(screens-b §2.4).
 class _ErrorBody extends StatelessWidget {
   const _ErrorBody({required this.text, required this.onRetry});
 
@@ -315,19 +505,33 @@ class _ErrorBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return TestId(
       DisplayTestIds.errorState,
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(text),
-            const SizedBox(height: 12),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: tokens.text.body.copyWith(
+                color: tokens.colors.textSecondary,
+              ),
+            ),
+            SizedBox(height: tokens.spacing.xl),
             TestId.button(
               DisplayTestIds.retryButton,
-              child: FilledButton(
-                onPressed: onRetry,
-                child: const Text(Copy.displayRetry),
+              child: Semantics(
+                button: true,
+                label: Copy.displayRetry,
+                excludeSemantics: true,
+                onTap: onRetry,
+                child: ChalkakRetryCircleButton(
+                  onPressed: onRetry,
+                  size: 48,
+                  iconSize: 20,
+                ),
               ),
             ),
           ],
@@ -341,17 +545,16 @@ class _Content extends StatelessWidget {
   const _Content({
     required this.state,
     required this.controller,
+    required this.onSortSelected,
     required this.onItemShown,
     required this.onPostTapped,
     required this.onLikeTapped,
     required this.onFeaturedPageChanged,
   });
 
-  /// 한 줄의 높이. 폭과 무관하게 고정해 작은 화면에서도 여러 줄이 한눈에 들어온다.
-  static const double _cellHeight = 200;
-
   final DisplayState state;
   final ScrollController controller;
+  final ValueChanged<DisplaySort> onSortSelected;
   final ValueChanged<int> onItemShown;
   final ValueChanged<String> onPostTapped;
   final ValueChanged<String> onLikeTapped;
@@ -360,6 +563,7 @@ class _Content extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = state.items;
+    final tokens = context.tokens;
     return Stack(
       children: [
         TestId(
@@ -367,31 +571,41 @@ class _Content extends StatelessWidget {
           child: CustomScrollView(
             controller: controller,
             slivers: [
+              SliverToBoxAdapter(child: _TopicHeader(state: state)),
               if (state.isArchive && state.featured.isNotEmpty)
                 SliverToBoxAdapter(
-                  child: _FeaturedPager(
-                    key: ValueKey(state.selectedDate),
-                    cards: state.featured,
-                    initialPage: state.featuredPage,
-                    onPageChanged: onFeaturedPageChanged,
-                    onTap: onPostTapped,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 15, bottom: 8),
+                    child: _FeaturedPager(
+                      key: ValueKey(state.selectedDate),
+                      cards: state.featured,
+                      initialPage: state.featuredPage,
+                      onPageChanged: onFeaturedPageChanged,
+                      onTap: onPostTapped,
+                    ),
                   ),
                 ),
-              if (state.isArchive)
-                const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: Text(Copy.displayGridTitle),
+              if (state.showSortTabs)
+                SliverToBoxAdapter(
+                  child: _SortTabs(
+                    selected: state.sort,
+                    onSelected: onSortSelected,
                   ),
                 ),
               SliverPadding(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.fromLTRB(
+                  tokens.spacing.screenHorizontal,
+                  state.showSortTabs ? 11 : 4,
+                  tokens.spacing.screenHorizontal,
+                  tokens.spacing.xxl,
+                ),
                 sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    mainAxisExtent: _cellHeight,
+                    mainAxisSpacing: tokens.spacing.md,
+                    crossAxisSpacing: tokens.spacing.md,
+                    // 측정 전 기본 비율 3:4(DisplayPhotoGrid.swift).
+                    childAspectRatio: 3 / 4,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
@@ -429,13 +643,13 @@ class _Content extends StatelessWidget {
             ),
           ),
         if (state.isPaging)
-          const Positioned(
-            bottom: 16,
+          Positioned(
+            bottom: tokens.spacing.lg,
             left: 0,
             right: 0,
-            child: TestId(
+            child: const TestId(
               DisplayTestIds.loadMoreIndicator,
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: ChalkakSpinner(size: 24)),
             ),
           ),
       ],
@@ -444,6 +658,7 @@ class _Content extends StatelessWidget {
 }
 
 /// 그리드 한 칸. 화면에 새로 만들어질 때 한 번 위치를 알린다(다음 페이지 판단용).
+/// 카드는 검정 바탕 + 사진 + 좌하단 좋아요 배지다(제목은 그리지 않는다: DisplayMasonryCell).
 class _GridCell extends StatefulWidget {
   const _GridCell({
     super.key,
@@ -477,47 +692,25 @@ class _GridCellState extends State<_GridCell> {
   @override
   Widget build(BuildContext context) {
     final card = widget.card;
-    final theme = Theme.of(context);
+    final tokens = context.tokens;
     return TestId(
       DisplayTestIds.item(card.id),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Column(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(tokens.radius.photoCard),
+        child: ColoredBox(
+          color: Colors.black,
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              Expanded(
-                child: InkWell(
-                  onTap: widget.onTap,
-                  child: SizedBox.expand(
-                    child: AppNetworkImage(url: card.thumbnailImageUrl),
-                  ),
-                ),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.onTap,
+                child: AppNetworkImage(url: card.thumbnailImageUrl),
               ),
-              Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        PostTitle.display(card.title),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                    LikeButton(
-                      buttonId: DisplayTestIds.likeButton(card.id),
-                      countId: DisplayTestIds.likeCount(card.id),
-                      isLiked: card.isLiked,
-                      likeCount: card.likeCount,
-                      onPressed: widget.onLike,
-                    ),
-                  ],
-                ),
+              Positioned(
+                left: 0,
+                bottom: 0,
+                child: _LikeBadge(card: card, onLike: widget.onLike),
               ),
             ],
           ),
@@ -527,7 +720,31 @@ class _GridCellState extends State<_GridCell> {
   }
 }
 
-/// 아카이브 상위 카드 페이저. 날짜가 바뀌면 새로 만들어져 처음 페이지로 돌아간다.
+/// 좌하단 좋아요 배지(DisplayLikeBadge): 카드 모서리에서 하트까지 10만큼 터치 영역에 포함한다.
+class _LikeBadge extends StatelessWidget {
+  const _LikeBadge({required this.card, required this.onLike});
+
+  final PostCard card;
+  final VoidCallback onLike;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 0, bottom: 0),
+      child: LikeButton(
+        buttonId: DisplayTestIds.likeButton(card.id),
+        countId: DisplayTestIds.likeCount(card.id),
+        isLiked: card.isLiked,
+        likeCount: card.likeCount,
+        onImage: true,
+        onPressed: onLike,
+      ),
+    );
+  }
+}
+
+/// 아카이브 상위 카드 페이저(DisplayFeaturedCarousel). 날짜가 바뀌면 새로 만들어져 처음 페이지로 돌아간다.
+/// 페이지 폭은 컨테이너 - 64, 카드 3:4, 이웃 카드는 scale 1 - 0.08*|offset|, opacity 1 - 0.12*|offset|.
 class _FeaturedPager extends StatefulWidget {
   const _FeaturedPager({
     super.key,
@@ -547,12 +764,21 @@ class _FeaturedPager extends StatefulWidget {
 }
 
 class _FeaturedPagerState extends State<_FeaturedPager> {
-  static const double _height = 300;
+  static const double _sideInset = 32;
+  static const double _pageGap = 5;
 
-  late final PageController _controller = PageController(
-    initialPage: widget.initialPage.clamp(0, widget.cards.length - 1),
-    viewportFraction: 0.85,
-  );
+  late PageController _controller;
+  late int _page = widget.initialPage.clamp(0, widget.cards.length - 1);
+  double _fraction = 0.85;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController(
+      initialPage: _page,
+      viewportFraction: _fraction,
+    );
+  }
 
   @override
   void dispose() {
@@ -560,36 +786,119 @@ class _FeaturedPagerState extends State<_FeaturedPager> {
     super.dispose();
   }
 
+  void _syncFraction(double width) {
+    final next = (width - _sideInset * 2 + _pageGap) / width;
+    if ((next - _fraction).abs() < 0.0005) return;
+    _fraction = next;
+    final old = _controller;
+    _controller = PageController(initialPage: _page, viewportFraction: next);
+    WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
+  }
+
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return TestId(
       DisplayTestIds.featuredPager,
-      child: SizedBox(
-        height: _height,
-        child: PageView.builder(
-          controller: _controller,
-          itemCount: widget.cards.length,
-          onPageChanged: widget.onPageChanged,
-          itemBuilder: (context, index) {
-            final card = widget.cards[index];
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-              child: TestId(
-                DisplayTestIds.featuredItem(card.id),
-                child: _FeaturedCard(
-                  card: card,
-                  onTap: () => widget.onTap(card.id),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          _syncFraction(width);
+          final cardWidth = width - _sideInset * 2;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: cardWidth * 4 / 3,
+                child: PageView.builder(
+                  controller: _controller,
+                  itemCount: widget.cards.length,
+                  onPageChanged: (index) {
+                    setState(() => _page = index);
+                    widget.onPageChanged(index);
+                  },
+                  itemBuilder: (context, index) {
+                    final card = widget.cards[index];
+                    return AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) {
+                        final current =
+                            _controller.hasClients &&
+                                _controller.position.haveDimensions
+                            ? (_controller.page ?? _page.toDouble())
+                            : _page.toDouble();
+                        final offset = (current - index).abs().clamp(0.0, 1.0);
+                        return Opacity(
+                          opacity: 1 - 0.12 * offset,
+                          child: Transform.scale(
+                            scale: 1 - 0.08 * offset,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: _pageGap / 2,
+                        ),
+                        child: TestId(
+                          DisplayTestIds.featuredItem(card.id),
+                          child: _FeaturedCard(
+                            card: card,
+                            onTap: () => widget.onTap(card.id),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
-            );
-          },
-        ),
+              if (widget.cards.length > 1) ...[
+                SizedBox(height: tokens.spacing.lg),
+                _PageIndicator(count: widget.cards.length, selected: _page),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
 }
 
-/// 추천 카드. 좋아요 값은 그리드와 같은 저장소 값을 읽기만 한다.
+/// 페이지 표시기(DisplayPageIndicator): 선택 24x7 actionPrimary, 나머지 7x7 textMuted 45%.
+class _PageIndicator extends StatelessWidget {
+  const _PageIndicator({required this.count, required this.selected});
+
+  final int count;
+  final int selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.tokens.colors;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (var i = 0; i < count; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          Container(
+            width: i == selected ? 24 : 7,
+            height: 7,
+            decoration: ShapeDecoration(
+              shape: const StadiumBorder(),
+              color: i == selected
+                  ? colors.actionPrimary
+                  : colors.textMuted.withValues(
+                      alpha: 0.45 * colors.textMuted.a,
+                    ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// 추천 카드(3:4, 검정 바탕, 사진 fit). 제목은 하단 가운데 손글씨, 좋아요 배지는 좌하단.
+/// 좋아요 값은 그리드와 같은 저장소 값을 읽기만 한다.
 class _FeaturedCard extends StatelessWidget {
   const _FeaturedCard({required this.card, required this.onTap});
 
@@ -598,56 +907,60 @@ class _FeaturedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final tokens = context.tokens;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            AppNetworkImage(url: card.thumbnailImageUrl),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: ColoredBox(
-                color: Colors.black54,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+      borderRadius: BorderRadius.circular(tokens.radius.photoCard),
+      child: ColoredBox(
+        color: Colors.black,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              AppNetworkImage(url: card.thumbnailImageUrl, fit: BoxFit.contain),
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 10,
+                child: Text(
+                  PostTitle.display(card.title),
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: tokens.text.handwriting.copyWith(
+                    color: tokens.colors.textOnImage,
+                    height: 1.2,
                   ),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                bottom: 0,
+                child: IgnorePointer(
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        child: Text(
-                          PostTitle.display(card.title),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      Icon(
-                        card.isLiked ? Icons.favorite : Icons.favorite_border,
-                        size: 16,
-                        color: Colors.white,
+                      ChalkakIcon(
+                        card.isLiked
+                            ? ChalkakIcon.heartFilled
+                            : ChalkakIcon.heart,
+                        size: 18,
+                        color: tokens.colors.textOnImage,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         '${card.likeCount}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.white,
+                        style: tokens.text.subheadline.copyWith(
+                          color: tokens.colors.textOnImage,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

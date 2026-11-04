@@ -11,7 +11,8 @@ import { screenViews } from '../../test/screenViews';
 import { FakeVisibilityObserver } from '../../test/FakeVisibilityObserver';
 import type { VisibilityObserverFactory } from '../../core/ui/VisibilityObserver';
 import { render } from '@testing-library/react';
-import { VisibilitySentinel } from './HomeScreen';
+import { VisibilitySentinel } from '../../core/ui/VisibilitySentinel';
+import { advanceClock } from '../../test/settle';
 import {
   BANNERS_P1,
   CALENDAR_OCT,
@@ -53,11 +54,7 @@ async function loaded() {
   await waitFor(() => expect(screen.queryByTestId('home.hero-loading')).not.toBeInTheDocument());
 }
 
-const advance = async (h: Harness, ms: number) => {
-  await act(async () => {
-    await h.clock.advance(ms);
-  });
-};
+const advance = (h: Harness, ms: number) => advanceClock(h, ms);
 const toastText = () => screen.queryByTestId('toast.message')?.textContent ?? null;
 const id = (n: string) => `22222222-2222-4222-8222-222222222${n}`;
 
@@ -253,7 +250,11 @@ describe('홈 이번 주 기록 (REQ-HOME-019~026)', () => {
     fireEvent.click(screen.getByText(t('home.weekly.more')));
     await screen.findByTestId('record.root');
     expect(path()).toBe('/record');
-    expect(router.state.location.search).toBe('');
+    // 기록 화면은 기본 선택 날짜를 ?date=로 replace해 쓴다(이 fixture의 가장 늦은 사진은 10/27).
+    await waitFor(() => expect(router.state.location.search).toBe('?date=2026-10-27'));
+    // replace라서 기록 진입이 기록을 두 번 쌓지 않는다: 한 번 뒤로 가면 홈이다.
+    await act(async () => void router.navigate(-1));
+    await waitFor(() => expect(path()).toBe('/home'));
   });
 
   it('TC-HOME-032 REQ-HOME-025 주간 조회 실패는 이 섹션만 "기록을 불러오지 못했어요" + 다시 시도이고, 다시 시도는 주간만 다시 부른다', async () => {
@@ -393,9 +394,7 @@ describe('홈 AI 피드백 카드 (REQ-HOME-034, 035)', () => {
   ])('TC-HOME-054 히어로가 %s이면 카드가 없고 ai-review 요청도 0건이다', async (_name, fixture) => {
     const { h } = await openHome({ routes: { [TODAY_POST]: fixture } });
     await loaded();
-    await act(async () => {
-      await h.clock.advance(0);
-    });
+    await advanceClock(h, 0);
     expect(screen.queryByTestId('home.ai-card')).not.toBeInTheDocument();
     expect(h.ff.calls.filter((c) => c.path.endsWith('/ai-review'))).toHaveLength(0);
   });
@@ -443,6 +442,7 @@ describe('홈 AI 피드백 카드 (REQ-HOME-034, 035)', () => {
   it('TC-HOME-054 요청 버튼은 POST /ai-review를 1회 보내고 진행 중 카드로 바뀐다', async () => {
     const { fixtures } = await openHome({ routes: { [AI_POST]: 'ai-review/ai-review-post__202-processing' } });
     fireEvent.click(await screen.findByTestId('home.ai-request-button'));
+    fireEvent.click(await screen.findByTestId('ai-start-sheet.start-button'));
     expect(await screen.findByTestId('home.ai-processing')).toBeInTheDocument();
     expect(fixtures.calls(AI_POST)).toHaveLength(1);
   });
@@ -450,6 +450,7 @@ describe('홈 AI 피드백 카드 (REQ-HOME-034, 035)', () => {
   it('D-08 요청이 403이면 정지 안내 토스트가 뜨고 요청 버튼이 그대로 남는다', async () => {
     await openHome({ routes: { [AI_POST]: 'ai-review/ai-review-post__403-banned' } });
     fireEvent.click(await screen.findByTestId('home.ai-request-button'));
+    fireEvent.click(await screen.findByTestId('ai-start-sheet.start-button'));
     await waitFor(() => expect(toastText()).toBe(t('ai.error.banned')));
     expect(screen.getByTestId('home.ai-request-button')).toBeInTheDocument();
   });

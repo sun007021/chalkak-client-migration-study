@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/ui/app_network_image.dart';
+import '../../../core/ui/components/chalkak_button.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/record_models.dart';
 import 'record_test_ids.dart';
@@ -36,7 +38,9 @@ class RecordSelectedPhoto extends StatelessWidget {
               child: AspectRatio(
                 aspectRatio: 3 / 4,
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(
+                    context.tokens.radius.photoCard,
+                  ),
                   child: AppNetworkImage(url: photo.thumbnailImageUrl),
                 ),
               ),
@@ -60,9 +64,9 @@ class RecordSelectedPhoto extends StatelessWidget {
                 Expanded(
                   child: TestId.button(
                     RecordTestIds.viewFeedButton,
-                    child: OutlinedButton(
+                    child: ChalkakOutlinedButton(
                       onPressed: onViewFeed,
-                      child: const Text(Copy.recordActionFeed),
+                      label: Copy.recordActionFeed,
                     ),
                   ),
                 ),
@@ -70,9 +74,9 @@ class RecordSelectedPhoto extends StatelessWidget {
                 Expanded(
                   child: TestId.button(
                     RecordTestIds.viewDisplayButton,
-                    child: FilledButton(
+                    child: ChalkakButton(
                       onPressed: onViewDisplay,
-                      child: const Text(Copy.recordActionDisplay),
+                      label: Copy.recordActionDisplay,
                     ),
                   ),
                 ),
@@ -92,7 +96,7 @@ class _PendingBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final colors = context.tokens.colors;
     return TestId(
       RecordTestIds.pendingBadge,
       child: InkWell(
@@ -103,7 +107,12 @@ class _PendingBadge extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(Copy.recordPendingBadge),
+              Text(
+                Copy.recordPendingBadge,
+                style: context.tokens.text.callout.copyWith(
+                  color: colors.textPrimary,
+                ),
+              ),
               const SizedBox(width: 4),
               // 보조 라벨: 풍선이 닫혀 있으면 열기, 열려 있으면 닫기를 알린다.
               Semantics(
@@ -114,7 +123,7 @@ class _PendingBadge extends StatelessWidget {
                 child: Icon(
                   Icons.info_outline,
                   size: 16,
-                  color: colors.onSurfaceVariant,
+                  color: colors.iconSecondary,
                 ),
               ),
             ],
@@ -130,20 +139,22 @@ class _PendingTooltip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final colors = context.tokens.colors;
     return TestId(
       RecordTestIds.pendingTooltip,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: colors.inverseSurface,
-          borderRadius: BorderRadius.circular(8),
+          color: colors.actionPrimary,
+          borderRadius: BorderRadius.circular(context.tokens.radius.button),
         ),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Text(
             Copy.recordPendingTooltip,
             textAlign: TextAlign.center,
-            style: TextStyle(color: colors.onInverseSurface),
+            style: context.tokens.text.footnote.copyWith(
+              color: colors.onActionPrimary,
+            ),
           ),
         ),
       ),

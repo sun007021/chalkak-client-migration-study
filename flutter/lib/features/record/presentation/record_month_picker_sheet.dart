@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/time/kst_date.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/record_models.dart';
@@ -66,7 +67,9 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
             children: [
               Text(
                 Copy.recordPickerTitle,
-                style: Theme.of(context).textTheme.titleMedium,
+                style: context.tokens.text.title3.copyWith(
+                  color: context.tokens.colors.textPrimary,
+                ),
               ),
               if (years.length > 1) ...[
                 const SizedBox(height: 12),
@@ -93,8 +96,12 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
                         child: ListTile(
                           selected: month == widget.selected,
                           title: Text(month.recordLabel),
+                          selectedColor: context.tokens.colors.accent,
                           trailing: month == widget.selected
-                              ? const Icon(Icons.check)
+                              ? Icon(
+                                  Icons.check,
+                                  color: context.tokens.colors.accent,
+                                )
                               : null,
                           onTap: () => widget.onSelected(month),
                         ),

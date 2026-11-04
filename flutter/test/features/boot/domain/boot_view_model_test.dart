@@ -21,6 +21,8 @@ class _Rig {
       checker: updateChecker,
       launcher: FakeUpdateLauncher(),
       enabled: gateEnabled,
+      exit: FakeAppExit(),
+      cancelAvailable: false,
     );
     vm = BootViewModel(
       updateGate: gate,
@@ -132,6 +134,8 @@ void main() {
           checker: FakeUpdateChecker(),
           launcher: FakeUpdateLauncher(),
           enabled: true,
+          exit: FakeAppExit(),
+          cancelAvailable: false,
         ),
         authGate: AuthGate(sessions: SessionManager(store: store)),
         homePreloader: preloader,

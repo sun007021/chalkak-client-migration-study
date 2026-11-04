@@ -7,6 +7,7 @@ import { t } from '../../copy/ko';
 import type { TabDestination } from '../../constants';
 import { expectGuestRequestsOnlyPublic, outsideHome } from '../../test/homeRequests';
 
+import { advanceClock } from '../../test/settle';
 const TABS: readonly TabDestination[] = ['home', 'display', 'record', 'settings'];
 const TAB_IDS = {
   home: 'bottom-bar.tab-home',
@@ -318,12 +319,12 @@ describe('게스트 제한 (D-05)', () => {
     const { h } = await openMain('guest');
     fireEvent.click(tabButton('record'));
     const first = screen.getByTestId('toast.container');
-    await act(async () => h.clock.advance(1_000));
+    await advanceClock(h, 1_000);
     fireEvent.click(tabButton('record'));
     expect(screen.getByTestId('toast.container')).not.toBe(first);
-    await act(async () => h.clock.advance(2_499));
+    await advanceClock(h, 2_499);
     expect(toastText()).toBe(t('nav.guest.record'));
-    await act(async () => h.clock.advance(1));
+    await advanceClock(h, 1);
     expect(screen.queryByTestId('toast.container')).not.toBeInTheDocument();
   });
 
@@ -357,9 +358,9 @@ describe('게스트 제한 (D-05)', () => {
   it('REQ-NAV-044 TC-NAV-025 게스트 제한 토스트는 2.5초 동안 보였다가 사라진다', async () => {
     const { h } = await openMain('guest');
     fireEvent.click(tabButton('record'));
-    await act(async () => h.clock.advance(2_499));
+    await advanceClock(h, 2_499);
     expect(screen.getByTestId('toast.container')).toBeInTheDocument();
-    await act(async () => h.clock.advance(1));
+    await advanceClock(h, 1);
     expect(screen.queryByTestId('toast.container')).not.toBeInTheDocument();
   });
 

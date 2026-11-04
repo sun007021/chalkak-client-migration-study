@@ -7,14 +7,13 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { colors } from '../../../shared/design/tokens';
 import type { CropHandle, CropRect } from '../CropGeometry';
 import type { Size } from '../ImageTypes';
 
 const HANDLE_TOUCH = 44;
-const HANDLE_MARK = 18;
+const HANDLE_MARK = 20;
 const HANDLES: readonly CropHandle[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
-const SHADE = 'rgba(0,0,0,0.55)';
-
 export type CropFrameProps = {
   testID: string;
   /** 돌린 사진이 화면에 보이는 크기. 프레임은 이 크기의 영역 위에 놓는다. */
@@ -96,10 +95,15 @@ function markStyle(handle: CropHandle) {
 }
 
 const styles = StyleSheet.create({
-  shade: { position: 'absolute', backgroundColor: SHADE },
-  frame: { position: 'absolute', borderWidth: 1, borderColor: '#FFFFFF' },
+  shade: { position: 'absolute', backgroundColor: colors.editorScrim },
+  frame: { position: 'absolute', borderWidth: 1, borderColor: colors.editorContent },
   touch: { position: 'absolute', width: HANDLE_TOUCH, height: HANDLE_TOUCH },
-  mark: { position: 'absolute', width: HANDLE_MARK, height: HANDLE_MARK, borderColor: '#FFFFFF' },
+  mark: {
+    position: 'absolute',
+    width: HANDLE_MARK,
+    height: HANDLE_MARK,
+    borderColor: colors.editorContent,
+  },
 });
 
 /** 끌기 영역. 누른 자리(pageX/pageY)에서 움직인 거리를 사진 크기에 대한 비율로 바꿔 증분으로 알린다. */

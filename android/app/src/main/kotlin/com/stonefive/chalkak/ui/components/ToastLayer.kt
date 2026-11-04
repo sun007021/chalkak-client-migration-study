@@ -1,15 +1,21 @@
 package com.stonefive.chalkak.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -38,23 +44,31 @@ fun ToastLayer(
             delay(AppConstants.TOAST_DURATION_MS)
             onExpired(toast.id)
         }
+        val visible = remember { MutableTransitionState(false).apply { targetState = true } }
         Box(
             modifier = modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 24.dp, vertical = 32.dp)
+                .padding(horizontal = ChalkakTheme.spacing.screenHorizontal, vertical = 32.dp)
                 .testTag("toast.container"),
             contentAlignment = Alignment.BottomCenter,
         ) {
-            Text(
-                text = toast.text,
-                color = ChalkakTheme.colors.onToast,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .background(ChalkakTheme.colors.toastBackground, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .testTag("toast.message"),
-            )
+            // screens-a 1.9 / screens-c 1.1: dark capsule, subheadline, 16 / 12 padding, 32 above the bottom, rises in with a fade.
+            AnimatedVisibility(
+                visibleState = visible,
+                enter = slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it } + fadeIn(),
+            ) {
+                Text(
+                    text = toast.text,
+                    color = ChalkakTheme.colors.onActionPrimary,
+                    style = ChalkakTheme.typography.subheadline,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .background(ChalkakTheme.colors.actionPrimary, ChalkakTheme.shapes.pill)
+                        .padding(horizontal = ChalkakTheme.spacing.lg, vertical = ChalkakTheme.spacing.md)
+                        .testTag("toast.message"),
+                )
+            }
         }
     }
 }

@@ -181,6 +181,37 @@ class NavigationController(
         return pushAndReport(route)
     }
 
+    /**
+     * The screen on top is replaced by [route] (e.g. a notification detail by the inbox): exactly one `screen_view` for [route],
+     * and none for the screen below, which is never revealed. Same guest rules as [open]; a [route] equal to [top] is
+     * [NavOutcome.Ignored].
+     */
+    fun replaceTop(route: Route): NavOutcome {
+        guestActionFor(route)?.let { action -> blocked(action)?.let { return it } }
+        if (top == route) return NavOutcome.Ignored
+        backStack.replaceTop(route)
+        reportTop()
+        return NavOutcome.Replaced(route)
+    }
+
+    /**
+     * Pops until [predicate] holds for the top (at least one entry stays), reporting a single `screen_view` for the final top instead
+     * of one per popped screen. Nothing popped -> [NavOutcome.Ignored]; popping overlays only reports nothing new (as in [onSystemBack]).
+     */
+    fun popTo(predicate: (Route) -> Boolean): NavOutcome {
+        if (predicate(top) || !backStack.canPop) return NavOutcome.Ignored
+        var closedScreen = false
+        while (backStack.canPop && !predicate(top)) {
+            if (!RouteRules.isOverlay(top)) closedScreen = true
+            backStack.pop()
+        }
+        if (closedScreen) reportTop() else {
+            reporter.hidden()
+            publish()
+        }
+        return NavOutcome.Navigated(top)
+    }
+
     /** Guest check for actions that do not navigate (like). Member -> [NavOutcome.Ignored] (the caller proceeds). */
     fun onGuardedAction(action: GuestAction): NavOutcome = blocked(action) ?: NavOutcome.Ignored
 

@@ -21,6 +21,7 @@ import com.stonefive.chalkak.R
 import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.ui.components.BlockingLayer
 import com.stonefive.chalkak.ui.components.ChalkakOutlinedButton
+import com.stonefive.chalkak.ui.components.ChalkakTopBar
 import com.stonefive.chalkak.ui.components.IconAction
 import com.stonefive.chalkak.ui.components.Loading
 import com.stonefive.chalkak.ui.theme.ChalkakTheme
@@ -49,18 +50,12 @@ fun LegalDocSheet(
     BackHandler(onBack = onClose)
     BlockingLayer(modifier = modifier.testTag("legal-doc.sheet"), scrim = ChalkakTheme.colors.background) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(start = 20.dp, end = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = ChalkakTheme.colors.textPrimary,
-                    modifier = Modifier.weight(1f).testTag("legal-doc.title"),
-                )
-                IconAction(R.drawable.ic_close, onClose, Modifier.testTag("legal-doc.close-button"))
-            }
+            ChalkakTopBar(
+                title = title,
+                onBack = null,
+                titleModifier = Modifier.testTag("legal-doc.title"),
+                trailing = { IconAction(R.drawable.ic_close, onClose, Modifier.testTag("legal-doc.close-button")) },
+            )
             Box(modifier = Modifier.weight(1f).fillMaxWidth().navigationBarsPadding()) {
                 if (load != LegalDocLoad.Failed) {
                     Box(modifier = Modifier.fillMaxSize().testTag("legal-doc.web-content")) { web() }
@@ -76,8 +71,8 @@ fun LegalDocSheet(
                     ) {
                         Text(
                             text = copy["onb.terms.doc.error"],
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = ChalkakTheme.colors.textNeutral,
+                            style = ChalkakTheme.typography.callout,
+                            color = ChalkakTheme.colors.textMuted,
                             modifier = Modifier.testTag("legal-doc.error-state"),
                         )
                         ChalkakOutlinedButton(

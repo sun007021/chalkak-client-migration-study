@@ -11,18 +11,14 @@ struct HomeWeekSection: View {
         VStack(alignment: .leading, spacing: ChalkakSpacing.lg) {
             HomeSectionHeader(title: HomeCopy.weeklyTitle, suffix: countLabel, suffixIdentifier: "home.week-count") {
                 Button { viewModel.weekMoreTapped() } label: {
-                    Text(HomeCopy.weeklyMore)
-                        .font(ChalkakFont.subheadline)
-                        .foregroundStyle(ChalkakColor.textSecondary)
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
+                    HomeMoreLabel()
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("home.week-more-link")
             }
             switch viewModel.week {
             case .loading:
-                ProgressView().frame(maxWidth: .infinity, minHeight: 64)
+                ProgressView().frame(maxWidth: .infinity, minHeight: 48)
             case .failed(let message):
                 HomeSectionError(
                     message: message, messageIdentifier: "home.week-error", retryIdentifier: "home.week-retry-button",
@@ -60,10 +56,10 @@ struct HomeWeekSection: View {
                     VStack {
                         Spacer(minLength: 0)
                         Text(HomeCopy.weeklyPending)
-                            .font(ChalkakFont.caption)
+                            .font(ChalkakFont.captionSemibold)
                             .foregroundStyle(ChalkakColor.textOnImage)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 2)
+                            .padding(.vertical, 1)
                             .background(ChalkakColor.scrim)
                     }
                 }

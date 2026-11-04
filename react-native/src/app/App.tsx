@@ -1,10 +1,12 @@
-import { NavigationContainer } from '@react-navigation/native';
+import { DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import type { AppConfigResult } from '../core/config/AppConfig';
 import { useViewModelState } from '../core/state/useViewModelState';
+import { colors } from '../shared/design/tokens';
 import { ToastHost } from '../core/toast/ToastHost';
 import { LoginScreen } from '../features/auth/LoginScreen';
 import { ConfigErrorScreen } from '../features/config/ConfigErrorScreen';
@@ -38,11 +40,27 @@ export function App({ configResult, overrides }: AppProps) {
   );
 }
 
+/** 라이트 고정 내비게이션 테마: 전환 중 배경이 흰색/검정으로 번쩍이지 않게 모든 화면 바탕을 background 토큰으로 맞춘다. */
+const NAV_THEME: Theme = {
+  ...DefaultTheme,
+  dark: false,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: colors.actionPrimary,
+    background: colors.background,
+    card: colors.background,
+    text: colors.textPrimary,
+    border: colors.border,
+    notification: colors.accent,
+  },
+};
+
 /** 내비게이션 컨테이너와 화면 위 오버레이(토스트). 내비게이션 핸들은 컨테이너(AppContainer)가 소유한다. */
 function AppNavigation() {
   const { navigationHandle, toastCenter, onNavigationReady } = useAppContainer();
   return (
-    <NavigationContainer ref={navigationHandle} onReady={onNavigationReady}>
+    <NavigationContainer ref={navigationHandle} onReady={onNavigationReady} theme={NAV_THEME}>
+      <StatusBar style="dark" />
       <AppShell />
       <UploadEntryOverlay />
       {toastCenter ? <ToastHost center={toastCenter} /> : null}

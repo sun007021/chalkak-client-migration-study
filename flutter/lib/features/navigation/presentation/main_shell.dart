@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/analytics/analytics_constants.dart';
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_icon.dart';
 import '../../../core/ui/test_id.dart';
 import '../../../core/ui/toast/toast_controller.dart';
 import '../../../core/ui/toast/toast_host.dart';
@@ -22,6 +24,9 @@ import '../domain/main_shell_view_model.dart';
 import 'main_shell_navigator.dart';
 import 'navigation_test_ids.dart';
 import 'settings_tab.dart';
+
+/// 토스트를 하단 바 위로 띄우는 거리(바 높이 약 85 + 여백).
+const double _toastAboveBottomBar = 96;
 
 /// 메인 화면: 탭 본문 + 하단 바(홈, 전시, 가운데 업로드, 기록, 설정).
 /// - 하단 바 `bottom-bar.root`, 탭 `bottom-bar.tab-*`(선택된 탭만 selected), 업로드 버튼
@@ -277,7 +282,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     final shell = widget.shell;
     return ToastHost(
       controller: widget.toast,
+      bottomOffset: _toastAboveBottomBar,
       child: Scaffold(
+        backgroundColor: context.tokens.colors.background,
         body: Stack(
           children: [
             IndexedStack(
@@ -373,6 +380,10 @@ class _TabPlaceholder extends StatelessWidget {
       TestId(id, child: const SizedBox.expand());
 }
 
+/// 하단 바(screens-a §3.3 Flat / §3.6 Android). 배경 surfaceElevated, 위 15 / 아래 10 여백,
+/// 아이템 최소 48x48, 아이콘 23 + 간격 7 + 라벨 footnote(선택 시 bold). 색은 선택 actionPrimary,
+/// 비선택 bottomBar이고 눌러도 ripple이 없다. 가운데 작성 버튼은 `ic_bottom_write`(40 원).
+/// iOS 26 Liquid Glass 렌즈는 네이티브만의 연출이라 따르지 않는다(README §1.2).
 class _BottomBar extends StatelessWidget {
   const _BottomBar({
     required this.selected,
@@ -384,60 +395,94 @@ class _BottomBar extends StatelessWidget {
   final void Function(BottomDestination) onTab;
   final VoidCallback onUpload;
 
+  // ChalkakBottomBar.kt:64-72, ChalkakBottomBar.swift:425-492
+  static const _iconSize = 23.0;
+  static const _iconLabelGap = 7.0;
+  static const _topPadding = 15.0;
+  static const _bottomPadding = 10.0;
+  static const _itemMinSize = 48.0;
+  static const _writeSize = 40.0;
+
   @override
   Widget build(BuildContext context) {
+    final colors = context.tokens.colors;
     return TestId(
       NavigationTestIds.bottomBarRoot,
-      child: Material(
-        elevation: 8,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surfaceElevated,
+          // 원본은 그림자 없이 흰 면이다. 위쪽 경계만 옅게 구분한다.
+          border: Border(top: BorderSide(color: colors.border)),
+        ),
         child: SafeArea(
           top: false,
-          child: SizedBox(
-            height: 64,
-            child: Row(
-              children: [
-                _tab(
-                  BottomDestination.home,
-                  NavigationTestIds.tabHome,
-                  Icons.home_outlined,
-                  Copy.navTabHome,
-                ),
-                _tab(
-                  BottomDestination.display,
-                  NavigationTestIds.tabDisplay,
-                  Icons.photo_library_outlined,
-                  Copy.navTabDisplay,
-                ),
-                Expanded(
-                  child: Center(
-                    child: Semantics(
-                      key: const Key(NavigationTestIds.uploadButton),
-                      identifier: NavigationTestIds.uploadButton,
-                      container: true,
-                      button: true,
-                      label: Copy.navTabUploadA11y,
-                      onTap: onUpload,
-                      excludeSemantics: true,
-                      child: IconButton.filled(
-                        icon: const Icon(Icons.add),
-                        onPressed: onUpload,
+          child: Padding(
+            padding: const EdgeInsets.only(
+              top: _topPadding,
+              bottom: _bottomPadding,
+            ),
+            // 높이를 고정해 Scaffold가 주는 무제한 높이에서 Center가 화면 끝까지 늘어나지 않게 한다.
+            child: SizedBox(
+              height: _itemMinSize,
+              child: Row(
+                children: [
+                  _tab(
+                    context,
+                    BottomDestination.home,
+                    NavigationTestIds.tabHome,
+                    'home',
+                    Copy.navTabHome,
+                  ),
+                  _tab(
+                    context,
+                    BottomDestination.display,
+                    NavigationTestIds.tabDisplay,
+                    'display',
+                    Copy.navTabDisplay,
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Semantics(
+                        key: const Key(NavigationTestIds.uploadButton),
+                        identifier: NavigationTestIds.uploadButton,
+                        container: true,
+                        button: true,
+                        label: Copy.navTabUploadA11y,
+                        onTap: onUpload,
+                        excludeSemantics: true,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: onUpload,
+                          child: const SizedBox(
+                            width: _itemMinSize,
+                            height: _itemMinSize,
+                            child: Center(
+                              child: ChalkakIcon(
+                                ChalkakIcon.bottomWrite,
+                                size: _writeSize,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                _tab(
-                  BottomDestination.record,
-                  NavigationTestIds.tabRecord,
-                  Icons.calendar_month_outlined,
-                  Copy.navTabRecord,
-                ),
-                _tab(
-                  BottomDestination.settings,
-                  NavigationTestIds.tabSettings,
-                  Icons.settings_outlined,
-                  Copy.navTabSettings,
-                ),
-              ],
+                  _tab(
+                    context,
+                    BottomDestination.record,
+                    NavigationTestIds.tabRecord,
+                    'record',
+                    Copy.navTabRecord,
+                  ),
+                  _tab(
+                    context,
+                    BottomDestination.settings,
+                    NavigationTestIds.tabSettings,
+                    'setting',
+                    Copy.navTabSettings,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -446,13 +491,17 @@ class _BottomBar extends StatelessWidget {
   }
 
   Widget _tab(
+    BuildContext context,
     BottomDestination destination,
     String id,
-    IconData icon,
+    String iconName,
     String label,
   ) {
+    final tokens = context.tokens;
     final isSelected = destination == selected;
-    final color = isSelected ? Colors.black : Colors.black54;
+    final color = isSelected
+        ? tokens.colors.actionPrimary
+        : tokens.colors.bottomBar;
     return Expanded(
       child: TestId.button(
         id,
@@ -462,14 +511,37 @@ class _BottomBar extends StatelessWidget {
           label: label,
           excludeSemantics: true,
           onTap: () => onTab(destination),
-          child: InkWell(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () => onTab(destination),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, color: color),
-                Text(label, style: TextStyle(color: color, fontSize: 12)),
-              ],
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                minWidth: _itemMinSize,
+                minHeight: _itemMinSize,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ChalkakIcon(
+                    isSelected
+                        ? 'ic_bottom_${iconName}_selected'
+                        : 'ic_bottom_$iconName',
+                    size: _iconSize,
+                    color: color,
+                  ),
+                  const SizedBox(height: _iconLabelGap),
+                  Text(
+                    label,
+                    style: tokens.text.footnote.copyWith(
+                      color: color,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

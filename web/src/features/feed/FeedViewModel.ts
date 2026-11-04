@@ -94,7 +94,8 @@ export interface FeedViewModelDeps {
  * - dispose해도 진행 중인 삭제·제목 저장 요청의 결과는 changes에 반영한다(토스트는 ToastController가 보일 때만 띄운다).
  */
 export class FeedViewModel extends ViewModel<FeedState> {
-  private readonly unsubscribeChanges: () => void;
+  /** 생성자에서는 구독하지 않는다(렌더 중에 만들어질 수 있다). load()에서 처음 한 번 붙인다. */
+  private unsubscribeChanges: (() => void) | null = null;
   private readonly midnight: MidnightWatcher;
   private closed = false;
   /** 상세 읽기(load·retry·refresh)마다 올린다. 최신이 아닌 응답은 버린다. */
@@ -106,24 +107,25 @@ export class FeedViewModel extends ViewModel<FeedState> {
   private deleted = false;
 
   constructor(protected readonly deps: FeedViewModelDeps) {
+    // 시드가 있으면 첫 프레임부터 시드 내용이다(load()가 같은 값을 다시 적용한다). 확인 전이라 canLike 등은 모두 false다.
     super({
-      view: { kind: 'loading' },
-      post: null,
+      view: deps.seed ? { kind: 'content' } : { kind: 'loading' },
+      post: deps.seed ? FeedViewModel.fromSeed(deps.seed) : null,
       confirmed: false,
       refreshing: false,
-      isMine: false,
+      isMine: deps.seed ? (deps.assumeMine ?? deps.seed.isMine) : (deps.assumeMine ?? false),
       canLike: false,
       canEditTitle: false,
       canDelete: false,
       titleDialog: { open: false, input: '', saving: false, error: null },
       deleteDialog: { open: false, deleting: false },
     });
-    this.unsubscribeChanges = deps.changes.subscribe((change) => this.onChange(change));
     this.midnight = new MidnightWatcher({ clock: deps.clock, onDateChanged: () => this.update({}) });
   }
 
   /** 화면이 열릴 때 한 번. 끝나면 이행된다. */
   load(): Promise<void> {
+    this.unsubscribeChanges ??= this.deps.changes.subscribe((change) => this.onChange(change));
     const { seed } = this.deps;
     if (seed) {
       const assumed = this.deps.assumeMine ?? seed.isMine;
@@ -254,7 +256,8 @@ export class FeedViewModel extends ViewModel<FeedState> {
   override dispose(): void {
     this.closed = true;
     this.loadSeq += 1;
-    this.unsubscribeChanges();
+    this.unsubscribeChanges?.();
+    this.unsubscribeChanges = null;
     this.midnight.stop();
     super.dispose();
   }
@@ -325,7 +328,7 @@ export class FeedViewModel extends ViewModel<FeedState> {
     }
     if (!post) return;
     if (change.type === 'like') this.setState({ post: { ...post, isLiked: change.isLiked, likeCount: change.likeCount } });
-    else this.setState({ post: { ...post, title: change.title } });
+    else if (change.type === 'title') this.setState({ post: { ...post, title: change.title } });
   }
 
   private announceRemoved(postId: string): void {

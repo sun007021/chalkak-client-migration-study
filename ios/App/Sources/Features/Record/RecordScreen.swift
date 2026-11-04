@@ -40,6 +40,7 @@ private struct RecordScreen: View {
     @State private var showsMonthPicker = false
 
     private var shell: MainShellViewModel { session.shell }
+    // 원본 RecordCalendarGrid(screens-c.md 2.3): 7열, 칸 간격 6, 칸 모서리 small(7), 좌우 20
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 7)
 
     var body: some View {
@@ -80,6 +81,7 @@ private struct RecordScreen: View {
             RecordMonthPickerSheet(viewModel: viewModel, isPresented: $showsMonthPicker)
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
+                .chalkakSheetPresentationStyle()
         }
     }
 
@@ -102,24 +104,23 @@ private struct RecordScreen: View {
 
     // MARK: 월 헤더
 
+    /// 연월 버튼(`M월` title2 + `yyyy` footnote/textMuted, 첫 글자 기준선) 왼쪽 + ‹ › 이동 버튼 오른쪽.
     private var monthHeader: some View {
         HStack(spacing: 0) {
-            arrowButton(systemName: "chevron.left", identifier: "record.prev-month-button", enabled: viewModel.canGoToPreviousMonth) {
-                Task { await viewModel.previousMonthTapped() }
-            }
-            Spacer(minLength: 0)
             Button { showsMonthPicker = true } label: {
-                HStack(spacing: ChalkakSpacing.xs) {
-                    Text(viewModel.selectedMonth.label)
-                        .font(ChalkakFont.headlineBold)
+                HStack(alignment: .firstTextBaseline, spacing: ChalkakSpacing.xs) {
+                    Text("\(viewModel.selectedMonth.month)월")
+                        .font(ChalkakFont.title2)
                         .foregroundStyle(ChalkakColor.textPrimary)
-                        .accessibilityIdentifier("record.month-label")
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(ChalkakColor.iconPrimary)
+                    Text(String(viewModel.selectedMonth.year))
+                        .font(ChalkakFont.footnote)
+                        .foregroundStyle(ChalkakColor.textMuted)
                 }
-                .frame(minHeight: 44)
-                .padding(.horizontal, ChalkakSpacing.md)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(viewModel.selectedMonth.label)
+                .accessibilityIdentifier("record.month-label")
+                .frame(minHeight: 48)
+                .padding(.horizontal, ChalkakSpacing.sm)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -127,19 +128,24 @@ private struct RecordScreen: View {
             .accessibilityLabel(RecordCopy.pickerTitle)
             .accessibilityIdentifier("record.month-picker-button")
             Spacer(minLength: 0)
+            arrowButton(systemName: "chevron.left", identifier: "record.prev-month-button", enabled: viewModel.canGoToPreviousMonth) {
+                Task { await viewModel.previousMonthTapped() }
+            }
             arrowButton(systemName: "chevron.right", identifier: "record.next-month-button", enabled: viewModel.canGoToNextMonth) {
                 Task { await viewModel.nextMonthTapped() }
             }
         }
-        .padding(.horizontal, ChalkakSpacing.sm)
-        .frame(height: 55)
+        .padding(.leading, 12)
+        .padding(.trailing, ChalkakSpacing.sm)
+        .padding(.top, ChalkakSpacing.sm)
+        .frame(height: 64)
     }
 
     private func arrowButton(systemName: String, identifier: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(enabled ? ChalkakColor.iconPrimary : ChalkakColor.iconPrimary.opacity(0.25))
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(enabled ? ChalkakColor.iconPrimary : ChalkakColor.textInactive)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
@@ -156,9 +162,7 @@ private struct RecordScreen: View {
         case .idle:
             Color.clear.frame(height: 1)
         case .loading:
-            ProgressView()
-                .frame(maxWidth: .infinity, minHeight: 240)
-                .accessibilityIdentifier("record.loading")
+            loadingGrid
         case .failed(let failure):
             errorState(failure)
         case .loaded:
@@ -170,8 +174,9 @@ private struct RecordScreen: View {
                     Color.clear.frame(height: 0).accessibilityIdentifier("record.empty-state")
                 }
             }
-            .padding(.horizontal, ChalkakSpacing.screenHorizontal)
-            .padding(.bottom, ChalkakSpacing.xl)
+            .padding(.horizontal, 20)
+            .padding(.top, ChalkakSpacing.sm)
+            .padding(.bottom, 32)
         }
     }
 
@@ -182,10 +187,10 @@ private struct RecordScreen: View {
         case .invalidMonth: stateID = "record.invalid-month-message"
         case .other: stateID = "record.error-state"
         }
-        return VStack(spacing: ChalkakSpacing.lg) {
+        return VStack(spacing: ChalkakSpacing.sm) {
             Text(failure.title)
-                .font(ChalkakFont.callout)
-                .foregroundStyle(ChalkakColor.textPrimary)
+                .font(ChalkakFont.body)
+                .foregroundStyle(ChalkakColor.textSecondary)
                 .multilineTextAlignment(.center)
             if let buttonTitle = failure.buttonTitle {
                 Button {
@@ -196,31 +201,49 @@ private struct RecordScreen: View {
                     }
                 } label: {
                     Text(buttonTitle)
-                        .font(ChalkakFont.callout)
-                        .foregroundStyle(ChalkakColor.onActionPrimary)
-                        .padding(.horizontal, ChalkakSpacing.xl)
+                        .font(ChalkakFont.body)
+                        .foregroundStyle(ChalkakColor.actionPrimary)
+                        .padding(.horizontal, ChalkakSpacing.sm)
                         .frame(minHeight: 44)
-                        .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier(failure == .loginRequired ? "record.login-button" : "record.retry-button")
             }
         }
         .frame(maxWidth: .infinity, minHeight: 240)
-        .padding(.horizontal, ChalkakSpacing.screenHorizontal)
+        .padding(.horizontal, 20)
+        .padding(.top, ChalkakSpacing.xl)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(stateID)
+    }
+
+    /// 로딩: 스피너 대신 달력 칸 모양의 스켈레톤.
+    private var loadingGrid: some View {
+        VStack(spacing: 6) {
+            LazyVGrid(columns: columns, spacing: 6) {
+                ForEach(0..<35, id: \.self) { _ in
+                    ChalkakSkeleton()
+                        .aspectRatio(1, contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.small))
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 14)
+        .accessibilityElement(children: .ignore)
+        .accessibilityIdentifier("record.loading")
     }
 
     // MARK: 달력
 
     private var calendarGrid: some View {
-        VStack(spacing: ChalkakSpacing.sm) {
+        VStack(spacing: 14) {
             LazyVGrid(columns: columns, spacing: 6) {
                 ForEach(Array(RecordCopy.weekdayLabels.enumerated()), id: \.offset) { _, label in
                     Text(label)
                         .font(ChalkakFont.caption)
-                        .foregroundStyle(ChalkakColor.textSecondary)
+                        .foregroundStyle(ChalkakColor.textMuted)
                 }
             }
             .accessibilityElement(children: .combine)
@@ -246,24 +269,26 @@ private struct RecordScreen: View {
             Color.clear
                 .aspectRatio(1, contentMode: .fit)
                 .overlay {
-                    ZStack(alignment: .topLeading) {
+                    ZStack {
                         ChalkakColor.calendarCell
                         if let post {
                             ChalkakRemoteImage(url: post.thumbnailImageURL)
+                        } else {
+                            // 사진 없는 날: 날짜 숫자(caption, 고정폭 숫자, textSecondary) 가운데
+                            Text("\(date.day)")
+                                .font(ChalkakFont.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(ChalkakColor.textSecondary)
                         }
-                        Text("\(date.day)")
-                            .font(ChalkakFont.caption)
-                            .foregroundStyle(post == nil ? ChalkakColor.textPrimary : ChalkakColor.textOnImage)
-                            .padding(4)
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.small))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(isSelected ? ChalkakColor.accent : Color.clear, lineWidth: 2)
+                    RoundedRectangle(cornerRadius: ChalkakRadius.small)
+                        .stroke(isSelected ? ChalkakColor.calendarSelection : Color.clear, lineWidth: 2)
                 )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ChalkakUnhighlightedButtonStyle())
         .disabled(post == nil)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("record.day-\(date.idString)")
@@ -278,7 +303,7 @@ private struct RecordScreen: View {
                 ChalkakRemoteImage(url: post.thumbnailImageURL)
                     .frame(maxWidth: .infinity)
                     .aspectRatio(1, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.card))
+                    .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.photoCard))
                     .overlay(alignment: .topLeading) {
                         if viewModel.showsPendingBadge { pendingBadge }
                     }
@@ -297,11 +322,11 @@ private struct RecordScreen: View {
         VStack(alignment: .leading, spacing: ChalkakSpacing.xs) {
             Button { viewModel.pendingBadgeTapped() } label: {
                 Text(RecordCopy.pendingBadge)
-                    .font(ChalkakFont.caption)
-                    .foregroundStyle(ChalkakColor.onActionPrimary)
+                    .font(ChalkakFont.captionSemibold)
+                    .foregroundStyle(ChalkakColor.textOnImage)
                     .padding(.horizontal, ChalkakSpacing.md)
                     .frame(minHeight: 28)
-                    .background(ChalkakColor.actionPrimary.opacity(0.85), in: Capsule())
+                    .background(ChalkakColor.scrim, in: Capsule())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(viewModel.pendingBadgeAccessibilityLabel)
@@ -311,7 +336,8 @@ private struct RecordScreen: View {
                     .font(ChalkakFont.caption)
                     .foregroundStyle(ChalkakColor.textPrimary)
                     .padding(ChalkakSpacing.md)
-                    .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.small))
+                    .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
+                    .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 2)
                     .accessibilityIdentifier("record.pending-tooltip")
             }
         }
@@ -319,29 +345,20 @@ private struct RecordScreen: View {
     }
 
     private func actionButton(_ title: String, identifier: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(ChalkakFont.callout)
-                .foregroundStyle(ChalkakColor.onActionPrimary)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(identifier)
+        ChalkakButton(title: title, action: action, fillsWidth: true, verticalPadding: 13)
+            .accessibilityIdentifier(identifier)
     }
 
     // MARK: 이미지 저장
 
     private var saveButton: some View {
-        Button { Task { await viewModel.saveImageTapped() } } label: {
-            Text(RecordCopy.save)
-                .font(ChalkakFont.callout)
-                .foregroundStyle(ChalkakColor.textPrimary)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .overlay(RoundedRectangle(cornerRadius: ChalkakRadius.button).stroke(ChalkakColor.border))
-        }
-        .buttonStyle(.plain)
-        .disabled(viewModel.isSaving)
+        ChalkakOutlinedButton(
+            title: RecordCopy.save,
+            action: { Task { await viewModel.saveImageTapped() } },
+            isEnabled: !viewModel.isSaving,
+            fillsWidth: true,
+            verticalPadding: 13
+        )
         .accessibilityIdentifier("record.save-image-button")
     }
 }
@@ -370,7 +387,7 @@ private struct RecordMonthPickerSheet: View {
                                     .foregroundStyle(ChalkakColor.textPrimary)
                                 Spacer(minLength: 0)
                                 if month == viewModel.selectedMonth {
-                                    Image(systemName: "checkmark").foregroundStyle(ChalkakColor.accent)
+                                    Image(systemName: "checkmark").foregroundStyle(ChalkakColor.calendarSelection)
                                 }
                             }
                             .frame(minHeight: 48)
@@ -383,7 +400,7 @@ private struct RecordMonthPickerSheet: View {
                 }
             }
         }
-        .background(ChalkakColor.background.ignoresSafeArea())
+        .background(ChalkakSheetSurface.contentBackground.ignoresSafeArea())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("record.month-picker-sheet")
     }

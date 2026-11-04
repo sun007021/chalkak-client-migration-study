@@ -13,13 +13,22 @@ import { resolveAuthGate } from '../features/boot/authGate';
 import type { AuthGateDecision } from '../features/boot/authGate';
 import { BootScreen, SplashView } from '../features/boot/BootScreen';
 import { DisplayScreen } from '../features/display/DisplayScreen';
+import { NotificationDetailScreen } from '../features/notification/NotificationDetailScreen';
+import { NotificationsScreen } from '../features/notification/NotificationsScreen';
 import { FeedScreen } from '../features/feed/FeedScreen';
 import { HomeScreen } from '../features/home/HomeScreen';
+import { RecordScreen } from '../features/record/RecordScreen';
 import { TermsScreen } from '../features/onboarding/TermsScreen';
+import { RouterUploadNavigator } from '../features/upload/uploadNavigation';
+import { UploadEntryLoading } from '../features/upload/UploadEntryLoading';
+import { UploadScreen } from '../features/upload/UploadScreen';
+import { UploadSuccessScreen } from '../features/upload/UploadSuccessScreen';
 import { SignatureDrawScreen } from '../features/signature/SignatureDrawScreen';
 import { SignaturePreviewScreen } from '../features/signature/SignaturePreviewScreen';
+import { FeedbackScreen } from '../features/feedback/FeedbackScreen';
+import { SettingsScreen } from '../features/settings/SettingsScreen';
 import { MemberOnly } from '../features/shell/MemberOnly';
-import { BottomBarSlotContext, MainShell, TabGate, TabPlaceholder } from '../features/shell/MainShell';
+import { BottomBarSlotContext, MainShell, TabGate } from '../features/shell/MainShell';
 import type { TabRouteHandle } from '../features/shell/MainShell';
 import { ContainerProvider } from './AppContext';
 import type { AppContainer } from './container';
@@ -69,6 +78,8 @@ function RootLayout({ container }: { container: AppContainer }): ReactNode {
   );
   // 다른 탭의 로그아웃·계정 전환(REQ-NAV-022)과 문서 가시성에 따른 토스트(D-20). 정리 함수로 구독이 하나만 남는다(StrictMode 포함).
   useEffect(() => container.crossTabSync.start(), [container]);
+  // 업로드 게이트가 화면을 여는 통로. 라우터가 마운트되어 있는 동안만 붙인다.
+  useEffect(() => container.uploadNavigator.attach(new RouterUploadNavigator(navigate)), [container, navigate]);
   useEffect(() => bindToastVisibility(container.toast, document), [container]);
   return (
     <ContainerProvider container={container}>
@@ -79,6 +90,7 @@ function RootLayout({ container }: { container: AppContainer }): ReactNode {
             <Outlet />
           </main>
           <div ref={setBottomBarSlot} />
+          <UploadEntryLoading />
           <ToastHost controller={container.toast} />
         </BottomBarSlotContext.Provider>
       </AnalyticsProvider>
@@ -122,21 +134,37 @@ export function createAppRoutes(container: AppContainer): RouteObject[] {
               handle: recordHandle,
               element: (
                 <TabGate tab="record">
-                  <TabPlaceholder tab="record" testId="record.root" />
+                  <RecordScreen />
                 </TabGate>
               ),
             },
-            { path: ROUTES.settings, handle: settingsHandle, element: <TabPlaceholder tab="settings" testId="settings.root" /> },
+            { path: ROUTES.settings, handle: settingsHandle, element: <SettingsScreen /> },
           ],
         },
-        // 알림함·게시물 상세는 다음 PR의 화면이 대체하는 자리표시(홈 이동 계약 검증용). 탭 셸 밖이라 하단 바가 없고 회원만 들어온다(게스트는 홈으로).
+        // 알림함·알림 상세. 탭 셸 밖이라 하단 바가 없고 회원만 들어온다(게스트는 홈으로).
         {
           element: <RequireSession container={container}>{(mode) => <MemberOnly mode={mode} action="notification"><Outlet /></MemberOnly>}</RequireSession>,
-          children: [{ path: ROUTES.notifications, element: <div data-testid="notifications.root" /> }],
+          children: [
+            { path: ROUTES.notifications, element: <NotificationsScreen /> },
+            { path: ROUTES.notificationDetail, element: <NotificationDetailScreen /> },
+          ],
         },
         {
           element: <RequireSession container={container}>{(mode) => <MemberOnly mode={mode} action="feed"><Outlet /></MemberOnly>}</RequireSession>,
           children: [{ path: `${ROUTES.feed}/:postId`, element: <FeedScreen /> }],
+        },
+        // 업로드: 회원만, 탭 셸 밖(하단 바 없음). 게스트가 URL로 오면 홈으로 + nav.guest.upload 토스트.
+        {
+          element: <RequireSession container={container}>{(mode) => <MemberOnly mode={mode} action="upload"><Outlet /></MemberOnly>}</RequireSession>,
+          children: [
+            { path: ROUTES.upload, element: <UploadScreen /> },
+            { path: ROUTES.uploadSuccess, element: <UploadSuccessScreen /> },
+          ],
+        },
+        // 피드백: 회원만, 탭 셸 밖(하단 바 없음). 게스트가 URL로 오면 홈으로 + nav.guest.feedback 토스트.
+        {
+          element: <RequireSession container={container}>{(mode) => <MemberOnly mode={mode} action="feedback"><Outlet /></MemberOnly>}</RequireSession>,
+          children: [{ path: ROUTES.feedback, element: <FeedbackScreen /> }],
         },
         ...devSessionRoutes(container),
         { path: '*', element: <Navigate to={ROUTES.boot} replace /> },

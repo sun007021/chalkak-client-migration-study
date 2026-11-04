@@ -5,6 +5,7 @@ import { screenViews } from '../test/screenViews';
 import { SIGNUP_CONFIRM, SIGNUP_PUT, SIGNUP_UPLOADS, routeSignup, sequence } from '../test/signatureRoutes';
 import { drawStroke, stubCanvasRect } from '../test/signatureDrawing';
 
+import { advanceClock } from '../test/settle';
 const LOGIN = 'POST /auth/social-login';
 const STROKE = [{ x: 100, y: 100 }, { x: 300, y: 220 }, { x: 520, y: 140 }];
 
@@ -157,7 +158,7 @@ describe('가입 흐름의 뒤로 가기와 재진입', () => {
     fireEvent.click(screen.getByTestId('signature-preview.confirm-button'));
     await waitFor(() => expect(h.ff.callsTo(SIGNUP_CONFIRM)).toHaveLength(1));
     await act(async () => router.navigate(-1));
-    await act(async () => h.clock.advance(10_000));
+    await advanceClock(h, 10_000);
     expect(h.store.writes).toHaveLength(0);
     expect(screen.queryByTestId('home.root')).not.toBeInTheDocument();
   });

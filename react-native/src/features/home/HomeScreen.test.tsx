@@ -1,12 +1,12 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
-import { deferred } from '../../core/http/__testing__/FakeTransport';
+import { deferred, networkFailure } from '../../core/http/__testing__/FakeTransport';
 import { fixtureResponse } from '../../core/http/__testing__/loadFixture';
 import { formatTodayTopicLabel, WEEKDAY_HEADERS } from '../../core/time/dateFormat';
 import { KstDate } from '../../core/time/KstDate';
 import { format, t } from '../../shared/copy';
-import { createHomeHarness, MY_POST_ID } from './__testing__/createHomeHarness';
+import { createHomeHarness, MEMBER_ROUTES, MY_POST_ID } from './__testing__/createHomeHarness';
 import type { HomeHarness } from './__testing__/createHomeHarness';
 import { HomeScreen } from './HomeScreen';
 
@@ -153,7 +153,10 @@ describe('HomeScreen 히어로 7상태 (D-06)', () => {
     h.router.set('GET /posts/today', 'home/posts-today__500-server-error');
     await renderHome(h, false);
     expect(await screen.findByTestId('home.hero-error')).toHaveTextContent(t('home.hero.error'));
-    expect(screen.getByTestId('home.hero-retry-button')).toHaveTextContent(t('home.hero.retry'));
+    // 원본 디자인: 재시도는 둥근 아이콘 버튼이라 문구는 접근성 라벨에 있다.
+    expect(screen.getByTestId('home.hero-retry-button').props.accessibilityLabel).toBe(
+      t('home.hero.retry'),
+    );
 
     h.router.set('GET /posts/today', 'home/posts-today__posted-approved');
     await fireEvent.press(screen.getByTestId('home.hero-retry-button'));
@@ -215,8 +218,9 @@ describe('HomeScreen 이번 주 기록', () => {
     const dates = ['25', '26', '27', '28', '29', '30', '31'];
     dates.forEach((day, i) => {
       const cell = screen.getByTestId(`home.week-day-2026-10-${day}`);
-      expect(within(cell).getByText(WEEKDAY_HEADERS[i])).toBeOnTheScreen();
-      expect(within(cell).getByText(day)).toBeOnTheScreen();
+      // 원본 디자인: 요일 기호는 사진이 없는 칸 안에 보이고, 날짜는 접근성 라벨로 읽힌다.
+      expect(cell.props.accessibilityLabel).toBe(`${WEEKDAY_HEADERS[i]} ${day}`);
+      if (i >= 3) expect(within(cell).getByText(WEEKDAY_HEADERS[i])).toBeOnTheScreen();
     });
     for (const day of ['25', '26', '27']) {
       expect(screen.getByTestId(`home.week-photo-2026-10-${day}`)).toBeOnTheScreen();
@@ -246,7 +250,9 @@ describe('HomeScreen 이번 주 기록', () => {
     await renderHome(h);
     await fireEvent.press(screen.getByTestId('home.week-day-2026-10-26'));
     await fireEvent.press(screen.getByTestId('home.week-day-2026-10-29'));
-    await fireEvent.press(screen.getByText(t('home.weekly.more')));
+    await fireEvent.press(
+      within(screen.getByTestId('home.week-section')).getByText(t('home.weekly.more')),
+    );
     expect(h.navigator.calls).toEqual([
       { type: 'record', selectedDate: '2026-10-26' },
       { type: 'record', selectedDate: null },
@@ -538,7 +544,7 @@ async function waitForRefreshEnd() {
 }
 
 describe('HomeScreen 알림 버튼·새로고침', () => {
-  it('TC-HOME-050 hasUnread=true면 미읽음 점이 있고 false면 요소 자체가 없다', async () => {
+  it('TC-HOME-050 TC-NOTI-049 hasUnread=true면 미읽음 점이 있고 false면 요소 자체가 없다', async () => {
     const h = await createHomeHarness();
     await renderHome(h);
     expect(screen.queryByTestId('home.notification-unread-dot')).not.toBeOnTheScreen();
@@ -546,6 +552,10 @@ describe('HomeScreen 알림 버튼·새로고침', () => {
     h.router.set('GET /notifications/unread-status', 'home/notifications-unread-status__true');
     await act(async () => h.viewModel.onPushReceived());
     expect(screen.getByTestId('home.notification-unread-dot')).toBeOnTheScreen();
+
+    h.router.set('GET /notifications/unread-status', 'home/notifications-unread-status__false');
+    await act(async () => h.viewModel.onPushReceived());
+    expect(screen.queryByTestId('home.notification-unread-dot')).not.toBeOnTheScreen();
   });
 
   it('TC-HOME-048 알림 버튼을 누르면 알림함으로 간다', async () => {
@@ -584,5 +594,63 @@ describe('HomeScreen 알림 버튼·새로고침', () => {
     await act(async () => gate.resolve());
     await screen.findByTestId('home.hero-photo');
     expect(screen.queryByTestId('home.refresh-indicator')).not.toBeOnTheScreen();
+  });
+});
+
+describe('HomeScreen 오프라인·이미지 실패 (D-20)', () => {
+  it('TC-HOME-045 오프라인이고 캐시가 없으면 각 섹션이 자기 오류와 다시 시도를 보이고, 온라인 복귀 뒤 다시 시도하면 모두 로드된다', async () => {
+    const h = await createHomeHarness();
+    const offline = [
+      'GET /topics?date=2026-10-27',
+      'GET /topics?date=2026-10-26',
+      POP_TODAY,
+      POP_YEST,
+      'GET /posts/today',
+      'GET /posts/calendar?year=2026&month=10',
+      'GET /banners?page=1&pageSize=10',
+    ];
+    const online = new Map(offline.map((key) => [key, MEMBER_ROUTES[key]]));
+    offline.forEach((key) => h.router.set(key, networkFailure()));
+    await renderHome(h, false);
+
+    // 스펙(home.md 실패별 처리)이 섹션마다 고정 문구를 정하므로 카탈로그의 공통 네트워크 문구 대신 그 문구를 따른다.
+    expect(await screen.findByTestId('home.hero-error')).toHaveTextContent(t('home.hero.error'));
+    expect(screen.getByTestId('home.topic-title')).toHaveTextContent(t('home.topic.error'));
+    expect(screen.getByTestId('home.week-error')).toHaveTextContent(t('home.weekly.error'));
+    expect(screen.getByTestId('home.popular-error')).toBeOnTheScreen();
+    expect(screen.getByTestId('home.ranking-error')).toBeOnTheScreen();
+    expect(await screen.findByTestId('home.issue-error')).toBeOnTheScreen();
+
+    online.forEach((value, key) => h.router.set(key, value));
+    await fireEvent.press(screen.getByTestId('home.retry-button'));
+    await fireEvent.press(screen.getByTestId('home.hero-retry-button'));
+    await fireEvent.press(screen.getByTestId('home.week-retry-button'));
+    await fireEvent.press(screen.getByTestId('home.ranking-retry-button'));
+    await fireEvent.press(screen.getByTestId('home.issue-retry-button'));
+    expect(await screen.findByTestId('home.hero-photo')).toBeOnTheScreen();
+    expect(await screen.findByTestId('home.week-photo-2026-10-27')).toBeOnTheScreen();
+    expect(await screen.findByTestId(`home.popular-item-${ID('03')}`)).toBeOnTheScreen();
+    expect(await screen.findByTestId(`home.ranking-item-${ID('61')}`)).toBeOnTheScreen();
+    expect(await screen.findByTestId(`home.issue-item-${BANNER('01')}`)).toBeOnTheScreen();
+    expect(screen.queryByTestId('home.hero-error')).not.toBeOnTheScreen();
+  });
+
+  it('TC-HOME-056 이미지가 로드되지 않은 항목만 "{섹션 제목} 사진을 불러오지 못했어요"를 보이고 다른 항목은 정상이다', async () => {
+    const h = await createHomeHarness();
+    await renderHome(h);
+    const broken = ID('03');
+    const other = ID('02');
+    const brokenItem = screen.getByTestId(`home.popular-item-${broken}`);
+    expect(screen.queryByTestId(`home.popular-image-error-${broken}`)).not.toBeOnTheScreen();
+
+    await fireEvent(within(brokenItem).getByTestId(`home.popular-image-${broken}`), 'error');
+    expect(screen.getByTestId(`home.popular-image-error-${broken}`)).toHaveTextContent(
+      format(t('home.ranking.error'), { '섹션 제목': t('home.ranking.today') }),
+    );
+    expect(screen.queryByTestId(`home.popular-image-${broken}`)).not.toBeOnTheScreen();
+    expect(screen.getByTestId(`home.popular-image-${other}`)).toBeOnTheScreen();
+    expect(screen.queryByTestId(`home.popular-image-error-${other}`)).not.toBeOnTheScreen();
+    // 항목 자체(좋아요 버튼 포함)는 그대로라 눌러서 상세로 갈 수 있다.
+    expect(within(brokenItem).getByTestId(`home.popular-like-button-${broken}`)).toBeOnTheScreen();
   });
 });

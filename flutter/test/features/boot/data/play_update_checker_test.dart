@@ -63,18 +63,4 @@ void main() {
       UpdateStatus.unavailable,
     );
   });
-
-  test('TC-BOOT-029 launcher는 즉시 업데이트를 정확히 시작한다', () async {
-    final src = FakePlayUpdateSource();
-    await PlayUpdateLauncher(source: src).launch();
-    expect(src.startCalls, 1);
-  });
-
-  test('TC-BOOT-031 즉시 업데이트가 취소·실패하면 예외를 그대로 알린다', () async {
-    final src = FakePlayUpdateSource()..startError = Exception('cancelled');
-    await expectLater(
-      PlayUpdateLauncher(source: src).launch(),
-      throwsException,
-    );
-  });
 }

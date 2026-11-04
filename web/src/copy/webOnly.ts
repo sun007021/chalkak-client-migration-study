@@ -3,6 +3,10 @@
  * 홈 새로고침 버튼은 모바일의 당겨서 새로고침에 해당하는 Web 대체 수단이다(home.md 새로고침 방식).
  */
 export const webOnlyCopy = {
+  /** 공통 상단 바 뒤로 버튼의 접근성 이름(원본 ChalkakNavigationButton .back). */
+  'common.back': '뒤로 가기',
+  /** 공통 이미지 자리표시의 접근성 이름. */
+  'common.image-error': '사진을 불러오지 못했어요',
   'home.refresh': '새로고침',
   /** 홈 새로고침 중 표시(home.refresh-indicator)의 텍스트. */
   'home.refresh-indicator': '새로고침 중',
@@ -29,8 +33,44 @@ export const webOnlyCopy = {
   'display.picker.year-label': '연도',
   'display.picker.month-label': '월',
   'display.picker.day-label': '일',
+  /** 업로드: 앨범·카메라 파일 입력의 접근성 이름(안내 문구와 겹치지 않게 서로 다르게), 미리보기 버튼·이미지, 성공 화면 사진. TODO: shared/copy/ko.json에 키가 생기면 옮긴다. */
+  'upload.album.a11y': '앨범에서 사진 고르기',
+  'upload.camera.a11y': '카메라로 사진 찍기',
+  'upload.preview.edit': '사진 편집하기',
+  'upload.preview.alt': '선택한 사진',
+  'upload.success.photo-alt': '전시한 사진',
+  /** 사진 편집기: 대화상자 이름, 완료 뒤 마지막 렌더를 기다리는 표시, 자르기 영역·비율 묶음의 접근성 이름. TODO: shared/copy/ko.json에 키가 생기면 옮긴다. */
+  'edit.dialog.label': '사진 편집',
+  'edit.rendering': '사진을 준비하는 중',
+  'edit.crop.area': '자르기 영역',
+  'edit.ratio.label': '자르기 비율',
+  /** 자르기 프레임 손잡이의 접근성 이름(방향키로 조작한다). */
+  'edit.crop.move': '자르기 영역 이동',
+  'edit.crop.handle.top-left': '왼쪽 위 모서리',
+  'edit.crop.handle.top-right': '오른쪽 위 모서리',
+  'edit.crop.handle.bottom-left': '왼쪽 아래 모서리',
+  'edit.crop.handle.bottom-right': '오른쪽 아래 모서리',
+  /** 알림함·알림 상세: 당겨서 새로고침 대신 쓰는 새로고침 버튼, 새로고침·다음 페이지 표시, 뒤로 버튼, 미읽음 표시의 접근성 이름, 반려 사진 대체 텍스트. */
+  'noti.refresh': '새로고침',
+  'noti.refresh-indicator': '새로고침 중',
+  'noti.load-more': '불러오는 중',
+  'noti.back': '뒤로 가기',
+  'noti.unread.a11y': '읽지 않은 알림',
+  'noti.detail.photo-alt': '원본 사진',
+  /** 기록: 이전·다음 달 버튼, 기록 없는 달 안내, 선택한 날짜의 사진 대체 텍스트. TODO: shared/copy/ko.json에 키가 생기면 옮긴다. */
+  'record.nav.previous': '이전 달',
+  'record.nav.next': '다음 달',
+  'record.empty': '이 달에는 기록이 없어요',
+  'record.selected-photo-alt': '선택한 날짜의 사진',
+  'record.today': '오늘',
+  /** 기록 → 상세: 응답 전에 미리 보이는 썸네일의 대체 텍스트. */
+  'feed.preview-alt': '사진',
   /** 상세: 삭제 요청 중 표시. */
   'feed.deleting': '삭제 중',
+  /** 설정: 사인 카드 이미지의 대체 텍스트, 사인·푸시 설정을 읽는 중 표시. */
+  'settings.signature-alt': '현재 사인',
+  'settings.signature-loading': '사인을 불러오는 중',
+  'settings.push-loading': '알림 설정을 불러오는 중',
 } as const;
 
 export type WebOnlyCopyKey = keyof typeof webOnlyCopy;

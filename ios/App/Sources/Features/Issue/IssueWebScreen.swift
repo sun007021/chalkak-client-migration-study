@@ -59,16 +59,8 @@ struct IssueWebScreen: View {
                 Text(message)
                     .font(ChalkakFont.callout)
                     .foregroundStyle(ChalkakColor.textSecondary)
-                Button { viewModel.retry() } label: {
-                    Text(BannerCopy.retry)
-                        .font(ChalkakFont.callout)
-                        .foregroundStyle(ChalkakColor.onActionPrimary)
-                        .padding(.horizontal, ChalkakSpacing.xl)
-                        .frame(minHeight: 44)
-                        .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("issue.retry-button")
+                ChalkakButton(title: BannerCopy.retry) { viewModel.retry() }
+                    .accessibilityIdentifier("issue.retry-button")
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(ChalkakColor.background)

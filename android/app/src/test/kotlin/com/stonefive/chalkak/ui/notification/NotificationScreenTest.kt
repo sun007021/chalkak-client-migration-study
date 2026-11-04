@@ -5,6 +5,9 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
@@ -76,7 +79,13 @@ class NotificationScreenTest {
         rule.waitForIdle()
     }
 
-    private fun tag(t: String) = rule.onNodeWithTag(t)
+    /** Rows are taller than the test viewport now (screens-c 3.1.2), so rows below the fold are scrolled into the lazy list first. */
+    private fun tag(t: String): SemanticsNodeInteraction {
+        if (t.startsWith("notifications.item-") && rule.onAllNodesWithTag("notifications.list").fetchSemanticsNodes().isNotEmpty()) {
+            runCatching { rule.onNodeWithTag("notifications.list").performScrollToNode(hasTestTag(t)) }
+        }
+        return rule.onNodeWithTag(t)
+    }
 
     private fun count(t: String) = rule.onAllNodesWithTag(t)
 

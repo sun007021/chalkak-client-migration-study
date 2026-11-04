@@ -1,67 +1,43 @@
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { t } from '../../shared/copy';
+import { Dialog, DialogButton } from '../../shared/ui/Dialog';
 import type { UpdateDialogViewModel } from './UpdateDialogViewModel';
 
 /**
  * 닫을 수 없는 강제 업데이트 다이얼로그. testID update-gate.*.
  * onRequestClose(안드로이드 뒤로가기)는 아무것도 하지 않고, 바깥 영역에는 닫기 동작이 없다.
+ * Android 계열에만 "취소"(앱 종료) 버튼이 있다. 모양은 공통 다이얼로그(docs/design/screens-b.md §1.6).
  */
 export function UpdateGateDialog({ viewModel }: { viewModel: UpdateDialogViewModel }) {
   const { opening } = useViewModelState(viewModel);
   return (
-    <Modal
-      visible
-      transparent
-      animationType="fade"
+    <Dialog
       testID="update-gate.dialog"
+      titleTestID="update-gate.title"
+      messageTestID="update-gate.message"
+      title={t('boot.update.title')}
+      message={t('boot.update.body')}
       onRequestClose={noop}
-    >
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
-          <Text testID="update-gate.title" style={styles.title}>
-            {t('boot.update.title')}
-          </Text>
-          <Text testID="update-gate.message" style={styles.message}>
-            {t('boot.update.body')}
-          </Text>
-          <Pressable
+      actions={
+        <>
+          {viewModel.canCancel && (
+            <DialogButton
+              testID="update-gate.cancel-button"
+              tone="cancel"
+              label={t('boot.update.cancel')}
+              onPress={() => viewModel.onCancelPress()}
+            />
+          )}
+          <DialogButton
             testID="update-gate.update-button"
-            accessibilityRole="button"
+            label={t('boot.update.button')}
             disabled={opening}
             onPress={() => void viewModel.onUpdatePress()}
-            style={[styles.button, opening && styles.buttonDisabled]}
-          >
-            <Text style={styles.buttonText}>{t('boot.update.button')}</Text>
-          </Pressable>
-        </View>
-      </View>
-    </Modal>
+          />
+        </>
+      }
+    />
   );
 }
 
 function noop(): void {}
-
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 24,
-  },
-  card: { width: '100%', maxWidth: 320, borderRadius: 16, backgroundColor: '#FFFFFF', padding: 24 },
-  title: { fontSize: 18, fontWeight: '700', textAlign: 'center' },
-  message: { marginTop: 12, fontSize: 14, textAlign: 'center', color: '#444444' },
-  button: {
-    marginTop: 24,
-    height: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#111111',
-  },
-  buttonDisabled: { opacity: 0.5 },
-  buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-});

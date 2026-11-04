@@ -18,6 +18,7 @@ import 'package:chalkak/features/like/domain/toast_message.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'fake_analytics_tracker.dart';
 import 'fixtures.dart';
 import 'ui_helpers.dart';
 
@@ -577,6 +578,7 @@ class FeedRig {
       likes: likes,
       postEvents: bus,
       userId: userId,
+      analytics: FakeAnalyticsTracker(),
     );
     vm.events.listen(events.add);
     likes.toasts.listen(likeToasts.add);

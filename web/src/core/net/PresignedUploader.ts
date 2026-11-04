@@ -13,6 +13,8 @@ export interface PresignedUploaderDeps {
   logger?: Logger;
   /** 전송 직전에 주소를 바꾼다(개발 프록시). 없으면 그대로. 허용 검사와 로그는 원래 주소 기준. */
   urlRewriter?: UploadUrlRewriter;
+  /** false면 https만 허용한다(배포 빌드). 기본 true(https 또는 loopback http). */
+  allowLoopbackHttp?: boolean;
 }
 
 export interface PresignedPutRequest {
@@ -22,6 +24,11 @@ export interface PresignedPutRequest {
   /** 정책이 준 Content-Type(사진 image/webp, 사인 image/png). */
   contentType: string;
   signal?: AbortSignal;
+  /**
+   * true면 네트워크 오류·5xx에 0.5s, 1s 백오프로 최대 2회 자동 재시도한다(D-21: PUT은 멱등, 사진 업로드 TC-UPL-055). 4xx는 재시도하지 않는다.
+   * 기본 false(사인 업로드는 기존 동작 그대로).
+   */
+  retry?: boolean;
 }
 
 /** presigned PUT: 타임아웃 60초, Authorization·Accept 등 앱 공통 헤더 없이 Content-Type만. 비 2xx는 ApiError(status, null). */
@@ -33,14 +40,14 @@ export class PresignedUploader {
   }
 
   async put(request: PresignedPutRequest): Promise<void> {
-    assertAllowedAbsoluteUrl(request.url);
+    assertAllowedAbsoluteUrl(request.url, { allowLoopbackHttp: this.deps.allowLoopbackHttp });
     const response = await this.transport.send({
       method: 'PUT',
       url: this.deps.urlRewriter ? this.deps.urlRewriter.rewrite(request.url) : request.url,
       headers: { 'content-type': request.contentType },
       body: request.body,
       timeoutMs: UPLOAD_PUT_TIMEOUT_MS,
-      retry: false,
+      retry: request.retry === true,
       signal: request.signal,
     });
     if (response.status >= 200 && response.status < 300) return;

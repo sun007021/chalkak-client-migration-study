@@ -37,25 +37,19 @@ struct SignatureDrawingStepView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button(action: onBack) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(ChalkakColor.iconPrimary)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("signature.back-button")
+            ChalkakNavigationButton(kind: .back, action: onBack)
+                .padding(.leading, -ChalkakSpacing.sm)
+                .accessibilityIdentifier("signature.back-button")
 
             Text(OnboardingCopy.signTitle)
-                .font(ChalkakFont.display)
+                .font(ChalkakFont.title1)
                 .foregroundStyle(ChalkakColor.textPrimary)
-                .padding(.top, ChalkakSpacing.lg)
+                .padding(.top, ChalkakSpacing.sm)
                 .accessibilityIdentifier("signature.title")
             Text(OnboardingCopy.signGuide)
                 .font(ChalkakFont.subheadline)
                 .foregroundStyle(ChalkakColor.textSecondary)
-                .padding(.top, ChalkakSpacing.md)
+                .padding(.top, 30)
                 .accessibilityIdentifier("signature.guide-text")
 
             ZStack {
@@ -69,27 +63,30 @@ struct SignatureDrawingStepView: View {
                     onMoved: { viewModel.strokeMoved(to: $0) },
                     onEnded: { viewModel.strokeEnded() }
                 )
-                if !viewModel.canUndo {
-                    Text(OnboardingCopy.signPadHint)
-                        .font(ChalkakFont.callout)
-                        .foregroundStyle(ChalkakColor.textSecondary)
-                        .allowsHitTesting(false)
-                        .accessibilityIdentifier("signature.canvas-hint")
-                }
             }
-            .padding(.top, ChalkakSpacing.xl)
+            .padding(.top, 32)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("signature.canvas")
 
+            if !viewModel.canUndo {
+                Text(OnboardingCopy.signPadHint)
+                    .font(ChalkakFont.footnote)
+                    .foregroundStyle(ChalkakColor.textMuted)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, ChalkakSpacing.md)
+                    .accessibilityIdentifier("signature.canvas-hint")
+            }
+
             HStack(spacing: ChalkakSpacing.md) {
-                secondaryButton(OnboardingCopy.signUndo, identifier: "signature.undo-button", enabled: viewModel.canUndo) {
+                secondaryButton(OnboardingCopy.signUndo, identifier: "signature.undo-button", systemImage: "arrow.counterclockwise", enabled: viewModel.canUndo) {
                     viewModel.undoTapped()
                 }
                 secondaryButton(OnboardingCopy.signClear, identifier: "signature.clear-button", enabled: viewModel.canClear) {
                     viewModel.clearTapped()
                 }
             }
-            .padding(.top, ChalkakSpacing.lg)
+            .frame(maxWidth: .infinity)
+            .padding(.top, ChalkakSpacing.xl)
 
             if let message = viewModel.notice?.message ?? carriedNotice?.message {
                 Text(message)
@@ -101,20 +98,11 @@ struct SignatureDrawingStepView: View {
 
             Spacer(minLength: 0)
 
-            Button { Task { await viewModel.confirmTapped() } } label: {
-                Text(OnboardingCopy.signConfirm)
-                    .font(ChalkakFont.callout)
-                    .foregroundStyle(ChalkakColor.onActionPrimary)
-                    .frame(maxWidth: .infinity, minHeight: 56)
-                    .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
-                    .opacity(viewModel.canConfirm ? 1 : 0.3)
-            }
-            .buttonStyle(.plain)
-            .disabled(!viewModel.canConfirm)
-            .accessibilityIdentifier("signature.submit-button")
+            ChalkakButton(title: OnboardingCopy.signConfirm, action: { Task { await viewModel.confirmTapped() } }, isEnabled: viewModel.canConfirm, fillsWidth: true)
+                .accessibilityIdentifier("signature.submit-button")
         }
         .padding(.horizontal, ChalkakSpacing.screenHorizontal)
-        .padding(.bottom, ChalkakSpacing.xl)
+        .padding(.bottom, 18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(ChalkakColor.background.ignoresSafeArea())
         .accessibilityElement(children: .contain)
@@ -133,16 +121,20 @@ struct SignatureDrawingStepView: View {
         }
     }
 
-    private func secondaryButton(_ title: String, identifier: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+    /// 되돌리기·전체 지우기: footnote, 패딩 16/10, Capsule 테두리 border, 비활성은 textMuted (screens-a.md 6.1).
+    private func secondaryButton(_ title: String, identifier: String, systemImage: String? = nil, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title)
-                .font(ChalkakFont.subheadline)
-                .foregroundStyle(ChalkakColor.textPrimary)
-                .padding(.horizontal, ChalkakSpacing.lg)
-                .frame(minHeight: 40)
-                .background(ChalkakColor.inputBackground, in: Capsule())
-                .overlay(Capsule().stroke(ChalkakColor.border, lineWidth: 1))
-                .opacity(enabled ? 1 : 0.3)
+            HStack(spacing: ChalkakSpacing.xs) {
+                if let systemImage {
+                    Image(systemName: systemImage).font(.system(size: 15))
+                }
+                Text(title).font(ChalkakFont.footnote)
+            }
+            .foregroundStyle(enabled ? ChalkakColor.textPrimary : ChalkakColor.textMuted)
+            .padding(.horizontal, ChalkakSpacing.lg)
+            .padding(.vertical, 10)
+            .overlay(Capsule().stroke(ChalkakColor.border, lineWidth: 1))
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .disabled(!enabled)

@@ -13,7 +13,10 @@ void main() {
   late FakeUpdateLauncher launcher;
   late StreamController<void> signals;
 
-  UpdateGate gate({bool enabled = true}) {
+  late FakeAppExit appExit;
+
+  UpdateGate gate({bool enabled = true, bool cancelAvailable = false}) {
+    appExit = FakeAppExit();
     checker = FakeUpdateChecker();
     launcher = FakeUpdateLauncher();
     signals = StreamController<void>.broadcast();
@@ -21,6 +24,8 @@ void main() {
       checker: checker,
       launcher: launcher,
       enabled: enabled,
+      exit: appExit,
+      cancelAvailable: cancelAvailable,
       recheckSignals: signals.stream,
     );
   }
@@ -121,6 +126,53 @@ void main() {
     resolve(async, g.check());
     launcher.error = Exception('user cancelled');
     resolve(async, g.openStore()); // 예외가 밖으로 새지 않는다
+    expect(g.status, UpdateGateStatus.forced);
+    expect(appExit.calls, 0); // iOS 정책: 종료하지 않는다
+  });
+
+  fakeTest('TC-BOOT-031 스토어를 열고 돌아와도 강제 상태면 종료 없이 forced 유지', (async) {
+    final g = gate(cancelAvailable: true);
+    checker.next = () => UpdateStatus.updateRequired;
+    resolve(async, g.check());
+    resolve(async, g.openStore());
+    expect(launcher.calls, 1);
+    expect(appExit.calls, 0);
+    expect(g.status, UpdateGateStatus.forced);
+  });
+
+  fakeTest('TC-BOOT-031 Android에서 스토어를 둘 다 열지 못하면 앱을 종료한다', (async) {
+    final g = gate(cancelAvailable: true);
+    checker.next = () => UpdateStatus.updateRequired;
+    resolve(async, g.check());
+    launcher.opens = false;
+    resolve(async, g.openStore());
+    expect(appExit.calls, 1);
+  });
+
+  fakeTest('TC-BOOT-031 iOS에서 스토어를 열지 못해도 종료하지 않고 forced 유지', (async) {
+    final g = gate();
+    checker.next = () => UpdateStatus.updateRequired;
+    resolve(async, g.check());
+    launcher.opens = false;
+    resolve(async, g.openStore());
+    expect(appExit.calls, 0);
+    expect(g.status, UpdateGateStatus.forced);
+  });
+
+  fakeTest('TC-BOOT-028 "취소"는 Android에서 앱을 종료한다', (async) {
+    final g = gate(cancelAvailable: true);
+    checker.next = () => UpdateStatus.updateRequired;
+    resolve(async, g.check());
+    resolve(async, g.cancel());
+    expect(appExit.calls, 1);
+  });
+
+  fakeTest('TC-BOOT-028 "취소"는 iOS 정책에서는 아무 일도 하지 않는다', (async) {
+    final g = gate();
+    checker.next = () => UpdateStatus.updateRequired;
+    resolve(async, g.check());
+    resolve(async, g.cancel());
+    expect(appExit.calls, 0);
     expect(g.status, UpdateGateStatus.forced);
   });
 

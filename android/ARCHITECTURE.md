@@ -74,7 +74,7 @@ app/src/fcmOff/kotlin/.../platform/FcmTokens.kt            Firebase 없는 빌�
 | `UpdateChecker`·`UpdateLauncher` | `PlayUpdateSourceAdapter`, `PlayUpdateLauncher`(IMMEDIATE, 불가하면 `StoreOpener`로 스토어 열기) | `ConfiguredUpdateChecker`가 `forceUpdateCheck`가 꺼져 있으면 조회 없이 통과시킨다 |
 | `ExternalBrowser` | `AndroidExternalBrowser` | 약관 URL 중 앱 안 허용 호스트가 아닌 것 |
 | `SignatureImageEncoder` | `AndroidSignatureEncoder` | `android.graphics`. 규칙은 순수 `SignaturePngEncoder`와 같다 |
-| `AnalyticsTracker`, `PushRegistrar`, `DeviceRegistrar`, `HomePreloader` | `LogAnalyticsTracker`, `NoopPushRegistrar`, `ReadyHomePreloader` | Firebase·FCM·홈 preload는 이후 PR이 교체 |
+| `AnalyticsTracker`, `HomePreloader` | `LogAnalyticsTracker`, `ReadyHomePreloader` | 푸시 등록은 `PushRegistrationCoordinator`(AppContainer)가 맡는다 |
 
 Activity 참조 규칙: 어댑터는 Activity를 직접 쥐지 않는다. `CurrentActivity`(WeakReference)를 `MainActivity`가 `onCreate`에 등록하고 `onDestroy`에 해제하며, Play 업데이트 결과 launcher(`UpdateFlowBridge.launcher`)도 `onDestroy`에서 해제한다(launcher가 Activity의 result registry를 붙잡기 때문).
 

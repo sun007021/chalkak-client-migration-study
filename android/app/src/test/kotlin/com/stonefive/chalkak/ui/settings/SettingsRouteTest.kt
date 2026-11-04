@@ -1,6 +1,7 @@
 package com.stonefive.chalkak.ui.settings
 
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -29,6 +30,7 @@ import kr.chalkak.core.data.settings.NotificationSettings
 import kr.chalkak.core.data.settings.PushSetting
 import kr.chalkak.core.network.ApiResult
 import kr.chalkak.core.network.ErrorCode
+import kr.chalkak.feature.auth.AccountEffect
 import kr.chalkak.feature.auth.HomeMode
 import kr.chalkak.feature.onboarding.LegalDocuments
 import kr.chalkak.feature.onboarding.TermsKind
@@ -72,6 +74,10 @@ class SettingsRouteTest {
         visible = true
         rule.setContent {
             TestApp(copy) {
+                // The host collects the account effect (it stays composed while the settings route is gone).
+                LaunchedEffect(h.holders.account) {
+                    h.holders.account.effects.collect { if (it == AccountEffect.GoToLogin) accountEnded++ }
+                }
                 if (visible) {
                     SettingsRoute(
                         holders = h.holders,
@@ -81,7 +87,6 @@ class SettingsRouteTest {
                         onChangeSignature = { signatureChanges++ },
                         onShowDocument = { kind, url -> documents += kind to url },
                         onOpenSystemNotificationSettings = { systemSettings++ },
-                        onAccountEnded = { accountEnded++ },
                         onLoginRequired = { logins++ },
                     )
                 }

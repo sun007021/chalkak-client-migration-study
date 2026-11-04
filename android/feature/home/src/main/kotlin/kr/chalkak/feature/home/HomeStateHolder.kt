@@ -2,12 +2,14 @@ package kr.chalkak.feature.home
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -21,6 +23,7 @@ import kr.chalkak.core.data.home.BannerRepository
 import kr.chalkak.core.data.home.HomePost
 import kr.chalkak.core.data.home.HomeRepository
 import kr.chalkak.core.data.home.ModerationStatus
+import kr.chalkak.core.data.upload.PostCreated
 import kr.chalkak.feature.auth.HomeMode
 import java.time.LocalDate
 
@@ -61,6 +64,8 @@ class HomeStateHolder(
     private val analytics: AnalyticsTracker,
     mode: HomeMode,
     private val diagnostics: HomeDiagnostics = HomeDiagnostics.Ignore,
+    /** "A post was created" announcements (`PostCreations.events`): home reloads silently (REQ-UPL-063). */
+    creations: Flow<PostCreated> = emptyFlow(),
 ) {
     private val kst = KstCalendar(clock)
     private val core = HomeCore(mode, diagnostics)
@@ -78,6 +83,10 @@ class HomeStateHolder(
     private var work: Job = newWork()
 
     private enum class LoadKind { Fresh, SilentRefresh, PullRefresh }
+
+    init {
+        scope.launch(start = CoroutineStart.UNDISPATCHED) { creations.collect { onPostCreated() } }
+    }
 
     // ---- lifecycle ------------------------------------------------------------------------------
 
@@ -117,6 +126,15 @@ class HomeStateHolder(
     fun onNotificationInboxClosed() = recheckUnread()
 
     fun onPushReceived() = recheckUnread()
+
+    /**
+     * A post was uploaded (REQ-UPL-063, TC-HOME-047): hero, AI card and week row reload silently, also while home is covered, so the
+     * new state is already there when it is shown again. Before the first load there is nothing to refresh ([onShown] loads).
+     */
+    private fun onPostCreated() {
+        if (!started || !core.member) return
+        startLoad(if (dateChanged()) LoadKind.Fresh else LoadKind.SilentRefresh)
+    }
 
     private fun dateChanged(): Boolean = loadDate != kst.today()
 

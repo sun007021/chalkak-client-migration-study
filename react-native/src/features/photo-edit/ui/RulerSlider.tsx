@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react';
-import { StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
+import { StyleSheet, View, type GestureResponderEvent } from 'react-native';
 
-import { colors } from '../../../shared/ui/theme';
+import { colors, typography } from '../../../shared/design/tokens';
 import {
   RULER_DP_PER_UNIT,
   RULER_TICKS_PER_UNIT,
@@ -9,10 +9,12 @@ import {
   isMajorTick,
   tickValue,
 } from '../RulerScale';
+import { Text } from '../../../shared/ui/Text';
 
 /** 멈칫하는 범위(값 단위). 눈금 한 칸(0.02) 안이면 기준값으로 붙는다. */
 const DETENT_RANGE = 0.02;
 const VIEW_HEIGHT = 56;
+// 원본 룰러(screens-b.md §6.2): 눈금 폭 2 · 높이 20 · 둥근 끝, 불투명도 기본 0.4 / 10칸마다 0.75, 표시선 폭 2 · 높이 40.
 
 export type RulerSliderProps = {
   testID: string;
@@ -99,19 +101,28 @@ export function RulerSlider({
 
 const styles = StyleSheet.create({
   root: { height: VIEW_HEIGHT + 24, alignItems: 'center', justifyContent: 'center' },
-  value: { fontSize: 14, fontWeight: '600', color: '#FFFFFF', marginBottom: 4 },
-  window: { width: '100%', height: VIEW_HEIGHT - 24, overflow: 'hidden' },
+  value: { ...typography.footnote, color: colors.editorContent, marginBottom: 4 },
+  window: { width: '100%', height: VIEW_HEIGHT - 12, overflow: 'hidden', justifyContent: 'center' },
   // 가운데(0점)를 원점으로 눈금을 놓는다.
   strip: { position: 'absolute', left: '50%', top: 0, bottom: 0, width: 0 },
-  tick: { position: 'absolute', top: 12, width: 1, height: 8, backgroundColor: '#8A8A8A' },
-  major: { top: 6, height: 20, backgroundColor: '#FFFFFF' },
+  tick: {
+    position: 'absolute',
+    top: 12,
+    width: 2,
+    height: 20,
+    borderRadius: 1,
+    backgroundColor: colors.editorContent,
+    opacity: 0.4,
+  },
+  major: { opacity: 0.75 },
   indicator: {
     position: 'absolute',
     left: '50%',
     top: 2,
-    bottom: 2,
+    height: 40,
     width: 2,
+    borderRadius: 1,
     marginLeft: -1,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.editorContent,
   },
 });

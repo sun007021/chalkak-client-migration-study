@@ -11,9 +11,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,7 +21,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.stonefive.chalkak.R
@@ -56,17 +61,25 @@ fun LoginScreen(
 ) {
     val copy = LocalCopy.current
     val colors = ChalkakTheme.colors
+    val spacing = ChalkakTheme.spacing
     Box(modifier = modifier.fillMaxSize().background(colors.background).testTag("login.root")) {
         Column(modifier = Modifier.fillMaxSize()) {
+            // Header (screens-a 4.4): faded photo behind the display-size tagline; 1.2 : 1 against the actions.
             Box(modifier = Modifier.weight(1.2f).fillMaxWidth()) {
+                Image(
+                    painter = painterResource(R.drawable.img_login_background),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alpha = 0.2f,
+                    modifier = Modifier.fillMaxSize(),
+                )
                 Text(
                     text = copy["auth.login.tagline"],
                     color = colors.textPrimary,
-                    style = MaterialTheme.typography.displayLarge,
-                    fontWeight = FontWeight.Bold,
+                    style = ChalkakTheme.typography.display,
                     modifier = Modifier
                         .statusBarsPadding()
-                        .padding(start = 24.dp, top = 110.dp, end = 24.dp)
+                        .padding(start = spacing.screenHorizontal, top = 110.dp, end = spacing.screenHorizontal)
                         .testTag("login.tagline"),
                 )
             }
@@ -75,23 +88,25 @@ fun LoginScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 32.dp),
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = spacing.screenHorizontal, vertical = spacing.xxl),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing.lg),
             ) {
                 KakaoButton(text = copy["auth.login.kakao"], enabled = !state.busy, onClick = onKakaoClick)
-                TextButton(
-                    onClick = onGuestClick,
-                    enabled = !state.busy,
-                    modifier = Modifier.testTag("login.guest-button"),
-                ) {
-                    Text(
-                        text = copy["auth.login.guest"],
-                        color = if (state.busy) colors.textInactive else colors.textNeutral,
-                        style = MaterialTheme.typography.bodySmall,
-                        textDecoration = TextDecoration.Underline,
-                    )
-                }
+                Text(
+                    text = copy["auth.login.guest"],
+                    color = if (state.busy) colors.textInactive else colors.textSecondary,
+                    style = ChalkakTheme.typography.subheadline,
+                    textDecoration = TextDecoration.Underline,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .clickable(enabled = !state.busy, role = Role.Button, onClick = onGuestClick)
+                        .wrapContentHeight(Alignment.CenterVertically)
+                        .padding(horizontal = spacing.sm)
+                        .testTag("login.guest-button"),
+                )
             }
         }
         if (state.busy) {
@@ -119,6 +134,7 @@ private fun KakaoButton(text: String, enabled: Boolean, onClick: () -> Unit) {
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier.fillMaxWidth().testTag("login.kakao-button"),
+        containerColor = ChalkakTheme.colors.inputBackground,
         leading = { Image(painter = painterResource(R.drawable.img_kakao_logo), contentDescription = null, modifier = Modifier.size(20.dp)) },
     )
 }

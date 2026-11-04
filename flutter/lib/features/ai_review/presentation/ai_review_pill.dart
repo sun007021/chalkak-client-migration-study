@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_button.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/ai_review_session.dart';
 import '../domain/ai_review_state.dart';
@@ -39,16 +41,18 @@ class AiReviewPill extends StatelessWidget {
       builder: (context, state) {
         final id = _id(state.pill);
         if (id == null) return const SizedBox.shrink();
-        final theme = Theme.of(context);
+        final tokens = context.tokens;
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TestId.button(
               id,
-              child: FilledButton.tonal(
+              child: ChalkakButton(
                 onPressed: state.pill.enabled ? session.onPillPressed : null,
-                child: Text(state.pill.label!),
+                label: state.pill.label!,
+                fillsWidth: false,
+                verticalPadding: 10,
               ),
             ),
             if (state.notice != null)
@@ -56,7 +60,12 @@ class AiReviewPill extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 8),
                 child: TestId(
                   AiReviewTestIds.feedMessage,
-                  child: Text(state.notice!, style: theme.textTheme.bodySmall),
+                  child: Text(
+                    state.notice!,
+                    style: tokens.text.footnote.copyWith(
+                      color: tokens.colors.textMuted,
+                    ),
+                  ),
                 ),
               ),
           ],

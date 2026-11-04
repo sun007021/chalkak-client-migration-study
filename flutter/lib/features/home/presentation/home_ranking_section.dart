@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/ui/app_network_image.dart';
+import '../../../core/ui/components/chalkak_icon.dart';
+import '../../../core/ui/components/chalkak_skeleton.dart';
+import '../../../core/ui/components/chalkak_states.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/home_models.dart';
 import '../domain/home_state.dart';
@@ -28,7 +32,8 @@ class RankingTestIds {
   final String Function(String postId) likeButton;
 }
 
-/// 제목, 더보기, 사진 가로 목록(최대 5장)과 로딩·빈·오류 상태.
+/// 랭킹 행(screens-a §7.7): 헤더(제목 + 보러가기), 82x82 사진 카드 가로 목록(최대 5장, 간격 lg).
+/// 안드로이드 원본처럼 목록이 화면 끝까지 스크롤된다(contentPadding screenHorizontal).
 class HomeRankingSection extends StatelessWidget {
   const HomeRankingSection({
     super.key,
@@ -49,13 +54,18 @@ class HomeRankingSection extends StatelessWidget {
   final void Function(String postId) onLikePressed;
   final VoidCallback onRetry;
 
+  /// HomeRankingRow 카드 한 변.
+  static const double _itemSize = 82;
+
   @override
   Widget build(BuildContext context) {
     final ranking = this.ranking;
+    final tokens = context.tokens;
+    final spacing = tokens.spacing;
     return TestId(
       ids.section,
       child: Padding(
-        padding: const EdgeInsets.only(top: 24),
+        padding: EdgeInsets.only(top: spacing.xxl),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -64,26 +74,32 @@ class HomeRankingSection extends StatelessWidget {
               moreLinkId: ids.moreLink,
               onPressed: onMorePressed,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: spacing.lg),
             switch (ranking) {
-              RankingLoading() => const SizedBox(
-                height: _itemSize,
-                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              RankingLoading() => Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: spacing.screenHorizontal,
+                ),
+                child: const _ItemSkeletons(),
               ),
               RankingReady(:final posts) when posts.isEmpty => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(
+                  horizontal: spacing.screenHorizontal,
+                ),
                 child: TestId(
                   ids.empty,
-                  child: const Text(Copy.homeRankingEmpty),
+                  child: const ChalkakStatusText(Copy.homeRankingEmpty),
                 ),
               ),
               RankingReady(:final posts) => SizedBox(
                 height: _itemSize,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: spacing.screenHorizontal,
+                  ),
                   itemCount: posts.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  separatorBuilder: (_, _) => SizedBox(width: spacing.lg),
                   itemBuilder: (context, index) => _Item(
                     post: posts[index],
                     ids: ids,
@@ -104,10 +120,33 @@ class HomeRankingSection extends StatelessWidget {
       ),
     );
   }
-
-  static const double _itemSize = 140;
 }
 
+class _ItemSkeletons extends StatelessWidget {
+  const _ItemSkeletons();
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return SizedBox(
+      height: HomeRankingSection._itemSize,
+      child: Row(
+        children: [
+          for (var i = 0; i < 3; i++) ...[
+            if (i > 0) SizedBox(width: tokens.spacing.lg),
+            ChalkakSkeleton(
+              width: HomeRankingSection._itemSize,
+              height: HomeRankingSection._itemSize,
+              borderRadius: BorderRadius.circular(tokens.radius.small),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 섹션 헤더: 제목(headline bold) + 오른쪽 "보러가기" caption + chevron 12. 줄 전체가 하나의 링크다.
 class _Header extends StatelessWidget {
   const _Header({
     required this.title,
@@ -121,19 +160,42 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      // 제목과 화살표 전체가 하나의 "더보기" 링크다.
+      padding: EdgeInsets.symmetric(
+        horizontal: tokens.spacing.screenHorizontal,
+      ),
       child: TestId.button(
         moreLinkId,
-        child: InkWell(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: onPressed,
-          borderRadius: BorderRadius.circular(8),
-          child: Row(
-            children: [
-              Text(title, style: Theme.of(context).textTheme.titleMedium),
-              const Icon(Icons.chevron_right),
-            ],
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: tokens.text.headline.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Text(
+                  Copy.homeWeeklyMore,
+                  style: tokens.text.caption.copyWith(
+                    color: tokens.colors.textPrimary,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                ChalkakIcon(
+                  ChalkakIcon.chevronRight,
+                  size: 12,
+                  color: tokens.colors.textPrimary,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -156,6 +218,7 @@ class _Item extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return SizedBox.square(
       dimension: HomeRankingSection._itemSize,
       child: Stack(
@@ -163,24 +226,22 @@ class _Item extends StatelessWidget {
           Positioned.fill(
             child: TestId(
               ids.item(post.id),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    AppNetworkImage(url: post.thumbnailImageUrl),
-                    Material(
-                      type: MaterialType.transparency,
-                      child: InkWell(onTap: onPressed),
-                    ),
-                  ],
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onPressed,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(tokens.radius.small),
+                  child: ColoredBox(
+                    color: tokens.colors.calendarCell,
+                    child: AppNetworkImage(url: post.thumbnailImageUrl),
+                  ),
                 ),
               ),
             ),
           ),
           Positioned(
-            right: 4,
-            bottom: 4,
+            right: tokens.spacing.xs,
+            bottom: tokens.spacing.xs,
             child: _LikeBadge(
               selected: post.isLiked,
               count: post.likeCount,
@@ -194,6 +255,7 @@ class _Item extends StatelessWidget {
   }
 }
 
+/// 사진 위 좋아요 칩: scrim 캡슐 + 하트 아이콘(빈/찬) + 개수(caption, textOnImage).
 class _LikeBadge extends StatelessWidget {
   const _LikeBadge({
     required this.selected,
@@ -209,30 +271,39 @@ class _LikeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return TestId.button(
       buttonId,
       child: Semantics(
         selected: selected,
-        child: Material(
-          color: Colors.black.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            onTap: onPressed,
-            borderRadius: BorderRadius.circular(16),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onPressed,
+          child: DecoratedBox(
+            decoration: ShapeDecoration(
+              color: tokens.colors.scrim,
+              shape: const StadiumBorder(),
+            ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    selected ? Icons.favorite : Icons.favorite_border,
-                    size: 16,
-                    color: selected ? Colors.redAccent : Colors.white,
+                  ChalkakIcon(
+                    selected ? ChalkakIcon.heartFilled : ChalkakIcon.heart,
+                    size: 12,
+                    color: selected
+                        ? tokens.colors.destructive
+                        : tokens.colors.textOnImage,
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 3),
                   Text(
                     '$count',
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    style: tokens.text.caption.copyWith(
+                      color: tokens.colors.textOnImage,
+                      fontSize: 11,
+                      height: 14 / 11,
+                    ),
                   ),
                 ],
               ),
@@ -260,15 +331,24 @@ class _Error extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: EdgeInsets.symmetric(
+        horizontal: context.tokens.spacing.screenHorizontal,
+      ),
       child: Row(
         children: [
-          Expanded(child: TestId(errorId, child: Text(message))),
+          Expanded(child: TestId(errorId, child: ChalkakStatusText(message))),
           TestId.button(
             retryId,
-            child: TextButton(
-              onPressed: onRetry,
-              child: const Text(Copy.commonRetry),
+            child: Semantics(
+              button: true,
+              label: Copy.commonRetry,
+              excludeSemantics: true,
+              onTap: onRetry,
+              child: ChalkakRetryCircleButton(
+                onPressed: onRetry,
+                size: 32,
+                iconSize: 15,
+              ),
             ),
           ),
         ],

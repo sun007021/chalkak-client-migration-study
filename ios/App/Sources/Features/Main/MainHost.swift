@@ -35,26 +35,26 @@ struct MainView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var entries: [StackEntry] = []
     @State private var nextEntryID = 0
+    /// 전시 사진 → 피드 줌 전환의 출발·도착 연결.
+    @Namespace private var feedZoomNamespace
+    /// 스크롤하면 Liquid Glass 하단 바를 줄인다(iOS 26 미만에서는 쓰이지 않는다).
+    @State private var isBottomBarCompact = false
 
     var body: some View {
         let shell = session.shell
         NavigationStack(path: pathBinding) {
-            // 하단 바는 safeAreaInset이 아니라 내용 아래에 쌓는다. safeAreaInset은 스크롤 내용이 바 밑까지 이어져
-            // 첫 화면의 아래쪽 하트가 바에 가려 눌리지 않는다. 쌓으면 스크롤 영역이 바 위에서 끝난다.
-            VStack(spacing: 0) {
-                tabContent(shell.selectedTab)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                if shell.isBottomBarVisible {
-                    ChalkakBottomBar(
-                        selectedTab: shell.selectedTab,
-                        onSelect: { tab in
-                            // 전시 탭을 다시 누르면 맨 위로 + 재검증(REQ-DISP-029).
-                            if shell.selectTab(tab) == .reselected, tab == .display {
-                                Task { await session.display?.tabReselected() }
-                            }
-                        },
-                        onUpload: { Task { await shell.startUpload() } }
-                    )
+            // 평면 바는 내용 아래에 쌓는다. safeAreaInset은 스크롤 내용이 바 밑까지 이어져 첫 화면의 아래쪽 하트가
+            // 바에 가려 눌리지 않았다(#83). Liquid Glass 바는 원본 ContentView처럼 safeAreaInset으로 띄워
+            // 스크롤 내용이 유리 밑으로 비치게 한다(스크롤 끝은 바 위에서 멈춘다).
+            Group {
+                if ChalkakPlatformAppearance.usesLiquidGlass {
+                    tabContentArea(shell.selectedTab)
+                        .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar(shell) }
+                } else {
+                    VStack(spacing: 0) {
+                        tabContentArea(shell.selectedTab)
+                        bottomBar(shell)
+                    }
                 }
             }
             .background(ChalkakColor.background.ignoresSafeArea())
@@ -64,6 +64,7 @@ struct MainView: View {
                     .toolbar(.hidden, for: .navigationBar)
             }
         }
+        .environment(\.feedZoomNamespace, feedZoomNamespace)
         .overlay { SettingsAccountDialogs(account: session.settings.account) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("main.root")
@@ -76,6 +77,7 @@ struct MainView: View {
                 Task { await session.home.notificationsClosed() }
             }
         }
+        .onChange(of: shell.selectedTab) { _, _ in isBottomBarCompact = false }
         .onChange(of: shell.needsLogin) { _, needsLogin in
             guard needsLogin else { return }
             shell.consumeNeedsLogin()
@@ -104,6 +106,42 @@ struct MainView: View {
         }
     }
 
+    private func tabContentArea(_ tab: MainTab) -> some View {
+        tabContent(tab)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .chalkakBottomBarScrollBehavior(isCompact: $isBottomBarCompact)
+    }
+
+    @ViewBuilder
+    private func bottomBar(_ shell: MainShellViewModel) -> some View {
+        if shell.isBottomBarVisible {
+            ChalkakBottomBar(
+                selectedTab: shell.selectedTab,
+                isCompact: $isBottomBarCompact,
+                onSelect: { tab in
+                    // 전시 탭을 다시 누르면 맨 위로 + 재검증(REQ-DISP-029).
+                    if shell.selectTab(tab) == .reselected, tab == .display {
+                        Task { await session.display?.tabReselected() }
+                    }
+                },
+                onUpload: { Task { await shell.startUpload() } }
+            )
+            .padding(.horizontal, bottomBarHorizontalPadding)
+            .padding(.bottom, bottomBarBottomPadding)
+            .animation(.smooth(duration: 0.75), value: isBottomBarCompact)
+        }
+    }
+
+    // 원본 ContentView: Liquid Glass일 때만 좌우 lg+xs(줄이면 xxl+xs), 아래 sm 여백. 평면 바는 화면 폭 그대로.
+    private var bottomBarHorizontalPadding: CGFloat {
+        guard ChalkakPlatformAppearance.usesLiquidGlass else { return 0 }
+        return (isBottomBarCompact ? ChalkakSpacing.xxl : ChalkakSpacing.lg) + ChalkakSpacing.xs
+    }
+
+    private var bottomBarBottomPadding: CGFloat {
+        ChalkakPlatformAppearance.usesLiquidGlass ? ChalkakSpacing.sm : 0
+    }
+
     @ViewBuilder
     private func tabContent(_ tab: MainTab) -> some View {
         switch tab {
@@ -127,6 +165,7 @@ struct MainView: View {
             IssueWebScreen(container: container, url: url, onBack: { shell.pop() })
         case .feed(let entry):
             FeedScreen(container: container, session: session, entry: entry)
+                .feedZoomDestination(postID: entry.feedPostID, enabled: shell.selectedTab == .display)
         case .notifications:
             NotificationInboxScreen(container: container, session: session)
         case .notificationDetail(let notificationId):

@@ -33,7 +33,13 @@ async function renderApp(mode: 'member' | 'guest', extra: Record<string, RouteVa
         api: net.api,
         analytics,
         push: { permission },
-        appInfo: { platform: 'ios', bundleId: 'b', version: '1.1.1', appStoreId: null },
+        appInfo: {
+          platform: 'ios',
+          bundleId: 'b',
+          version: '1.1.1',
+          appStoreId: null,
+          iosFcmEnabled: false,
+        },
       }}
     />,
   );

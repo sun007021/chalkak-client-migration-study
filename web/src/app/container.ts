@@ -40,6 +40,13 @@ import { AttachableHomeNavigator } from '../features/home/AttachableHomeNavigato
 import { HomeViewModel } from '../features/home/HomeViewModel';
 import { DisplayRepository } from '../features/display/DisplayRepository';
 import { DisplayViewModel } from '../features/display/DisplayViewModel';
+import { RecordViewModel } from '../features/record/RecordViewModel';
+import { RecordRepository } from '../features/record/RecordRepository';
+import { CanvasCalendarImageExporter } from '../features/record/CalendarImageExporter';
+import type { CalendarImageExporter } from '../features/record/CalendarImageExporter';
+import { AnchorFileDownloader } from '../features/record/FileDownloader';
+import type { FileDownloader } from '../features/record/FileDownloader';
+import { AttachableRecordNavigator } from '../features/record/recordNavigation';
 import { FeedRepository } from '../features/feed/FeedRepository';
 import { FeedViewModel } from '../features/feed/FeedViewModel';
 import type { FeedNavigator } from '../features/feed/FeedViewModel';
@@ -68,14 +75,41 @@ import { SignaturePreviewViewModel } from '../features/signature/SignaturePrevie
 import { CanvasSignatureRasterizer } from '../features/signature/SignatureRasterizer';
 import type { SignatureRasterizer } from '../features/signature/SignatureRasterizer';
 import { SignatureRepository } from '../features/signature/SignatureRepository';
+import { FeedbackRepository } from '../features/feedback/FeedbackRepository';
+import { FeedbackViewModel } from '../features/feedback/FeedbackViewModel';
+import { NotificationSettingsRepository } from '../features/settings/NotificationSettingsRepository';
+import { NotificationSettingsStore } from '../features/settings/NotificationSettingsStore';
+import { SettingsViewModel } from '../features/settings/SettingsViewModel';
 import { GuestGate } from '../features/shell/GuestGate';
 import { MainShellViewModel } from '../features/shell/MainShellViewModel';
-import { NoopUploadEntry } from '../features/shell/UploadEntry';
 import type { UploadEntry } from '../features/shell/UploadEntry';
+import { BrowserImageDecoder, BrowserWebpCompressor } from '../features/upload/browserImage';
+import { BrowserCameraCaptureSupport } from '../features/upload/CameraCaptureSupport';
+import type { CameraCaptureSupport } from '../features/upload/CameraCaptureSupport';
+import type { EditRenderer, ImageDecoder, WebpCompressor } from '../features/upload/imagePorts';
+import { PhotoPreparer } from '../features/upload/PhotoPreparer';
+import type { PhotoEditorComponent } from '../features/upload/photoEditor';
+import { CanvasAutoAnalyzer, CanvasPreviewRenderer } from '../features/upload/editor/canvasPorts';
+import { CanvasEditRenderer, createCanvasPixelSurface } from '../features/upload/editor/CanvasEditRenderer';
+import type { AutoAnalyzer, PixelSurfaceFactory, PreviewRenderer, RenderScheduler } from '../features/upload/editor/editorPorts';
+import { createPhotoEditor } from '../features/upload/editor/PhotoEditorScreen';
+import { UploadGate } from '../features/upload/UploadGate';
+import { AttachableUploadNavigator } from '../features/upload/UploadNavigator';
+import { UploadRepository } from '../features/upload/UploadRepository';
+import { UploadResultStore } from '../features/upload/UploadResult';
+import { UploadViewModel } from '../features/upload/UploadViewModel';
 import type { SessionMode } from '../features/boot/authGate';
 import { BootViewModel } from '../features/boot/BootViewModel';
 import { NoopHomePreloader } from '../features/boot/HomePreloader';
 import type { HomePreloader } from '../features/boot/HomePreloader';
+import { AiReviewRepository } from '../features/aireview/AiReviewRepository';
+import { AiReviewStore } from '../features/aireview/AiReviewStore';
+import { FeedAiViewModel } from '../features/aireview/FeedAiViewModel';
+import { AttachableNotificationNavigator } from '../features/notification/notificationNavigation';
+import { NotificationDetailViewModel } from '../features/notification/NotificationDetailViewModel';
+import { NotificationInboxViewModel } from '../features/notification/NotificationInboxViewModel';
+import { NotificationRepository } from '../features/notification/NotificationRepository';
+import type { NotificationSync } from '../features/notification/notificationSync';
 import { SIGNATURE_PNG_SIZE } from '../constants';
 import { DEV_SESSION_ENABLED } from './devSession';
 import { ROUTES } from './paths';
@@ -109,8 +143,30 @@ export interface AppContainerOptions {
   sessionChannel?: SessionChannel;
   /** 목록 끝 센티넬이 보이는지 보는 수단. 기본 IntersectionObserver(없는 환경이면 null=자동 다음 페이지 읽기 없음). */
   visibilityObserver?: VisibilityObserverFactory | null;
-  /** 업로드 버튼(회원)이 부르는 진입. 기본 NoopUploadEntry. */
+  /** presigned 업로드 URL에 loopback http를 허용할지. 기본은 개발 빌드(__UPLOAD_PROXY_ENABLED__)에서만 true, 배포 빌드는 https만. */
+  allowLoopbackUploadHttp?: boolean;
+  /** 설정 버전정보 행의 값(빌드 버전 문자열). 기본은 package.json의 version(빌드 define). */
+  appVersion?: string;
+  /** 업로드 버튼(회원)이 부르는 진입. 기본 UploadGate(container.uploadGate). 테스트가 Fake로 덮어쓰면 uploadGate는 null. */
   uploadEntry?: UploadEntry;
+  /** 사진 디코드(EXIF 반영·다운샘플). 기본 BrowserImageDecoder. */
+  imageDecoder?: ImageDecoder;
+  /** WebP 한 번 압축. 기본 BrowserWebpCompressor(canvas, 안 되면 WASM). */
+  webpCompressor?: WebpCompressor;
+  /** 편집값 적용. 기본 CanvasEditRenderer(pixelSurface 위). */
+  editRenderer?: EditRenderer;
+  /** 카메라 버튼 표시 판정. 기본 BrowserCameraCaptureSupport. */
+  cameraCapture?: CameraCaptureSupport;
+  /** 편집기 화면(W7b). 생략하면 실제 편집기(createPhotoEditor), 명시적 null이면 편집기 없음(고른 사진은 편집하지 않은 값으로 바로 확정). */
+  photoEditor?: PhotoEditorComponent | null;
+  /** 편집기 미리보기·썸네일 렌더. 기본 CanvasPreviewRenderer. */
+  previewRenderer?: PreviewRenderer;
+  /** 자동 보정 분석. 기본 CanvasAutoAnalyzer. */
+  autoAnalyzer?: AutoAnalyzer;
+  /** 편집기 렌더 요청을 한 프레임으로 모으는 수단. 주면 실제 화면 모드(필터 썸네일은 필터 탭에서만 그린다)이고, 생략하면 변경마다 바로 요청한다(테스트). 앱 진입점(bootstrap)이 BrowserRenderScheduler를 준다. */
+  renderScheduler?: RenderScheduler;
+  /** 편집 결과를 그리는 픽셀 표면. 기본 createCanvasPixelSurface(canvas). */
+  pixelSurface?: PixelSurfaceFactory;
   /** 약관 문서를 새 탭으로 여는 수단. 기본 WindowExternalLinkOpener. */
   externalLinkOpener?: ExternalLinkOpener;
   /** 사인 PNG 내보내기. 기본 CanvasSignatureRasterizer(canvas). */
@@ -119,6 +175,10 @@ export interface AppContainerOptions {
   blobUrls?: BlobUrlFactory;
   /** presigned PUT 주소 재작성(개발 프록시). 기본 그대로. */
   uploadUrlRewriter?: UploadUrlRewriter;
+  /** 기록 탭 달력 이미지 렌더(PNG Blob). 기본 CanvasCalendarImageExporter(canvas). */
+  calendarImageExporter?: CalendarImageExporter;
+  /** 기록 탭 이미지 저장(파일 다운로드). 기본 AnchorFileDownloader(`<a download>`). */
+  fileDownloader?: FileDownloader;
 }
 
 export interface AppContainer {
@@ -142,6 +202,18 @@ export interface AppContainer {
   devSessionEnabled: boolean;
   guestGate: GuestGate;
   uploadEntry: UploadEntry;
+  /** 기본 진입 구현. options.uploadEntry를 주면 null. 라우트 루트의 UploadEntryLoading이 checking을 구독한다. */
+  uploadGate: UploadGate | null;
+  /** 게이트가 화면을 여는 통로. 라우트 루트가 마운트되는 동안 RouterUploadNavigator를 꽂는다. */
+  uploadNavigator: AttachableUploadNavigator;
+  uploadRepository: UploadRepository;
+  photoPreparer: PhotoPreparer;
+  /** 업로드 화면 → 성공 화면 사이 결과(메모리). 계정 전환 때 비운다. */
+  uploadResults: UploadResultStore;
+  cameraCapture: CameraCaptureSupport;
+  photoEditor: PhotoEditorComponent | null;
+  /** 업로드 준비가 쓰는 편집값 적용. 기본 CanvasEditRenderer(W7b). */
+  editRenderer: EditRenderer;
   /** 다른 탭의 로그아웃·계정 전환을 받는다. 라우트 루트가 마운트될 때 start()한다. */
   crossTabSync: CrossTabSessionSync;
   /** 인증 헤더 없는 presigned PUT(사진·사인). */
@@ -155,12 +227,26 @@ export interface AppContainer {
   /** 설정 사인 카드가 쓸 데이터. 사인 변경 성공 뒤 재조회한다. UserCaches에 등록되어 계정 전환 시 비워진다. */
   signatureCard: SignatureCardController;
   homeRepository: HomeRepository;
+  /** 설정 버전정보 행의 값. */
+  appVersion: string;
+  /** 푸시 수신 설정(W11). UserCaches에 등록되어 계정 전환 시 비워진다. */
+  notificationSettings: NotificationSettingsStore;
+  feedbackRepository: FeedbackRepository;
   /** 공개 API(/banners). 토큰을 붙이지 않는다. */
   bannerRepository: BannerRepository;
   signupService: SignupService;
   changeSignatureService: ChangeSignatureService;
   displayRepository: DisplayRepository;
+  recordRepository: RecordRepository;
+  /** 기록 탭 달력 이미지 렌더(W9). 기본 canvas 구현. */
+  calendarImageExporter: CalendarImageExporter;
+  /** 기록 탭 이미지 저장(W9). 기본 `<a download>` 구현. */
+  fileDownloader: FileDownloader;
   feedRepository: FeedRepository;
+  /** AI 피드백 공용 저장소(W8): 홈 카드와 상세 알약이 같은 상태를 본다. 계정 전환 때 UserCaches가 reset한다. */
+  aiReviews: AiReviewStore;
+  /** 알림함 API(W10): 목록·상세·읽음. */
+  notificationRepository: NotificationRepository;
   likeRepository: LikeRepository;
   /** 게시물 변경 이벤트 통로(like·title·removed). 계정 전환 때 UserCaches가 삭제 기억을 비운다. */
   postChanges: PostChanges;
@@ -177,6 +263,10 @@ export interface AppContainer {
   /** 메인 셸이 마운트될 때마다 새 ViewModel을 만든다. */
   createMainShellViewModel(mode: SessionMode): MainShellViewModel;
   createTermsViewModel(): TermsViewModel;
+  /** 설정 탭이 마운트될 때마다 새 ViewModel을 만든다. */
+  createSettingsViewModel(mode: SessionMode): SettingsViewModel;
+  /** 피드백 화면이 마운트될 때마다 새 ViewModel을 만든다. */
+  createFeedbackViewModel(): FeedbackViewModel;
   /**
    * 홈 ViewModel은 모드별로 하나를 보관한다(REQ-HOME-040: 탭을 오가도 화면을 비우지 않고 다시 보일 때 조용히 갱신).
    * 다른 모드(게스트 ↔ 회원)를 요청하면 이전 것은 dispose한다. 계정 전환·로그아웃 때는 UserCaches가 처음 상태로 돌린다(보이고 있으면 곧바로 재로드).
@@ -188,11 +278,28 @@ export interface AppContainer {
    * 계정 전환·로그아웃 때는 UserCaches가 resetForAccountChange로 처음 상태로 돌린다. 화면은 navigator.attach로 실제 이동 수단을 꽂는다.
    */
   displaySession(mode: SessionMode): { viewModel: DisplayViewModel; navigator: AttachablePostNavigator };
+  /**
+   * 알림함 ViewModel은 하나를 보관한다(상세·피드에 갔다 와도 목록이 남는다). 회원 전용이라 모드가 없다. 계정 전환·로그아웃 때는 UserCaches가 resetForAccountChange로 처음 상태로 돌린다.
+   * 화면은 navigator.attach로 실제 이동 수단을 꽂고, 보이는 동안 viewModel.onShown/onHidden을 부른다.
+   */
+  inboxSession(): { viewModel: NotificationInboxViewModel; navigator: AttachableNotificationNavigator };
+  /** 알림 상세 화면이 마운트될 때마다 새 ViewModel을 만든다. 404이면 알림함(inboxSession의 revalidate)과 홈 미읽음(homeSession의 refreshUnread)을 갱신한다. */
+  createNotificationDetailViewModel(args: { notificationId: string }): NotificationDetailViewModel;
+  /**
+   * 기록 ViewModel도 모드별로 하나를 보관한다(피드·전시에 갔다 와도 달·날짜·캐시가 남는다). 다른 모드를 요청하면 이전 것은 dispose한다.
+   * 계정 전환·로그아웃 때는 UserCaches가 resetForAccountChange로 처음 상태로 돌린다. 화면은 navigator.attach로 실제 이동 수단을 꽂는다.
+   * PostChanges(created·removed)는 ViewModel이 직접 구독한다.
+   */
+  recordSession(mode: SessionMode): { viewModel: RecordViewModel; navigator: AttachableRecordNavigator };
   /** 상세 화면이 마운트될 때마다 새 ViewModel을 만든다. 저장된 userId는 store에서 읽는다. */
   createFeedViewModel(args: { postId: string; seed: PostSeed | null; assumeMine?: boolean; navigator: FeedNavigator }): FeedViewModel;
+  /** 상세 화면의 AI 영역(알약·시트). 상세가 마운트될 때마다 새로 만든다. openAiReview는 location.state에서 읽은 값. */
+  createFeedAiViewModel(args: { postId: string; openAiReview: boolean; onOpenAiReviewConsumed?: () => void }): FeedAiViewModel;
   /** 빈 패드(1024×512)로 시작한다. */
   createSignatureDrawViewModel(mode: SignatureMode): SignatureDrawViewModel;
   createSignaturePreviewViewModel(mode: SignatureMode, png: Blob): SignaturePreviewViewModel;
+  /** 업로드 화면이 마운트될 때마다 새 ViewModel을 만든다. topicDate는 게이트가 고정한 값(location.state). */
+  createUploadViewModel(topicDate: string): UploadViewModel;
 }
 
 /**
@@ -270,21 +377,84 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     window: globalThis.window,
   });
   holder.sync = crossTabSync;
-  const presignedUploader = new PresignedUploader({ fetch: fetchImpl, clock, logger, urlRewriter: options.uploadUrlRewriter });
+  const presignedUploader = new PresignedUploader({ fetch: fetchImpl, clock, logger, urlRewriter: options.uploadUrlRewriter, allowLoopbackHttp: options.allowLoopbackUploadHttp ?? __UPLOAD_PROXY_ENABLED__ });
   const signatureRepository = new SignatureRepository({ api });
   const signatureCard = new SignatureCardController({ repository: signatureRepository, toast });
   userCaches.register(signatureCard);
+  const notificationSettings = new NotificationSettingsStore({ repository: new NotificationSettingsRepository({ api }), toast });
+  userCaches.register(notificationSettings);
+  const feedbackRepository = new FeedbackRepository({ api });
   let homeSession: { mode: SessionMode; viewModel: HomeViewModel; navigator: AttachableHomeNavigator } | null = null;
   userCaches.register({ clear: () => homeSession?.viewModel.resetForAccountChange() });
   const postChanges = new PostChanges();
   const likeRepository = new LikeRepository({ api });
   const likes = new PostLikeStore({ repository: likeRepository, changes: postChanges, toast });
+  let inboxSession: { viewModel: NotificationInboxViewModel; navigator: AttachableNotificationNavigator } | null = null;
+  // 알림 화면이 홈 미읽음 점·알림함 목록을 갱신하는 통로. 해당 ViewModel이 아직 없으면(예: 홈을 거치지 않은 직접 진입) 아무 일도 없다.
+  const notificationSync: NotificationSync = {
+    refreshUnread: async () => {
+      if (homeSession?.mode === 'member') await homeSession.viewModel.refreshUnread();
+    },
+    refreshInbox: async () => {
+      await inboxSession?.viewModel.revalidate();
+    },
+  };
   let displaySession: { mode: SessionMode; viewModel: DisplayViewModel; navigator: AttachablePostNavigator } | null = null;
   userCaches.register({
     clear: () => {
       likes.reset();
       postChanges.reset();
       displaySession?.viewModel.resetForAccountChange();
+    },
+  });
+  const notificationRepository = new NotificationRepository({ api });
+  userCaches.register({ clear: () => inboxSession?.viewModel.resetForAccountChange() });
+  let recordSession: { mode: SessionMode; viewModel: RecordViewModel; navigator: AttachableRecordNavigator } | null = null;
+  userCaches.register({ clear: () => recordSession?.viewModel.resetForAccountChange() });
+  const aiReviews = new AiReviewStore({ repository: new AiReviewRepository({ api }), clock, toast });
+  userCaches.register({ clear: () => aiReviews.reset() });
+  const uploadNavigator = new AttachableUploadNavigator();
+  const uploadResults = new UploadResultStore();
+  const uploadRepository = new UploadRepository({ api });
+  const homeRepository = new HomeRepository({ api });
+  const imageDecoder = options.imageDecoder ?? new BrowserImageDecoder();
+  const blobUrls = options.blobUrls ?? new ObjectUrlFactory();
+  const pixelSurface = options.pixelSurface ?? createCanvasPixelSurface;
+  const editRenderer = options.editRenderer ?? new CanvasEditRenderer({ createSurface: pixelSurface });
+  const photoEditor =
+    options.photoEditor === undefined
+      ? createPhotoEditor({
+          decoder: imageDecoder,
+          preview: options.previewRenderer ?? new CanvasPreviewRenderer({ createSurface: pixelSurface, blobUrls }),
+          analyzer: options.autoAnalyzer ?? new CanvasAutoAnalyzer({ createSurface: pixelSurface }),
+          scheduler: options.renderScheduler,
+          lazyThumbnails: options.renderScheduler !== undefined,
+        })
+      : options.photoEditor;
+  const photoPreparer = new PhotoPreparer({
+    repository: uploadRepository,
+    decoder: imageDecoder,
+    compressor: options.webpCompressor ?? new BrowserWebpCompressor(),
+    renderer: editRenderer,
+    clock,
+  });
+  const guestGate = new GuestGate({ toast });
+  const uploadGate = options.uploadEntry
+    ? null
+    : new UploadGate({
+        mode: async () => {
+          const session = await store.read();
+          return session.userId && session.tokens ? 'member' : 'guest';
+        },
+        guestGate,
+        today: homeRepository,
+        navigator: uploadNavigator,
+        toast,
+      });
+  userCaches.register({
+    clear: () => {
+      uploadResults.clear();
+      uploadGate?.cancel();
     },
   });
   const container: AppContainer = {
@@ -305,20 +475,36 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     preloader: options.preloader ?? new NoopHomePreloader(),
     accountService: new AccountService({ authApi, store, userCaches, toast, sessionEvents, logger }),
     devSessionEnabled,
-    guestGate: new GuestGate({ toast }),
-    uploadEntry: options.uploadEntry ?? new NoopUploadEntry(),
+    guestGate,
+    uploadEntry: options.uploadEntry ?? uploadGate!,
+    uploadGate,
+    uploadNavigator,
+    uploadRepository,
+    photoPreparer,
+    uploadResults,
+    cameraCapture: options.cameraCapture ?? new BrowserCameraCaptureSupport(),
+    photoEditor,
+    editRenderer,
     crossTabSync,
     presignedUploader,
     externalLinkOpener: options.externalLinkOpener ?? new WindowExternalLinkOpener(),
     visibilityObserver: options.visibilityObserver === undefined ? createIntersectionVisibilityObserver() : options.visibilityObserver,
     signatureDraft: new SignatureDraft(),
     signatureRasterizer: options.signatureRasterizer ?? new CanvasSignatureRasterizer({ createSurface: createCanvasSurface }),
-    blobUrls: options.blobUrls ?? new ObjectUrlFactory(),
+    blobUrls,
     signatureRepository,
     signatureCard,
-    homeRepository: new HomeRepository({ api }),
+    homeRepository,
+    appVersion: options.appVersion ?? __APP_VERSION__,
+    notificationSettings,
+    feedbackRepository,
     displayRepository: new DisplayRepository({ api }),
+    recordRepository: new RecordRepository({ api }),
+    calendarImageExporter: options.calendarImageExporter ?? new CanvasCalendarImageExporter({ clock }),
+    fileDownloader: options.fileDownloader ?? new AnchorFileDownloader({ blobUrls, clock }),
     feedRepository: new FeedRepository({ api }),
+    aiReviews,
+    notificationRepository,
     likeRepository,
     postChanges,
     likes,
@@ -354,6 +540,20 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
     createTermsViewModel() {
       return new TermsViewModel({ launcher: new LegalDocumentLauncher({ opener: this.externalLinkOpener }), signupDraft: this.signupDraft });
     },
+    createSettingsViewModel(mode) {
+      return new SettingsViewModel({
+        mode,
+        signatureCard: this.signatureCard,
+        notifications: this.notificationSettings,
+        account: this.accountService,
+        launcher: new LegalDocumentLauncher({ opener: this.externalLinkOpener }),
+        session: this.store,
+        appVersion: this.appVersion,
+      });
+    },
+    createFeedbackViewModel() {
+      return new FeedbackViewModel({ repository: this.feedbackRepository, toast: this.toast });
+    },
     homeSession(mode) {
       if (homeSession?.mode !== mode) {
         homeSession?.viewModel.dispose();
@@ -372,6 +572,7 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
             navigator,
             likes: this.likes,
             changes: this.postChanges,
+            aiReviews: this.aiReviews,
           }),
         };
       }
@@ -398,6 +599,46 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
       }
       return displaySession;
     },
+    inboxSession() {
+      if (!inboxSession) {
+        const navigator = new AttachableNotificationNavigator();
+        inboxSession = {
+          navigator,
+          viewModel: new NotificationInboxViewModel({
+            repository: this.notificationRepository,
+            toast: this.toast,
+            navigator,
+            sync: notificationSync,
+            clock: this.clock,
+          }),
+        };
+      }
+      return inboxSession;
+    },
+    createNotificationDetailViewModel(args) {
+      return new NotificationDetailViewModel({ notificationId: args.notificationId, repository: this.notificationRepository, sync: notificationSync });
+    },
+    recordSession(mode) {
+      if (recordSession?.mode !== mode) {
+        recordSession?.viewModel.dispose();
+        const navigator = new AttachableRecordNavigator();
+        recordSession = {
+          mode,
+          navigator,
+          viewModel: new RecordViewModel({
+            mode,
+            clock: this.clock,
+            repository: this.recordRepository,
+            changes: this.postChanges,
+            toast: this.toast,
+            navigator,
+            exporter: this.calendarImageExporter,
+            downloader: this.fileDownloader,
+          }),
+        };
+      }
+      return recordSession;
+    },
     createFeedViewModel(args) {
       return new FeedViewModel({
         postId: args.postId,
@@ -411,6 +652,9 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
         toast: this.toast,
         navigator: args.navigator,
       });
+    },
+    createFeedAiViewModel(args) {
+      return new FeedAiViewModel({ postId: args.postId, clock: this.clock, store: this.aiReviews, toast: this.toast, openAiReview: args.openAiReview, onOpenAiReviewConsumed: args.onOpenAiReviewConsumed });
     },
     createSignatureDrawViewModel(mode) {
       return new SignatureDrawViewModel({
@@ -428,7 +672,19 @@ export function createAppContainer(options: AppContainerOptions): AppContainer {
         png,
         submitter: mode === 'onboarding' ? this.signupService : this.changeSignatureService,
         toast: this.toast,
-        refreshSignatureCard: mode === 'change' ? () => this.signatureCard.refresh() : undefined,
+        refreshSignatureCard: mode === 'change' ? () => this.signatureCard.refreshAfterChange() : undefined,
+      });
+    },
+    createUploadViewModel(topicDate) {
+      return new UploadViewModel({
+        topicDate,
+        repository: this.uploadRepository,
+        today: this.homeRepository,
+        preparer: this.photoPreparer,
+        uploader: this.presignedUploader,
+        results: this.uploadResults,
+        changes: this.postChanges,
+        editorEnabled: this.photoEditor !== null,
       });
     },
     createBootViewModel() {

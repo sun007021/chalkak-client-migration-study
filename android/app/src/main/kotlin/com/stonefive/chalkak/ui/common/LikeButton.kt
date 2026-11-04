@@ -6,7 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,7 +22,11 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.stonefive.chalkak.R
+import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.ui.theme.ChalkakTheme
+
+/** Soft shadow under on-photo likes so white stays readable on bright pictures (black 25%, radius 2, y 1). */
+private val ImageShadow = Shadow(Color.Black.copy(alpha = 0.25f), Offset(0f, 1f), 2f)
 
 /**
  * Heart + count (testids.md "상태 노출"): the heart exposes `selected` (= [isLiked]), `enabled` and a description that names
@@ -39,7 +44,11 @@ fun LikeButton(
     modifier: Modifier = Modifier,
     tint: Color = ChalkakTheme.colors.textPrimary,
     liked: Color = ChalkakTheme.colors.destructive,
+    onImage: Boolean = false,
+    iconSize: androidx.compose.ui.unit.Dp = if (onImage) 18.dp else 22.dp,
+    countStyle: androidx.compose.ui.text.TextStyle? = null,
 ) {
+    val label = LocalCopy.current.format("like.a11y.count", "n" to count)
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         Box(
             modifier = Modifier
@@ -47,7 +56,7 @@ fun LikeButton(
                 .testTag(buttonTag)
                 .semantics {
                     selected = isLiked
-                    contentDescription = count.toString()
+                    contentDescription = label // "좋아요 N개"; `selected` is read by the screen reader as the state (TC-LIKE-034)
                 }
                 .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,
@@ -55,13 +64,13 @@ fun LikeButton(
             Image(
                 painter = painterResource(if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline),
                 contentDescription = null,
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(iconSize),
                 colorFilter = ColorFilter.tint(if (isLiked) liked else tint),
             )
         }
         Text(
             text = count.toString(),
-            style = MaterialTheme.typography.labelLarge,
+            style = countStyle ?: if (onImage) ChalkakTheme.typography.subheadline.copy(shadow = ImageShadow) else ChalkakTheme.typography.callout,
             color = tint,
             modifier = Modifier.testTag(countTag),
         )

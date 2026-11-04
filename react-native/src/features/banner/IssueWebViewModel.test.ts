@@ -75,7 +75,7 @@ describe('IssueWebViewModel 로드 상태', () => {
 });
 
 describe('IssueWebViewModel 분석', () => {
-  it('TC-BANR-025 REQ-BANR-012 screen_view issue를 한 번만 보낸다', () => {
+  it('TC-BANR-025 TC-ANL-006 REQ-BANR-012 screen_view issue를 한 번만 보낸다', () => {
     const h = createIssueWebHarness();
     h.viewModel.onScreenShown();
     h.viewModel.onScreenShown();

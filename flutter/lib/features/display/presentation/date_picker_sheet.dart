@@ -2,7 +2,9 @@ import 'package:flutter/cupertino.dart' show CupertinoPicker;
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/time/kst_date.dart';
+import '../../../core/ui/components/chalkak_button.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/date_picker_rules.dart';
 import 'display_test_ids.dart';
@@ -29,7 +31,8 @@ class DatePickerSheet extends StatefulWidget {
 }
 
 class _DatePickerSheetState extends State<DatePickerSheet> {
-  static const double _wheelHeight = 180;
+  // ChalkakWheelPicker: 줄 높이 44, 5줄 표시(screens-c §1.9).
+  static const double _wheelHeight = 44 * 5;
 
   late KstDate _picked;
 
@@ -60,22 +63,30 @@ class _DatePickerSheetState extends State<DatePickerSheet> {
   @override
   Widget build(BuildContext context) {
     final today = widget.today;
+    final tokens = context.tokens;
+    // 피커 시트(ChalkakPickerBottomSheet): 좌우 xl, 위 sm, 아래 xl, 세로 간격 lg, 제목 왼쪽 title3.
     return TestId(
       DisplayTestIds.datePickerSheet,
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+          padding: EdgeInsets.fromLTRB(
+            tokens.spacing.xl,
+            tokens.spacing.sm,
+            tokens.spacing.xl,
+            tokens.spacing.xl,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
                 Copy.displayPickerTitle,
-                style: Theme.of(context).textTheme.titleMedium,
-                textAlign: TextAlign.center,
+                style: tokens.text.title3.copyWith(
+                  color: tokens.colors.textPrimary,
+                ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: tokens.spacing.lg),
               SizedBox(
                 height: _wheelHeight,
                 child: Row(
@@ -117,12 +128,12 @@ class _DatePickerSheetState extends State<DatePickerSheet> {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: tokens.spacing.lg),
               TestId.button(
                 DisplayTestIds.datePickerConfirmButton,
-                child: FilledButton(
+                child: ChalkakButton(
+                  label: Copy.commonConfirm,
                   onPressed: () => widget.onConfirm(_picked),
-                  child: const Text(Copy.commonConfirm),
                 ),
               ),
             ],
@@ -156,7 +167,7 @@ class _Wheel extends StatefulWidget {
 }
 
 class _WheelState extends State<_Wheel> {
-  static const double _itemExtent = 40;
+  static const double _itemExtent = 44;
 
   late final FixedExtentScrollController _controller =
       FixedExtentScrollController(initialItem: _indexOfSelected);
@@ -190,6 +201,8 @@ class _WheelState extends State<_Wheel> {
       child: CupertinoPicker(
         scrollController: _controller,
         itemExtent: _itemExtent,
+        backgroundColor: Colors.transparent,
+        selectionOverlay: const _WheelSelection(),
         onSelectedItemChanged: (index) {
           if (index >= 0 && index < values.length) {
             widget.onChanged(values[index]);
@@ -197,8 +210,30 @@ class _WheelState extends State<_Wheel> {
         },
         children: [
           for (final value in values)
-            Center(child: Text(Copy.fill(widget.template, {'n': '$value'}))),
+            Center(
+              child: Text(
+                Copy.fill(widget.template, {'n': '$value'}),
+                style: context.tokens.text.headline.copyWith(
+                  color: context.tokens.colors.textPrimary,
+                ),
+              ),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+/// 선택 줄 표시: 위아래 1px border 선(ChalkakWheelPicker).
+class _WheelSelection extends StatelessWidget {
+  const _WheelSelection();
+
+  @override
+  Widget build(BuildContext context) {
+    final border = BorderSide(color: context.tokens.colors.border);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(top: border, bottom: border),
       ),
     );
   }

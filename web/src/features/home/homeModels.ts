@@ -55,9 +55,3 @@ export interface BannerPage {
 }
 
 export type AiReviewStatus = 'NONE' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
-
-/** 홈 AI 카드가 쓰는 요약. canRequestAgain이 없으면 false. */
-export interface AiReviewSummary {
-  status: AiReviewStatus;
-  canRequestAgain: boolean;
-}

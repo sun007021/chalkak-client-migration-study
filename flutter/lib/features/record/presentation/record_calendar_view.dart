@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/time/kst_date.dart';
 import '../../../core/ui/app_network_image.dart';
 import '../../../core/ui/test_id.dart';
@@ -34,14 +35,16 @@ class RecordCalendarView extends StatelessWidget {
                   child: Center(
                     child: Text(
                       Copy.recordWeekday[i],
-                      style: Theme.of(context).textTheme.labelMedium,
+                      style: context.tokens.text.caption.copyWith(
+                        color: context.tokens.colors.textMuted,
+                      ),
                     ),
                   ),
                 ),
             ],
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         TestId(
           RecordTestIds.calendarGrid,
           child: Column(
@@ -61,7 +64,7 @@ class RecordCalendarView extends StatelessWidget {
   }
 
   Widget _cell(KstDate? date) {
-    if (date == null) return const AspectRatio(aspectRatio: 3 / 4);
+    if (date == null) return const AspectRatio(aspectRatio: 1);
     final photo = state.photoOn(date);
     return _DayCell(
       date: date,
@@ -90,36 +93,40 @@ class _DayCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final colors = context.tokens.colors;
     final photo = this.photo;
     final border = isSelected
-        ? Border.all(color: colors.primary, width: 3)
+        ? Border.all(color: colors.calendarSelection, width: 2)
         : isToday
-        ? Border.all(color: colors.tertiary, width: 2)
+        ? Border.all(color: colors.calendarCellBorder, width: 1.5)
         : null;
     return TestId.button(
       RecordTestIds.day(date.toApiString()),
       child: Semantics(
         selected: isSelected,
         child: Padding(
-          padding: const EdgeInsets.all(2),
+          padding: const EdgeInsets.all(3),
           child: AspectRatio(
-            aspectRatio: 3 / 4,
-            child: InkWell(
+            aspectRatio: 1,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: onPressed,
-              borderRadius: BorderRadius.circular(8),
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(
+                    context.tokens.radius.small,
+                  ),
                   border: border,
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(
+                    context.tokens.radius.small - 1,
+                  ),
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
                       if (photo == null)
-                        ColoredBox(color: colors.surfaceContainerHighest)
+                        ColoredBox(color: colors.calendarCell)
                       else
                         AppNetworkImage(url: photo.thumbnailImageUrl),
                       Positioned(
@@ -129,20 +136,19 @@ class _DayCell extends StatelessWidget {
                         child: ColoredBox(
                           color: photo == null
                               ? Colors.transparent
-                              : Colors.black54,
+                              : colors.scrim,
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 2),
                             child: Text(
                               '${date.day}',
                               textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 12,
+                              style: context.tokens.text.caption.copyWith(
                                 fontWeight: isToday
                                     ? FontWeight.w700
                                     : FontWeight.w400,
                                 color: photo == null
-                                    ? colors.onSurfaceVariant
-                                    : Colors.white,
+                                    ? colors.textSecondary
+                                    : colors.textOnImage,
                               ),
                             ),
                           ),
@@ -172,19 +178,23 @@ class _PendingChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const DecoratedBox(
+    final colors = context.tokens.colors;
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.black54,
-        borderRadius: BorderRadius.all(Radius.circular(4)),
+        color: colors.scrim,
+        borderRadius: const BorderRadius.all(Radius.circular(4)),
       ),
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
         child: FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(
             Copy.recordPendingBadge,
             maxLines: 1,
-            style: TextStyle(fontSize: 9, color: Colors.white),
+            style: context.tokens.text.caption.copyWith(
+              fontSize: 9,
+              color: colors.textOnImage,
+            ),
           ),
         ),
       ),

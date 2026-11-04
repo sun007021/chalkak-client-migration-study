@@ -24,7 +24,7 @@ async function setup() {
 }
 
 describe('SignatureCardViewModel', () => {
-  it('TC-SIGN-026 refresh는 GET /users/me/signature의 썸네일을 이미지로 쓴다', async () => {
+  it('TC-SIGN-026 TC-SET-003 refresh는 GET /users/me/signature의 썸네일을 이미지로 쓴다', async () => {
     const h = await setup();
     routeFixtures(h.transport, { [GET]: 'signature/users-me-signature__get-success' });
     await h.vm.refresh();
@@ -36,7 +36,7 @@ describe('SignatureCardViewModel', () => {
     });
   });
 
-  it('TC-SIGN-026 썸네일이 null이면 원본을 쓴다', async () => {
+  it('TC-SIGN-026 TC-SET-003 썸네일이 null이면 원본을 쓴다', async () => {
     const h = await setup();
     routeFixtures(h.transport, { [GET]: 'signature/users-me-signature__get-thumbnail-null' });
     await h.vm.refresh();

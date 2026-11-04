@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_icon.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/ai_review_session.dart';
 import '../domain/ai_review_state.dart';
@@ -37,8 +39,12 @@ class AiReviewHomeCard extends StatelessWidget {
         if (content == null) return const SizedBox.shrink();
         return TestId(
           AiReviewTestIds.homeCard,
-          child: Card(
-            margin: EdgeInsets.zero,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: context.tokens.colors.surfaceElevated,
+              borderRadius: BorderRadius.circular(context.tokens.radius.large),
+              border: Border.all(color: context.tokens.colors.border),
+            ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: content,
@@ -50,19 +56,27 @@ class AiReviewHomeCard extends StatelessWidget {
   }
 
   Widget? _content(BuildContext context, AiPill pill) {
-    final style = Theme.of(context).textTheme.bodyMedium;
+    final tokens = context.tokens;
+    final style = tokens.text.subheadline.copyWith(
+      color: tokens.colors.textPrimary,
+    );
     switch (pill) {
       case AiPill.hidden || AiPill.checking || AiPill.recheck:
         return null;
       case AiPill.request:
         return TestId.button(
           AiReviewTestIds.homeRequestButton,
-          child: InkWell(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: session.onPillPressed,
             child: Row(
               children: [
                 Expanded(child: Text(Copy.aiCardRequest, style: style)),
-                const Icon(Icons.chevron_right),
+                ChalkakIcon(
+                  ChalkakIcon.chevronRight,
+                  size: 20,
+                  color: tokens.colors.iconSecondary,
+                ),
               ],
             ),
           ),

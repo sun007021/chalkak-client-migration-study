@@ -32,6 +32,16 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import com.stonefive.chalkak.R
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -103,24 +113,24 @@ fun SignatureScreen(
             .testTag("signature.root"),
     ) {
         BackAction(onClick = onBack, modifier = Modifier.statusBarsPadding().padding(start = 8.dp, top = 4.dp).testTag("signature.back-button"))
-        Column(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 24.dp)) {
+        Column(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = ChalkakTheme.spacing.screenHorizontal)) {
             Spacer(Modifier.height(8.dp))
             Text(
                 text = copy["onb.sign.title"],
                 color = colors.textPrimary,
-                style = MaterialTheme.typography.headlineLarge,
+                style = ChalkakTheme.typography.title1,
                 modifier = Modifier.testTag("signature.title"),
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(30.dp))
             Text(
                 text = copy["onb.sign.guide"],
-                color = colors.textNeutral,
-                style = MaterialTheme.typography.bodySmall,
+                color = colors.textSecondary,
+                style = ChalkakTheme.typography.subheadline,
                 modifier = Modifier.testTag("signature.guide-text"),
             )
             // The pad is the flexible part: a square as large as the space between the guide and the buttons allows, so the
             // buttons below stay on screen on short displays.
-            BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
+            BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
                 SignatureCanvas(
                     side = minOf(maxWidth, maxHeight),
                     strokes = state.strokes,
@@ -131,13 +141,15 @@ fun SignatureScreen(
                 )
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
-                ChalkakOutlinedButton(
+                SignatureControlButton(
                     text = copy["onb.sign.undo"],
                     onClick = onUndo,
                     enabled = state.canUndo,
+                    icon = R.drawable.ic_rotate_right,
+                    mirrorIcon = true,
                     modifier = Modifier.testTag("signature.undo-button"),
                 )
-                ChalkakOutlinedButton(
+                SignatureControlButton(
                     text = copy["onb.sign.clear"],
                     onClick = onClear,
                     enabled = state.canClear,
@@ -147,13 +159,13 @@ fun SignatureScreen(
             state.errorCopyKey?.let { key ->
                 Text(
                     text = copy[key],
-                    color = colors.destructive,
-                    style = MaterialTheme.typography.labelMedium,
+                    color = colors.error,
+                    style = ChalkakTheme.typography.footnote,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("signature.error-message"),
                 )
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(24.dp))
             ChalkakButton(
                 text = copy["onb.sign.confirm"],
                 onClick = onConfirm,
@@ -162,6 +174,39 @@ fun SignatureScreen(
             )
             Spacer(Modifier.navigationBarsPadding().height(18.dp))
         }
+    }
+}
+
+/** Capsule control under the pad (screens-a 6.1): footnote text, 1dp `border` outline, padding 16 / 10, muted when disabled. */
+@Composable
+private fun SignatureControlButton(
+    text: String,
+    onClick: () -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    icon: Int? = null,
+    mirrorIcon: Boolean = false,
+) {
+    val color = if (enabled) ChalkakTheme.colors.textPrimary else ChalkakTheme.colors.textMuted
+    Row(
+        modifier = modifier
+            .heightIn(min = 44.dp)
+            .clip(ChalkakTheme.shapes.pill)
+            .border(1.dp, ChalkakTheme.colors.border, ChalkakTheme.shapes.pill)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.xs, Alignment.CenterHorizontally),
+    ) {
+        if (icon != null) {
+            Icon(
+                painter = painterResource(icon),
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(16.dp).graphicsLayer { if (mirrorIcon) scaleX = -1f },
+            )
+        }
+        Text(text = text, color = color, style = ChalkakTheme.typography.footnote)
     }
 }
 
@@ -179,59 +224,78 @@ private fun SignatureCanvas(
     val extend by rememberUpdatedState(onExtendStroke)
     val end by rememberUpdatedState(onEndStroke)
     val space = SignaturePadSpace
+    // Outer card (screens-a 6.1): inputBackground, shapes.large, faint outline, 16 / 16 / 16 / 14 padding around the dark canvas.
     Box(
         modifier = Modifier
             .size(side)
-            .clip(RoundedCornerShape(16.dp))
-            .background(colors.actionPrimary)
-            .testTag("signature.canvas")
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    fun toSpace(position: Offset) = Offset(
-                        position.x / size.width.coerceAtLeast(1) * space.width,
-                        position.y / size.height.coerceAtLeast(1) * space.height,
-                    )
-                    toSpace(down.position).let { begin(it.x, it.y) }
-                    try {
-                        do {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id }
-                            if (change != null && change.positionChanged()) {
-                                change.consume()
-                                toSpace(change.position).let { extend(it.x, it.y) }
-                            }
-                        } while (change?.pressed == true)
-                    } finally {
-                        end()
+            .clip(ChalkakTheme.shapes.large)
+            .background(colors.inputBackground)
+            .border(1.dp, colors.textPrimary.copy(alpha = 0.12f), ChalkakTheme.shapes.large)
+            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 14.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(ChalkakTheme.shapes.button)
+                .background(colors.actionPrimary)
+                .testTag("signature.canvas")
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        fun toSpace(position: Offset) = Offset(
+                            position.x / size.width.coerceAtLeast(1) * space.width,
+                            position.y / size.height.coerceAtLeast(1) * space.height,
+                        )
+                        toSpace(down.position).let { begin(it.x, it.y) }
+                        try {
+                            do {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id }
+                                if (change != null && change.positionChanged()) {
+                                    change.consume()
+                                    toSpace(change.position).let { extend(it.x, it.y) }
+                                }
+                            } while (change?.pressed == true)
+                        } finally {
+                            end()
+                        }
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                // Dashed guide: textOnImage 28%, 1dp, dash 6 / 6, inset 1, radius 10.
+                drawRoundRect(
+                    color = Color.White.copy(alpha = 0.28f),
+                    topLeft = Offset(1.dp.toPx(), 1.dp.toPx()),
+                    size = androidx.compose.ui.geometry.Size(size.width - 2.dp.toPx(), size.height - 2.dp.toPx()),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx()),
+                    style = Stroke(width = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 6.dp.toPx()))),
+                )
+                val scaleX = size.width / space.width
+                val scaleY = size.height / space.height
+                strokes.filter { it.points.isNotEmpty() }.forEach { stroke ->
+                    val points = stroke.points.map { Offset(it.x * scaleX, it.y * scaleY) }
+                    if (points.size == 1) {
+                        drawCircle(color = Color.White, radius = SignatureDotRadius.toPx(), center = points.first())
+                    } else {
+                        drawPath(
+                            path = smoothPath(points),
+                            color = Color.White,
+                            style = Stroke(width = SignatureStrokeWidth.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+                        )
                     }
                 }
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val scaleX = size.width / space.width
-            val scaleY = size.height / space.height
-            strokes.filter { it.points.isNotEmpty() }.forEach { stroke ->
-                val points = stroke.points.map { Offset(it.x * scaleX, it.y * scaleY) }
-                if (points.size == 1) {
-                    drawCircle(color = Color.White, radius = SignatureDotRadius.toPx(), center = points.first())
-                } else {
-                    drawPath(
-                        path = smoothPath(points),
-                        color = Color.White,
-                        style = Stroke(width = SignatureStrokeWidth.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
-                    )
-                }
             }
-        }
-        if (strokes.none { it.points.isNotEmpty() }) {
-            Text(
-                text = hint,
-                color = Color.White.copy(alpha = 0.56f),
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.testTag("signature.canvas-hint"),
-            )
+            if (strokes.none { it.points.isNotEmpty() }) {
+                Text(
+                    text = hint,
+                    color = colors.photoEditContentMuted,
+                    style = ChalkakTheme.typography.handwriting.copy(fontSize = 22.sp, lineHeight = 28.sp),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.testTag("signature.canvas-hint"),
+                )
+            }
         }
     }
 }
@@ -272,34 +336,46 @@ fun SignaturePreviewScreen(
             .semantics { stateDescription = if (change) "change" else "onboarding" }
             .testTag("signature-preview.root"),
     ) {
-        Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp)) {
+        Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = ChalkakTheme.spacing.screenHorizontal)) {
             Spacer(Modifier.height(50.dp))
             Text(
                 text = copy["onb.sign.preview.title"],
                 color = colors.textPrimary,
-                style = MaterialTheme.typography.headlineLarge,
+                style = ChalkakTheme.typography.title1,
                 modifier = Modifier.testTag("signature-preview.title"),
             )
             if (change) {
                 Text(
                     text = copy["sign.change.notice"],
-                    color = colors.textInactive,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("signature-preview.change-notice"),
+                    color = colors.textMuted,
+                    style = ChalkakTheme.typography.subheadline,
+                    modifier = Modifier.fillMaxWidth().padding(top = ChalkakTheme.spacing.sm).testTag("signature-preview.change-notice"),
                 )
             }
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(if (change) 36.dp else 50.dp))
+            // The signature as it will sit on a photo: bottom end, 112 x 84, 8 in (screens-a 6.2).
             Box(
                 modifier = Modifier
+                    .weight(1f, fill = false)
                     .fillMaxWidth()
-                    .aspectRatio(1.4f)
-                    .clip(RoundedCornerShape(20.dp))
+                    .aspectRatio(5f / 6f)
+                    .clip(ChalkakTheme.shapes.xlarge)
                     .background(colors.actionPrimary)
                     .testTag("signature-preview.image"),
-                contentAlignment = Alignment.Center,
             ) {
+                Image(
+                    painter = painterResource(R.drawable.preview_photo),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
                 bitmap?.let {
-                    Image(bitmap = it, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(16.dp))
+                    Image(
+                        bitmap = it,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(ChalkakTheme.spacing.sm).size(width = 112.dp, height = 84.dp),
+                    )
                 }
             }
             if (busy) {
@@ -308,7 +384,7 @@ fun SignaturePreviewScreen(
                 }
             }
             Spacer(Modifier.weight(1f))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 ChalkakOutlinedButton(
                     text = copy["onb.sign.preview.redraw"],
                     onClick = onRedraw,

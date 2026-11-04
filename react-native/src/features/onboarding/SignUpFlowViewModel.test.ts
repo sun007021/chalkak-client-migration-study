@@ -100,7 +100,7 @@ describe('SignUpFlowViewModel: 약관', () => {
 });
 
 describe('SignUpFlowViewModel: 사인 -> 미리보기 -> 가입', () => {
-  it('TC-ONB-049 화면 진입 screen_view가 terms, onboarding_signature, onboarding_signature_preview 순으로 한 번씩이다', async () => {
+  it('TC-ONB-049 TC-ANL-003 화면 진입 screen_view가 terms, onboarding_signature, onboarding_signature_preview 순으로 한 번씩이다', async () => {
     const h = createSignUpHarness();
     await h.reachPreview();
     expect(h.analytics.screenNames).toEqual([

@@ -3,7 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/ui/app_network_image.dart';
+import '../../../core/ui/components/chalkak_button.dart';
+import '../../../core/ui/components/chalkak_icon.dart';
+import '../../../core/ui/components/chalkak_nav_button.dart';
+import '../../../core/ui/components/chalkak_states.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/notification_models.dart';
 import 'notification_inbox_view_model.dart';
@@ -32,7 +37,7 @@ class NotificationInboxScreen extends StatelessWidget {
     return TestId(
       NotificationTestIds.inboxRoot,
       child: Material(
-        color: Theme.of(context).scaffoldBackgroundColor,
+        color: context.tokens.colors.background,
         child: SafeArea(
           child: ListenableBuilder(
             listenable: viewModel,
@@ -87,7 +92,7 @@ class NotificationInboxScreen extends StatelessWidget {
                 NotificationTestIds.inboxLoadMoreIndicator,
                 child: Padding(
                   padding: EdgeInsets.all(12),
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(child: ChalkakSpinner()),
                 ),
               ),
           ],
@@ -107,15 +112,14 @@ class _TitleBar extends StatelessWidget {
       children: [
         TestId.button(
           NotificationTestIds.inboxBackButton,
-          child: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: onBack,
-          ),
+          child: ChalkakNavButton.back(onPressed: onBack),
         ),
         Expanded(
           child: Text(
             Copy.notiInboxTitle,
-            style: Theme.of(context).textTheme.titleMedium,
+            style: context.tokens.text.headline.copyWith(
+              color: context.tokens.colors.textPrimary,
+            ),
           ),
         ),
       ],
@@ -134,9 +138,9 @@ class _Loading extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 12),
-            Text(Copy.notiInboxLoading),
+            ChalkakSpinner(),
+            SizedBox(height: 16),
+            ChalkakStatusText(Copy.notiInboxLoading),
           ],
         ),
       ),
@@ -158,13 +162,14 @@ class _ErrorBody extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 12),
+            ChalkakStatusText(message, textAlign: TextAlign.center),
+            const SizedBox(height: 24),
             TestId.button(
               NotificationTestIds.inboxRetryButton,
-              child: FilledButton(
+              child: ChalkakOutlinedButton(
                 onPressed: () => unawaited(onRetry()),
-                child: const Text(Copy.notiInboxRetry),
+                label: Copy.notiInboxRetry,
+                fillsWidth: false,
               ),
             ),
           ],
@@ -179,7 +184,7 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final tokens = context.tokens;
     // 당겨서 새로고침이 되도록 스크롤 가능한 영역 안에 둔다.
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
@@ -190,19 +195,29 @@ class _Empty extends StatelessWidget {
             NotificationTestIds.inboxEmpty,
             child: Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.all(tokens.spacing.xl),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    ChalkakIcon(
+                      ChalkakIcon.bell,
+                      size: 34,
+                      color: tokens.colors.iconSecondary,
+                    ),
+                    SizedBox(height: tokens.spacing.sm),
                     Text(
                       Copy.notiInboxEmptyTitle,
-                      style: theme.textTheme.titleMedium,
+                      style: tokens.text.body.copyWith(
+                        color: tokens.colors.textSecondary,
+                      ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: tokens.spacing.sm),
                     Text(
                       Copy.notiInboxEmptyBody,
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium,
+                      style: tokens.text.subheadline.copyWith(
+                        color: tokens.colors.textMuted,
+                      ),
                     ),
                   ],
                 ),
@@ -251,81 +266,100 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final tokens = context.tokens;
     final unread = item.isUnread;
     return TestId(
       NotificationTestIds.item(item.id),
-      child: InkWell(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TestId(
-                NotificationTestIds.itemThumbnail(item.id),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: SizedBox(
-                    width: 56,
-                    height: 56,
-                    child: AppNetworkImage(url: item.thumbnailImageUrl),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: tokens.colors.border)),
+          ),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: tokens.spacing.screenHorizontal,
+              vertical: tokens.spacing.xl,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: tokens.spacing.md,
+                  child: unread
+                      ? Padding(
+                          padding: EdgeInsets.only(top: tokens.spacing.xs),
+                          child: TestId(
+                            NotificationTestIds.itemUnread(item.id),
+                            child: Container(
+                              width: tokens.spacing.sm,
+                              height: tokens.spacing.sm,
+                              decoration: BoxDecoration(
+                                color: tokens.colors.inputCursor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        )
+                      : null,
+                ),
+                SizedBox(width: tokens.spacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TestId(
+                        NotificationTestIds.itemTitle(item.id),
+                        child: Text(
+                          item.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: tokens.text.subheadline.copyWith(
+                            color: tokens.colors.textPrimary,
+                            fontWeight: unread ? FontWeight.w600 : null,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: tokens.spacing.sm),
+                      TestId(
+                        NotificationTestIds.itemBody(item.id),
+                        child: Text(
+                          item.body,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: tokens.text.caption.copyWith(
+                            color: tokens.colors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: tokens.spacing.sm),
+                      TestId(
+                        NotificationTestIds.itemTime(item.id),
+                        child: Text(
+                          item.timeLabel,
+                          style: tokens.text.caption.copyWith(
+                            color: tokens.colors.textInactive,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TestId(
-                      NotificationTestIds.itemTitle(item.id),
-                      child: Text(
-                        item.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: unread ? FontWeight.w700 : null,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    TestId(
-                      NotificationTestIds.itemBody(item.id),
-                      child: Text(
-                        item.body,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    TestId(
-                      NotificationTestIds.itemTime(item.id),
-                      child: Text(
-                        item.timeLabel,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.outline,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (unread)
+                SizedBox(width: tokens.spacing.lg),
                 TestId(
-                  NotificationTestIds.itemUnread(item.id),
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    margin: const EdgeInsets.only(left: 8, top: 6),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.error,
-                      shape: BoxShape.circle,
+                  NotificationTestIds.itemThumbnail(item.id),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: AppNetworkImage(url: item.thumbnailImageUrl),
                     ),
                   ),
                 ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

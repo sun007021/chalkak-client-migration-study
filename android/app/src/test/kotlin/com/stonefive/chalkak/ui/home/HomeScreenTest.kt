@@ -3,6 +3,8 @@ package com.stonefive.chalkak.ui.home
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertContentDescriptionEquals
+
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -193,7 +195,7 @@ class HomeScreenTest {
         show(state)
         assertOnlyHero("home.hero-error", "home.hero-retry-button")
         tag("home.hero-error").assertTextEquals(copy["home.hero.error"])
-        tag("home.hero-retry-button").assertTextEquals(copy["home.hero.retry"])
+        tag("home.hero-retry-button").assertContentDescriptionEquals(copy["home.hero.retry"])
         tag("home.hero-retry-button").performClick()
         assertEquals(listOf("hero-retry"), calls)
     }
@@ -273,7 +275,8 @@ class HomeScreenTest {
     fun `TC-HOME-019 오늘 인기 사진은 최대 5장이다`() {
         val state = loadedHomeState()
         show(state)
-        listOf("202", "203", "204", "205", "206").forEach { tag("home.popular-item-${postId(it)}").assertIsDisplayed() }
+        // The ranking row is a 82dp horizontal scroller: the fifth card may sit past the viewport edge, so only its presence is checked.
+        listOf("202", "203", "204", "205", "206").forEach { tag("home.popular-item-${postId(it)}").assertExists() }
         assertAbsent("home.popular-item-${postId("207")}", "home.popular-item-${postId("208")}")
     }
 
@@ -389,7 +392,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun `TC-HOME-050 미읽음이 있으면 점이 존재하고 없으면 트리에 존재하지 않는다`() {
+    fun `TC-HOME-050 TC-NOTI-049 미읽음이 있으면 점이 존재하고 없으면 트리에 존재하지 않는다`() {
         val unread = loadedHomeState { home.unreadHandler = { HomeFixtureModels.ok(HomeFixtureModels.hasUnread("home/notifications-unread-status__true.json")) } }
         assertTrue(unread.hasUnread)
         show(unread)

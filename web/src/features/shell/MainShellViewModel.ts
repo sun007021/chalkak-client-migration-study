@@ -62,7 +62,9 @@ export class MainShellViewModel extends ViewModel<MainShellState> implements Res
     if (this.deps.guestGate.requireMember(this.state.mode, 'upload')) this.deps.uploadEntry.start();
   }
 
+  /** 셸이 사라지면 확인 중이던 업로드 진입을 취소한다(결과를 버린다, REQ-UPL-011). */
   override dispose(): void {
+    this.deps.uploadEntry.cancel();
     this.reselectListeners.clear();
     super.dispose();
   }

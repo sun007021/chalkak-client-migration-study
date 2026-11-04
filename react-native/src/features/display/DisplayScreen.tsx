@@ -4,7 +4,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -17,16 +16,23 @@ import { useViewModelState } from '../../core/state/useViewModelState';
 import { formatMonthDay } from '../../core/time/dateFormat';
 import type { PostSort, PostSummary } from '../../data/post/PostModels';
 import { t } from '../../shared/copy';
-import { colors, spacing } from '../../shared/ui/theme';
+import { colors, radius, spacing, typography } from '../../shared/design/tokens';
+import { EmptyState } from '../../shared/ui/EmptyState';
+import { Icon } from '../../shared/ui/icons/Icon';
+import { RoundIconButton } from '../../shared/ui/RoundIconButton';
+import { Skeleton } from '../../shared/ui/Skeleton';
+import { SortSelector } from '../../shared/ui/SortSelector';
 import { collapseProgress } from './displayDateRange';
+import { type MasonryAssignment, sameAssignment, splitMasonry } from './masonry';
 import { DatePickerSheet } from './ui/DatePickerSheet';
 import { FeaturedPager } from './ui/FeaturedPager';
-import { PhotoTile } from './ui/PhotoTile';
+import { DEFAULT_PHOTO_RATIO, PhotoTile } from './ui/PhotoTile';
 import type { DisplayViewModel } from './DisplayViewModel';
+import { Text } from '../../shared/ui/Text';
 
 /** 헤더(주제·설명)가 다 접히는 스크롤 거리와 접히기 전 높이. */
 const COLLAPSE_DISTANCE = 96;
-const COLLAPSIBLE_HEIGHT = 56;
+const COLLAPSIBLE_HEIGHT = 99;
 
 const SORTS: readonly { sort: PostSort; testID: string; label: () => string }[] = [
   { sort: 'recent', testID: 'display.sort-recent-tab', label: () => t('display.sort.recent') },
@@ -50,6 +56,7 @@ export function DisplayScreen({ viewModel }: { viewModel: DisplayViewModel }) {
   const scrollRef = useRef<ScrollViewInstance>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [collapse, setCollapse] = useState(0);
+  const [placed, setPlaced] = useState<MasonryAssignment>(() => new Map());
   const [ratios, setRatios] = useState<Readonly<Record<string, number>>>({});
   const visible = useVisibleReport(viewModel, state.photos);
 
@@ -72,52 +79,61 @@ export function DisplayScreen({ viewModel }: { viewModel: DisplayViewModel }) {
   };
 
   const hasGrid = state.status === 'content';
-  const half = [0, 1].map((column) => state.photos.filter((_, index) => index % 2 === column));
+  // 한 번 놓인 사진은 열을 옮기지 않는다(이미지 로드 후 점프 방지). 렌더마다 같은 입력이면 같은 결과다.
+  const { columns: half, assignment } = splitMasonry(state.photos, ratios, placed);
+  if (!sameAssignment(placed, assignment)) setPlaced(assignment);
 
   return (
     <View testID="display.root" style={[styles.root, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <View style={styles.dateRow}>
-          <Pressable
-            testID="display.prev-date-button"
-            accessibilityRole="button"
-            accessibilityLabel={t('display.nav.previous')}
-            disabled={!state.canGoPrevious}
-            onPress={() => void viewModel.goPrevious()}
-            hitSlop={8}
-            style={!state.canGoPrevious && styles.disabled}
-          >
-            <Text style={styles.arrow}>{'<'}</Text>
-          </Pressable>
-          <Pressable
-            testID="display.date-picker-button"
-            accessibilityRole="button"
-            onPress={() => setPickerOpen(true)}
-            hitSlop={8}
-          >
-            <Text testID="display.date-label" style={styles.date}>
-              {formatMonthDay(state.date)}
-            </Text>
-          </Pressable>
-          <Pressable
-            testID="display.next-date-button"
-            accessibilityRole="button"
-            accessibilityLabel={t('display.nav.next')}
-            disabled={!state.canGoNext}
-            onPress={() => void viewModel.goNext()}
-            hitSlop={8}
-            style={!state.canGoNext && styles.disabled}
-          >
-            <Text style={styles.arrow}>{'>'}</Text>
-          </Pressable>
-        </View>
-        <View
-          style={{
-            height: COLLAPSIBLE_HEIGHT * (1 - collapse),
-            opacity: 1 - collapse,
-            overflow: 'hidden',
-          }}
+      <View style={styles.dateRow}>
+        <Pressable
+          testID="display.prev-date-button"
+          accessibilityRole="button"
+          accessibilityLabel={t('display.nav.previous')}
+          disabled={!state.canGoPrevious}
+          onPress={() => void viewModel.goPrevious()}
+          style={styles.arrow}
         >
+          <Icon
+            name="ic_display_arrow_left"
+            size={24}
+            color={state.canGoPrevious ? colors.iconSecondary : colors.textInactive}
+          />
+        </Pressable>
+        <Pressable
+          testID="display.date-picker-button"
+          accessibilityRole="button"
+          accessibilityHint="눌러서 날짜를 선택해요"
+          onPress={() => setPickerOpen(true)}
+          style={styles.dateButton}
+        >
+          <Text testID="display.date-label" numberOfLines={1} style={styles.date}>
+            {formatMonthDay(state.date)}
+          </Text>
+        </Pressable>
+        <Pressable
+          testID="display.next-date-button"
+          accessibilityRole="button"
+          accessibilityLabel={t('display.nav.next')}
+          disabled={!state.canGoNext}
+          onPress={() => void viewModel.goNext()}
+          style={styles.arrow}
+        >
+          <Icon
+            name="ic_display_arrow_right"
+            size={24}
+            color={state.canGoNext ? colors.iconSecondary : colors.textInactive}
+          />
+        </Pressable>
+      </View>
+      <View
+        style={{
+          height: COLLAPSIBLE_HEIGHT * (1 - collapse),
+          opacity: 1 - collapse,
+          overflow: 'hidden',
+        }}
+      >
+        <View style={styles.topicBox}>
           <Text testID="display.topic-title" style={styles.topic} numberOfLines={1}>
             {state.topic?.title ?? ''}
           </Text>
@@ -127,34 +143,36 @@ export function DisplayScreen({ viewModel }: { viewModel: DisplayViewModel }) {
               : t('display.header.desc-latest')}
           </Text>
         </View>
-        {state.mode === 'latest' ? (
-          <View style={styles.tabs}>
-            {SORTS.map(({ sort, testID, label }) => (
-              <Pressable
-                key={sort}
-                testID={testID}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: state.sort === sort }}
-                onPress={() => void viewModel.selectSort(sort)}
-                style={[styles.tab, state.sort === sort && styles.tabSelected]}
-              >
-                <Text style={[styles.tabText, state.sort === sort && styles.tabTextSelected]}>
-                  {label()}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
       </View>
+      <View style={styles.divider} />
+      {state.mode === 'latest' ? (
+        <View style={styles.sort}>
+          <SortSelector
+            selected={state.sort}
+            onSelect={(sort) => void viewModel.selectSort(sort)}
+            options={SORTS.map(({ sort, testID, label }) => ({
+              value: sort,
+              testID,
+              label: label(),
+            }))}
+          />
+        </View>
+      ) : null}
 
       {state.status === 'loading' ? (
-        <ActivityIndicator testID="display.loading" style={styles.center} />
+        <View testID="display.loading" style={styles.skeletonGrid}>
+          {[0, 1].map((column) => (
+            <View key={column} style={styles.column}>
+              {SKELETON_RATIOS[column].map((ratio, i) => (
+                <Skeleton key={i} style={[styles.skeletonCard, { aspectRatio: ratio }]} />
+              ))}
+            </View>
+          ))}
+        </View>
       ) : null}
       {state.status === 'empty' ? (
         <View style={styles.center}>
-          <Text testID="display.empty-state" style={styles.message}>
-            {t('display.empty')}
-          </Text>
+          <EmptyState testID="display.empty-state" title={t('display.empty')} />
         </View>
       ) : null}
       {state.status === 'error' ? (
@@ -162,14 +180,13 @@ export function DisplayScreen({ viewModel }: { viewModel: DisplayViewModel }) {
           <Text testID="display.error-state" style={styles.message}>
             {state.errorKind === 'network' ? t('common.error.network') : t('display.error')}
           </Text>
-          <Pressable
+          <RoundIconButton
             testID="display.retry-button"
-            accessibilityRole="button"
+            accessibilityLabel={t('display.retry')}
+            size={48}
+            iconSize={20}
             onPress={() => void viewModel.retry()}
-            style={styles.retry}
-          >
-            <Text style={styles.retryText}>{t('display.retry')}</Text>
-          </Pressable>
+          />
         </View>
       ) : null}
 
@@ -180,9 +197,14 @@ export function DisplayScreen({ viewModel }: { viewModel: DisplayViewModel }) {
           onLayout={visible.onViewportLayout}
           onScroll={onScroll}
           scrollEventThrottle={50}
+          contentContainerStyle={styles.gridContent}
         >
           {state.refreshing ? (
-            <ActivityIndicator testID="display.refresh-indicator" style={styles.indicator} />
+            <ActivityIndicator
+              testID="display.refresh-indicator"
+              color={colors.actionPrimary}
+              style={styles.indicator}
+            />
           ) : null}
           {state.mode === 'archive' && state.featured.length > 0 ? (
             <FeaturedPager
@@ -195,15 +217,18 @@ export function DisplayScreen({ viewModel }: { viewModel: DisplayViewModel }) {
               onImageLoad={onImageLoad}
             />
           ) : null}
-          <View style={styles.columns} onLayout={visible.onColumnsLayout}>
+          <View
+            style={[styles.columns, state.mode === 'archive' && styles.columnsAfterFeatured]}
+            onLayout={visible.onColumnsLayout}
+          >
             {half.map((posts, column) => (
-              <View key={column} style={styles.column}>
+              <View key={column} testID={`display.column-${column}`} style={styles.column}>
                 {posts.map((post) => (
                   <PhotoTile
                     key={post.id}
                     post={post}
                     ids={GRID_IDS}
-                    ratio={ratios[post.id] ?? 1}
+                    ratio={ratios[post.id] ?? DEFAULT_PHOTO_RATIO}
                     onPress={() => viewModel.onPhotoPress(post.id)}
                     onLikePress={() => viewModel.onLikePress(post.id)}
                     onImageLoad={(ratio) => onImageLoad(post.id, ratio)}
@@ -214,7 +239,11 @@ export function DisplayScreen({ viewModel }: { viewModel: DisplayViewModel }) {
             ))}
           </View>
           {state.paging ? (
-            <ActivityIndicator testID="display.load-more-indicator" style={styles.indicator} />
+            <ActivityIndicator
+              testID="display.load-more-indicator"
+              color={colors.actionPrimary}
+              style={styles.indicator}
+            />
           ) : null}
         </ScrollView>
       ) : null}
@@ -284,35 +313,53 @@ function useVisibleReport(viewModel: DisplayViewModel, photos: readonly PostSumm
   };
 }
 
+// 원본 전시 레이아웃(screens-b.md §2.1~2.2): 날짜 헤더 높이 52(가로 25), 주제 영역 위 15 / 아래 24 + 0.5px 구분선,
+// 그리드 2열 간격 12, 좌우 25, 아래 40. 정렬 선택기는 구분선 바로 아래 왼쪽.
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  header: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.sm },
-  dateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  arrow: { fontSize: 22, color: colors.textPrimary, paddingHorizontal: spacing.sm },
-  disabled: { opacity: 0.3 },
-  date: { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
-  topic: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-  description: { fontSize: 13, color: colors.textSecondary, textAlign: 'center' },
-  tabs: { flexDirection: 'row', gap: spacing.sm, justifyContent: 'center' },
-  tab: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
+  dateRow: {
+    height: 52,
+    paddingLeft: spacing.screenHorizontal - 13,
+    paddingRight: spacing.screenHorizontal,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  tabSelected: { backgroundColor: colors.textPrimary },
-  tabText: { fontSize: 13, color: colors.textSecondary },
-  tabTextSelected: { color: '#FFFFFF', fontWeight: '700' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-  message: { color: colors.textSecondary, fontSize: 15 },
-  retry: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: 20,
-    backgroundColor: colors.accent,
+  arrow: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  dateButton: { minHeight: 44, justifyContent: 'center', marginRight: spacing.xs },
+  date: { ...typography.headline, color: colors.textPrimary },
+  topicBox: {
+    paddingTop: 15,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.screenHorizontal,
+    gap: spacing.md,
   },
-  retryText: { color: '#FFFFFF', fontWeight: '600' },
+  topic: { ...typography.title2, color: colors.textPrimary },
+  description: { ...typography.subheadline, color: colors.textInactive },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.divider, opacity: 0.4 },
+  sort: { paddingHorizontal: spacing.screenHorizontal },
+  center: { flex: 1, alignItems: 'center', paddingTop: 96, gap: spacing.xl },
+  message: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   indicator: { padding: spacing.lg },
-  columns: { flexDirection: 'row', gap: spacing.sm, padding: spacing.lg },
+  gridContent: { paddingBottom: spacing.xxl },
+  columns: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingHorizontal: spacing.screenHorizontal,
+    paddingTop: 11,
+  },
+  columnsAfterFeatured: { paddingTop: spacing.xs },
   column: { flex: 1, gap: spacing.md },
+  skeletonGrid: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingHorizontal: spacing.screenHorizontal,
+    paddingTop: 11,
+  },
+  skeletonCard: { width: '100%', borderRadius: radius.photoCard },
 });
+
+/** 로딩 스켈레톤 카드 비율(열마다). 원본 iOS는 카드 비율 그대로 스켈레톤을 그린다. */
+const SKELETON_RATIOS: readonly (readonly number[])[] = [
+  [3 / 4, 1, 3 / 4],
+  [1, 3 / 4, 1],
+];

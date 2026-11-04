@@ -6,6 +6,9 @@ import '../../../app/app_scope.dart';
 import '../../../core/analytics/analytics_constants.dart';
 import '../../../core/analytics/analytics_tracker.dart';
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_dialog.dart';
+import '../../../core/ui/components/chalkak_states.dart';
 import '../../../core/ui/test_id.dart';
 import '../../../core/ui/test_ids.dart';
 import 'login_view_model.dart';
@@ -30,9 +33,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  static const _kakaoYellow = Color(0xFFFEE500);
-  static const _kakaoLabel = Color(0xD9000000);
-
   StreamSubscription<LoginEvent>? _events;
   int? _shownErrorId;
   bool _viewTracked = false;
@@ -80,8 +80,12 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  /// 로그인 헤더 높이 비율(LoginScreen.swift: 화면의 0.53).
+  static const _headerFraction = 0.53;
+
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return ListenableBuilder(
       listenable: widget.viewModel,
       builder: (context, _) {
@@ -89,75 +93,213 @@ class _LoginScreenState extends State<LoginScreen> {
         return TestId(
           TestIds.loginRoot,
           child: Scaffold(
-            body: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: Center(
-                        child: TestId(
-                          TestIds.loginTagline,
-                          child: Text(
-                            Copy.authLoginTagline,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.headlineMedium,
-                          ),
-                        ),
-                      ),
+            backgroundColor: tokens.colors.background,
+            body: LayoutBuilder(
+              builder: (context, constraints) {
+                final headerHeight = constraints.maxHeight * _headerFraction;
+                return SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
                     ),
-                    SizedBox(
-                      height: 32,
-                      child: submitting
-                          ? const Center(
-                              child: TestId(
-                                TestIds.loginLoading,
-                                child: SizedBox.square(
-                                  dimension: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          height: headerHeight,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              // 배경 사진은 20% 농도로 깔고 위에 타이틀을 얹는다.
+                              Opacity(
+                                opacity: 0.2,
+                                child: Image.asset(
+                                  'assets/images/img_login_background.jpg',
+                                  fit: BoxFit.cover,
+                                  excludeFromSemantics: true,
+                                ),
+                              ),
+                              Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                  20,
+                                  MediaQuery.paddingOf(context).top + 135,
+                                  20,
+                                  0,
+                                ),
+                                child: Align(
+                                  alignment: Alignment.topLeft,
+                                  child: TestId(
+                                    TestIds.loginTagline,
+                                    child: Text(
+                                      Copy.authLoginTagline,
+                                      style: tokens.text.display.copyWith(
+                                        color: tokens.colors.textPrimary,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            )
-                          : null,
-                    ),
-                    TestId.button(
-                      TestIds.loginKakaoButton,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _kakaoYellow,
-                          foregroundColor: _kakaoLabel,
-                          minimumSize: const Size.fromHeight(52),
+                            ],
+                          ),
                         ),
-                        onPressed: submitting
-                            ? null
-                            : widget.viewModel.onKakaoPressed,
-                        child: const Text(Copy.authLoginKakao),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TestId.button(
-                      TestIds.loginGuestButton,
-                      child: TextButton(
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size.fromHeight(48),
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            tokens.spacing.screenHorizontal,
+                            60,
+                            tokens.spacing.screenHorizontal,
+                            56,
+                          ),
+                          child: Column(
+                            children: [
+                              TestId.button(
+                                TestIds.loginKakaoButton,
+                                child: _SocialButton(
+                                  label: Copy.authLoginKakao,
+                                  submitting: submitting,
+                                  onPressed: submitting
+                                      ? null
+                                      : widget.viewModel.onKakaoPressed,
+                                ),
+                              ),
+                              TestId.button(
+                                TestIds.loginGuestButton,
+                                child: _GuestLink(
+                                  onPressed: submitting
+                                      ? null
+                                      : widget.viewModel.onGuestPressed,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        onPressed: submitting
-                            ? null
-                            : widget.viewModel.onGuestPressed,
-                        child: const Text(Copy.authLoginGuest),
-                      ),
+                      ],
                     ),
-                    const SizedBox(height: 24),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
           ),
         );
       },
+    );
+  }
+}
+
+/// 소셜 로그인 버튼(screens-a §4.2): 높이 56, inputBackground, 테두리 1 border, 라운드 button(12),
+/// 로고 20 + 12 + callout. 눌림은 opacity 0.7, 진행 중이면 로고 자리에 작은 로딩을 보인다.
+class _SocialButton extends StatefulWidget {
+  const _SocialButton({
+    required this.label,
+    required this.submitting,
+    required this.onPressed,
+  });
+
+  final String label;
+  final bool submitting;
+  final VoidCallback? onPressed;
+
+  @override
+  State<_SocialButton> createState() => _SocialButtonState();
+}
+
+class _SocialButtonState extends State<_SocialButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final enabled = widget.onPressed != null;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: widget.label,
+      excludeSemantics: true,
+      onTap: widget.onPressed,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onPressed,
+        onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        child: Opacity(
+          opacity: _pressed ? 0.7 : 1,
+          child: Container(
+            height: 56,
+            decoration: BoxDecoration(
+              color: tokens.colors.inputBackground,
+              borderRadius: tokens.radius.buttonShape,
+              border: Border.all(color: tokens.colors.border),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (widget.submitting)
+                  const TestId(
+                    TestIds.loginLoading,
+                    child: ChalkakSpinner(size: 20),
+                  )
+                else
+                  Image.asset(
+                    'assets/images/img_kakao_logo.png',
+                    width: 20,
+                    height: 20,
+                    excludeFromSemantics: true,
+                  ),
+                SizedBox(width: tokens.spacing.md),
+                Text(
+                  widget.label,
+                  style: tokens.text.callout.copyWith(
+                    color: enabled
+                        ? tokens.colors.textPrimary
+                        : tokens.colors.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "로그인 없이 사진 둘러보기": subheadline textSecondary 밑줄, 최소 높이 44, 위 24.
+class _GuestLink extends StatelessWidget {
+  const _GuestLink({required this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return Padding(
+      padding: EdgeInsets.only(top: tokens.spacing.xl),
+      child: Semantics(
+        button: true,
+        enabled: onPressed != null,
+        label: Copy.authLoginGuest,
+        excludeSemantics: true,
+        onTap: onPressed,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onPressed,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+            child: Center(
+              child: Text(
+                Copy.authLoginGuest,
+                style: tokens.text.subheadline.copyWith(
+                  color: onPressed == null
+                      ? tokens.colors.textMuted
+                      : tokens.colors.textSecondary,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -171,15 +313,15 @@ class _ErrorDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return TestId(
       TestIds.loginErrorDialog,
-      child: AlertDialog(
-        title: const Text(Copy.authLoginErrorTitle),
-        content: Text(message),
+      child: ChalkakDialog(
+        title: Copy.authLoginErrorTitle,
+        message: message,
         actions: [
           TestId.button(
             TestIds.loginErrorDialogConfirmButton,
-            child: TextButton(
+            child: ChalkakDialogButton(
+              label: Copy.commonConfirm,
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text(Copy.commonConfirm),
             ),
           ),
         ],

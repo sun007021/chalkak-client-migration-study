@@ -18,6 +18,7 @@ import { RecordingLogger } from '../test/RecordingLogger';
 import { SequentialIdGenerator } from '../test/sequentialIds';
 import { watchAdded } from '../test/domWatch';
 import { outsideHome } from '../test/homeRequests';
+import { routeSettings } from '../test/settingsHarness';
 
 /** 같은 IndexedDB를 쓰는 "브라우저 탭" 하나. 탭마다 컨테이너·시계·fetch·채널 객체가 따로다. */
 function makeTab(idb: IDBFactory, hub: SessionChannelHub) {
@@ -52,9 +53,13 @@ describe('다른 탭의 로그아웃·계정 전환 전파', () => {
   it('REQ-NAV-022 탭 A에서 로그아웃하면 탭 B가 캐시를 비우고 로그인으로 replace 이동하며, 탭 A는 자기 신호를 받지 않는다', async () => {
     const { tabA, tabB } = setup();
     await tabA.container.store.write(memberSession());
-    // 서버를 부르지 않는 보호 화면(설정)에서 확인한다: 전시 화면은 열릴 때 스스로 목록을 읽으므로 "전파만으로는 서버를 부르지 않는다"를 가릴 수 없다.
+    // 설정 화면은 열릴 때 사인·푸시 설정을 한 번씩 읽는다. 그 조회가 끝난 뒤의 요청 수를 기준으로 "전파만으로는 서버를 부르지 않는다"를 확인한다.
+    routeSettings(tabB.ff);
     const { path, router } = renderApp(tabB.container, '/settings');
     await screen.findByTestId('settings.root');
+    await screen.findByTestId('settings.signature-image');
+    await waitFor(() => expect(screen.getByTestId('settings.push-topic-toggle')).toBeEnabled());
+    const requestsBeforeLogout = tabB.ff.calls.length;
     const cleared = vi.fn();
     tabB.container.userCaches.register({ clear: cleared });
     tabA.ff.route('POST /auth/logout', () => loadFixture('auth/logout__no-content.json').toResponse());
@@ -67,7 +72,7 @@ describe('다른 탭의 로그아웃·계정 전환 전파', () => {
     expect(cleared).toHaveBeenCalledTimes(1);
     expect(tabB.reasons).toEqual(['changed']); // 부팅 경로에서 게이트를 다시 판정한 결과가 로그인
     expect(tabA.reasons).toEqual(['logout']); // 탭 A는 자기 로그아웃 한 번뿐(전파 신호로 다시 emit하지 않는다)
-    expect(tabB.ff.calls).toHaveLength(0); // 탭 B는 서버를 부르지 않는다
+    expect(tabB.ff.calls).toHaveLength(requestsBeforeLogout); // 탭 B는 전파만으로 서버를 부르지 않는다
     expect(await tabB.container.store.read()).toMatchObject({ userId: null, tokens: null });
   });
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
+import '../../../core/ui/components/chalkak_dialog.dart';
 import '../../../core/ui/test_id.dart';
 import '../../../core/ui/test_ids.dart';
 import '../domain/boot_view_model.dart';
@@ -14,11 +16,17 @@ class BootScreen extends StatefulWidget {
     required this.viewModel,
     required this.onReady,
     required this.onUpdatePressed,
+    required this.onCancelPressed,
+    required this.showCancel,
   });
 
   final BootViewModel viewModel;
   final void Function(BootReady ready) onReady;
   final VoidCallback onUpdatePressed;
+  final VoidCallback onCancelPressed;
+
+  /// "취소" 버튼 노출 정책(Android true, iOS false). 주입한 값으로만 정한다.
+  final bool showCancel;
 
   @override
   State<BootScreen> createState() => _BootScreenState();
@@ -59,20 +67,30 @@ class _BootScreenState extends State<BootScreen> {
         return PopScope(
           canPop: !forced,
           child: Scaffold(
+            // 런치 화면과 이어지도록 같은 바탕색·로고(Info.plist ChalkakLogoBackground, 220x220).
+            backgroundColor: context.tokens.colors.logoBackground,
             body: Stack(
               children: [
                 Center(
                   child: TestId(
                     TestIds.splashLogo,
-                    child: Text(
-                      Copy.appName,
-                      style: Theme.of(context).textTheme.displayMedium,
+                    child: Image.asset(
+                      'assets/images/ChalkakLaunchLogo.png',
+                      width: 220,
+                      height: 220,
+                      semanticLabel: Copy.appName,
                     ),
                   ),
                 ),
                 if (forced) ...[
-                  const ModalBarrier(dismissible: false, color: Colors.black54),
-                  _UpdateDialog(onPressed: widget.onUpdatePressed),
+                  ModalBarrier(
+                    dismissible: false,
+                    color: context.tokens.colors.scrim,
+                  ),
+                  _UpdateDialog(
+                    onUpdate: widget.onUpdatePressed,
+                    onCancel: widget.showCancel ? widget.onCancelPressed : null,
+                  ),
                 ],
               ],
             ),
@@ -84,30 +102,36 @@ class _BootScreenState extends State<BootScreen> {
 }
 
 class _UpdateDialog extends StatelessWidget {
-  const _UpdateDialog({required this.onPressed});
+  const _UpdateDialog({required this.onUpdate, required this.onCancel});
 
-  final VoidCallback onPressed;
+  final VoidCallback onUpdate;
+  final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: TestId(
         TestIds.updateGateDialog,
-        child: AlertDialog(
-          title: const TestId(
-            TestIds.updateGateTitle,
-            child: Text(Copy.bootUpdateTitle),
-          ),
-          content: const TestId(
-            TestIds.updateGateMessage,
-            child: Text(Copy.bootUpdateBody),
-          ),
+        child: ChalkakDialog(
+          title: Copy.bootUpdateTitle,
+          titleId: TestIds.updateGateTitle,
+          message: Copy.bootUpdateBody,
+          messageId: TestIds.updateGateMessage,
           actions: [
+            if (onCancel != null)
+              TestId.button(
+                TestIds.updateGateCancelButton,
+                child: ChalkakDialogButton(
+                  kind: ChalkakDialogButtonKind.cancel,
+                  label: Copy.bootUpdateCancel,
+                  onPressed: onCancel,
+                ),
+              ),
             TestId.button(
               TestIds.updateGateUpdateButton,
-              child: FilledButton(
-                onPressed: onPressed,
-                child: const Text(Copy.bootUpdateButton),
+              child: ChalkakDialogButton(
+                label: Copy.bootUpdateButton,
+                onPressed: onUpdate,
               ),
             ),
           ],

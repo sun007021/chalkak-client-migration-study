@@ -1,11 +1,14 @@
 package com.stonefive.chalkak.ui.main
 
+import com.stonefive.chalkak.ui.theme.ChalkakTheme
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -21,6 +24,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.ui.display.DisplayRoute
@@ -52,6 +56,7 @@ import kr.chalkak.core.data.post.LikeController
 import kr.chalkak.core.data.post.PostChanges
 import kr.chalkak.core.data.post.PostSort
 import kr.chalkak.feature.aireview.AiReviewStateHolder
+import kr.chalkak.feature.auth.AccountEffect
 import kr.chalkak.feature.auth.HomeMode
 import kr.chalkak.feature.display.DisplayStateHolder
 import kr.chalkak.feature.display.FeedEntry
@@ -105,7 +110,7 @@ class ScrollToTopSignal {
 @Composable
 fun TabPlaceholder(tab: Tab, modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize().testTag("${tab.analyticsName}.root"), contentAlignment = Alignment.Center) {
-        Text(text = LocalCopy.current[tab.labelCopyKey], style = MaterialTheme.typography.titleMedium)
+        Text(text = LocalCopy.current[tab.labelCopyKey], style = ChalkakTheme.typography.headline)
     }
 }
 
@@ -235,6 +240,19 @@ private fun MainHostContent(
         homeUnread?.attach(homeHolder)
         onDispose { homeUnread?.detach(homeHolder) }
     }
+    // Logout / withdrawal end the session wherever the user is by then: the settings route may have left the composition meanwhile.
+    // The holders are the settings route's own (same key), built here as soon as the host composes.
+    deps.newSettingsHolders?.let { create ->
+        val mode = navState.accessMode
+        val holders = rememberStateHolder("settings-$sessionKey-$mode") { scope -> create(scope, mode.toHomeMode()) }
+        LaunchedEffect(holders.account, coordinator) {
+            holders.account.effects.collect { effect ->
+                when (effect) {
+                    AccountEffect.GoToLogin -> coordinator.onAccountEnded()
+                }
+            }
+        }
+    }
     val homeList = rememberLazyListState()
     val idleSignal = remember { ScrollToTopSignal() }
 
@@ -328,7 +346,6 @@ private fun MainHostContent(
                         onChangeSignature = coordinator::onOpenChangeSignature,
                         onShowDocument = coordinator::onShowDocument,
                         onOpenSystemNotificationSettings = { deps.openSystemNotificationSettings() },
-                        onAccountEnded = coordinator::onAccountEnded,
                         onLoginRequired = { }, // the 401 also ends the session through AuthEvent.GoToLogin (as for feed)
                     )
                     if (route is Route.TermsDocument) {
@@ -370,6 +387,10 @@ private fun MainHostContent(
                     rememberStateHolder("ai-$sessionKey-${slot.id}") { scope -> create(scope) }
                 }
                 slot.aiHolder = aiHolder
+                // screens-b 4.2: the feed content fades in (PHOTO_CONTENT_FADE 700ms, FastOutSlowIn); the shared photo morph is not ported.
+                val fade = remember(slot.id) { Animatable(0f) }
+                LaunchedEffect(slot.id) { fade.animateTo(1f, tween(PHOTO_CONTENT_FADE_MILLIS, easing = FastOutSlowInEasing)) }
+                Box(Modifier.fillMaxSize().graphicsLayer { alpha = fade.value }) {
                 FeedRoute(
                     holder = holder,
                     remoteImage = deps.photo,
@@ -381,6 +402,7 @@ private fun MainHostContent(
                     finishOnLeave = false,
                     aiReview = aiHolder,
                 )
+                }
             }
             Route.PhotoUpload -> {
                 val topicDate = session.uploadTopicDate
@@ -551,3 +573,6 @@ private fun AccessMode.toHomeMode(): HomeMode = when (this) {
     AccessMode.Member -> HomeMode.Member
     AccessMode.Guest -> HomeMode.Guest
 }
+
+/** Feed content fade-in (screens-a 9 / screens-b 4.2, original `PHOTO_CONTENT_FADE_DURATION_MILLIS`). */
+private const val PHOTO_CONTENT_FADE_MILLIS = 700

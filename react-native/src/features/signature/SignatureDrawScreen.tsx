@@ -1,5 +1,5 @@
 import { memo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
@@ -10,6 +10,11 @@ import type { SignatureDrawViewModel } from './SignatureDrawViewModel';
 import { SignaturePadGesture } from './SignaturePadGesture';
 import { strokeToSvgPath } from './SignatureStrokePath';
 import type { Stroke } from './Stroke';
+import { colors, radius, spacing, typography } from '../../shared/design/tokens';
+import { BackButton } from '../../shared/ui/BackButton';
+import { ChalkakButton } from '../../shared/ui/Button';
+import { Icon } from '../../shared/ui/icons/Icon';
+import { Text } from '../../shared/ui/Text';
 
 export type SignatureDrawScreenProps = {
   viewModel: SignatureDrawViewModel;
@@ -18,8 +23,10 @@ export type SignatureDrawScreenProps = {
   onBack: () => void;
 };
 
-const STROKE_COLOR = '#111111';
-const SCREEN_STROKE_WIDTH = 6;
+// 원본 사인 패드(screens-a.md §6.1): 어두운 캔버스(actionPrimary) 위에 흰 획, 굵기 4, 점선 테두리 textOnImage 28%.
+const STROKE_COLOR = colors.textOnImage;
+const SCREEN_STROKE_WIDTH = 4;
+const PLACEHOLDER = '사인';
 
 // 제목·안내의 첫 줄만 testID 요소에 두고 나머지는 다음 줄 요소에 둔다(테스트가 첫 줄 문구로 조회한다).
 const firstLine = (text: string): string => text.split('\n')[0];
@@ -39,17 +46,11 @@ export function SignatureDrawScreen({ viewModel, mode, onBack }: SignatureDrawSc
     <View
       testID="signature.root"
       accessibilityValue={{ text: mode }}
-      style={[styles.root, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 16 }]}
+      style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom + 18 }]}
     >
-      <Pressable
-        testID="signature.back-button"
-        accessibilityRole="button"
-        onPress={onBack}
-        hitSlop={12}
-        style={styles.back}
-      >
-        <Text style={styles.backText}>‹</Text>
-      </Pressable>
+      <View style={styles.backRow}>
+        <BackButton testID="signature.back-button" onPress={onBack} />
+      </View>
       <View style={styles.titleBox}>
         <Text testID="signature.title" style={styles.title}>
           {firstLine(titleText)}
@@ -62,22 +63,32 @@ export function SignatureDrawScreen({ viewModel, mode, onBack }: SignatureDrawSc
         </Text>
         <Text style={styles.guide}>{otherLines(guideText)}</Text>
       </View>
-      <View
-        testID="signature.canvas"
-        style={styles.pad}
-        onLayout={(event) => gesture.setWidth(event.nativeEvent.layout.width)}
-        {...gesture.responder.panHandlers}
-      >
-        <Svg width="100%" height="100%" viewBox={viewBox} pointerEvents="none">
-          {strokes.map((stroke, index) => (
-            <StrokeShape key={index} stroke={stroke} />
-          ))}
-        </Svg>
+      <View style={styles.padFrame}>
+        <View
+          testID="signature.canvas"
+          style={styles.pad}
+          onLayout={(event) => gesture.setWidth(event.nativeEvent.layout.width)}
+          {...gesture.responder.panHandlers}
+        >
+          <View pointerEvents="none" style={styles.dashed} />
+          <Svg width="100%" height="100%" viewBox={viewBox} pointerEvents="none">
+            {strokes.map((stroke, index) => (
+              <StrokeShape key={index} stroke={stroke} />
+            ))}
+          </Svg>
+          {strokes.length === 0 ? (
+            <Text pointerEvents="none" style={styles.placeholder}>
+              {PLACEHOLDER}
+            </Text>
+          ) : null}
+        </View>
         {strokes.length === 0 ? (
-          <Text testID="signature.canvas-hint" pointerEvents="none" style={styles.hint}>
+          <Text testID="signature.canvas-hint" style={styles.caption}>
             {t('onb.sign.pad-hint')}
           </Text>
-        ) : null}
+        ) : (
+          <Text style={styles.caption}>{t('onb.sign.pad-hint')}</Text>
+        )}
       </View>
       {error ? (
         <Text testID="signature.error-message" accessibilityRole="alert" style={styles.error}>
@@ -90,29 +101,34 @@ export function SignatureDrawScreen({ viewModel, mode, onBack }: SignatureDrawSc
           accessibilityRole="button"
           disabled={!canUndo}
           onPress={() => viewModel.undo()}
-          style={[styles.tool, !canUndo && styles.off]}
+          style={styles.tool}
         >
-          <Text style={styles.toolText}>{t('onb.sign.undo')}</Text>
+          <View style={styles.flip}>
+            <Icon
+              name="ic_rotate_right"
+              size={15}
+              color={canUndo ? colors.textPrimary : colors.textMuted}
+            />
+          </View>
+          <Text style={[styles.toolText, !canUndo && styles.toolOff]}>{t('onb.sign.undo')}</Text>
         </Pressable>
         <Pressable
           testID="signature.clear-button"
           accessibilityRole="button"
           disabled={!canClear}
           onPress={() => viewModel.clear()}
-          style={[styles.tool, !canClear && styles.off]}
+          style={styles.tool}
         >
-          <Text style={styles.toolText}>{t('onb.sign.clear')}</Text>
+          <Text style={[styles.toolText, !canClear && styles.toolOff]}>{t('onb.sign.clear')}</Text>
         </Pressable>
       </View>
-      <Pressable
+      <View style={styles.spacer} />
+      <ChalkakButton
         testID="signature.submit-button"
-        accessibilityRole="button"
+        label={t('onb.sign.confirm')}
         disabled={!canSubmit}
         onPress={() => void viewModel.confirm()}
-        style={[styles.submit, !canSubmit && styles.submitOff]}
-      >
-        <Text style={styles.submitText}>{t('onb.sign.confirm')}</Text>
-      </Pressable>
+      />
     </View>
   );
 }
@@ -139,45 +155,75 @@ const StrokeShape = memo(function StrokeShape({ stroke }: { stroke: Stroke }) {
 });
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#FFFFFF', paddingHorizontal: 24 },
-  back: { width: 44, height: 44, justifyContent: 'center' },
-  backText: { fontSize: 32, color: '#111111' },
-  titleBox: { marginTop: 8 },
-  title: { fontSize: 26, fontWeight: '700', lineHeight: 36, color: '#111111' },
-  guideBox: { marginTop: 12 },
-  guide: { fontSize: 14, lineHeight: 20, color: '#666666' },
+  root: {
+    flex: 1,
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.screenHorizontal,
+  },
+  backRow: { marginLeft: -12, height: 50, justifyContent: 'center' },
+  titleBox: {},
+  title: { ...typography.title1, color: colors.textPrimary },
+  guideBox: { marginTop: 30 },
+  guide: { ...typography.subheadline, color: colors.textSecondary },
+  padFrame: {
+    marginTop: 32,
+    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: 14,
+    borderRadius: radius.large,
+    borderWidth: 1,
+    borderColor: 'rgba(43,39,36,0.12)',
+    backgroundColor: colors.inputBackground,
+  },
   pad: {
-    marginTop: 24,
     width: '100%',
     aspectRatio: 1,
-    borderRadius: 16,
-    backgroundColor: '#F4F4F4',
+    borderRadius: radius.button,
+    backgroundColor: colors.actionPrimary,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  hint: { position: 'absolute', color: '#AAAAAA', fontSize: 15 },
-  error: { marginTop: 12, textAlign: 'center', color: '#D32F2F', fontSize: 13 },
-  tools: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginTop: 16 },
-  tool: {
-    height: 40,
-    paddingHorizontal: 18,
-    borderRadius: 20,
+  dashed: {
+    ...StyleSheet.absoluteFill,
+    margin: 1,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#CCCCCC',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255,255,255,0.28)',
   },
-  toolText: { fontSize: 14, color: '#333333' },
-  off: { opacity: 0.4 },
-  submit: {
-    marginTop: 'auto',
-    height: 52,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#111111',
+  placeholder: {
+    position: 'absolute',
+    ...typography.handwriting,
+    color: 'rgba(255,255,255,0.56)',
+    transform: [{ scale: 2.4 }],
   },
-  submitOff: { backgroundColor: '#CCCCCC' },
-  submitText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  caption: {
+    ...typography.footnote,
+    marginTop: spacing.md,
+    textAlign: 'center',
+    color: colors.textMuted,
+  },
+  error: {
+    ...typography.footnote,
+    marginTop: spacing.md,
+    textAlign: 'center',
+    color: colors.error,
+  },
+  tools: { flexDirection: 'row', justifyContent: 'center', gap: spacing.md, marginTop: spacing.xl },
+  tool: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  flip: { transform: [{ scaleX: -1 }] },
+  toolText: { ...typography.footnote, color: colors.textPrimary },
+  toolOff: { color: colors.textMuted },
+  spacer: { flex: 1, minHeight: spacing.lg },
 });

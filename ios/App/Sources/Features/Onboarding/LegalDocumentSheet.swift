@@ -50,26 +50,20 @@ struct LegalDocumentSheet: View {
                 .accessibilityIdentifier("legal-doc.web-content")
                 switch loadState {
                 case .loading:
-                    ProgressView().accessibilityIdentifier("legal-doc.loading")
+                    ProgressView()
+                        .tint(ChalkakColor.actionPrimary)
+                        .accessibilityIdentifier("legal-doc.loading")
                 case .loaded:
                     EmptyView()
                 case .failed:
                     VStack(spacing: ChalkakSpacing.md) {
                         Text(OnboardingCopy.termsDocError)
-                            .font(ChalkakFont.callout)
+                            .font(ChalkakFont.subheadline)
                             .foregroundStyle(ChalkakColor.textSecondary)
-                        Button {
+                        ChalkakButton(title: OnboardingCopy.termsDocRetry) {
                             loadState = .loading
                             reloadToken += 1
-                        } label: {
-                            Text(OnboardingCopy.termsDocRetry)
-                                .font(ChalkakFont.callout)
-                                .foregroundStyle(ChalkakColor.onActionPrimary)
-                                .padding(.horizontal, ChalkakSpacing.xl)
-                                .frame(minHeight: 44)
-                                .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
                         }
-                        .buttonStyle(.plain)
                         .accessibilityIdentifier("legal-doc.retry-button")
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

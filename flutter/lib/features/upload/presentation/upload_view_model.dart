@@ -231,6 +231,12 @@ class UploadViewModel extends ChangeNotifier {
 
   // ------------------------------------------------------------------ 주제
 
+  /// 위에 쌓인 화면(사진 편집기)이 닫혀 업로드 화면이 다시 보인다.
+  void onReturned() {
+    if (_disposed || !_started) return;
+    analytics.logEvent(AnalyticsEvent.screenView(ScreenNames.photoUpload));
+  }
+
   Future<void> start() {
     if (!_started) {
       _started = true;
