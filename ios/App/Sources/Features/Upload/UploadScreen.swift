@@ -56,6 +56,13 @@ private struct UploadContentView: View {
     /// 이번 촬영본을 앨범에 저장할지("저장 없이 촬영"이면 false).
     @State private var savesCapture = true
     @State private var previewImage: UIImage?
+    /// 키보드가 떠 있는가. 뒤로 가기·끌어 닫기는 키보드를 먼저 내린다(screens-b.md 5.3).
+    @State private var isKeyboardVisible = false
+    /// 키보드를 내리는 중에 눌린 뒤로 가기. 키보드가 완전히 내려간 뒤 이어서 처리한다.
+    @State private var isBackPending = false
+    @State private var scrollOffset: CGFloat = 0
+    @State private var captionFrame: CGRect = .zero
+    @State private var canDismissCurrentDrag: Bool?
 
     private var shell: MainShellViewModel { session.shell }
 
@@ -135,7 +142,7 @@ private struct UploadContentView: View {
                 title: UploadCopy.title,
                 backIdentifier: "upload.close-button",
                 titleIdentifier: "upload.title",
-                onBack: { shell.pop() }
+                onBack: requestBack
             )
             ScrollView {
                 // 원본 PhotoUploadScreen(screens-b.md 5.1): 위 24, 사진 영역(전체 폭) → 34 → 설명 입력(좌우 22) → 아래 104
@@ -144,6 +151,7 @@ private struct UploadContentView: View {
                     titleField
                         .padding(.horizontal, 22)
                         .padding(.top, 34)
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.dismissSpace)) } action: { captionFrame = $0 }
                     if case .failed(let notice) = viewModel.topic {
                         topicFailure(notice)
                             .padding(.horizontal, 22)
@@ -162,8 +170,64 @@ private struct UploadContentView: View {
                 .padding(.bottom, 104)
             }
             .scrollDismissesKeyboard(.interactively)
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, offset in
+                scrollOffset = offset
+            }
             submitButton
         }
+        .contentShape(Rectangle())
+        .coordinateSpace(name: Self.dismissSpace)
+        .simultaneousGesture(dismissGesture)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            isKeyboardVisible = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
+            isKeyboardVisible = false
+            completePendingBack()
+        }
+    }
+
+    private static let dismissSpace = "upload.dismiss"
+
+    /// 뒤로 가기: 키보드가 떠 있으면 먼저 내리고, 다 내려간 뒤 이동한다.
+    private func requestBack() {
+        guard !isBackPending else { return }
+        if isKeyboardVisible {
+            isBackPending = true
+            dismissKeyboard()
+        } else {
+            shell.pop()
+        }
+    }
+
+    private func completePendingBack() {
+        guard isBackPending else { return }
+        isBackPending = false
+        shell.pop()
+    }
+
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+
+    /// 아래로 끌어 닫기: 맨 위에서 입력칸 밖에서 시작한 세로 우세 끌기만 인정한다. 80 이상 또는 예측 140 이상이면 닫는다.
+    private var dismissGesture: some Gesture {
+        DragGesture(minimumDistance: 20, coordinateSpace: .named(Self.dismissSpace))
+            .onChanged { value in
+                guard canDismissCurrentDrag == nil else { return }
+                // 키보드가 드래그 도중 내려가더라도 같은 드래그로 화면을 닫지 않는다.
+                canDismissCurrentDrag = !isKeyboardVisible && !viewModel.isSubmitting
+                    && scrollOffset <= 1 && !captionFrame.contains(value.startLocation)
+            }
+            .onEnded { value in
+                let canDismiss = canDismissCurrentDrag == true
+                canDismissCurrentDrag = nil
+                guard canDismiss, !viewModel.isSubmitting, !isKeyboardVisible,
+                      value.translation.height > abs(value.translation.width) else { return }
+                if value.translation.height > 80 || value.predictedEndTranslation.height > 140 {
+                    requestBack()
+                }
+            }
     }
 
     private func topicFailure(_ notice: Notice) -> some View {
