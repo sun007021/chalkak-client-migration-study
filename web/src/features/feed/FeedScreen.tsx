@@ -7,6 +7,9 @@ import { webOnlyCopy } from '../../copy/webOnly';
 import { useScreenView } from '../../core/analytics/useScreenView';
 import { useOwnedViewModel } from '../../core/state/useOwnedViewModel';
 import { useViewModel } from '../../core/state/useViewModel';
+import { color, font, space } from '../../design/tokens';
+import { Button } from '../../core/ui/Button';
+import { IcArrowBack, IcDelete, IcEdit } from '../../core/ui/icons.generated';
 import { LoadingIndicator } from '../../core/ui/StateViews';
 import { useDialogFocus } from '../../core/ui/useDialogFocus';
 import { useScrollRestore } from '../../core/ui/useScrollRestore';
@@ -94,26 +97,42 @@ function FeedBody({ vm, aiVm, previewUrl, onClose }: { vm: FeedViewModel; aiVm: 
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [vm]);
   const { view } = state;
+  const showActions = view.kind === 'content' && state.post !== null;
   return (
-    <div data-testid="feed.root">
-      <header style={{ padding: '8px 16px' }}>
-        <button type="button" data-testid="feed.back-button" aria-label={t('common.close')} onClick={onClose}>
-          <span aria-hidden="true">‹</span>
+    <div data-testid="feed.root" className="ck-screen" style={{ paddingBottom: 'calc(var(--space-xxl) + var(--safe-bottom))' }}>
+      {/* 상단 바(원본 FeedTopBar): 뒤로(48) + 오른쪽 수정(ic_edit, actionPrimary)·삭제(ic_delete, error) 아이콘 버튼 */}
+      <header style={{ position: 'sticky', top: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 72, padding: `var(--safe-top) var(--space-md)`, background: 'rgba(247, 246, 243, 0.96)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+        <button type="button" className="ck-icon-btn" style={{ width: 48, height: 48 }} data-testid="feed.back-button" aria-label={t('common.close')} onClick={onClose}>
+          <IcArrowBack size={24} />
         </button>
+        {showActions ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: space.xs }}>
+            {state.canEditTitle ? (
+              <button type="button" className="ck-icon-btn" style={{ width: 48, height: 48, color: color.actionPrimary }} data-testid="feed.edit-title-button" aria-label={t('feed.edit.title')} onClick={() => vm.openTitleEdit()}>
+                <IcEdit size={24} />
+              </button>
+            ) : null}
+            {state.isMine ? (
+              <button type="button" className="ck-icon-btn" style={{ width: 48, height: 48, color: color.error }} data-testid="feed.delete-button" aria-label={t('feed.delete.title')} disabled={!state.canDelete} onClick={() => vm.openDelete()}>
+                <IcDelete size={24} />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </header>
-      {view.kind === 'loading' && previewUrl ? <img src={previewUrl} alt={webOnlyCopy['feed.preview-alt']} style={{ display: 'block', width: '100%', maxHeight: '60vh', objectFit: 'contain', background: '#e5e5e5' }} /> : null}
+      {view.kind === 'loading' && previewUrl ? <img src={previewUrl} alt={webOnlyCopy['feed.preview-alt']} style={{ display: 'block', width: '100%', maxHeight: '60vh', objectFit: 'contain', background: color.calendarCell }} /> : null}
       {view.kind === 'loading' ? <LoadingIndicator screenId="feed" /> : null}
       {view.kind === 'not-found' ? (
-        <p data-testid="feed.not-found-state" style={{ padding: 16 }}>
-          {t('feed.not-found')}
-        </p>
+        <div data-testid="feed.not-found-state" className="ck-state" style={{ paddingTop: 96 }}>
+          <span className="ck-state__title">{t('feed.not-found')}</span>
+        </div>
       ) : null}
       {view.kind === 'error' ? (
-        <div style={{ padding: 16 }}>
-          <p data-testid="feed.error-state">{view.reason === 'network' ? t('common.error.network') : view.reason === 'invalid' ? t('feed.error.invalid') : t('feed.error.load')}</p>
-          <button type="button" data-testid="feed.retry-button" onClick={() => void vm.retry()}>
+        <div className="ck-state" style={{ gap: space.xl, paddingTop: 96 }}>
+          <p data-testid="feed.error-state" className="ck-state__title">{view.reason === 'network' ? t('common.error.network') : view.reason === 'invalid' ? t('feed.error.invalid') : t('feed.error.load')}</p>
+          <Button variant="outlined" compact data-testid="feed.retry-button" onClick={() => void vm.retry()}>
             {t('common.retry')}
-          </button>
+          </Button>
         </div>
       ) : null}
       {view.kind === 'content' && state.post ? <Content vm={vm} aiVm={aiVm} state={state} post={state.post} /> : null}
@@ -125,37 +144,32 @@ function FeedBody({ vm, aiVm, previewUrl, onClose }: { vm: FeedViewModel; aiVm: 
 
 function Content({ vm, aiVm, state, post }: { vm: FeedViewModel; aiVm: FeedAiViewModel; state: FeedState; post: FeedPost }): ReactNode {
   return (
-    <article style={{ padding: '0 16px 16px' }}>
+    <article>
+      {/* 주제 영역(원본 FeedTopic): 좌우 25, 위 16, 아래 40. 날짜 라벨 subheadline + 주제 display */}
+      <div style={{ padding: `${space.lg} var(--space-screen-horizontal) 40px` }}>
+        {post.topicDate ? (
+          <p data-testid="feed.date-label" style={{ margin: 0, ...font('subheadline') }}>
+            {t('feed.date-label', { M: Number(post.topicDate.slice(5, 7)), d: Number(post.topicDate.slice(8, 10)) })}
+          </p>
+        ) : null}
+        <h1 style={{ margin: `${space.sm} 0 0`, ...font('display'), minHeight: '2.5625rem' }}>{post.topicTitle ?? ' '}</h1>
+      </div>
       <ZoomablePhoto post={post} />
-      {post.topicDate ? (
-        <p data-testid="feed.date-label" style={{ margin: '12px 0 0' }}>
-          {t('feed.date-label', { M: Number(post.topicDate.slice(5, 7)), d: Number(post.topicDate.slice(8, 10)) })}
-        </p>
-      ) : null}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <h1 data-testid="feed.title" style={{ margin: '4px 0', fontSize: 20 }}>
-          {post.title ?? t('feed.title-none')}
-        </h1>
+      {/* 좋아요 행(원본 FeedLikeRow): 높이 57, 좌우 14. 왼쪽 하트 + 숫자, 오른쪽 제목(textSecondary, 1줄). 바닥 구분선 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: space.md, minHeight: 57, padding: '0 14px', borderBottom: `1px solid ${color.border}` }}>
         <LikeButton buttonTestId="feed.like-button" countTestId="feed.like-count" isLiked={post.isLiked} likeCount={post.likeCount} disabled={!state.canLike} onPress={() => void vm.onLikePress()} />
+        <p data-testid="feed.title" style={{ flex: 1, minWidth: 0, margin: 0, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: color.textSecondary, ...font('body') }}>
+          {post.title ?? t('feed.title-none')}
+        </p>
       </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        {state.canEditTitle ? (
-          <button type="button" data-testid="feed.edit-title-button" onClick={() => vm.openTitleEdit()}>
-            {t('feed.edit.title')}
-          </button>
-        ) : null}
-        {state.isMine ? (
-          <button type="button" data-testid="feed.delete-button" disabled={!state.canDelete} onClick={() => vm.openDelete()}>
-            {t('feed.delete.title')}
-          </button>
-        ) : null}
+      <div style={{ padding: `${space.lg} var(--space-screen-horizontal) 0` }}>
+        <FeedAiSection vm={aiVm} isMine={state.isMine} topicDate={post.topicDate} />
       </div>
-      <FeedAiSection vm={aiVm} isMine={state.isMine} topicDate={post.topicDate} />
     </article>
   );
 }
 
-const photoFrame: CSSProperties = { position: 'relative', overflow: 'hidden', touchAction: 'pan-y', borderRadius: 8, background: '#e5e5e5' };
+const photoFrame: CSSProperties = { position: 'relative', overflow: 'hidden', touchAction: 'pan-y', background: color.calendarCell };
 
 /** 원본 사진 위에 작가 사인. 핀치(두 손가락)·Ctrl+휠로 1~4배 확대하고 놓으면 돌아온다(REQ-FEED-011, 012). */
 function ZoomablePhoto({ post }: { post: FeedPost }): ReactNode {
@@ -240,7 +254,7 @@ function ZoomablePhoto({ post }: { post: FeedPost }): ReactNode {
           draggable={false}
         />
         {post.signatureOriginalImageUrl ? (
-          <img data-testid="feed.signature-image" src={post.signatureOriginalImageUrl} alt="" style={{ position: 'absolute', right: 8, bottom: 8, width: '30%', pointerEvents: 'none' }} draggable={false} />
+          <img data-testid="feed.signature-image" src={post.signatureOriginalImageUrl} alt="" style={{ position: 'absolute', right: 8, bottom: 8, width: 70, height: 52, objectFit: 'contain', pointerEvents: 'none' }} draggable={false} />
         ) : (
           <span data-testid="feed.signature-image" />
         )}
@@ -248,9 +262,6 @@ function ZoomablePhoto({ post }: { post: FeedPost }): ReactNode {
     </div>
   );
 }
-
-const overlay: CSSProperties = { position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)' };
-const sheet: CSSProperties = { width: 'min(90vw, 360px)', padding: 16, borderRadius: 12, background: '#fff' };
 
 function TitleDialog({ vm, state }: { vm: FeedViewModel; state: FeedState }): ReactNode {
   const dialog = state.titleDialog;
@@ -263,34 +274,36 @@ function TitleDialog({ vm, state }: { vm: FeedViewModel; state: FeedState }): Re
     void vm.saveTitle();
   };
   return (
-    <div style={overlay}>
-      <div ref={ref} data-testid="feed.title-dialog" role="dialog" aria-modal="true" aria-labelledby={`${inputId}-title`} style={sheet}>
+    <div className="ck-overlay" style={{ zIndex: 200 }}>
+      <div ref={ref} data-testid="feed.title-dialog" role="dialog" aria-modal="true" aria-labelledby={`${inputId}-title`} className="ck-dialog" style={{ maxWidth: 340, padding: space.xl, textAlign: 'left' }}>
         <form onSubmit={submit}>
-          <h2 id={`${inputId}-title`} style={{ margin: '0 0 8px', fontSize: 16 }}>
+          <h2 id={`${inputId}-title`} className="ck-dialog__title">
             {t('feed.edit.title')}
           </h2>
-          <label htmlFor={inputId} style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
+          <label htmlFor={inputId} className="visually-hidden">
             {t('feed.edit.title')}
           </label>
-          <input
-            id={inputId}
-            ref={inputRef}
-            data-testid="feed.title-input"
-            value={dialog.input}
-            placeholder={t('feed.edit.placeholder')}
-            readOnly={dialog.saving}
-            onChange={(event) => vm.setTitleInput(event.target.value)}
-            style={{ width: '100%', boxSizing: 'border-box' }}
-          />
-          {dialog.error ? <p role="alert">{dialog.error}</p> : null}
+          <div className="ck-field" style={{ marginTop: space.lg }}>
+            <input
+              id={inputId}
+              ref={inputRef}
+              data-testid="feed.title-input"
+              value={dialog.input}
+              placeholder={t('feed.edit.placeholder')}
+              readOnly={dialog.saving}
+              onChange={(event) => vm.setTitleInput(event.target.value)}
+              style={{ ...font('subheadline') }}
+            />
+          </div>
+          {dialog.error ? <p role="alert" style={{ marginTop: space.md, color: color.error, ...font('footnote') }}>{dialog.error}</p> : null}
           {dialog.saving ? <span data-testid="feed.title-saving" role="status" aria-busy="true" /> : null}
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
-            <button type="button" data-testid="feed.title-cancel-button" disabled={dialog.saving} onClick={() => vm.cancelTitleEdit()}>
+          <div className="ck-dialog__actions" style={{ marginTop: 20 }}>
+            <Button variant="secondary" data-testid="feed.title-cancel-button" disabled={dialog.saving} onClick={() => vm.cancelTitleEdit()}>
               {t('feed.edit.cancel')}
-            </button>
-            <button type="submit" data-testid="feed.title-save-button" disabled={dialog.saving}>
+            </Button>
+            <Button type="submit" data-testid="feed.title-save-button" disabled={dialog.saving}>
               {dialog.saving ? t('feed.edit.saving') : t('feed.edit.save')}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -304,27 +317,27 @@ function DeleteDialog({ vm, state }: { vm: FeedViewModel; state: FeedState }): R
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   useDialogFocus(ref, deleting ? undefined : () => vm.cancelDelete(), cancelRef);
   return (
-    <div style={overlay}>
-      <div ref={ref} data-testid="feed.delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="feed-delete-title" aria-describedby="feed-delete-body" style={sheet}>
-        <h2 id="feed-delete-title" data-testid="feed.delete-title" style={{ margin: '0 0 8px', fontSize: 16 }}>
+    <div className="ck-overlay" style={{ zIndex: 200 }}>
+      <div ref={ref} data-testid="feed.delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="feed-delete-title" aria-describedby="feed-delete-body" className="ck-dialog">
+        <h2 id="feed-delete-title" data-testid="feed.delete-title" className="ck-dialog__title">
           {t('feed.delete.title')}
         </h2>
-        <p id="feed-delete-body" data-testid="feed.delete-body">
+        <p id="feed-delete-body" data-testid="feed.delete-body" className="ck-dialog__message">
           {t('feed.delete.body')}
         </p>
         {deleting ? (
-          <span data-testid="feed.deleting" role="status" aria-busy="true">
+          <span data-testid="feed.deleting" role="status" aria-busy="true" style={{ display: 'block', marginTop: space.md, color: color.textMuted, ...font('footnote') }}>
             {webOnlyCopy['feed.deleting']}
           </span>
         ) : null}
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+        <div className="ck-dialog__actions">
           {/* 되돌릴 수 없는 삭제라 처음 포커스는 취소에 둔다. */}
-          <button ref={cancelRef} type="button" data-testid="feed.delete-cancel-button" disabled={deleting} onClick={() => vm.cancelDelete()}>
+          <Button ref={cancelRef} variant="secondary" data-testid="feed.delete-cancel-button" disabled={deleting} onClick={() => vm.cancelDelete()}>
             {t('feed.delete.cancel')}
-          </button>
-          <button type="button" data-testid="feed.delete-confirm-button" disabled={deleting} onClick={() => void vm.confirmDelete()}>
+          </Button>
+          <Button variant="destructive" data-testid="feed.delete-confirm-button" disabled={deleting} onClick={() => void vm.confirmDelete()}>
             {t('feed.delete.confirm')}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

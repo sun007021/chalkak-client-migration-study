@@ -5,6 +5,8 @@ import { useContainer } from '../../app/AppContext';
 import { DEV_SESSION_ENABLED, DEV_SESSION_PATH } from '../../app/devSession';
 import { ROUTES } from '../../app/paths';
 import { t } from '../../copy/ko';
+import { images } from '../../assets/images';
+import { color, font } from '../../design/tokens';
 import { useOwnedViewModel } from '../../core/state/useOwnedViewModel';
 import { useViewModel } from '../../core/state/useViewModel';
 import { AlertDialog } from '../../core/ui/AlertDialog';
@@ -63,23 +65,31 @@ function LoginView({ vm }: { vm: LoginViewModel }): ReactNode {
     if (to) navigate(to, { replace: true });
   };
   return (
-    <div data-testid="login.root" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 16, padding: 16 }}>
-      <h1 data-testid="login.tagline" style={{ whiteSpace: 'pre-line' }}>
-        {t('auth.login.tagline')}
-      </h1>
-      <button type="button" data-testid="login.kakao-button" disabled={busy} onClick={() => void vm.loginWithKakao().then(go)}>
-        {t('auth.login.kakao')}
-      </button>
-      <button type="button" data-testid="login.guest-button" disabled={busy} onClick={() => void vm.browseAsGuest().then(go)}>
-        {t('auth.login.guest')}
-      </button>
-      {DEV_SESSION_ENABLED && container.devSessionEnabled && (
-        // 개발 전용: 배포 빌드에는 이 버튼이 없다.
-        <button type="button" data-testid="login.dev-bypass-button" onClick={() => navigate(DEV_SESSION_PATH)}>
-          Dev session
+    <div data-testid="login.root" className="ck-screen" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: color.background }}>
+      {/* 헤더(원본 weight 1.2 : 1): 배경 이미지 alpha 0.2 + display 타이틀 */}
+      <div style={{ position: 'relative', flex: '1.2 1 0', minHeight: 280, overflow: 'hidden' }}>
+        <img src={images.loginBackground} alt="" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.2 }} />
+        <h1 data-testid="login.tagline" style={{ position: 'relative', margin: 0, padding: 'calc(110px + env(safe-area-inset-top, 0px)) var(--space-screen-horizontal) 0', whiteSpace: 'pre-line', ...font('display'), color: color.textPrimary }}>
+          {t('auth.login.tagline')}
+        </h1>
+      </div>
+      {/* 액션: 가로 25, 소셜 버튼 사이 12, 게스트 텍스트 버튼 */}
+      <div style={{ flex: '1 1 0', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 'var(--space-md)', padding: '60px var(--space-screen-horizontal) calc(var(--space-xxl) + env(safe-area-inset-bottom, 0px))' }}>
+        <button type="button" className="ck-social-btn" data-testid="login.kakao-button" disabled={busy} onClick={() => void vm.loginWithKakao().then(go)}>
+          <img src={images.kakaoLogo} alt="" width={20} height={20} />
+          <span>{t('auth.login.kakao')}</span>
         </button>
-      )}
-      {state.busy === 'server' && <LoadingIndicator screenId="login" />}
+        <button type="button" className="ck-link" data-testid="login.guest-button" style={{ alignSelf: 'center', marginTop: 'var(--space-md)' }} disabled={busy} onClick={() => void vm.browseAsGuest().then(go)}>
+          {t('auth.login.guest')}
+        </button>
+        {DEV_SESSION_ENABLED && container.devSessionEnabled && (
+          // 개발 전용: 배포 빌드에는 이 버튼이 없다.
+          <button type="button" className="ck-link" data-testid="login.dev-bypass-button" style={{ alignSelf: 'center', color: color.textMuted }} onClick={() => navigate(DEV_SESSION_PATH)}>
+            Dev session
+          </button>
+        )}
+      </div>
+      {state.busy === 'server' && <LoadingIndicator screenId="login" variant="overlay" />}
       {state.error && <AlertDialog key={state.error.id} testId="login.error-dialog" message={state.error.message} confirmLabel={t('common.confirm')} onConfirm={() => vm.dismissError()} />}
     </div>
   );

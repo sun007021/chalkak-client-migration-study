@@ -4,6 +4,9 @@ import { Navigate, useLocation, useNavigate } from 'react-router';
 import { useContainer } from '../../app/AppContext';
 import { ROUTES, isSettingsBelow } from '../../app/paths';
 import { t } from '../../copy/ko';
+import { images } from '../../assets/images';
+import { color, font, radius } from '../../design/tokens';
+import { Button } from '../../core/ui/Button';
 import { useSignupGate } from '../onboarding/useSignupGate';
 import { useScreenView } from '../../core/analytics/useScreenView';
 import { useOwnedViewModel } from '../../core/state/useOwnedViewModel';
@@ -36,7 +39,8 @@ export function SignaturePreviewScreen({ mode }: { mode: SignatureMode }): React
   return vm ? <SignaturePreviewView vm={vm} mode={mode} png={png} /> : null;
 }
 
-const imageStyle: CSSProperties = { width: '100%', aspectRatio: '2 / 1', objectFit: 'contain', display: 'block', background: 'linear-gradient(135deg, #7a8b99, #b9a58f)', borderRadius: 12 };
+// 원본 미리보기(screens-a §6.2): 사진 5:6 라운드 18, 사인 112×84를 오른쪽 아래(안쪽 8)에 얹는다.
+const frameStyle: CSSProperties = { position: 'relative', width: '100%', aspectRatio: '5 / 6', overflow: 'hidden', borderRadius: radius.xlarge, background: color.calendarCell };
 
 function SignaturePreviewView({ vm, mode, png }: { vm: SignaturePreviewViewModel; mode: SignatureMode; png: Blob }): ReactNode {
   const container = useContainer();
@@ -62,18 +66,30 @@ function SignaturePreviewView({ vm, mode, png }: { vm: SignaturePreviewViewModel
     else navigate(plan.to, { replace: true });
   };
   return (
-    <div data-testid="signature-preview.root" data-mode={mode} style={{ minHeight: '100dvh', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16, padding: 16 }}>
-      <h1 data-testid="signature-preview.title">{t('onb.sign.preview.title')}</h1>
-      {imageUrl && <img data-testid="signature-preview.image" src={imageUrl} alt="" style={imageStyle} />}
-      {mode === 'change' && <p data-testid="signature-preview.change-notice">{t('sign.change.notice')}</p>}
-      {state.busy && <LoadingIndicator screenId="signature-preview" />}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>
-        <button type="button" data-testid="signature-preview.redraw-button" disabled={state.busy} style={{ minHeight: 48 }} onClick={() => go(vm.redraw())}>
+    <div
+      data-testid="signature-preview.root"
+      data-mode={mode}
+      className="ck-screen"
+      style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', padding: 'calc(var(--safe-top) + 50px) var(--space-screen-horizontal) calc(18px + var(--safe-bottom))', background: color.background }}
+    >
+      <h1 data-testid="signature-preview.title" style={{ ...font('title1') }}>{t('onb.sign.preview.title')}</h1>
+      {mode === 'change' && (
+        <p data-testid="signature-preview.change-notice" style={{ marginTop: 'var(--space-sm)', color: color.textMuted, ...font('subheadline') }}>
+          {t('sign.change.notice')}
+        </p>
+      )}
+      <div style={{ ...frameStyle, marginTop: mode === 'change' ? 36 : 50 }}>
+        <img src={images.previewPhoto} alt="" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        {imageUrl && <img data-testid="signature-preview.image" src={imageUrl} alt="" style={{ position: 'absolute', right: 8, bottom: 8, width: 112, height: 84, objectFit: 'contain' }} />}
+      </div>
+      {state.busy && <LoadingIndicator screenId="signature-preview" variant="overlay" />}
+      <div style={{ display: 'flex', gap: 20, marginTop: 'auto', paddingTop: 'var(--space-xl)' }}>
+        <Button variant="outlined" fill data-testid="signature-preview.redraw-button" disabled={state.busy} onClick={() => go(vm.redraw())}>
           {t('onb.sign.preview.redraw')}
-        </button>
-        <button type="button" data-testid="signature-preview.confirm-button" disabled={state.busy} style={{ minHeight: 48 }} onClick={() => void vm.confirm().then(go, () => undefined)}>
+        </Button>
+        <Button fill data-testid="signature-preview.confirm-button" disabled={state.busy} onClick={() => void vm.confirm().then(go, () => undefined)}>
           {mode === 'onboarding' ? t('onb.sign.preview.start') : t('sign.change.confirm')}
-        </button>
+        </Button>
       </div>
     </div>
   );
