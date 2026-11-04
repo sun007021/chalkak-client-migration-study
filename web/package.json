@@ -11,7 +11,9 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "gen:design": "node vite/design/generate.ts",
+    "gen:fonts": "python3 vite/design/convert-fonts.py"
   },
   "dependencies": {
     "@jsquash/webp": "1.5.0",

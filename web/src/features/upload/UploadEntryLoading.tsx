@@ -6,7 +6,10 @@ import type { UploadGate } from "./UploadGate";
 
 const overlayStyle: CSSProperties = {
   position: "fixed",
-  inset: 0,
+  top: 0,
+  bottom: 0,
+  left: "var(--column-inset)",
+  right: "var(--column-inset)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",

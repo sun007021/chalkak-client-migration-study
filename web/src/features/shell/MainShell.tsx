@@ -1,5 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
+import { color, font } from '../../design/tokens';
+import { IcBottomDisplay, IcBottomDisplaySelected, IcBottomHome, IcBottomHomeSelected, IcBottomRecord, IcBottomRecordSelected, IcBottomSetting, IcBottomSettingSelected, IcBottomWrite } from '../../core/ui/icons.generated';
+import type { IconComponent } from '../../core/ui/icons.generated';
 import { createPortal } from 'react-dom';
 import { Navigate, Outlet, useLocation, useMatches, useNavigate, useOutletContext } from 'react-router';
 import { useContainer } from '../../app/AppContext';
@@ -30,8 +33,11 @@ export const useShellContext = (): ShellContext => useOutletContext<ShellContext
 /** 하단 바를 <main> 밖에 그리기 위한 자리. 루트 레이아웃이 <main> 옆에 둔다. */
 export const BottomBarSlotContext = createContext<HTMLElement | null>(null);
 
-/** 하단 바 높이(safe-area 포함). 바 자체, 콘텐츠 하단 여백, 토스트 위치(CSS 변수)가 모두 이 값 하나를 쓴다. */
-const BAR_HEIGHT = 'calc(64px + env(safe-area-inset-bottom, 0px))';
+/**
+ * 하단 바 높이(safe-area 포함). 바 자체, 콘텐츠 하단 여백, 토스트 위치(CSS 변수)가 모두 이 값 하나를 쓴다.
+ * 원본 플랫 바(screens-a §3.3, §3.6): 위 15 + 항목 48 + 아래 10 = 73.
+ */
+const BAR_HEIGHT = 'calc(73px + env(safe-area-inset-bottom, 0px))';
 const TAB_LABELS: Readonly<Record<TabDestination, CopyKey>> = {
   home: 'nav.tab.home',
   display: 'nav.tab.display',
@@ -48,34 +54,49 @@ const TAB_TEST_IDS: Readonly<Record<TabDestination, string>> = {
 /** 탭 네 개가 놓이는 격자 칸(가운데 세 번째 칸은 업로드 버튼 자리). */
 const TAB_COLUMNS: Readonly<Record<TabDestination, number>> = { home: 1, display: 2, record: 4, settings: 5 };
 
+const TAB_ICONS: Readonly<Record<TabDestination, { off: IconComponent; on: IconComponent }>> = {
+  home: { off: IcBottomHome, on: IcBottomHomeSelected },
+  display: { off: IcBottomDisplay, on: IcBottomDisplaySelected },
+  record: { off: IcBottomRecord, on: IcBottomRecordSelected },
+  settings: { off: IcBottomSetting, on: IcBottomSettingSelected },
+};
+
+// 원본 Android ChalkakBottomBar / iOS 플랫 바(screens-a §3.3, §3.6): 흰 바탕, 위 15·아래 10, 아이콘 23 + 간격 7 + footnote 라벨.
 const barStyle: CSSProperties = {
   position: 'fixed',
-  left: 0,
-  right: 0,
+  left: 'var(--column-inset)',
+  right: 'var(--column-inset)',
   bottom: 0,
   zIndex: 100,
   display: 'grid',
   boxSizing: 'border-box',
   height: BAR_HEIGHT,
-  paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+  paddingTop: 15,
+  paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
   paddingLeft: 'env(safe-area-inset-left, 0px)',
   paddingRight: 'env(safe-area-inset-right, 0px)',
-  background: '#fff',
-  borderTop: '1px solid #e5e5e5',
+  background: color.surfaceElevated,
+  borderTop: `1px solid ${color.border}`,
 };
 const tablistStyle: CSSProperties = { gridArea: '1 / 1', display: 'grid', gridTemplateColumns: '1fr 1fr 64px 1fr 1fr', minWidth: 0 };
 const tabStyle = (tab: TabDestination, selected: boolean): CSSProperties => ({
   gridColumn: TAB_COLUMNS[tab],
   minWidth: 0,
+  minHeight: 48,
   padding: 0,
   border: 0,
   background: 'none',
-  font: 'inherit',
-  fontSize: 12,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 7,
+  ...font('footnote'),
   fontWeight: selected ? 700 : 400,
-  color: selected ? '#111' : '#666', // 흰 배경 대비 5.7:1
+  color: selected ? color.actionPrimary : color.bottomBar,
   cursor: 'pointer',
 });
+// add 버튼: ic_bottom_write(40 원, #2B2724, + 표시). 가운데 칸에 놓는다.
 const uploadStyle: CSSProperties = {
   gridArea: '1 / 1',
   justifySelf: 'center',
@@ -84,13 +105,21 @@ const uploadStyle: CSSProperties = {
   height: 48,
   padding: 0,
   border: 0,
-  borderRadius: '50%',
-  background: '#111',
-  color: '#fff',
-  fontSize: 28,
-  lineHeight: '48px',
+  background: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
   cursor: 'pointer',
 };
+
+function TabIconOn({ tab }: { tab: TabDestination }): ReactNode {
+  const Icon = TAB_ICONS[tab].on;
+  return <Icon size={23} />;
+}
+function TabIconOff({ tab }: { tab: TabDestination }): ReactNode {
+  const Icon = TAB_ICONS[tab].off;
+  return <Icon size={23} />;
+}
 
 function currentTab(matches: readonly { handle?: unknown }[]): TabDestination | null {
   for (const match of matches) {
@@ -166,12 +195,13 @@ function BottomBar({ vm }: { vm: MainShellViewModel }): ReactNode {
             onClick={() => onSelect(tab)}
             onKeyDown={(event) => onKeyDown(event, tab)}
           >
-            {t(TAB_LABELS[tab])}
+            {selected === tab ? <TabIconOn tab={tab} /> : <TabIconOff tab={tab} />}
+            <span>{t(TAB_LABELS[tab])}</span>
           </button>
         ))}
       </div>
       <button type="button" data-testid="bottom-bar.upload-button" aria-label={t('nav.tab.upload.a11y')} style={uploadStyle} onClick={() => vm.pressUpload()}>
-        <span aria-hidden="true">+</span>
+        <IcBottomWrite size={40} />
       </button>
     </nav>
   );

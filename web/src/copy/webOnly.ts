@@ -3,6 +3,10 @@
  * 홈 새로고침 버튼은 모바일의 당겨서 새로고침에 해당하는 Web 대체 수단이다(home.md 새로고침 방식).
  */
 export const webOnlyCopy = {
+  /** 공통 상단 바 뒤로 버튼의 접근성 이름(원본 ChalkakNavigationButton .back). */
+  'common.back': '뒤로 가기',
+  /** 공통 이미지 자리표시의 접근성 이름. */
+  'common.image-error': '사진을 불러오지 못했어요',
   'home.refresh': '새로고침',
   /** 홈 새로고침 중 표시(home.refresh-indicator)의 텍스트. */
   'home.refresh-indicator': '새로고침 중',

@@ -1,10 +1,10 @@
 import { useId, useRef } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { t } from '../../copy/ko';
+import { Button } from './Button';
 import { useDialogFocus } from './useDialogFocus';
 
-const overlay: CSSProperties = { position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)', padding: 16 };
-const sheet: CSSProperties = { background: 'var(--color-surface, #fff)', color: 'inherit', borderRadius: 12, padding: 16, maxWidth: 360, width: '100%' };
+const overlay: CSSProperties = { zIndex: 200 };
 
 export interface ConfirmDialogProps {
   message: string;
@@ -29,18 +29,18 @@ export function ConfirmDialog({ message, confirmLabel, busy = false, destructive
   const messageId = useId();
   useDialogFocus(ref, busy ? undefined : onCancel, cancelRef);
   return (
-    <div style={overlay}>
-      <div ref={ref} data-testid={`${testIdPrefix}-dialog`} role="alertdialog" aria-modal="true" aria-labelledby={messageId} aria-busy={busy || undefined} style={sheet}>
-        <p id={messageId} style={{ marginTop: 0 }}>
+    <div className="ck-overlay" style={overlay}>
+      <div ref={ref} data-testid={`${testIdPrefix}-dialog`} role="alertdialog" aria-modal="true" aria-labelledby={messageId} aria-busy={busy || undefined} className="ck-dialog">
+        <p id={messageId} className="ck-dialog__message" style={{ marginTop: 0, color: 'var(--color-text-primary)' }}>
           {message}
         </p>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button ref={cancelRef} type="button" data-testid={`${testIdPrefix}-cancel-button`} aria-disabled={busy || undefined} style={{ minHeight: 44 }} onClick={() => (busy ? undefined : onCancel())}>
+        <div className="ck-dialog__actions">
+          <Button ref={cancelRef} variant="secondary" data-testid={`${testIdPrefix}-cancel-button`} aria-disabled={busy || undefined} onClick={() => (busy ? undefined : onCancel())}>
             {t('auth.confirm.cancel')}
-          </button>
-          <button type="button" data-testid={`${testIdPrefix}-confirm-button`} data-emphasis={destructive ? 'destructive' : undefined} disabled={busy} style={{ minHeight: 44 }} onClick={onConfirm}>
+          </Button>
+          <Button variant={destructive ? 'destructive' : 'primary'} data-testid={`${testIdPrefix}-confirm-button`} data-emphasis={destructive ? 'destructive' : undefined} disabled={busy} onClick={onConfirm}>
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

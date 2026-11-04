@@ -9,6 +9,10 @@ import { webOnlyCopy } from '../../copy/webOnly';
 import { useScreenView } from '../../core/analytics/useScreenView';
 import { useOwnedViewModel } from '../../core/state/useOwnedViewModel';
 import { useViewModel } from '../../core/state/useViewModel';
+import { color, font, radius, space } from '../../design/tokens';
+import { Button } from '../../core/ui/Button';
+import { IcChevronRight } from '../../core/ui/icons.generated';
+import { Skeleton } from '../../core/ui/Skeleton';
 import { ConfirmDialog } from '../../core/ui/ConfirmDialog';
 import { useShellContext } from '../shell/MainShell';
 import type { NotificationSettingsStore } from './NotificationSettingsStore';
@@ -46,10 +50,15 @@ export function SettingsScreen(): ReactNode {
   return <SettingsView vm={vm} signatureCard={container.signatureCard} notifications={container.notificationSettings} />;
 }
 
-const page: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 16, padding: 16, paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 0px) + 16px)' };
-const sectionStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8 };
-const headingStyle: CSSProperties = { margin: 0, fontSize: 14 };
-const rowStyle: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 44, padding: '0 8px', textAlign: 'left' };
+// 원본 설정(screens-c §1.5): 섹션 라벨 callout textMuted, 카드(흰색, 라운드 16, 옅은 그림자) 안에 행(좌우 20, 위아래 16)과 1px 구분선.
+const page: CSSProperties = { display: 'flex', flexDirection: 'column', gap: space.xl, padding: `calc(var(--safe-top) + ${space.xl}) var(--space-screen-horizontal)`, paddingBottom: 'calc(var(--bottom-bar-height, 73px) + 24px)' };
+const sectionStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: space.sm };
+const headingStyle: CSSProperties = { margin: 0, color: color.textMuted, ...font('callout'), fontWeight: 400 };
+const rowStyle: CSSProperties = { cursor: 'pointer' };
+
+function Chevron(): ReactNode {
+  return <IcChevronRight size={16} style={{ color: color.textMuted }} />;
+}
 
 function SettingsView({ vm, signatureCard, notifications }: { vm: SettingsViewModel; signatureCard: SignatureCardController; notifications: NotificationSettingsStore }): ReactNode {
   const state = useViewModel(vm);
@@ -58,9 +67,9 @@ function SettingsView({ vm, signatureCard, notifications }: { vm: SettingsViewMo
   if (state.mode === 'guest') {
     return (
       <div data-testid="settings.root" style={page}>
-        <button type="button" data-testid="settings.login-button" style={{ minHeight: 44 }} onClick={() => void vm.pressLogin().then(() => navigate(ROUTES.login, { replace: true }))}>
+        <Button fill data-testid="settings.login-button" onClick={() => void vm.pressLogin().then(() => navigate(ROUTES.login, { replace: true }))}>
           {t('settings.guest.login')}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -76,9 +85,12 @@ function SettingsView({ vm, signatureCard, notifications }: { vm: SettingsViewMo
         <AccountSection vm={vm} />
         <section style={sectionStyle}>
           <h2 style={headingStyle}>{t('settings.section.feedback')}</h2>
-          <button type="button" data-testid="settings.feedback-row" style={rowStyle} onClick={() => void navigate(ROUTES.feedback, { state: SETTINGS_BELOW_STATE })}>
-            {t('settings.row.feedback')}
-          </button>
+          <div className="ck-card">
+            <button type="button" className="ck-row" data-testid="settings.feedback-row" style={rowStyle} onClick={() => void navigate(ROUTES.feedback, { state: SETTINGS_BELOW_STATE })}>
+              {t('settings.row.feedback')}
+              <Chevron />
+            </button>
+          </div>
         </section>
         <InfoSection vm={vm} documentOpenFailed={state.documentOpenFailed} appVersion={state.appVersion} />
       </div>
@@ -111,27 +123,32 @@ function SignatureCard({ card, onChange }: { card: SignatureCardController; onCh
   const state = useViewModel(card);
   const showLoading = state.imageUrl === null && (state.status === 'idle' || state.status === 'loading');
   return (
-    <div data-testid="settings.signature-card" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 8 }}>
-      <span>{t('sign.card.title')}</span>
-      {state.imageUrl !== null ? <img data-testid="settings.signature-image" src={state.imageUrl} alt={webOnlyCopy['settings.signature-alt']} style={{ maxWidth: '100%', maxHeight: 120, objectFit: 'contain' }} /> : null}
-      {showLoading ? (
-        <span data-testid="settings.signature-loading" role="status" aria-busy="true">
-          {webOnlyCopy['settings.signature-loading']}
-        </span>
-      ) : null}
-      {state.status === 'error' ? (
-        <div>
-          <p data-testid="settings.signature-error" style={{ margin: 0 }}>
-            {t('sign.load.error')}
-          </p>
-          <button type="button" data-testid="settings.signature-retry-button" style={{ minHeight: 44 }} onClick={() => void card.refresh()}>
-            {t('common.retry')}
-          </button>
+    <div data-testid="settings.signature-card" className="ck-card" style={{ display: 'flex', flexDirection: 'column', gap: space.md, padding: `${space.lg} 20px` }}>
+      <span style={{ ...font('callout') }}>{t('sign.card.title')}</span>
+      {state.imageUrl !== null ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: space.md, borderRadius: radius.button, background: color.actionPrimary }}>
+          <img data-testid="settings.signature-image" src={state.imageUrl} alt={webOnlyCopy['settings.signature-alt']} style={{ maxWidth: '100%', maxHeight: 96, objectFit: 'contain' }} />
         </div>
       ) : null}
-      <button type="button" data-testid="settings.signature-change-button" style={{ minHeight: 44 }} onClick={onChange}>
+      {showLoading ? (
+        <div data-testid="settings.signature-loading" role="status" aria-busy="true">
+          <Skeleton style={{ height: 96, borderRadius: radius.button }} />
+          <span className="visually-hidden">{webOnlyCopy['settings.signature-loading']}</span>
+        </div>
+      ) : null}
+      {state.status === 'error' ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
+          <p data-testid="settings.signature-error" style={{ margin: 0, color: color.textSecondary, ...font('footnote') }}>
+            {t('sign.load.error')}
+          </p>
+          <Button variant="outlined" compact data-testid="settings.signature-retry-button" onClick={() => void card.refresh()}>
+            {t('common.retry')}
+          </Button>
+        </div>
+      ) : null}
+      <Button variant="outlined" compact data-testid="settings.signature-change-button" onClick={onChange}>
         {t('sign.card.change')}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -150,40 +167,44 @@ function PushSection({ store }: { store: NotificationSettingsStore }): ReactNode
     <section data-testid="settings.push-section" style={sectionStyle}>
       <h2 style={headingStyle}>{t('settings.section.push')}</h2>
       {state.status === 'idle' || state.status === 'loading' ? (
-        <span data-testid="settings.push-loading" role="status" aria-busy="true">
-          {webOnlyCopy['settings.push-loading']}
-        </span>
-      ) : null}
-      {state.status === 'error' ? (
-        <div>
-          <p data-testid="settings.push-error" style={{ margin: 0 }}>
-            {t('settings.push.load-error')}
-          </p>
-          <button type="button" data-testid="settings.push-retry-button" style={{ minHeight: 44 }} onClick={() => void store.load()}>
-            {t('common.retry')}
-          </button>
+        <div data-testid="settings.push-loading" role="status" aria-busy="true">
+          <Skeleton style={{ height: 4, width: '100%', borderRadius: radius.pill }} />
+          <span className="visually-hidden">{webOnlyCopy['settings.push-loading']}</span>
         </div>
       ) : null}
-      {PUSH_SETTING_KEYS.map((key) => {
-        const item = PUSH_ITEMS[key];
-        const checked = state.values?.[key] === true;
-        return (
-          <button
-            key={key}
-            type="button"
-            role="switch"
-            aria-checked={checked}
-            aria-busy={state.saving[key] || undefined}
-            disabled={!ready}
-            data-testid={item.testId}
-            style={rowStyle}
-            onClick={() => void store.toggle(key)}
-          >
-            <span>{t(item.label)}</span>
-            <span aria-hidden="true">{checked ? 'ON' : 'OFF'}</span>
-          </button>
-        );
-      })}
+      {state.status === 'error' ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
+          <p data-testid="settings.push-error" style={{ margin: 0, color: color.textSecondary, ...font('footnote') }}>
+            {t('settings.push.load-error')}
+          </p>
+          <Button variant="outlined" compact data-testid="settings.push-retry-button" onClick={() => void store.load()}>
+            {t('common.retry')}
+          </Button>
+        </div>
+      ) : null}
+      <div className="ck-card">
+        {PUSH_SETTING_KEYS.map((key) => {
+          const item = PUSH_ITEMS[key];
+          const checked = state.values?.[key] === true;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="switch"
+              className="ck-row"
+              aria-checked={checked}
+              aria-busy={state.saving[key] || undefined}
+              disabled={!ready}
+              data-testid={item.testId}
+              style={{ ...rowStyle, minHeight: 56, paddingTop: 12, paddingBottom: 12 }}
+              onClick={() => void store.toggle(key)}
+            >
+              <span>{t(item.label)}</span>
+              <span aria-hidden="true" className="ck-switch-vis" />
+            </button>
+          );
+        })}
+      </div>
     </section>
   );
 }
@@ -192,12 +213,14 @@ function AccountSection({ vm }: { vm: SettingsViewModel }): ReactNode {
   return (
     <section style={sectionStyle}>
       <h2 style={headingStyle}>{t('settings.section.account')}</h2>
-      <button type="button" data-testid="settings.logout-row" style={rowStyle} onClick={() => vm.requestLogout()}>
-        {t('settings.row.logout')}
-      </button>
-      <button type="button" data-testid="settings.withdraw-row" style={rowStyle} onClick={() => vm.requestWithdraw()}>
-        {t('settings.row.withdraw')}
-      </button>
+      <div className="ck-card">
+        <button type="button" className="ck-row" data-testid="settings.logout-row" style={rowStyle} onClick={() => vm.requestLogout()}>
+          {t('settings.row.logout')}
+        </button>
+        <button type="button" className="ck-row" data-testid="settings.withdraw-row" style={rowStyle} onClick={() => vm.requestWithdraw()}>
+          {t('settings.row.withdraw')}
+        </button>
+      </div>
     </section>
   );
 }
@@ -206,21 +229,25 @@ function InfoSection({ vm, documentOpenFailed, appVersion }: { vm: SettingsViewM
   return (
     <section style={sectionStyle}>
       <h2 style={headingStyle}>{t('settings.section.info')}</h2>
-      <button type="button" data-testid="settings.privacy-row" style={rowStyle} onClick={() => vm.openDocument('privacy')}>
-        {t('settings.row.privacy')}
-      </button>
-      <button type="button" data-testid="settings.terms-row" style={rowStyle} onClick={() => vm.openDocument('service')}>
-        {t('settings.row.terms')}
-      </button>
+      <div className="ck-card">
+        <button type="button" className="ck-row" data-testid="settings.privacy-row" style={rowStyle} onClick={() => vm.openDocument('privacy')}>
+          {t('settings.row.privacy')}
+          <Chevron />
+        </button>
+        <button type="button" className="ck-row" data-testid="settings.terms-row" style={rowStyle} onClick={() => vm.openDocument('service')}>
+          {t('settings.row.terms')}
+          <Chevron />
+        </button>
+        <div data-testid="settings.version-row" className="ck-row">
+          <span>{t('settings.row.version')}</span>
+          <span data-testid="settings.version-value" style={{ color: color.textMuted }}>{appVersion}</span>
+        </div>
+      </div>
       {documentOpenFailed ? (
-        <p data-testid="legal-doc.open-failed-message" role="alert" style={{ margin: 0 }}>
+        <p data-testid="legal-doc.open-failed-message" role="alert" style={{ margin: 0, color: color.error, ...font('footnote') }}>
           {t('onb.terms.doc.cannot-open')}
         </p>
       ) : null}
-      <div data-testid="settings.version-row" style={rowStyle}>
-        <span>{t('settings.row.version')}</span>
-        <span data-testid="settings.version-value">{appVersion}</span>
-      </div>
     </section>
   );
 }

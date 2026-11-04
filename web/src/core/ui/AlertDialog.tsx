@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { Button } from './Button';
 
 /**
  * 확인 버튼 하나짜리 알림. 열리면 확인 버튼으로 포커스가 가고, 닫히면(언마운트) 열기 전에 포커스가 있던 요소로 돌아간다.
@@ -17,11 +18,17 @@ export function AlertDialog({ testId, message, confirmLabel, onConfirm }: { test
     };
   }, []);
   return (
-    <div data-testid={testId} role="alertdialog" aria-modal="true" aria-labelledby={messageId}>
-      <p id={messageId}>{message}</p>
-      <button ref={confirmRef} type="button" data-testid={`${testId}-confirm-button`} onClick={onConfirm}>
-        {confirmLabel}
-      </button>
+    <div className="ck-overlay" style={{ zIndex: 200 }}>
+      <div data-testid={testId} role="alertdialog" aria-modal="true" aria-labelledby={messageId} className="ck-dialog">
+        <p id={messageId} className="ck-dialog__message" style={{ marginTop: 0, color: 'var(--color-text-primary)' }}>
+          {message}
+        </p>
+        <div className="ck-dialog__actions">
+          <Button ref={confirmRef} data-testid={`${testId}-confirm-button`} onClick={onConfirm}>
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -12,21 +12,11 @@ export function ToastHost({ controller }: { controller: ToastController }): Reac
       data-testid="toast.container"
       role="status"
       aria-live="polite"
-      style={{
-        position: 'fixed',
-        left: 16,
-        right: 16,
-        bottom: 'calc(env(safe-area-inset-bottom, 0px) + var(--bottom-bar-height, 0px) + 24px)',
-        display: 'flex',
-        justifyContent: 'center',
-        pointerEvents: 'none',
-        zIndex: 1000,
-      }}
+      className="ck-toast"
+      // 원본 ChalkakToast: 하단 바 위(바 높이 + 32). 위치·터치 통과는 인라인으로 둬 CSS 로드와 무관하게 지킨다.
+      style={{ bottom: 'calc(var(--bottom-bar-height, 0px) + 32px)', pointerEvents: 'none', zIndex: 1000 }}
     >
-      <span
-        data-testid="toast.message"
-        style={{ background: 'rgba(30, 30, 30, 0.92)', color: '#fff', padding: '12px 16px', borderRadius: 12, maxWidth: '100%' }}
-      >
+      <span data-testid="toast.message" className="ck-toast__message">
         {toast.message}
       </span>
     </div>

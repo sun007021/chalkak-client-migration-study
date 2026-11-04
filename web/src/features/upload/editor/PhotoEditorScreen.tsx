@@ -4,8 +4,10 @@ import { t } from '../../../copy/ko';
 import { webOnlyCopy } from '../../../copy/webOnly';
 import { useOwnedViewModel } from '../../../core/state/useOwnedViewModel';
 import { useViewModel } from '../../../core/state/useViewModel';
+import { Button } from '../../../core/ui/Button';
 import { useDialogFocus } from '../../../core/ui/useDialogFocus';
 import { useRovingTabIndex } from '../../../core/ui/useRovingTabIndex';
+import { color, font } from '../../../design/tokens';
 import { PHOTO_FILTERS } from '../editModel';
 import type { AdjustmentKey, PhotoFilter } from '../editModel';
 import type { ImageDecoder } from '../imagePorts';
@@ -91,13 +93,13 @@ export function createPhotoEditor(deps: PhotoEditorScreenDeps): PhotoEditorCompo
   return Editor;
 }
 
-const rootStyle: CSSProperties = { position: 'relative', boxSizing: 'border-box', height: '100dvh', display: 'flex', flexDirection: 'column', background: 'Canvas', color: 'CanvasText', outline: 'none' };
-const headerStyle: CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 8px', height: 56, flex: 'none' };
-const topButtonStyle: CSSProperties = { minHeight: 48, minWidth: 64, padding: '0 12px', fontSize: 16, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' };
-const stageStyle: CSSProperties = { position: 'relative', overflow: 'hidden', flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 16px', background: '#111' };
+const rootStyle: CSSProperties = { position: 'relative', boxSizing: 'border-box', height: '100dvh', display: 'flex', flexDirection: 'column', background: color.editorBackground, color: '#fff', outline: 'none', ...font('callout') };
+const headerStyle: CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 8px', height: 56, flex: 'none', background: color.editorBackground };
+const topButtonStyle: CSSProperties = { minHeight: 48, minWidth: 64, padding: '0 12px', ...font('headline'), background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' };
+const stageStyle: CSSProperties = { position: 'relative', overflow: 'hidden', flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 16px', background: color.editorBackground };
 const frameBoxStyle: CSSProperties = { position: 'relative', display: 'inline-block', lineHeight: 0, touchAction: 'none' };
 const imageStyle: CSSProperties = { display: 'block', maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100dvh - 330px)', userSelect: 'none', WebkitUserSelect: 'none' };
-const panelStyle: CSSProperties = { flex: 'none', minHeight: 120, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 12, boxSizing: 'border-box' };
+const panelStyle: CSSProperties = { flex: 'none', minHeight: 120, padding: '12px 16px', background: color.editorBackground, display: 'flex', flexDirection: 'column', gap: 12, boxSizing: 'border-box' };
 const rowStyle: CSSProperties = { display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 };
 const chipStyle = (selected: boolean): CSSProperties => ({
   flex: 'none',
@@ -105,15 +107,16 @@ const chipStyle = (selected: boolean): CSSProperties => ({
   minWidth: 44,
   padding: '0 12px',
   borderRadius: 22,
-  border: selected ? '2px solid currentColor' : '1px solid #888',
-  background: 'none',
-  color: 'inherit',
-  fontWeight: selected ? 700 : 400,
+  border: selected ? '1px solid #fff' : '1px solid #ffffff40',
+  background: selected ? '#fff' : 'none',
+  color: selected ? color.editorBackground : '#fff',
+  ...font('footnote'),
+  fontWeight: selected ? 700 : 500,
   cursor: 'pointer',
 });
-const tabBarStyle: CSSProperties = { flex: 'none', display: 'flex', borderTop: '1px solid #8884' };
-const tabStyle = (selected: boolean): CSSProperties => ({ flex: 1, minHeight: 56, background: 'none', border: 'none', color: 'inherit', fontSize: 16, fontWeight: selected ? 700 : 400, borderBottom: selected ? '3px solid currentColor' : '3px solid transparent', cursor: 'pointer' });
-const sliderStyle: CSSProperties = { width: '100%', minHeight: 44 };
+const tabBarStyle: CSSProperties = { flex: 'none', display: 'flex', borderTop: '1px solid #ffffff22', background: color.editorBackground, paddingBottom: 'env(safe-area-inset-bottom, 0px)' };
+const tabStyle = (selected: boolean): CSSProperties => ({ flex: 1, minHeight: 56, background: 'none', border: 'none', color: selected ? '#fff' : '#ffffff80', ...font('callout'), fontWeight: selected ? 700 : 500, borderBottom: selected ? '3px solid #fff' : '3px solid transparent', cursor: 'pointer' });
+const sliderStyle: CSSProperties = { width: '100%', minHeight: 44, accentColor: '#fff' };
 
 /** testids.md의 식별자(템플릿 문자열로 조립하지 않고 표로 둔다: check-testids가 정적 문자열을 기준으로 검사한다). */
 const TAB_TESTID: Record<EditorTool, string> = { crop: 'photo-edit.tab-crop', adjust: 'photo-edit.tab-adjust', filter: 'photo-edit.tab-filter' };
@@ -224,13 +227,13 @@ function ErrorDialog({ onRetry }: { onRetry: () => void }): ReactNode {
     retryRef.current?.focus();
   }, []);
   return (
-    <div data-testid="photo-edit.error-dialog" role="alertdialog" aria-modal="true" aria-labelledby={messageId} style={{ position: 'absolute', left: 16, right: 16, top: '40%', padding: 16, background: 'Canvas', border: '1px solid #888', borderRadius: 12, boxShadow: '0 4px 24px #0006', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div data-testid="photo-edit.error-dialog" role="alertdialog" aria-modal="true" aria-labelledby={messageId} style={{ position: 'absolute', left: 16, right: 16, top: '40%', padding: 16, background: color.surfaceElevated, color: color.textPrimary, borderRadius: 16, boxShadow: '0 8px 32px #0008', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <p id={messageId} style={{ margin: 0 }}>
         {t('edit.error.render')}
       </p>
-      <button ref={retryRef} type="button" data-testid="photo-edit.error-retry-button" style={{ minHeight: 48 }} onClick={onRetry}>
+      <Button ref={retryRef} fill data-testid="photo-edit.error-retry-button" onClick={onRetry}>
         {t('common.retry')}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -443,8 +446,8 @@ function FilterPanel({ vm, state }: { vm: PhotoEditorViewModel; state: PhotoEdit
         const selected = state.filter === filter;
         const thumbnail = state.thumbnails[filter];
         return (
-          <button key={filter} type="button" role="radio" tabIndex={selected ? 0 : -1} data-testid={FILTER_TESTID[filter]} aria-checked={selected} onClick={() => vm.selectFilter(filter)} style={{ flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: 4, background: 'none', color: 'inherit', border: selected ? '2px solid currentColor' : '1px solid transparent', borderRadius: 8, cursor: 'pointer', fontWeight: selected ? 700 : 400 }}>
-            {thumbnail ? <img src={thumbnail} alt="" draggable={false} style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6 }} /> : <span aria-hidden="true" style={{ width: 64, height: 64, borderRadius: 6, background: '#8883' }} />}
+          <button key={filter} type="button" role="radio" tabIndex={selected ? 0 : -1} data-testid={FILTER_TESTID[filter]} aria-checked={selected} onClick={() => vm.selectFilter(filter)} style={{ flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: 4, background: 'none', color: '#fff', border: selected ? '2px solid #fff' : '2px solid transparent', borderRadius: 10, cursor: 'pointer', ...font('caption'), fontWeight: selected ? 700 : 500 }}>
+            {thumbnail ? <img src={thumbnail} alt="" draggable={false} style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6 }} /> : <span aria-hidden="true" style={{ width: 64, height: 64, borderRadius: 6, background: '#ffffff22' }} />}
             <span>{t(`edit.filter.${filter}`)}</span>
           </button>
         );
