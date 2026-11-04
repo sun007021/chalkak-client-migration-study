@@ -35,7 +35,7 @@
 | 다이얼로그 | 시스템 alert | 맞춤. `ChalkakDialog` |
 | 빈 상태 | 텍스트만 | 맞춤. 화면 문서의 아이콘·문구 배치 |
 | 하단 바 | 기본 TabView 모양 | 맞춤. `ChalkakBottomBar`(ic_bottom_*, 가운데 작성 버튼, bottomBar 색) |
-| 하단 바 Liquid Glass·스크롤 시 숨김 | 원본은 iOS 26에서 glass 효과와 스크롤 숨김 | 보류. CI가 Xcode 16이라 iOS 26 API(`glassEffect`)를 컴파일할 수 없다. 평면 스타일 유지, `ChalkakBottomBarScrollBehavior`는 쓰이지 않아 삭제 |
+| 하단 바 Liquid Glass·스크롤 시 compact | 원본은 iOS 26에서 glass 효과와 스크롤 시 compact 전환 | 적용(iOS 26 이상, 미만은 평면). `ChalkakPlatformAppearance.usesLiquidGlass`(디버그 `-use-flat-ios-design`), 떠 있는 glass 캡슐·렌즈·scrub 제스처·`ChalkakBottomBarScrollBehavior`, 내비·피드 액션 버튼 `.glass`, 시트 시스템 유리 배경, 사진 편집 항목 glass. CI는 Xcode 26. 하단 바는 내용 위에 겹치지 않고 아래에 쌓는다(PR #83). 기록 월 이동 버튼·피드 AI 알약·툴바 공유 배경은 해당 요소가 원본에 없거나 달라 평면 유지 |
 
 ## 화면
 

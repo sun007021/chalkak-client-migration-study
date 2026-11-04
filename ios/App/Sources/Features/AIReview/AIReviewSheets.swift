@@ -30,8 +30,7 @@ extension View {
             AIReviewSheetContent(viewModel: viewModel, sheet: item.sheet)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
-                .presentationCornerRadius(ChalkakRadius.sheet)
-                .presentationBackground(ChalkakColor.surfaceElevated)
+                .chalkakSheetPresentationStyle()
         }
     }
 }
@@ -119,7 +118,7 @@ private struct AIStartSheet: View {
         .padding(.top, ChalkakSpacing.xl)
         .padding(.bottom, ChalkakSpacing.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(ChalkakColor.surfaceElevated.ignoresSafeArea())
+        .background(ChalkakSheetSurface.contentBackground.ignoresSafeArea())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ai-start-sheet.root")
     }
@@ -176,7 +175,7 @@ private struct AIResultSheet: View {
                 }
             }
         }
-        .background(ChalkakColor.surfaceElevated.ignoresSafeArea())
+        .background(ChalkakSheetSurface.contentBackground.ignoresSafeArea())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ai-result-sheet.root")
     }
@@ -288,7 +287,7 @@ private struct AIFailedSheet: View {
         .padding(.horizontal, ChalkakSpacing.xl)
         .padding(.bottom, ChalkakSpacing.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(ChalkakColor.surfaceElevated.ignoresSafeArea())
+        .background(ChalkakSheetSurface.contentBackground.ignoresSafeArea())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ai-failed-sheet.root")
     }

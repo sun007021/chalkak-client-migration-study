@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 원본 ChalkakNavigationButton(지름 48, SF chevron.backward/xmark). iOS 26 glass 스타일은 Xcode 16 빌드에서 컴파일되지 않아 플랫 스타일만 쓴다.
+/// 원본 ChalkakNavigationButton(지름 48, SF chevron.backward/xmark). iOS 26 이상은 `.glass` 버튼 스타일, 그 미만은 평면 아이콘.
 struct ChalkakNavigationButton: View {
     enum Kind {
         case back
@@ -24,18 +24,43 @@ struct ChalkakNavigationButton: View {
     static let diameter: CGFloat = 48
 
     let kind: Kind
+    var controlSize: ControlSize = .large
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Image(systemName: kind.systemImage)
-                .font(.system(size: 18, weight: .semibold))
+        if #available(iOS 26.0, *), ChalkakPlatformAppearance.usesLiquidGlass {
+            Button(kind.title, systemImage: kind.systemImage, action: action)
+                .labelStyle(.iconOnly)
                 .foregroundStyle(ChalkakColor.iconPrimary)
+                .tint(ChalkakColor.iconPrimary)
+                .controlSize(controlSize)
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
                 .frame(width: Self.diameter, height: Self.diameter)
                 .contentShape(Circle())
+                .accessibilityLabel(kind.title)
+        } else {
+            Button(action: action) {
+                Image(systemName: kind.systemImage)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(ChalkakColor.iconPrimary)
+                    .frame(width: Self.diameter, height: Self.diameter)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(kind.title)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(kind.title)
+    }
+}
+
+/// 원형 아이콘 버튼의 스타일. iOS 26 이상 Liquid Glass면 `.glass`, 아니면 `.plain`(원본 ChalkakNavigationButtonStyle).
+struct ChalkakNavigationButtonStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *), ChalkakPlatformAppearance.usesLiquidGlass {
+            content.buttonStyle(.glass)
+        } else {
+            content.buttonStyle(.plain)
+        }
     }
 }
 
