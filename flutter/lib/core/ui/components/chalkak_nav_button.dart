@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../copy/ko.g.dart';
 import '../../design/chalkak_tokens.dart';
+import '../glass/chalkak_glass.dart';
 import 'chalkak_icon.dart';
 
 /// 뒤로가기/닫기 버튼(screens-c §1.3): 지름 48 터치 영역, 아이콘 24 iconPrimary, 눌림은 옅은 ripple 없이 즉시.
@@ -21,12 +22,16 @@ class ChalkakNavButton extends StatelessWidget {
   final String _icon;
   final String? _defaultLabel;
 
-  /// 원본 지름.
+  /// 원본 지름(터치 영역).
   static const double size = 48;
+
+  /// 유리일 때 보이는 원 지름(ChalkakNavigationButton.swift:56-83).
+  static const double glassSize = 44;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.tokens.colors;
+    final icon = ChalkakIcon(_icon, size: 24, color: colors.iconPrimary);
     return Semantics(
       button: true,
       enabled: onPressed != null,
@@ -39,7 +44,16 @@ class ChalkakNavButton extends StatelessWidget {
         child: SizedBox.square(
           dimension: size,
           child: Center(
-            child: ChalkakIcon(_icon, size: 24, color: colors.iconPrimary),
+            child: ChalkakGlassScope.of(context)
+                ? SizedBox.square(
+                    key: const Key('chalkak-nav-button-glass'),
+                    dimension: glassSize,
+                    child: GlassSurface(
+                      shape: const CircleBorder(),
+                      child: Center(child: icon),
+                    ),
+                  )
+                : icon,
           ),
         ),
       ),

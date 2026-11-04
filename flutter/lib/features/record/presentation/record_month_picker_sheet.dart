@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/copy/ko.g.dart';
 import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/time/kst_date.dart';
+import '../../../core/ui/glass/chalkak_glass.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/record_models.dart';
 import '../domain/record_month_picker.dart';
@@ -16,7 +17,7 @@ Future<void> showRecordMonthPickerSheet(
   required KstMonth selected,
   required void Function(KstMonth month) onSelected,
 }) {
-  return showModalBottomSheet<void>(
+  return showChalkakBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,

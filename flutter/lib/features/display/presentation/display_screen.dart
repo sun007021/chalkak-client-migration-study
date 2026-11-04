@@ -9,6 +9,7 @@ import '../../../core/ui/app_network_image.dart';
 import '../../../core/ui/components/chalkak_icon.dart';
 import '../../../core/ui/components/chalkak_skeleton.dart';
 import '../../../core/ui/components/chalkak_states.dart';
+import '../../../core/ui/glass/chalkak_glass.dart';
 import '../../../core/ui/selectable_test_id.dart';
 import '../../../core/ui/test_id.dart';
 import '../../feed/domain/feed_target.dart';
@@ -107,7 +108,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
   void _openDatePicker() {
     final state = widget.viewModel.state;
     unawaited(
-      showModalBottomSheet<void>(
+      showChalkakBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         builder: (sheetContext) => DatePickerSheet(
