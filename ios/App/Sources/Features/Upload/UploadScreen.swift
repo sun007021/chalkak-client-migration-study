@@ -187,7 +187,7 @@ private struct UploadContentView: View {
         }
     }
 
-    private static let dismissSpace = "upload.dismiss"
+    nonisolated private static let dismissSpace = "upload.dismiss"
 
     /// 뒤로 가기: 키보드가 떠 있으면 먼저 내리고, 다 내려간 뒤 이동한다.
     private func requestBack() {
