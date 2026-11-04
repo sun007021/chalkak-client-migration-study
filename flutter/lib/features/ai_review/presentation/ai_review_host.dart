@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/ui/glass/chalkak_glass.dart';
 import '../domain/ai_review_session.dart';
 import '../domain/ai_review_state.dart';
 import 'ai_review_sheets.dart';
@@ -121,7 +122,7 @@ class _AiReviewHostState extends State<AiReviewHost>
   void _openSheet() {
     final token = _sheetToken = Object();
     final session = widget.session;
-    showModalBottomSheet<void>(
+    showChalkakBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
