@@ -57,7 +57,7 @@ export function TitleDialog({
           autoFocus
           returnKeyType="done"
           style={styles.input}
-          counter={{ current: Array.from(dialog.draft).length, max: TITLE_MAX }}
+          counterText={`${Array.from(dialog.draft).length} / ${TITLE_MAX}`}
         />
       </View>
       {dialog.errorMessage ? <Text style={styles.error}>{dialog.errorMessage}</Text> : null}

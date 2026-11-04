@@ -6,8 +6,8 @@ import { Text, TextInput, type TextInputRef } from './Text';
 
 export type TextFieldProps = TextInputProps & {
   ref?: Ref<TextInputRef>;
-  /** 있으면 오른쪽 아래에 "N / max" 카운터를 그린다. */
-  counter?: { current: number; max: number };
+  /** 있으면 오른쪽 아래에 카운터 문구("N / max")를 그린다. */
+  counterText?: string;
   /** 카운터 testID. */
   counterTestID?: string;
 };
@@ -17,7 +17,7 @@ export type TextFieldProps = TextInputProps & {
  * 테두리 1px(포커스 actionPrimary, 평소 border), 커서 inputCursor, 카운터 subheadline textInactive.
  */
 export function TextField({
-  counter,
+  counterText,
   counterTestID,
   style,
   onFocus,
@@ -31,7 +31,7 @@ export function TextField({
       style={[
         styles.box,
         { borderColor: focused ? colors.actionPrimary : colors.border },
-        counter ? styles.boxWithCounter : null,
+        counterText ? styles.boxWithCounter : null,
       ]}
     >
       <TextInput
@@ -47,9 +47,9 @@ export function TextField({
         }}
         style={[styles.input, style]}
       />
-      {counter ? (
+      {counterText ? (
         <Text testID={counterTestID} style={styles.counter}>
-          {counter.current} / {counter.max}
+          {counterText}
         </Text>
       ) : null}
     </View>

@@ -1,4 +1,10 @@
-import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 
 import { colors, radius, spacing, typography } from '../design/tokens';
 import { Text } from './Text';
@@ -18,6 +24,9 @@ export type ButtonProps = {
   verticalPadding?: number;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
+  /** 진행 중이면 라벨 앞에 작은 스피너를 보인다(busyTestID가 그 요소의 testID). */
+  busy?: boolean;
+  busyTestID?: string;
 };
 
 /** 주 버튼: actionPrimary 바탕 + 흰 글자. 비활성은 actionPrimary 12% 바탕 + textPrimary 글자. */
@@ -30,6 +39,8 @@ export function ChalkakButton({
   verticalPadding = VERTICAL_PADDING,
   accessibilityLabel,
   style,
+  busy,
+  busyTestID,
 }: ButtonProps) {
   return (
     <Pressable
@@ -49,6 +60,13 @@ export function ChalkakButton({
         style,
       ]}
     >
+      {busy ? (
+        <ActivityIndicator
+          testID={busyTestID}
+          size="small"
+          color={disabled ? colors.textPrimary : colors.onActionPrimary}
+        />
+      ) : null}
       <Text
         style={[styles.label, { color: disabled ? colors.textPrimary : colors.onActionPrimary }]}
       >
@@ -101,6 +119,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.button,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
     overflow: 'hidden',
   },
   fill: { alignSelf: 'stretch' },

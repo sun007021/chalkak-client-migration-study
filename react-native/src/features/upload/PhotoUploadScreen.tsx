@@ -15,13 +15,19 @@ import { bytesToBase64 } from '../../core/encoding/base64';
 import { useViewModelState } from '../../core/state/useViewModelState';
 import { format, t } from '../../shared/copy';
 import { POST_TITLE_MAX } from '../../shared/constants';
-import { colors, spacing } from '../../shared/design/tokens';
+import { colors, radius, spacing, typography } from '../../shared/design/tokens';
+import { BackButton } from '../../shared/ui/BackButton';
+import { ChalkakButton } from '../../shared/ui/Button';
+import { Dialog, DialogButton } from '../../shared/ui/Dialog';
+import { Icon } from '../../shared/ui/icons/Icon';
+import { Skeleton } from '../../shared/ui/Skeleton';
+import { TextField } from '../../shared/ui/TextField';
 import { rotatedSize } from '../photo-edit/PhotoEditTransform';
 import { PhotoEditScreen } from '../photo-edit/PhotoEditScreen';
 import { encodePng } from '../../core/image/png';
 import { localCopy, titleCounterText } from './localCopy';
 import type { PhotoUploadViewModel, SelectedPhoto } from './PhotoUploadViewModel';
-import { Text, TextInput } from '../../shared/ui/Text';
+import { Text } from '../../shared/ui/Text';
 
 type Props = { viewModel: PhotoUploadViewModel };
 
@@ -46,16 +52,16 @@ export function PhotoUploadScreen({ viewModel }: Props): ReactNode {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-          <Pressable
+        <View style={[styles.header, { paddingTop: insets.top }]}>
+          <BackButton
             testID="upload.close-button"
-            accessibilityRole="button"
             accessibilityLabel={localCopy.closeA11y}
             onPress={() => viewModel.close()}
-            hitSlop={12}
-          >
-            <Text style={styles.close}>{'✕'}</Text>
-          </Pressable>
+          />
+          <Text accessibilityRole="header" style={styles.headerTitle}>
+            {t('upload.title')}
+          </Text>
+          <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView
@@ -63,72 +69,79 @@ export function PhotoUploadScreen({ viewModel }: Props): ReactNode {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-          {topic.status === 'error' ? (
-            <View style={styles.errorState}>
-              <Text testID="upload.error-state" style={styles.errorText}>
-                {topic.message}
-              </Text>
-              <Pressable
-                testID="upload.retry-button"
-                accessibilityRole="button"
-                onPress={() => void viewModel.retryTopic()}
-                style={styles.retry}
-              >
-                <Text style={styles.retryText}>{t('upload.topic.retry')}</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <>
-              <Text testID="upload.topic-title" style={styles.heading}>
-                {topic.status === 'ready'
-                  ? format(t('upload.heading'), { 주제: topic.title })
-                  : ' '}
-              </Text>
-              <Text testID="upload.guide-text" style={styles.guide}>
-                {t('upload.subheading')}
-              </Text>
-            </>
-          )}
-
-          {state.photo ? <PhotoPreview viewModel={viewModel} photo={state.photo} /> : null}
-          {state.photoLoading ? <ActivityIndicator style={styles.loading} /> : null}
-
-          <View style={styles.pickRow}>
-            <PickButton
-              testID="upload.album-button"
-              label={localCopy.albumButton}
-              onPress={() => void viewModel.pickFromLibrary()}
-              disabled={state.submitting}
-            />
-            {state.cameraAvailable ? (
+          <View style={styles.imageArea}>
+            {state.photo ? (
+              <PhotoPreview viewModel={viewModel} photo={state.photo} disabled={state.submitting} />
+            ) : (
+              <View style={styles.empty}>
+                {topic.status === 'error' ? (
+                  <>
+                    <Text testID="upload.error-state" style={styles.errorText}>
+                      {topic.message}
+                    </Text>
+                    <Pressable
+                      testID="upload.retry-button"
+                      accessibilityRole="button"
+                      onPress={() => void viewModel.retryTopic()}
+                      style={styles.retry}
+                    >
+                      <Text style={styles.retryText}>{t('upload.topic.retry')}</Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <>
+                    <Text testID="upload.topic-title" style={styles.heading}>
+                      {topic.status === 'ready'
+                        ? format(t('upload.heading'), { 주제: topic.title })
+                        : ' '}
+                    </Text>
+                    <Text testID="upload.guide-text" style={styles.guide}>
+                      {t('upload.subheading')}
+                    </Text>
+                  </>
+                )}
+              </View>
+            )}
+            {state.photoLoading ? <Skeleton style={StyleSheet.absoluteFill} /> : null}
+            <View style={styles.pickRow}>
               <PickButton
-                testID="upload.camera-button"
-                label={localCopy.cameraButton}
-                onPress={() => void viewModel.capture()}
+                testID="upload.album-button"
+                icon="ic_photo_library"
+                label={t('upload.album.a11y')}
+                onPress={() => void viewModel.pickFromLibrary()}
                 disabled={state.submitting}
               />
-            ) : null}
+              {state.cameraAvailable ? (
+                <PickButton
+                  testID="upload.camera-button"
+                  icon="ic_photo_camera"
+                  label={t('upload.camera.a11y')}
+                  onPress={() => void viewModel.capture()}
+                  disabled={state.submitting}
+                />
+              ) : null}
+            </View>
           </View>
 
           <View style={styles.titleBox}>
-            <TextInput
+            <TextField
               testID="upload.title-input"
               value={state.title}
               onChangeText={(text) => viewModel.setTitle(text)}
               placeholder={t('upload.caption.placeholder')}
-              placeholderTextColor={colors.textSecondary}
               editable={!state.submitting}
               returnKeyType="done"
+              multiline
+              numberOfLines={3}
               style={styles.titleInput}
+              counterText={titleCounterText(state.titleLength, POST_TITLE_MAX)}
+              counterTestID="upload.title-counter"
             />
-            <Text testID="upload.title-counter" style={styles.counter}>
-              {titleCounterText(state.titleLength, POST_TITLE_MAX)}
-            </Text>
           </View>
 
           {state.preparation === 'preparing' && state.photo ? (
             <View testID="upload.preparing-indicator" style={styles.status}>
-              <ActivityIndicator size="small" />
+              <ActivityIndicator size="small" color={colors.actionPrimary} />
               <Text style={styles.statusText}>{localCopy.preparing}</Text>
             </View>
           ) : null}
@@ -139,21 +152,15 @@ export function PhotoUploadScreen({ viewModel }: Props): ReactNode {
           ) : null}
         </ScrollView>
 
-        <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
-          <Pressable
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 0) + 26 }]}>
+          <ChalkakButton
             testID="upload.submit-button"
-            accessibilityRole="button"
+            label={state.submitting ? t('upload.submitting') : t('upload.submit')}
             disabled={!state.canSubmit}
+            busy={state.submitting}
+            busyTestID="upload.submitting-indicator"
             onPress={() => void viewModel.submit()}
-            style={[styles.submit, !state.canSubmit && styles.submitDisabled]}
-          >
-            {state.submitting ? (
-              <ActivityIndicator testID="upload.submitting-indicator" color="#FFFFFF" />
-            ) : null}
-            <Text style={styles.submitText}>
-              {state.submitting ? t('upload.submitting') : t('upload.submit')}
-            </Text>
-          </Pressable>
+          />
         </View>
       </KeyboardAvoidingView>
 
@@ -163,8 +170,10 @@ export function PhotoUploadScreen({ viewModel }: Props): ReactNode {
   );
 }
 
+// 사진 선택 버튼(screens-b.md §5.1): 지름 42 원, 흰색 66%, 아이콘 22(원색), 옅은 그림자.
 function PickButton(props: {
   testID: string;
+  icon: 'ic_photo_library' | 'ic_photo_camera';
   label: string;
   onPress: () => void;
   disabled: boolean;
@@ -173,11 +182,12 @@ function PickButton(props: {
     <Pressable
       testID={props.testID}
       accessibilityRole="button"
+      accessibilityLabel={props.label}
       disabled={props.disabled}
       onPress={props.onPress}
       style={[styles.pick, props.disabled && styles.pickDisabled]}
     >
-      <Text style={styles.pickText}>{props.label}</Text>
+      <Icon name={props.icon} size={22} />
     </Pressable>
   );
 }
@@ -186,9 +196,11 @@ function PickButton(props: {
 function PhotoPreview({
   viewModel,
   photo,
+  disabled,
 }: {
   viewModel: PhotoUploadViewModel;
   photo: SelectedPhoto;
+  disabled: boolean;
 }) {
   const [result, setResult] = useState<{ photo: SelectedPhoto; uri: string } | null>(null);
   useEffect(() => {
@@ -213,6 +225,8 @@ function PhotoPreview({
       testID="upload.photo-preview"
       accessibilityRole="imagebutton"
       accessibilityLabel={localCopy.previewA11y}
+      accessibilityHint="사진을 다시 편집해요"
+      disabled={disabled}
       onPress={() => void viewModel.editPhoto()}
       style={[styles.preview, { aspectRatio }]}
     >
@@ -224,126 +238,106 @@ function PhotoPreview({
 /** iOS: 촬영 사진 저장 권한이 없을 때의 안내. */
 function PermissionDialog({ viewModel }: { viewModel: PhotoUploadViewModel }) {
   return (
-    <View style={styles.dialogLayer}>
-      <View style={styles.dialog}>
-        <Text testID="upload.camera-permission-dialog" style={styles.dialogTitle}>
-          {t('upload.permission.save')}
-        </Text>
-        <Text style={styles.dialogBody}>{localCopy.permissionBody}</Text>
-        <DialogButton
-          testID="upload.camera-permission-settings-button"
-          label={t('upload.permission.settings')}
-          onPress={() => void viewModel.openPermissionSettings()}
-          primary
-        />
-        <DialogButton
-          testID="upload.camera-permission-shoot-button"
-          label={t('upload.no-save-capture')}
-          onPress={() => void viewModel.captureWithoutSaving()}
-        />
-        <DialogButton
-          testID="upload.camera-permission-cancel-button"
-          label={localCopy.permissionCancel}
-          onPress={() => viewModel.dismissPermissionPrompt()}
-        />
-      </View>
-    </View>
+    <Dialog
+      titleTestID="upload.camera-permission-dialog"
+      title={t('upload.permission.save')}
+      message={localCopy.permissionBody}
+      onRequestClose={() => viewModel.dismissPermissionPrompt()}
+      stackedActions
+      actions={
+        <>
+          <DialogButton
+            testID="upload.camera-permission-settings-button"
+            label={t('upload.permission.settings')}
+            onPress={() => void viewModel.openPermissionSettings()}
+          />
+          <DialogButton
+            testID="upload.camera-permission-shoot-button"
+            tone="cancel"
+            label={t('upload.no-save-capture')}
+            onPress={() => void viewModel.captureWithoutSaving()}
+          />
+          <DialogButton
+            testID="upload.camera-permission-cancel-button"
+            tone="cancel"
+            label={localCopy.permissionCancel}
+            onPress={() => viewModel.dismissPermissionPrompt()}
+          />
+        </>
+      }
+    />
   );
 }
 
-function DialogButton(props: {
-  testID: string;
-  label: string;
-  onPress: () => void;
-  primary?: boolean;
-}) {
-  return (
-    <Pressable
-      testID={props.testID}
-      accessibilityRole="button"
-      onPress={props.onPress}
-      style={styles.dialogButton}
-    >
-      <Text style={[styles.dialogButtonText, props.primary && styles.dialogButtonPrimary]}>
-        {props.label}
-      </Text>
-    </Pressable>
-  );
-}
-
+// 원본 업로드(screens-b.md §5.1): 사진 영역 전체 폭 + inputBackground, 비어 있으면 1.216 비율 점선 테두리,
+// 선택 버튼은 우상단 top 14 / right 11, 설명 입력 좌우 22 · 위 34, 하단 버튼 좌우 26 · 아래 26.
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
-  header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, alignItems: 'flex-end' },
-  close: { fontSize: 20, color: colors.textPrimary },
-  content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, gap: spacing.lg },
-  heading: { fontSize: 22, fontWeight: '700', color: colors.textPrimary },
-  guide: { fontSize: 14, color: colors.textSecondary },
-  errorState: { gap: spacing.md, alignItems: 'flex-start' },
-  errorText: { fontSize: 15, color: colors.textPrimary },
-  retry: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.xs,
   },
-  retryText: { color: colors.accent, fontWeight: '700' },
-  loading: { alignSelf: 'center' },
-  preview: {
-    width: '100%',
-    maxHeight: 420,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: colors.surface,
-    alignSelf: 'center',
-  },
-  previewImage: { width: '100%', height: '100%' },
-  pickRow: { flexDirection: 'row', gap: spacing.md },
-  pick: {
-    flex: 1,
-    height: 48,
-    borderRadius: 24,
+  headerTitle: { ...typography.headline, color: colors.textPrimary },
+  headerSpacer: { width: 48 },
+  content: { paddingTop: spacing.sm, paddingBottom: 104 },
+  imageArea: { backgroundColor: colors.inputBackground, overflow: 'hidden' },
+  empty: {
+    aspectRatio: 1.216,
+    margin: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
+    gap: 5,
+    paddingHorizontal: spacing.screenHorizontal,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+  },
+  heading: { ...typography.subheadline, color: colors.textSecondary, textAlign: 'center' },
+  guide: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
+  errorText: { ...typography.subheadline, color: colors.textPrimary, textAlign: 'center' },
+  retry: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.lg },
+  retryText: { ...typography.body, color: colors.actionPrimary },
+  preview: { width: '100%', alignSelf: 'center', backgroundColor: colors.inputBackground },
+  previewImage: { width: '100%', height: '100%' },
+  pickRow: {
+    position: 'absolute',
+    top: 14,
+    right: 11,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  pick: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.66)',
+    shadowColor: '#000000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   pickDisabled: { opacity: 0.5 },
-  pickText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  titleBox: { borderBottomWidth: 1, borderColor: colors.border, paddingBottom: spacing.xs },
-  titleInput: { fontSize: 16, color: colors.textPrimary, paddingVertical: spacing.sm },
-  counter: { alignSelf: 'flex-end', fontSize: 12, color: colors.textSecondary },
-  status: { alignItems: 'center', gap: spacing.xs },
-  statusText: { color: colors.textSecondary, fontSize: 13 },
-  errorMessage: { color: colors.danger, fontSize: 14 },
-  footer: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-  submit: {
-    height: 52,
-    borderRadius: 26,
+  titleBox: { marginTop: 34, paddingHorizontal: 22 },
+  titleInput: { ...typography.subheadline, minHeight: 66, textAlignVertical: 'top' },
+  status: {
+    marginTop: spacing.lg,
     flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.accent,
-  },
-  submitDisabled: { backgroundColor: colors.border },
-  submitText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  dialogLayer: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    padding: spacing.xl,
-  },
-  dialog: {
-    width: '100%',
-    borderRadius: 14,
-    backgroundColor: '#FFFFFF',
-    padding: spacing.lg,
     gap: spacing.sm,
   },
-  dialogTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
-  dialogBody: { fontSize: 14, color: colors.textSecondary, marginBottom: spacing.sm },
-  dialogButton: { paddingVertical: spacing.md, alignItems: 'center' },
-  dialogButtonText: { fontSize: 15, color: colors.textPrimary },
-  dialogButtonPrimary: { color: colors.accent, fontWeight: '700' },
+  statusText: { ...typography.footnote, color: colors.textSecondary },
+  errorMessage: {
+    ...typography.footnote,
+    marginTop: spacing.lg,
+    paddingHorizontal: 22,
+    color: colors.error,
+  },
+  footer: { paddingHorizontal: 26, paddingTop: spacing.sm },
 });

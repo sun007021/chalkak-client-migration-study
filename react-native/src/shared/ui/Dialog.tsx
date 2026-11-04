@@ -19,6 +19,8 @@ export type DialogProps = {
   actions: ReactNode;
   messageTestID?: string;
   titleTestID?: string;
+  /** 버튼이 셋 이상이거나 길면 세로로 쌓는다. */
+  stackedActions?: boolean;
 };
 
 export function Dialog({
@@ -30,6 +32,7 @@ export function Dialog({
   actions,
   messageTestID,
   titleTestID,
+  stackedActions,
 }: DialogProps) {
   return (
     <Modal
@@ -52,7 +55,7 @@ export function Dialog({
             </Text>
           ) : null}
           {children}
-          <View style={styles.actions}>{actions}</View>
+          <View style={[styles.actions, stackedActions && styles.actionsStacked]}>{actions}</View>
         </View>
       </View>
     </Modal>
@@ -131,6 +134,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   actions: { marginTop: 23, flexDirection: 'row', alignSelf: 'stretch', gap: 10 },
+  actionsStacked: { flexDirection: 'column' },
   button: {
     flex: 1,
     flexDirection: 'row',
