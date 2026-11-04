@@ -17,6 +17,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import com.stonefive.chalkak.ui.components.ChalkakLogo
+import com.stonefive.chalkak.ui.components.ChalkakRetryButton
+import com.stonefive.chalkak.ui.components.ChalkakSkeleton
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -93,8 +102,9 @@ class HomeCallbacks(
     val onRefresh: () -> Unit = {},
 )
 
-private val ScreenPadding = 16.dp
-private val SectionGap = 28.dp
+/** Screen side margin (`spacing.screenHorizontal`, 25) and the gap above the weekly / ranking / ISSUE blocks (`spacing.xxl`, 40). */
+private val ScreenPadding = 25.dp
+private val SectionGap = 40.dp
 
 /**
  * Stateless home screen (testids.md "홈", TC-HOME-*, TC-BANR-*). It renders [state] and forwards taps through [callbacks]; every
@@ -139,7 +149,7 @@ fun HomeScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().testTag("home.scroll"),
-                contentPadding = PaddingValues(bottom = 24.dp),
+                contentPadding = PaddingValues(bottom = 40.dp),
             ) {
                 item(key = "topic") { TopicBlock(state.topic) }
                 item(key = "hero") { HeroBlock(state, callbacks, image) }
@@ -166,8 +176,8 @@ fun HomeScreen(
                         ) {
                             Text(
                                 text = copy["home.banner.error"],
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ChalkakTheme.colors.textNeutral,
+                                style = ChalkakTheme.typography.subheadline,
+                                color = ChalkakTheme.colors.textSecondary,
                                 modifier = Modifier.testTag("home.issue-error"),
                             )
                             RetryText(copy["home.hero.retry"], callbacks.onIssueRetry, Modifier.testTag("home.issue-retry-button"))
@@ -200,43 +210,43 @@ private fun ReportLastVisibleBanner(listState: LazyListState, firstBannerIndex: 
 @Composable
 private fun TopBar(hasUnread: Boolean, onNotificationClick: () -> Unit) {
     val copy = LocalCopy.current
-    Row(
-        modifier = Modifier.fillMaxWidth().statusBarsPadding().height(52.dp).padding(horizontal = ScreenPadding),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = copy["app.name"],
-            fontFamily = Continuous,
-            style = MaterialTheme.typography.headlineMedium,
-            color = ChalkakTheme.colors.textPrimary,
-            modifier = Modifier.weight(1f),
-        )
-        Box(Modifier.size(40.dp)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onNotificationClick)
-                    .testTag("home.notification-button"),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_notification),
-                    contentDescription = copy["noti.inbox.title"],
-                    tint = ChalkakTheme.colors.textPrimary,
-                )
-            }
-            // A sibling of the button: a clickable parent would merge the dot out of the addressable tree.
-            if (hasUnread) {
+    Column(Modifier.fillMaxWidth().background(ChalkakTheme.colors.background)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().statusBarsPadding().height(55.dp).padding(horizontal = ScreenPadding),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // The Continuous face has Latin glyphs only, so the wordmark is "Chalkak"; screen readers still hear the app name.
+            ChalkakLogo(modifier = Modifier.weight(1f).offset(y = 5.dp), accessibilityText = copy["app.name"])
+            Box(Modifier.size(44.dp)) {
                 Box(
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 6.dp, end = 6.dp)
-                        .size(8.dp)
-                        .background(ChalkakTheme.colors.destructive, CircleShape)
-                        .testTag("home.notification-unread-dot"),
-                )
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .clickable(role = Role.Button, onClick = onNotificationClick)
+                        .testTag("home.notification-button"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_notification),
+                        contentDescription = copy["noti.inbox.title"],
+                        tint = ChalkakTheme.colors.iconPrimary,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+                // A sibling of the button: a clickable parent would merge the dot out of the addressable tree.
+                if (hasUnread) {
+                    Box(
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 8.dp, end = 8.dp)
+                            .size(7.dp)
+                            .background(ChalkakTheme.colors.inputCursor, CircleShape)
+                            .testTag("home.notification-unread-dot"),
+                    )
+                }
             }
         }
+        HorizontalDivider(thickness = 0.5.dp, color = ChalkakTheme.colors.border)
     }
 }
 
@@ -245,18 +255,19 @@ private fun TopBar(hasUnread: Boolean, onNotificationClick: () -> Unit) {
 @Composable
 private fun TopicBlock(topic: TopicHeader) {
     val copy = LocalCopy.current
-    Column(Modifier.fillMaxWidth().padding(horizontal = ScreenPadding).padding(top = 4.dp, bottom = 16.dp)) {
+    // Spacing above the topic is xl + sm (32); below it the hero follows after xl (screens-a 7.1).
+    Column(Modifier.fillMaxWidth().padding(horizontal = ScreenPadding).padding(top = 32.dp), verticalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.sm)) {
         when (topic) {
             is TopicHeader.Ready -> {
                 Text(
                     text = topic.dateLabel,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ChalkakTheme.colors.textInactive,
+                    style = ChalkakTheme.typography.subheadline,
+                    color = ChalkakTheme.colors.textPrimary,
                     modifier = Modifier.testTag("home.topic-date"),
                 )
                 Text(
                     text = topic.title,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = ChalkakTheme.typography.title2,
                     color = ChalkakTheme.colors.textPrimary,
                     modifier = Modifier.testTag("home.topic-title"),
                 )
@@ -269,8 +280,8 @@ private fun TopicBlock(topic: TopicHeader) {
                         else -> "home.topic.error"
                     },
                 ],
-                style = MaterialTheme.typography.titleSmall,
-                color = ChalkakTheme.colors.textNeutral,
+                style = ChalkakTheme.typography.title2,
+                color = ChalkakTheme.colors.textMuted,
                 modifier = Modifier.testTag("home.topic-title"),
             )
         }
@@ -280,16 +291,17 @@ private fun TopicBlock(topic: TopicHeader) {
 @Composable
 private fun HeroBlock(state: HomeUiState, callbacks: HomeCallbacks, image: RemoteImage) {
     val copy = LocalCopy.current
-    val shape = RoundedCornerShape(20.dp)
+    val shape = ChalkakTheme.shapes.photoCard
     Box(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = ScreenPadding)
+            .padding(top = ChalkakTheme.spacing.xl)
             .aspectRatio(HERO_ASPECT_RATIO)
             .clip(shape),
     ) {
         when (val hero = state.hero) {
-            HeroState.Loading -> HeroMessage(copy["home.topic.loading"], "home.hero-loading")
+            HeroState.Loading -> HeroMessage(copy["home.topic.loading"], "home.hero-loading") { Loading(Modifier.size(24.dp)) }
             HeroState.NoOpenTopic -> HeroMessage(copy["home.hero.no-open-topic"], "home.hero-no-open-topic")
             HeroState.Processing -> HeroMessage(copy["home.hero.processing"], "home.hero-processing")
             is HeroState.Empty -> HeroEmpty(topicName(state.topic, copy), callbacks.onHeroClick)
@@ -297,21 +309,21 @@ private fun HeroBlock(state: HomeUiState, callbacks: HomeCallbacks, image: Remot
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(ChalkakTheme.colors.border)
+                        .background(ChalkakTheme.colors.surfaceElevated)
                         .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = callbacks.onHeroClick)
                         .testTag("home.hero-photo"),
                 ) { image(hero.thumbnailUrl, Modifier.fillMaxSize()) }
                 if (hero.pendingBadge) {
                     Text(
                         text = copy["home.hero.pending-badge"],
-                        style = MaterialTheme.typography.labelSmall,
+                        style = ChalkakTheme.typography.caption,
                         fontWeight = FontWeight.SemiBold,
                         color = ChalkakTheme.colors.textOnImage,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(12.dp)
-                            .background(ChalkakTheme.colors.scrim, CircleShape)
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                            .padding(ChalkakTheme.spacing.md)
+                            .background(ChalkakTheme.colors.scrim, ChalkakTheme.shapes.pill)
+                            .padding(horizontal = ChalkakTheme.spacing.md, vertical = ChalkakTheme.spacing.xs)
                             .testTag("home.hero-pending-badge"),
                     )
                 }
@@ -320,7 +332,7 @@ private fun HeroBlock(state: HomeUiState, callbacks: HomeCallbacks, image: Remot
                 text = copy[if (hero.network) HomeCopyKeys.COMMON_NETWORK else "home.hero.error"],
                 tag = "home.hero-error",
             ) {
-                RetryText(copy["home.hero.retry"], callbacks.onHeroRetry, Modifier.testTag("home.hero-retry-button"))
+                ChalkakRetryButton(copy["home.hero.retry"], callbacks.onHeroRetry, Modifier.testTag("home.hero-retry-button"))
             }
         }
     }
@@ -330,20 +342,21 @@ private fun HeroBlock(state: HomeUiState, callbacks: HomeCallbacks, image: Remot
 private fun topicName(topic: TopicHeader, copy: Copy): String =
     (topic as? TopicHeader.Ready)?.title?.takeIf { it.isNotBlank() } ?: copy["home.topic.header"].substringAfterLast("· ")
 
+/** Hero status tile (screens-a 7.4): `surface` with a 1dp `border`, subheadline `textSecondary` message, [action] 12dp below. */
 @Composable
 private fun HeroMessage(text: String, tag: String, action: @Composable () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(ChalkakTheme.colors.inputBackground)
-            .border(BorderStroke(1.dp, ChalkakTheme.colors.border), RoundedCornerShape(20.dp)),
+            .background(ChalkakTheme.colors.surface)
+            .border(BorderStroke(1.dp, ChalkakTheme.colors.border), ChalkakTheme.shapes.photoCard),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.md, Alignment.CenterVertically),
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.titleSmall,
-            color = ChalkakTheme.colors.textNeutral,
+            style = ChalkakTheme.typography.subheadline,
+            color = ChalkakTheme.colors.textSecondary,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 24.dp).testTag(tag),
         )
@@ -358,49 +371,49 @@ private fun HeroEmpty(topic: String, onUpload: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(ChalkakTheme.colors.inputBackground)
-            .border(BorderStroke(1.dp, ChalkakTheme.colors.border), RoundedCornerShape(20.dp))
+            .background(ChalkakTheme.colors.surface)
+            .border(BorderStroke(1.dp, ChalkakTheme.colors.border), ChalkakTheme.shapes.photoCard)
             // The whole card is a tap target for sighted users; semantics (and the tag) belong to the button inside.
             .pointerInput(Unit) { detectTapGestures { latestUpload() } }
             .testTag("home.hero-empty"),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.xl, Alignment.CenterVertically),
     ) {
         Text(
             text = copy.format("home.hero.empty", "주제" to topic),
-            style = MaterialTheme.typography.titleSmall,
+            style = ChalkakTheme.typography.subheadline,
             fontWeight = FontWeight.SemiBold,
             color = ChalkakTheme.colors.textPrimary,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 24.dp),
         )
-        Spacer(Modifier.height(20.dp))
         Box(
             Modifier
-                .size(40.dp)
+                .size(36.dp)
                 .background(ChalkakTheme.colors.actionPrimary, CircleShape)
                 .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onUpload)
                 .testTag("home.hero-upload-button"),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(painterResource(R.drawable.ic_plus), contentDescription = null, tint = ChalkakTheme.colors.onActionPrimary, modifier = Modifier.size(24.dp))
+            Icon(painterResource(R.drawable.ic_plus), contentDescription = null, tint = ChalkakTheme.colors.onActionPrimary, modifier = Modifier.size(22.dp))
         }
     }
 }
 
 private const val HERO_ASPECT_RATIO = 5f / 6f
 
+/** Text retry (ranking / ISSUE): body in `actionPrimary`, 44dp touch height. */
 @Composable
 private fun RetryText(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Text(
         text = text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = ChalkakTheme.colors.textPrimary,
+        style = ChalkakTheme.typography.body,
+        color = ChalkakTheme.colors.actionPrimary,
         modifier = modifier
-            .padding(top = 12.dp)
-            .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .heightIn(min = 44.dp)
+            .clickable(role = Role.Button, onClick = onClick)
+            .wrapContentHeight(Alignment.CenterVertically)
+            .padding(horizontal = 16.dp),
     )
 }
 
@@ -414,24 +427,29 @@ private fun SectionHeader(title: String, moreTag: String?, onMore: () -> Unit, m
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleLarge,
+            style = ChalkakTheme.typography.headline,
+            fontWeight = FontWeight.Bold,
             color = ChalkakTheme.colors.textPrimary,
             modifier = Modifier.weight(1f),
         )
         if (moreTag != null) {
-            Row(
-                modifier = Modifier
-                    .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onMore)
-                    .padding(vertical = 8.dp)
-                    .testTag(moreTag),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (moreText != null) {
-                    Text(moreText, style = MaterialTheme.typography.bodySmall, color = ChalkakTheme.colors.textInactive)
-                }
-                Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null, tint = ChalkakTheme.colors.textInactive)
-            }
+            MoreLink(moreText, onMore, Modifier.testTag(moreTag))
         }
+    }
+}
+
+/** "보러가기" + chevron (screens-a 7.6): caption and a 12dp chevron in `textPrimary`, 8dp above and below. */
+@Composable
+private fun MoreLink(text: String?, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = ChalkakTheme.spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.xs),
+    ) {
+        if (text != null) Text(text, style = ChalkakTheme.typography.caption, color = ChalkakTheme.colors.textPrimary)
+        Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null, tint = ChalkakTheme.colors.textPrimary, modifier = Modifier.size(12.dp))
     }
 }
 
@@ -442,30 +460,29 @@ private fun WeekBlock(week: Section<List<WeekDay>>, callbacks: HomeCallbacks, im
     val copy = LocalCopy.current
     Column(Modifier.fillMaxWidth().padding(top = SectionGap).testTag("home.week-section")) {
         Row(Modifier.fillMaxWidth().padding(horizontal = ScreenPadding), verticalAlignment = Alignment.CenterVertically) {
-            Text(copy["home.weekly.title"], style = MaterialTheme.typography.titleLarge, color = ChalkakTheme.colors.textPrimary)
+            Text(
+                copy["home.weekly.title"],
+                style = ChalkakTheme.typography.headline,
+                fontWeight = FontWeight.Bold,
+                color = ChalkakTheme.colors.textPrimary,
+            )
             if (week is Section.Ready) {
                 Text(
                     text = "${week.value.count { it.entry != null }}/${week.value.size}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ChalkakTheme.colors.textInactive,
-                    modifier = Modifier.padding(start = 8.dp).testTag("home.week-count"),
+                    style = ChalkakTheme.typography.caption,
+                    fontWeight = FontWeight.SemiBold,
+                    color = ChalkakTheme.colors.textSecondary,
+                    modifier = Modifier.padding(start = ChalkakTheme.spacing.xs).testTag("home.week-count"),
                 )
             }
             Spacer(Modifier.weight(1f))
-            Text(
-                text = copy["home.weekly.more"],
-                style = MaterialTheme.typography.bodySmall,
-                color = ChalkakTheme.colors.textInactive,
-                modifier = Modifier
-                    .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = callbacks.onWeekMoreClick)
-                    .padding(vertical = 8.dp),
-            )
+            MoreLink(copy["home.weekly.more"], callbacks.onWeekMoreClick)
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(ChalkakTheme.spacing.lg))
         when (week) {
             is Section.Ready -> Row(
                 Modifier.fillMaxWidth().padding(horizontal = ScreenPadding),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.sm),
             ) {
                 week.value.forEach { day -> WeekCell(day, callbacks.onWeekDayClick, image, Modifier.weight(1f)) }
             }
@@ -489,10 +506,10 @@ private fun WeekCell(day: WeekDay, onClick: (LocalDate) -> Unit, image: RemoteIm
         modifier = modifier.then(tap).testTag("home.week-day-${day.date}"),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(day.weekdayLabel, style = MaterialTheme.typography.labelSmall, color = ChalkakTheme.colors.textInactive)
+        Text(day.weekdayLabel, style = ChalkakTheme.typography.caption, color = ChalkakTheme.colors.textSecondary)
         Spacer(Modifier.height(6.dp))
         Box(
-            Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(10.dp)).background(ChalkakTheme.colors.border),
+            Modifier.fillMaxWidth().aspectRatio(1f).clip(ChalkakTheme.shapes.small).background(ChalkakTheme.colors.calendarCell),
             contentAlignment = Alignment.Center,
         ) {
             if (entry != null) {
@@ -500,19 +517,28 @@ private fun WeekCell(day: WeekDay, onClick: (LocalDate) -> Unit, image: RemoteIm
             }
             Text(
                 text = day.date.dayOfMonth.toString(),
-                style = MaterialTheme.typography.labelMedium,
+                style = ChalkakTheme.typography.caption.copy(
+                    shadow = if (entry != null) Shadow(Color.Black.copy(alpha = 0.45f), Offset(0f, 1f), 4f) else null,
+                ),
                 fontWeight = FontWeight.SemiBold,
-                color = if (entry != null) ChalkakTheme.colors.textOnImage else ChalkakTheme.colors.textInactive,
+                color = if (entry != null) ChalkakTheme.colors.textOnImage else ChalkakTheme.colors.textSecondary,
             )
-        }
-        if (entry?.status == ModerationStatus.PENDING) {
-            Text(
-                text = copy["home.weekly.pending"],
-                style = MaterialTheme.typography.labelSmall,
-                color = ChalkakTheme.colors.textNeutral,
-                maxLines = 1,
-                modifier = Modifier.padding(top = 4.dp),
-            )
+            if (entry?.status == ModerationStatus.PENDING) {
+                // Pending band along the bottom of the thumbnail, full width and centered.
+                Text(
+                    text = copy["home.weekly.pending"],
+                    style = ChalkakTheme.typography.caption,
+                    fontWeight = FontWeight.SemiBold,
+                    color = ChalkakTheme.colors.textOnImage,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(ChalkakTheme.colors.scrim)
+                        .padding(vertical = 1.dp),
+                )
+            }
         }
     }
 }
@@ -540,12 +566,12 @@ private fun RankingBlock(kind: RankingKind, section: Section<List<HomePost>>, ca
     val title = copy[if (kind == RankingKind.Yesterday) "home.ranking.yesterday-title" else "home.ranking.today-title"]
     Column(Modifier.fillMaxWidth().padding(top = SectionGap).testTag("$prefix-section")) {
         SectionHeader(title, "$prefix-more-link", onMore = { callbacks.onRankingMoreClick(kind) })
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(ChalkakTheme.spacing.lg))
         when (section) {
             is Section.Ready -> if (section.value.isEmpty()) {
                 SectionMessage(copy["home.ranking.empty"], "$prefix-empty")
             } else {
-                Row(Modifier.fillMaxWidth().padding(horizontal = ScreenPadding), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = ScreenPadding), horizontalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.md)) {
                     // Five equal slots: a short list leaves the right slots empty, so every photo is on screen at once.
                     section.value.take(RANKING_SLOTS).forEach { post ->
                         RankingCard(post, prefix, callbacks, image, Modifier.weight(1f))
@@ -571,8 +597,8 @@ private fun RankingCard(post: HomePost, prefix: String, callbacks: HomeCallbacks
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(10.dp))
-                .background(ChalkakTheme.colors.border)
+                .clip(ChalkakTheme.shapes.small)
+                .background(ChalkakTheme.colors.calendarCell)
                 .clickable(interactionSource = null, indication = null, role = Role.Button) { callbacks.onRankingPostClick(post) }
                 .testTag("$prefix-item-${post.id}"),
         ) { image(post.thumbnailImageUrl, Modifier.fillMaxSize()) }
@@ -593,14 +619,14 @@ private fun RankingCard(post: HomePost, prefix: String, callbacks: HomeCallbacks
                 Icon(
                     painter = painterResource(if (post.isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline),
                     contentDescription = null,
-                    tint = if (post.isLiked) ChalkakTheme.colors.destructive else ChalkakTheme.colors.textInactive,
+                    tint = if (post.isLiked) ChalkakTheme.colors.destructive else ChalkakTheme.colors.iconSecondary,
                     modifier = Modifier.size(16.dp),
                 )
             }
             Text(
                 text = post.likeCount.toString(),
-                style = MaterialTheme.typography.labelSmall,
-                color = ChalkakTheme.colors.textNeutral,
+                style = ChalkakTheme.typography.caption,
+                color = ChalkakTheme.colors.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Clip,
                 modifier = Modifier.testTag("$prefix-like-count-${post.id}"),
@@ -616,39 +642,45 @@ private fun IssueHeader() {
     val copy = LocalCopy.current
     Column(Modifier.fillMaxWidth().padding(top = SectionGap).testTag("home.issue-section")) {
         SectionHeader(copy["home.banner.title"], moreTag = null, onMore = {})
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(ChalkakTheme.spacing.lg))
     }
 }
 
+/** ISSUE banner (screens-a 7.8): 1672 : 941 image on `surfaceElevated`, `shapes.large`, then bold subheadline title and caption subtitle. */
 @Composable
 private fun BannerItem(banner: Banner, callbacks: HomeCallbacks, image: RemoteImage) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = ScreenPadding, vertical = 8.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(ChalkakTheme.colors.inputBackground)
+            .padding(horizontal = ScreenPadding)
+            .padding(bottom = SectionGap)
+            .clip(ChalkakTheme.shapes.large)
             .clickable(interactionSource = null, indication = null, role = Role.Button) { callbacks.onBannerClick(banner) }
-            .padding(10.dp)
             .testTag("home.issue-item-${banner.id}"),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.lg),
     ) {
-        Box(Modifier.size(64.dp).clip(RoundedCornerShape(10.dp)).background(ChalkakTheme.colors.border)) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1672f / 941f)
+                .clip(ChalkakTheme.shapes.large)
+                .background(ChalkakTheme.colors.surfaceElevated),
+        ) {
             image(banner.thumbnailUrl, Modifier.fillMaxSize())
         }
-        Column(Modifier.padding(start = 12.dp).weight(1f)) {
+        Column(verticalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.sm)) {
             Text(
                 banner.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
+                style = ChalkakTheme.typography.subheadline,
+                fontWeight = FontWeight.Bold,
                 color = ChalkakTheme.colors.textPrimary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 banner.subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = ChalkakTheme.colors.textNeutral,
+                style = ChalkakTheme.typography.caption,
+                color = ChalkakTheme.colors.textSecondary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -661,30 +693,28 @@ private fun BannerItem(banner: Banner, callbacks: HomeCallbacks, image: RemoteIm
 @Composable
 private fun SectionMessage(text: String, tag: String, retryTag: String? = null, onRetry: () -> Unit = {}) {
     val copy = LocalCopy.current
-    Column(
-        Modifier.fillMaxWidth().padding(horizontal = ScreenPadding).padding(vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = ScreenPadding),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.md),
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = ChalkakTheme.colors.textNeutral,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.testTag(tag),
+            style = ChalkakTheme.typography.footnote,
+            color = ChalkakTheme.colors.textSecondary,
+            modifier = Modifier.weight(1f, fill = false).testTag(tag),
         )
-        if (retryTag != null) RetryText(copy["home.hero.retry"], onRetry, Modifier.testTag(retryTag))
+        if (retryTag != null) ChalkakRetryButton(copy["home.hero.retry"], onRetry, Modifier.testTag(retryTag), size = 32.dp)
     }
 }
 
-/** Static stand-in while a section loads (no animation: the screen must be able to go idle). */
+/** Loading stand-in for a section: a shimmering skeleton row (still when the shimmer is off, so the screen can go idle in tests). */
 @Composable
 private fun SectionPlaceholder() {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = ScreenPadding)
-            .height(72.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(ChalkakTheme.colors.border),
-    )
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = ScreenPadding),
+        horizontalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.sm),
+    ) {
+        repeat(7) { ChalkakSkeleton(Modifier.weight(1f).aspectRatio(1f).clip(ChalkakTheme.shapes.small)) }
+    }
 }

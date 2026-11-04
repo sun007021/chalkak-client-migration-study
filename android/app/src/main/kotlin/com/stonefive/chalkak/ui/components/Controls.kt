@@ -42,6 +42,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import com.stonefive.chalkak.R
 import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.ui.theme.ChalkakTheme
@@ -153,8 +156,13 @@ fun ChalkakCheckbox(checked: Boolean, modifier: Modifier = Modifier) {
 
 /** Brand wordmark (screens-a 1.7): "Chalkak" in the Continuous face. */
 @Composable
-fun ChalkakLogo(modifier: Modifier = Modifier, text: String = "Chalkak") {
-    Text(text = text, modifier = modifier, color = ChalkakTheme.colors.textPrimary, style = ChalkakTheme.typography.brand)
+fun ChalkakLogo(modifier: Modifier = Modifier, text: String = "Chalkak", accessibilityText: String? = null) {
+    Text(
+        text = text,
+        modifier = if (accessibilityText != null) modifier.clearAndSetSemantics { this.text = AnnotatedString(accessibilityText) } else modifier,
+        color = ChalkakTheme.colors.textPrimary,
+        style = ChalkakTheme.typography.brand,
+    )
 }
 
 /** Arrow-back / close icon button of the full-screen flows (48dp round target, 24dp glyph). [iconRes] is `ic_arrow_back` or `ic_close`. */
@@ -251,7 +259,13 @@ enum class DialogButtonStyle { Primary, Secondary, Destructive }
 
 /** Dialog action button (screens-c 1.2): `shapes.button`, callout, 9.5dp vertical padding. */
 @Composable
-fun ChalkakDialogButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, style: DialogButtonStyle = DialogButtonStyle.Primary) {
+fun ChalkakDialogButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    style: DialogButtonStyle = DialogButtonStyle.Primary,
+    enabled: Boolean = true,
+) {
     val colors = ChalkakTheme.colors
     val (container, content) = when (style) {
         DialogButtonStyle.Primary -> colors.actionPrimary to colors.onActionPrimary
@@ -261,9 +275,15 @@ fun ChalkakDialogButton(text: String, onClick: () -> Unit, modifier: Modifier = 
     Button(
         onClick = onClick,
         modifier = modifier,
+        enabled = enabled,
         shape = ChalkakTheme.shapes.button,
         contentPadding = PaddingValues(vertical = 9.5.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = content),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = container,
+            contentColor = content,
+            disabledContainerColor = container.copy(alpha = 0.4f),
+            disabledContentColor = content,
+        ),
         elevation = null,
     ) {
         Text(text = text, style = ChalkakTheme.typography.callout)
