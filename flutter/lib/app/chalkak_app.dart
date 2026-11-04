@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/analytics/screen_return_reporter.dart';
 import '../core/copy/ko.g.dart';
+import '../core/design/chalkak_theme.dart';
 import 'app_dependencies.dart';
 import 'app_router.dart';
 import 'app_scope.dart';
@@ -22,6 +24,7 @@ class ChalkakApp extends StatefulWidget {
 }
 
 class _ChalkakAppState extends State<ChalkakApp> with WidgetsBindingObserver {
+  final ThemeData _theme = buildChalkakTheme();
   final ScreenReturnObserver _returnObserver = ScreenReturnObserver();
   late final GoRouter _router = createAppRouter(
     widget.dependencies,
@@ -77,11 +80,13 @@ class _ChalkakAppState extends State<ChalkakApp> with WidgetsBindingObserver {
         child: MaterialApp.router(
           title: Copy.appName,
           routerConfig: _router,
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFFFEE500),
-            ),
-            useMaterial3: true,
+          // 라이트 고정: 시스템 다크 모드에서도 같은 토큰 테마를 쓴다(docs/design/README.md §1.5).
+          theme: _theme,
+          darkTheme: _theme,
+          themeMode: ThemeMode.light,
+          builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+            value: chalkakSystemOverlayStyle,
+            child: child ?? const SizedBox.shrink(),
           ),
         ),
       ),

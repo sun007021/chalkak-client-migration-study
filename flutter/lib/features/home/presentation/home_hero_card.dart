@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/copy/ko.g.dart';
+import '../../../core/design/chalkak_tokens.dart';
 import '../../../core/ui/app_network_image.dart';
+import '../../../core/ui/components/chalkak_states.dart';
 import '../../../core/ui/test_id.dart';
 import '../domain/home_state.dart';
 import 'home_test_ids.dart';
@@ -24,7 +26,9 @@ class HomeHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: EdgeInsets.symmetric(
+        horizontal: context.tokens.spacing.screenHorizontal,
+      ),
       child: switch (hero) {
         HeroLoading() => const _MessageCard(
           id: HomeTestIds.heroLoading,
@@ -54,6 +58,9 @@ class HomeHeroCard extends StatelessWidget {
   }
 }
 
+/// 히어로 카드 틀: 비율 5:6, 라운드 photoCard(12) 클립 (HomeHeroCard.swift Metrics.aspectRatio).
+const double _heroAspectRatio = 5 / 6;
+
 class _CardFrame extends StatelessWidget {
   const _CardFrame({required this.child});
 
@@ -61,12 +68,15 @@ class _CardFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final shape = BorderRadius.circular(tokens.radius.photoCard);
     return AspectRatio(
-      aspectRatio: 4 / 3,
+      aspectRatio: _heroAspectRatio,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(16),
+          color: tokens.colors.surface,
+          borderRadius: shape,
+          border: Border.all(color: tokens.colors.border),
         ),
         child: child,
       ),
@@ -87,6 +97,7 @@ class _MessageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return TestId(
       id,
       child: _CardFrame(
@@ -94,14 +105,17 @@ class _MessageCard extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (busy) ...[
-                const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: tokens.text.subheadline.copyWith(
+                  color: tokens.colors.textSecondary,
                 ),
-                const SizedBox(height: 12),
+              ),
+              if (busy) ...[
+                SizedBox(height: tokens.spacing.md),
+                const ChalkakSpinner(size: 24),
               ],
-              Text(message, textAlign: TextAlign.center),
             ],
           ),
         ),
@@ -116,8 +130,13 @@ class _EmptyCard extends StatelessWidget {
   final String? topicTitle;
   final VoidCallback onPressed;
 
+  // HomeHeroCard.swift Metrics: addButtonSize 36, addIconSize 22.
+  static const _addButtonSize = 36.0;
+  static const _addIconSize = 22.0;
+
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     final title = topicTitle;
     final message = title == null
         ? Copy.homeHeroNoTopic
@@ -135,16 +154,47 @@ class _EmptyCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(message, textAlign: TextAlign.center),
+                  padding: EdgeInsets.symmetric(horizontal: tokens.spacing.xl),
+                  child: Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: tokens.text.subheadline.copyWith(
+                      color: tokens.colors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: tokens.spacing.xl),
                 TestId.button(
                   HomeTestIds.heroUploadButton,
-                  child: IconButton.filled(
-                    icon: const Icon(Icons.add),
-                    tooltip: Copy.navTabUploadA11y,
-                    onPressed: onPressed,
+                  child: Semantics(
+                    button: true,
+                    label: Copy.navTabUploadA11y,
+                    excludeSemantics: true,
+                    onTap: onPressed,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onPressed,
+                      child: SizedBox.square(
+                        dimension: 48,
+                        child: Center(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: tokens.colors.actionPrimary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: SizedBox.square(
+                              dimension: _addButtonSize,
+                              child: Icon(
+                                Icons.add_rounded,
+                                size: _addIconSize,
+                                color: tokens.colors.onActionPrimary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -164,26 +214,30 @@ class _PhotoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return TestId(
       HomeTestIds.heroPhoto,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(tokens.radius.photoCard),
         child: AspectRatio(
-          aspectRatio: 4 / 3,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              AppNetworkImage(url: thumbnailUrl),
-              if (pending)
-                const Positioned(
-                  top: 12,
-                  left: 12,
-                  child: TestId(
-                    HomeTestIds.heroPendingBadge,
-                    child: _Badge(label: Copy.homeHeroPendingBadge),
+          aspectRatio: _heroAspectRatio,
+          child: ColoredBox(
+            color: tokens.colors.surfaceElevated,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                AppNetworkImage(url: thumbnailUrl),
+                if (pending)
+                  Positioned(
+                    top: tokens.spacing.md,
+                    right: tokens.spacing.md,
+                    child: const TestId(
+                      HomeTestIds.heroPendingBadge,
+                      child: _Badge(label: Copy.homeHeroPendingBadge),
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -191,6 +245,7 @@ class _PhotoCard extends StatelessWidget {
   }
 }
 
+/// 검수 대기 배지: caption semibold, textOnImage, scrim 캡슐, 가로 md 세로 xs.
 class _Badge extends StatelessWidget {
   const _Badge({required this.label});
 
@@ -198,16 +253,23 @@ class _Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(8),
+      decoration: ShapeDecoration(
+        color: tokens.colors.scrim,
+        shape: const StadiumBorder(),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: EdgeInsets.symmetric(
+          horizontal: tokens.spacing.md,
+          vertical: tokens.spacing.xs,
+        ),
         child: Text(
           label,
-          style: const TextStyle(color: Colors.white, fontSize: 12),
+          style: tokens.text.caption.copyWith(
+            color: tokens.colors.textOnImage,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
@@ -221,6 +283,7 @@ class _ErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return TestId(
       HomeTestIds.heroError,
       child: _CardFrame(
@@ -228,13 +291,22 @@ class _ErrorCard extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(Copy.homeHeroError, textAlign: TextAlign.center),
-              const SizedBox(height: 8),
+              Text(
+                Copy.homeHeroError,
+                textAlign: TextAlign.center,
+                style: tokens.text.subheadline.copyWith(
+                  color: tokens.colors.textSecondary,
+                ),
+              ),
+              SizedBox(height: tokens.spacing.md),
               TestId.button(
                 HomeTestIds.heroRetryButton,
-                child: TextButton(
-                  onPressed: onRetry,
-                  child: const Text(Copy.homeHeroRetry),
+                child: Semantics(
+                  button: true,
+                  label: Copy.homeHeroRetry,
+                  excludeSemantics: true,
+                  onTap: onRetry,
+                  child: ChalkakRetryCircleButton(onPressed: onRetry),
                 ),
               ),
             ],

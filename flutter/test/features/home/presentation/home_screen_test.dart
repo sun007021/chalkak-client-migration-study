@@ -179,7 +179,9 @@ void main() {
     ]);
     await _pump(tester, r);
     expect(_text(HomeTestIds.heroError, Copy.homeHeroError), findsOneWidget);
-    expect(find.text(Copy.homeHeroRetry), findsOneWidget);
+    // 원본은 글자 없는 둥근 새로고침 버튼이다(접근성 이름만 다시 시도).
+    expect(find.text(Copy.homeHeroRetry), findsNothing);
+    expect(byId(HomeTestIds.heroRetryButton), findsOneWidget);
     await tester.tap(byId(HomeTestIds.heroRetryButton));
     await _settle(tester);
     expect(byId(HomeTestIds.heroError), findsNothing);
@@ -273,9 +275,19 @@ void main() {
     }
     expect(find.text(Copy.homeWeeklyTitle), findsOneWidget);
     expect(find.text('3/7'), findsOneWidget);
-    expect(find.text(Copy.homeWeeklyMore), findsOneWidget);
-    for (final w in ['일', '월', '화', '수', '목', '금', '토']) {
-      expect(find.text(w), findsWidgets, reason: w);
+    expect(
+      find.descendant(
+        of: byId(HomeTestIds.weekSection),
+        matching: find.text(Copy.homeWeeklyMore),
+      ),
+      findsOneWidget,
+    );
+    // 원본(HomeWeeklyRecord): 요일 기호는 사진이 없는 칸 안에만 그린다.
+    for (final w in ['수', '목', '금', '토']) {
+      expect(find.text(w), findsOneWidget, reason: w);
+    }
+    for (final w in ['일', '월', '화']) {
+      expect(find.text(w), findsNothing, reason: w);
     }
   });
 
