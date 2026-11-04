@@ -106,7 +106,7 @@ private struct HomeAICard: View {
         }
         .padding(ChalkakSpacing.lg)
         .frame(maxWidth: .infinity, minHeight: 56)
-        .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.card))
+        .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.large))
         .contentShape(Rectangle())
     }
 }

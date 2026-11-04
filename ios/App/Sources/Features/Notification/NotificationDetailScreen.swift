@@ -89,7 +89,7 @@ struct NotificationDetailScreen: View {
                     ChalkakRemoteImage(url: imageURL, contentMode: .fit)
                         .frame(maxWidth: .infinity)
                         .aspectRatio(1, contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.card))
+                        .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.large))
                         .accessibilityIdentifier("notification-detail.photo")
                 }
                 if let reason = detail.rejectionReason, !reason.isEmpty {

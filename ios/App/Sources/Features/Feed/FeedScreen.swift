@@ -229,7 +229,7 @@ private struct FeedContentView: View {
             if viewModel.isDeleting {
                 ProgressView()
                     .padding(ChalkakSpacing.lg)
-                    .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.card))
+                    .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.large))
                     .accessibilityIdentifier("feed.deleting")
             }
         }
@@ -320,7 +320,7 @@ private struct FeedTitleEditDialog: View {
             }
             .padding(ChalkakSpacing.xl)
             .frame(maxWidth: 320)
-            .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.dialog))
+            .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.large))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("feed.title-dialog")
             .accessibilityAddTraits(.isModal)
@@ -430,7 +430,7 @@ private struct FeedZoomablePhoto: View {
                     .frame(width: geo.size.width, height: geo.size.height)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.card))
+            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.large))
             .scaleEffect(scale, anchor: anchor)
             .zIndex(scale > 1 ? 1 : 0)
             .gesture(

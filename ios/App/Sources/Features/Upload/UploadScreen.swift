@@ -203,10 +203,10 @@ private struct UploadContentView: View {
                             .resizable()
                             .scaledToFit()
                             .frame(maxWidth: .infinity, maxHeight: 420)
-                            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.card))
+                            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.large))
                     } else {
                         ZStack {
-                            RoundedRectangle(cornerRadius: ChalkakRadius.card).fill(ChalkakColor.calendarCell)
+                            RoundedRectangle(cornerRadius: ChalkakRadius.large).fill(ChalkakColor.calendarCell)
                             ProgressView()
                         }
                         .aspectRatio(1, contentMode: .fit)
@@ -233,7 +233,7 @@ private struct UploadContentView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, ChalkakSpacing.xl)
-            .background(ChalkakColor.calendarCell, in: RoundedRectangle(cornerRadius: ChalkakRadius.card))
+            .background(ChalkakColor.calendarCell, in: RoundedRectangle(cornerRadius: ChalkakRadius.large))
         }
     }
 
@@ -250,7 +250,7 @@ private struct UploadContentView: View {
                 .font(.system(size: 28, weight: .regular))
                 .foregroundStyle(ChalkakColor.iconPrimary)
                 .frame(width: 88, height: 88)
-                .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.card))
+                .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.large))
         }
         .buttonStyle(.plain)
         .disabled(viewModel.isSubmitting)
@@ -385,7 +385,7 @@ private struct UploadSuccessView: View {
                 }
             }
             .frame(maxHeight: 360)
-            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.card))
+            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.large))
             VStack(spacing: ChalkakSpacing.sm) {
                 Text(success.message)
                     .font(ChalkakFont.headlineBold)

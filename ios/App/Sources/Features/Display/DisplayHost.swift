@@ -368,7 +368,7 @@ private struct PostCell: View {
                 )
                 .padding(ChalkakSpacing.sm)
             }
-            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.card))
+            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.large))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(itemIdentifier)
     }

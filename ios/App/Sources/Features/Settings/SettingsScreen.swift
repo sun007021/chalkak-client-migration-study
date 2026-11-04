@@ -14,7 +14,6 @@ struct SettingsScreen: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
             if viewModel.showsLoginButton {
                 guestContent
             } else {
@@ -54,32 +53,29 @@ struct SettingsScreen: View {
         }
     }
 
-    private var header: some View {
-        HStack {
-            Text(NavCopy.label(for: .settings))
-                .font(ChalkakFont.headline)
-                .foregroundStyle(ChalkakColor.textPrimary)
-                .accessibilityHidden(true)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 55)
-    }
-
     // MARK: 게스트
 
     private var guestContent: some View {
         VStack {
+            // 원본 SettingsLoginButton(screens-c.md 4.6): actionPrimary 행, 라운드 large, 로그인 + chevron.right, 좌우 20 상하 16
             Button { Task { await container.launch.loginFromGuest() } } label: {
-                Text(SettingsCopy.guestLogin)
-                    .font(ChalkakFont.callout)
-                    .foregroundStyle(ChalkakColor.onActionPrimary)
-                    .frame(maxWidth: .infinity, minHeight: 56)
-                    .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
+                HStack {
+                    Text(SettingsCopy.guestLogin)
+                        .font(ChalkakFont.callout)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(ChalkakColor.onActionPrimary)
+                .padding(.horizontal, 20)
+                .padding(.vertical, ChalkakSpacing.lg)
+                .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.large))
+                .settingsCardShadow()
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("settings.login-button")
             .padding(.horizontal, ChalkakSpacing.screenHorizontal)
-            .padding(.top, ChalkakSpacing.xl)
+            .padding(.top, 48)
             Spacer(minLength: 0)
         }
     }
@@ -88,15 +84,16 @@ struct SettingsScreen: View {
 
     private var memberContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: ChalkakSpacing.xl) {
+            VStack(alignment: .leading, spacing: 36) {
                 ForEach(viewModel.sections, id: \.self) { section in
                     sectionView(section)
                 }
             }
             .padding(.horizontal, ChalkakSpacing.screenHorizontal)
-            .padding(.top, ChalkakSpacing.sm)
-            .padding(.bottom, ChalkakSpacing.xl)
+            .padding(.top, 48)
+            .padding(.bottom, ChalkakSpacing.xxl)
         }
+        .scrollIndicators(.hidden)
     }
 
     @ViewBuilder
@@ -110,9 +107,9 @@ struct SettingsScreen: View {
                 .accessibilityIdentifier("settings.push-section")
         case .account:
             sectionContainer(title: SettingsCopy.sectionAccount) {
-                row(SettingsCopy.rowLogout, identifier: "settings.logout-row") { viewModel.account.logoutTapped() }
+                row(SettingsCopy.rowLogout, identifier: "settings.logout-row", trailingSystemImage: "rectangle.portrait.and.arrow.right") { viewModel.account.logoutTapped() }
                 divider
-                row(SettingsCopy.rowWithdraw, identifier: "settings.withdraw-row") { viewModel.account.withdrawTapped() }
+                row(SettingsCopy.rowWithdraw, identifier: "settings.withdraw-row", titleColor: ChalkakColor.error, showsChevron: false) { viewModel.account.withdrawTapped() }
             }
         case .feedback:
             sectionContainer(title: SettingsCopy.sectionFeedback) {
@@ -130,35 +127,49 @@ struct SettingsScreen: View {
     }
 
     private func sectionContainer<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: ChalkakSpacing.sm) {
+        // 섹션 라벨 callout/textMuted, 카드 surfaceElevated 라운드 16 + 옅은 그림자(screens-c.md 1.5)
+        VStack(alignment: .leading, spacing: ChalkakSpacing.lg) {
             Text(title)
-                .font(ChalkakFont.subheadline)
-                .foregroundStyle(ChalkakColor.textSecondary)
+                .font(ChalkakFont.callout)
+                .foregroundStyle(ChalkakColor.textMuted)
             VStack(spacing: 0) {
                 content()
             }
-            .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.card))
-            .overlay(RoundedRectangle(cornerRadius: ChalkakRadius.card).stroke(ChalkakColor.border, lineWidth: 1))
+            .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.large))
+            .settingsCardShadow()
         }
     }
 
     private var divider: some View {
-        Rectangle().fill(ChalkakColor.border).frame(height: 1).padding(.leading, ChalkakSpacing.lg)
+        Rectangle().fill(ChalkakColor.border).frame(height: 1).padding(.horizontal, 20)
     }
 
-    private func row(_ title: String, identifier: String, action: @escaping () -> Void) -> some View {
+    private func row(
+        _ title: String,
+        identifier: String,
+        titleColor: Color = ChalkakColor.textPrimary,
+        trailingSystemImage: String? = nil,
+        showsChevron: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             HStack {
                 Text(title)
                     .font(ChalkakFont.callout)
-                    .foregroundStyle(ChalkakColor.textPrimary)
+                    .foregroundStyle(titleColor)
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(ChalkakColor.textSecondary)
+                if let trailingSystemImage {
+                    Image(systemName: trailingSystemImage)
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(ChalkakColor.textMuted)
+                } else if showsChevron {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(ChalkakColor.textMuted)
+                }
             }
-            .padding(.horizontal, ChalkakSpacing.lg)
-            .frame(minHeight: 52)
+            .padding(.horizontal, 20)
+            .padding(.vertical, ChalkakSpacing.lg)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -173,11 +184,11 @@ struct SettingsScreen: View {
             Spacer(minLength: 0)
             Text(viewModel.versionText)
                 .font(ChalkakFont.callout)
-                .foregroundStyle(ChalkakColor.textSecondary)
+                .foregroundStyle(ChalkakColor.textMuted)
                 .accessibilityIdentifier("settings.version-value")
         }
-        .padding(.horizontal, ChalkakSpacing.lg)
-        .frame(minHeight: 52)
+        .padding(.horizontal, 20)
+        .padding(.vertical, ChalkakSpacing.lg)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("settings.version-row")
     }
@@ -186,7 +197,7 @@ struct SettingsScreen: View {
 
     private var signatureCard: some View {
         let signature = viewModel.signature
-        return VStack(alignment: .leading, spacing: ChalkakSpacing.md) {
+        return VStack(alignment: .leading, spacing: ChalkakSpacing.lg) {
             HStack {
                 Text(SignatureCopy.cardTitle)
                     .font(ChalkakFont.callout)
@@ -194,11 +205,12 @@ struct SettingsScreen: View {
                 Spacer(minLength: 0)
                 Button { session.beginSignatureChange() } label: {
                     Text(SignatureCopy.cardChange)
-                        .font(ChalkakFont.subheadline)
-                        .foregroundStyle(ChalkakColor.onActionPrimary)
-                        .padding(.horizontal, ChalkakSpacing.lg)
-                        .frame(minHeight: 36)
-                        .background(ChalkakColor.actionPrimary, in: Capsule())
+                        .font(ChalkakFont.callout)
+                        .underline()
+                        .foregroundStyle(ChalkakColor.textSecondary)
+                        .padding(.vertical, ChalkakSpacing.xs)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("settings.signature-change-button")
@@ -216,8 +228,12 @@ struct SettingsScreen: View {
                         .accessibilityIdentifier("settings.signature-loading")
                 }
             }
-            .aspectRatio(SignaturePadMetrics.aspectRatio, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.small))
+            .frame(height: 112)
+            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.button))
+            .overlay(
+                RoundedRectangle(cornerRadius: ChalkakRadius.button)
+                    .strokeBorder(ChalkakColor.textOnImage.opacity(0.28), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            )
             // 이미지가 없고 재등록 상태도 아닌데 조회가 실패한 경우에만 인라인 오류와 다시 불러오기를 보인다.
             if signature.notice != nil, signature.imageURL == nil, !signature.needsRegistration, !signature.isLoading {
                 HStack(spacing: ChalkakSpacing.md) {
@@ -236,7 +252,9 @@ struct SettingsScreen: View {
                 }
             }
         }
-        .padding(ChalkakSpacing.lg)
+        .padding(.horizontal, 20)
+        .padding(.top, 18)
+        .padding(.bottom, 20)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("settings.signature-card")
     }
@@ -262,19 +280,21 @@ struct SettingsScreen: View {
         case .failed:
             HStack(spacing: ChalkakSpacing.md) {
                 Text(SettingsCopy.pushLoadError)
-                    .font(ChalkakFont.footnote)
+                    .font(ChalkakFont.caption)
                     .foregroundStyle(ChalkakColor.error)
                     .accessibilityIdentifier("settings.push-error")
                 Spacer(minLength: 0)
                 Button { Task { await viewModel.retryPushSettings() } } label: {
                     Text(NotificationCopy.retry)
-                        .font(ChalkakFont.footnote)
-                        .foregroundStyle(ChalkakColor.textPrimary)
+                        .font(ChalkakFont.caption)
+                        .underline()
+                        .foregroundStyle(ChalkakColor.textSecondary)
+                        .frame(minWidth: 44, minHeight: 44)
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("settings.push-retry-button")
             }
-            .padding(ChalkakSpacing.lg)
+            .padding(.horizontal, 20)
         case .ready:
             EmptyView()
         }
@@ -297,7 +317,8 @@ struct SettingsScreen: View {
         }
         .tint(ChalkakColor.actionPrimary)
         .disabled(!viewModel.isPushEnabled)
-        .padding(.horizontal, ChalkakSpacing.lg)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10.5)
         .frame(minHeight: 52)
         .accessibilityIdentifier(identifier)
     }
@@ -340,37 +361,33 @@ struct SettingsAccountDialogs: View {
     private func dialog(action: AccountAction, prompt: ConfirmationPrompt, isBusy: Bool) -> some View {
         let prefix = action == .logout ? "settings.logout" : "settings.withdraw"
         return ChalkakDialog(identifier: "\(prefix)-dialog", title: nil, message: prompt.message) {
-            HStack(spacing: ChalkakSpacing.md) {
-                Button { account.cancelConfirmation() } label: {
-                    Text(prompt.cancelTitle)
-                        .font(ChalkakFont.callout)
-                        .foregroundStyle(ChalkakColor.textPrimary)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(ChalkakColor.inputBackground, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
-                        .overlay(RoundedRectangle(cornerRadius: ChalkakRadius.button).stroke(ChalkakColor.border, lineWidth: 1))
+            HStack(spacing: 10) {
+                ChalkakDialogButton(title: prompt.cancelTitle, identifier: "\(prefix)-cancel-button", style: .secondary) {
+                    account.cancelConfirmation()
                 }
-                .buttonStyle(.plain)
                 .disabled(isBusy)
-                .accessibilityIdentifier("\(prefix)-cancel-button")
-                Button {
+                ChalkakDialogButton(
+                    title: prompt.confirmTitle,
+                    identifier: "\(prefix)-confirm-button",
+                    style: action == .withdraw ? .destructive : .primary
+                ) {
                     Task {
                         switch action {
                         case .logout: await account.confirmLogout()
                         case .withdraw: await account.confirmWithdraw()
                         }
                     }
-                } label: {
-                    Text(prompt.confirmTitle)
-                        .font(ChalkakFont.callout)
-                        .foregroundStyle(ChalkakColor.onActionPrimary)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
-                        .opacity(isBusy ? 0.3 : 1)
                 }
-                .buttonStyle(.plain)
                 .disabled(isBusy)
-                .accessibilityIdentifier("\(prefix)-confirm-button")
+                .opacity(isBusy ? 0.3 : 1)
             }
         }
+    }
+}
+
+extension View {
+    /// 설정 카드의 옅은 그림자(black 8%, radius 2, y 1). screens-c.md 1.5
+    func settingsCardShadow() -> some View {
+        shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)
     }
 }

@@ -10,7 +10,7 @@ struct HomeHeroCard: View {
         content
             .frame(maxWidth: .infinity)
             .aspectRatio(5.0 / 6.0, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.card))
+            .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.large))
     }
 
     @ViewBuilder

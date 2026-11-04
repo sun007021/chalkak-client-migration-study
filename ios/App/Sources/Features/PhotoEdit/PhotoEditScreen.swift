@@ -121,7 +121,7 @@ struct PhotoEditScreen: View {
         return Button { Task { await viewModel.selectTab(tab) } } label: {
             Text(title)
                 .font(isSelected ? ChalkakFont.headline : ChalkakFont.body)
-                .foregroundStyle(isSelected ? ChalkakColor.textPrimary : ChalkakColor.bottomBarInactive)
+                .foregroundStyle(isSelected ? ChalkakColor.textPrimary : ChalkakColor.bottomBar)
                 .frame(maxWidth: .infinity, minHeight: 48)
         }
         .buttonStyle(.plain)

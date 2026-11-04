@@ -278,7 +278,7 @@ private struct RecordScreen: View {
                 ChalkakRemoteImage(url: post.thumbnailImageURL)
                     .frame(maxWidth: .infinity)
                     .aspectRatio(1, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.card))
+                    .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.large))
                     .overlay(alignment: .topLeading) {
                         if viewModel.showsPendingBadge { pendingBadge }
                     }

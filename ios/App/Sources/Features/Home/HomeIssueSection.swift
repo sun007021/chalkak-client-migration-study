@@ -36,7 +36,7 @@ struct HomeIssueSection: View {
             ChalkakRemoteImage(url: banner.thumbnailURL)
                 .frame(maxWidth: .infinity)
                 .aspectRatio(1672.0 / 941.0, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.card))
+                .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.large))
             Text(banner.title)
                 .font(ChalkakFont.subheadline)
                 .foregroundStyle(ChalkakColor.textPrimary)

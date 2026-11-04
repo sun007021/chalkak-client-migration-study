@@ -29,23 +29,26 @@ struct ChalkakDialog<Actions: View>: View {
     var body: some View {
         ZStack {
             ChalkakColor.scrim.ignoresSafeArea()
-            VStack(spacing: ChalkakSpacing.lg) {
+            // 원본 ChalkakConfirmDialog(screens-c.md 1.2): 카드 라운드 16, 제목 title3, 본문 callout/textNeutral, 버튼 라운드 12
+            VStack(spacing: ChalkakSpacing.md) {
                 if let title {
                     Text(title)
-                        .font(ChalkakFont.headline)
+                        .font(ChalkakFont.title3)
                         .foregroundStyle(ChalkakColor.textPrimary)
                         .accessibilityIdentifier(titleIdentifier ?? "\(identifier).title")
                 }
                 Text(message)
                     .font(ChalkakFont.callout)
-                    .foregroundStyle(ChalkakColor.textSecondary)
+                    .foregroundStyle(ChalkakColor.textNeutral)
                     .multilineTextAlignment(.center)
                     .accessibilityIdentifier(messageIdentifier ?? "\(identifier).message")
                 actions()
             }
-            .padding(ChalkakSpacing.xl)
+            .padding(.horizontal, ChalkakSpacing.xl)
+            .padding(.top, ChalkakSpacing.xl)
+            .padding(.bottom, ChalkakSpacing.lg)
             .frame(maxWidth: 320)
-            .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.dialog))
+            .background(ChalkakColor.surfaceElevated, in: RoundedRectangle(cornerRadius: ChalkakRadius.large))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(identifier)
             .accessibilityAddTraits(.isModal)
@@ -54,19 +57,42 @@ struct ChalkakDialog<Actions: View>: View {
 }
 
 struct ChalkakDialogButton: View {
+    enum Style {
+        case primary
+        case secondary
+        case destructive
+    }
+
     let title: String
     let identifier: String
+    var style: Style = .primary
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Text(title)
                 .font(ChalkakFont.callout)
-                .foregroundStyle(ChalkakColor.onActionPrimary)
+                .foregroundStyle(foreground)
                 .frame(maxWidth: .infinity, minHeight: 44)
-                .background(ChalkakColor.actionPrimary, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
+                .background(background, in: RoundedRectangle(cornerRadius: ChalkakRadius.button))
+                .contentShape(RoundedRectangle(cornerRadius: ChalkakRadius.button))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(identifier)
+    }
+
+    private var background: Color {
+        switch style {
+        case .primary: ChalkakColor.actionPrimary
+        case .secondary: ChalkakColor.actionSecondary
+        case .destructive: ChalkakColor.destructive
+        }
+    }
+
+    private var foreground: Color {
+        switch style {
+        case .primary, .destructive: ChalkakColor.onActionPrimary
+        case .secondary: ChalkakColor.onActionSecondary
+        }
     }
 }
