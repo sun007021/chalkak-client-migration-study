@@ -3,6 +3,9 @@ package com.stonefive.chalkak.ui.main
 import com.stonefive.chalkak.ui.theme.ChalkakTheme
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -21,6 +24,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import com.stonefive.chalkak.copy.LocalCopy
 import com.stonefive.chalkak.ui.display.DisplayRoute
@@ -383,6 +387,10 @@ private fun MainHostContent(
                     rememberStateHolder("ai-$sessionKey-${slot.id}") { scope -> create(scope) }
                 }
                 slot.aiHolder = aiHolder
+                // screens-b 4.2: the feed content fades in (PHOTO_CONTENT_FADE 700ms, FastOutSlowIn); the shared photo morph is not ported.
+                val fade = remember(slot.id) { Animatable(0f) }
+                LaunchedEffect(slot.id) { fade.animateTo(1f, tween(PHOTO_CONTENT_FADE_MILLIS, easing = FastOutSlowInEasing)) }
+                Box(Modifier.fillMaxSize().graphicsLayer { alpha = fade.value }) {
                 FeedRoute(
                     holder = holder,
                     remoteImage = deps.photo,
@@ -394,6 +402,7 @@ private fun MainHostContent(
                     finishOnLeave = false,
                     aiReview = aiHolder,
                 )
+                }
             }
             Route.PhotoUpload -> {
                 val topicDate = session.uploadTopicDate
@@ -564,3 +573,6 @@ private fun AccessMode.toHomeMode(): HomeMode = when (this) {
     AccessMode.Member -> HomeMode.Member
     AccessMode.Guest -> HomeMode.Guest
 }
+
+/** Feed content fade-in (screens-a 9 / screens-b 4.2, original `PHOTO_CONTENT_FADE_DURATION_MILLIS`). */
+private const val PHOTO_CONTENT_FADE_MILLIS = 700

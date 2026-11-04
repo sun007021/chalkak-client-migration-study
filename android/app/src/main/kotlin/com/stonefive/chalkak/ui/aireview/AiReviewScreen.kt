@@ -1,6 +1,12 @@
 package com.stonefive.chalkak.ui.aireview
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -244,11 +250,29 @@ private fun StartSheet(sheet: AiSheet.Start, enabled: Boolean, callbacks: AiRevi
             Text(copy[sheet.titleCopyKey], style = ChalkakTheme.typography.title3, color = colors.textPrimary, modifier = Modifier.weight(1f))
             CloseButton("ai-start-sheet.close-button", callbacks.onSheetDismiss)
         }
+        // screens-b 7.2: notice box (background, large shape, padding lg) with 36dp circle + icon rows, spacing lg.
         Column(
-            Modifier.padding(top = 8.dp, bottom = 20.dp).testTag("ai-start-sheet.description").semantics(mergeDescendants = true) {},
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            Modifier
+                .padding(top = ChalkakTheme.spacing.lg, bottom = ChalkakTheme.spacing.lg)
+                .fillMaxWidth()
+                .background(colors.background, ChalkakTheme.shapes.large)
+                .padding(ChalkakTheme.spacing.lg)
+                .testTag("ai-start-sheet.description")
+                .semantics(mergeDescendants = true) {},
+            verticalArrangement = Arrangement.spacedBy(ChalkakTheme.spacing.lg),
         ) {
-            sheet.lineCopyKeys.forEach { Text(copy[it], style = ChalkakTheme.typography.callout, color = colors.textNeutral) }
+            val icons = listOf(R.drawable.ic_clock, R.drawable.ic_smartphone, R.drawable.ic_bell)
+            sheet.lineCopyKeys.forEachIndexed { index, key ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(36.dp).background(colors.surfaceElevated, CircleShape), contentAlignment = Alignment.Center) {
+                        icons.getOrNull(index)?.let {
+                            Icon(painterResource(it), contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                    Spacer(Modifier.width(ChalkakTheme.spacing.md))
+                    Text(copy[key], style = ChalkakTheme.typography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = colors.textPrimary)
+                }
+            }
         }
         ChalkakButton(
             copy[sheet.confirmCopyKey],
@@ -275,14 +299,27 @@ private fun ResultSheet(content: AiResultUi, callbacks: AiReviewCallbacks) {
         }
         Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
             Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    content.scoreText,
-                    style = ChalkakTheme.typography.title1,
-                    color = colors.textPrimary,
-                    modifier = Modifier
-                        .testTag("ai-result-sheet.overall-score")
-                        .semantics { contentDescription = copy.format(content.scoreA11yCopyKey, "X" to content.scoreText) },
-                )
+                // screens-b 7.3: 84dp score ring (track calendarCell, progress actionPrimary, 8dp round cap from 12 o'clock).
+                val progress = (content.scoreText.toFloatOrNull() ?: 0f).div(10f).coerceIn(0f, 1f)
+                val track = colors.calendarCell
+                val bar = colors.actionPrimary
+                Box(Modifier.size(84.dp), contentAlignment = Alignment.Center) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        val stroke = 8.dp.toPx()
+                        val inset = stroke / 2f
+                        val arc = Size(size.width - stroke, size.height - stroke)
+                        drawArc(track, 0f, 360f, false, Offset(inset, inset), arc, style = Stroke(stroke))
+                        drawArc(bar, -90f, 360f * progress, false, Offset(inset, inset), arc, style = Stroke(stroke, cap = StrokeCap.Round))
+                    }
+                    Text(
+                        content.scoreText,
+                        style = ChalkakTheme.typography.title1,
+                        color = colors.textPrimary,
+                        modifier = Modifier
+                            .testTag("ai-result-sheet.overall-score")
+                            .semantics { contentDescription = copy.format(content.scoreA11yCopyKey, "X" to content.scoreText) },
+                    )
+                }
                 // No ko.json key for the bare "/ 10" denominator; the score's own description already says "10점 만점", so hide it from TalkBack.
                 Text("/ 10", style = ChalkakTheme.typography.callout, color = colors.textNeutral, modifier = Modifier.padding(start = 6.dp).clearAndSetSemantics {})
                 Spacer(Modifier.weight(1f))

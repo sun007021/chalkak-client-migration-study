@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.ui.res.painterResource
 import com.stonefive.chalkak.R
 import com.stonefive.chalkak.ui.theme.ChalkakTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
@@ -46,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -292,20 +294,53 @@ private fun CompactControls(content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified, content = content)
 }
 
+/**
+ * Ruler-style slider (original `AdjustmentRuler` look): tick marks instead of a bar, the ticks between the zero point (or the left end
+ * for 0..1) and the value are bright, and the thumb is a rounded vertical line. It is still a [Slider] underneath, so the semantics
+ * (range info, set-progress) and the test tags stay the contract.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditSlider(value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit, modifier: Modifier) {
+    val bright = EditContent
+    val dim = EditContent.copy(alpha = 0.4f)
+    val origin = if (range.start < 0f) 0f else range.start
     Slider(
         value = value.coerceIn(range.start, range.endInclusive),
         onValueChange = onChange,
         valueRange = range,
-        colors = SliderDefaults.colors(
-            thumbColor = EditContent,
-            activeTrackColor = EditContent,
-            inactiveTrackColor = EditContent.copy(alpha = 0.28f),
-        ),
+        colors = SliderDefaults.colors(thumbColor = bright),
+        thumb = {
+            Box(Modifier.size(width = 2.dp, height = 20.dp).clip(RoundedCornerShape(1.dp)).background(bright))
+        },
+        track = { sliderState ->
+            Canvas(Modifier.fillMaxWidth().height(24.dp)) {
+                val span = range.endInclusive - range.start
+                if (span <= 0f) return@Canvas
+                val fraction = { v: Float -> ((v - range.start) / span).coerceIn(0f, 1f) }
+                val lo = minOf(fraction(origin), fraction(sliderState.value))
+                val hi = maxOf(fraction(origin), fraction(sliderState.value))
+                val count = (size.width / TickSpacing.toPx()).toInt().coerceAtLeast(2)
+                val tickW = 1.5.dp.toPx()
+                for (i in 0..count) {
+                    val f = i / count.toFloat()
+                    val major = i % 5 == 0
+                    val h = (if (major) 14.dp else 8.dp).toPx()
+                    val lit = f in lo..hi
+                    drawRoundRect(
+                        color = if (lit) bright.copy(alpha = if (major) 0.9f else 0.65f) else dim.copy(alpha = if (major) 0.55f else 0.3f),
+                        topLeft = Offset(f * size.width - tickW / 2f, (size.height - h) / 2f),
+                        size = Size(tickW, h),
+                        cornerRadius = CornerRadius(tickW / 2f),
+                    )
+                }
+            }
+        },
         modifier = modifier,
     )
 }
+
+private val TickSpacing = 6.dp
 
 @Composable
 private fun FilterTools(state: PhotoEditUiState, actions: PhotoEditActions) {
