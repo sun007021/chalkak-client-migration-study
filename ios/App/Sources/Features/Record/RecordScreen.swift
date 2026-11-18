@@ -300,9 +300,12 @@ private struct RecordScreen: View {
     private var selectedPostSection: some View {
         if let post = viewModel.selectedPost {
             VStack(spacing: ChalkakSpacing.md) {
-                ChalkakRemoteImage(url: post.thumbnailImageURL)
+                // 정사각형 틀을 먼저 잡고 사진은 overlay로 채운다. fill 사진을 직접 프레임에 넣으면
+                // 가로 사진의 너비가 화면보다 커져 탭 화면 전체가 넓게 잡힌다.
+                Color.clear
                     .frame(maxWidth: .infinity)
                     .aspectRatio(1, contentMode: .fit)
+                    .overlay { ChalkakRemoteImage(url: post.thumbnailImageURL) }
                     .clipShape(RoundedRectangle(cornerRadius: ChalkakRadius.photoCard))
                     .overlay(alignment: .topLeading) {
                         if viewModel.showsPendingBadge { pendingBadge }
